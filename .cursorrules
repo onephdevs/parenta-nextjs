@@ -1,0 +1,149 @@
+# Cursor Rules for Task-Driven Development
+
+## Project Overview
+This is a Next.js 15 application with TypeScript, Tailwind CSS, and App Router. We follow task-driven development principles with clear separation of concerns.
+
+## Development Principles
+
+### Task-Driven Development
+- Break down features into small, manageable tasks
+- Each task should be completable in 1-4 hours
+- Create tasks in the `tasks/` directory with clear acceptance criteria
+- Use the task template format consistently
+- Link tasks to user stories and business requirements
+
+### Code Organization
+- Follow the App Router pattern with `src/app/` structure
+- Use server components by default, client components only when needed
+- Organize components by feature, not by type
+- Keep business logic separate from UI components
+
+### File Structure Standards
+```
+src/
+├── app/                    # App Router pages and layouts
+├── components/            # Reusable UI components
+│   ├── ui/               # Base UI components (buttons, inputs, etc.)
+│   └── features/         # Feature-specific components
+├── lib/                  # Utility functions and configurations
+├── hooks/                # Custom React hooks
+├── types/                # TypeScript type definitions
+├── styles/               # Global styles and theme
+└── utils/                # Helper functions
+```
+
+## Coding Standards
+
+### TypeScript
+- Use strict mode and explicit types
+- Prefer interfaces over types for object shapes
+- Use generic types for reusable components
+- Export types alongside components
+
+### React/Next.js
+- Use Server Components by default
+- Add 'use client' directive only when necessary
+- Prefer async/await over promises
+- Use proper error boundaries
+- Implement loading states and error handling
+
+### Styling
+- Use Tailwind CSS with consistent design tokens
+- Create custom components for repeated patterns
+- Use CSS modules for component-specific styles
+- Follow mobile-first responsive design
+
+### Performance
+- Optimize images with Next.js Image component
+- Use dynamic imports for code splitting
+- Implement proper caching strategies
+- Monitor bundle size and Core Web Vitals
+
+## Task Management
+
+### Task Structure
+Each task should include:
+- Clear title and description
+- Acceptance criteria
+- Dependencies
+- Estimated effort
+- Priority level
+- Status tracking
+
+### Branch Naming
+- feature/task-name-brief-description
+- bugfix/issue-description
+- hotfix/critical-issue
+
+### Commit Messages
+- Use conventional commits format
+- feat: new feature
+- fix: bug fix  
+- refactor: code refactoring
+- docs: documentation changes
+- test: adding tests
+- chore: maintenance tasks
+
+## Quality Assurance
+
+### Code Review Checklist
+- [ ] Follows TypeScript best practices
+- [ ] Implements proper error handling
+- [ ] Includes appropriate tests
+- [ ] Follows accessibility guidelines
+- [ ] Optimized for performance
+- [ ] Consistent with design system
+
+### CRUD Development Requirements
+**When implementing CRUD functionality, ALWAYS verify:**
+- [ ] Create operations work when clicking "Add" or "Create" buttons
+- [ ] Read operations display data correctly in lists and detail views
+- [ ] Update operations work when clicking "Edit" or "Save" buttons
+- [ ] Delete operations work when clicking "Delete" or "Remove" buttons
+- [ ] All UI buttons and forms are properly connected to API endpoints
+- [ ] Error handling displays appropriate messages to users
+- [ ] Success states provide clear feedback (notifications, redirects, etc.)
+- [ ] Loading states are implemented during API calls
+- [ ] Form validation works both client-side and server-side
+- [ ] Data refreshes automatically after operations complete
+
+### User Experience Requirements
+**For optimal user experience, ALWAYS implement:**
+- [ ] **Post-Creation Redirects**: After creating any entity (room, building, tenant, etc.), immediately redirect users to the created item's detail page
+- [ ] **Real-time Notifications**: Display toast notifications for all CRUD operations:
+  - Success: "Room created successfully", "Building updated", "Item deleted"
+  - Errors: "Failed to create room", "Unable to update building"
+  - Loading: "Creating room...", "Updating building..."
+- [ ] **Consistent Notification System**: Use a centralized notification system across the entire application
+- [ ] **Action Feedback**: Every user action should have immediate visual feedback
+- [ ] **Optimistic Updates**: Where appropriate, update UI immediately and rollback on error
+- [ ] **Navigation Flow**: Logical navigation patterns that guide users through workflows
+
+### Testing Strategy
+- Unit tests for utilities and hooks
+- Integration tests for components
+- E2E tests for critical user flows
+- Visual regression tests for UI components
+- **Manual testing of all CRUD UI interactions before considering feature complete**
+
+## Security Guidelines
+- Validate all user inputs
+- Use environment variables for secrets
+- Implement proper authentication/authorization
+- Follow OWASP security guidelines
+- Regular dependency updates
+- **Note**: Environment files (.env*) are hidden from AI assistant view for security
+
+## Documentation
+- Document complex business logic
+- Maintain up-to-date README
+- Document API endpoints and data structures
+- Keep task documentation current
+
+## AI Assistance Guidelines
+When working with AI:
+- Provide clear context about the current task
+- Reference existing code patterns and conventions
+- Ask for explanations of complex implementations
+- Request code reviews and suggestions for improvements
+- Ensure generated code follows project standards 

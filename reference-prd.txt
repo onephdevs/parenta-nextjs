@@ -1,0 +1,888 @@
+# 🏢 Parenta Property Management System - Development Roadmap
+
+## 📋 Project Overview
+
+**Project**: Parenta Property Management System  
+**Status**: MVP Complete, Enhancement Phase  
+**Tech Stack**: React 18 + TypeScript + Vite + Supabase + Tailwind CSS  
+**Last Updated**: December 2024
+
+## 🎯 System Architecture Summary
+
+### Core Modules
+- 🏢 **Building Management** - Property portfolio management
+- 🏠 **Room Management** - Individual unit tracking
+- 👥 **Tenant Management** - Resident profiles and relationships
+- 💰 **Financial Management** - Payments, invoices, expenses
+- ⚡ **Utility Management** - Utility bills and meter readings
+- 📄 **Document Management** - File storage and organization
+- 📦 **Asset Management** - Property asset tracking
+- 📊 **Analytics & Reporting** - Dashboard insights and exports
+
+### User Roles
+- **Admin**: Full system access, property management
+- **Tenant**: Limited access to personal data and payments
+
+---
+
+## 🔄 Page-by-Page Functionality Breakdown
+
+### 🌐 **Public Pages**
+
+#### 1. Landing Page (`src/pages/LandingPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- Modern hero section with property management messaging
+- Feature highlights and benefits
+- Call-to-action buttons for signup/login
+- Responsive design for all devices
+- SEO-optimized content
+
+**Current Features**:
+- Professional landing page design
+- Clear value proposition
+- Mobile-responsive layout
+- Navigation to auth pages
+
+**Enhancement Opportunities**:
+- [ ] Add testimonials section
+- [ ] Include pricing information
+- [ ] Add feature comparison table
+- [ ] Implement contact form
+
+---
+
+### 🔐 **Authentication Pages**
+
+#### 2. Login Page (`src/components/Auth/LoginForm.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- Email/password authentication via Supabase
+- Role-based redirection (admin/tenant)
+- Remember me functionality
+- Password reset capability
+- Input validation and error handling
+
+**Current Features**:
+- Secure authentication flow
+- Auto-redirect based on user role
+- Form validation
+- Loading states
+- Error messaging
+
+**Enhancement Opportunities**:
+- [ ] Two-factor authentication
+- [ ] Social login options (Google, Microsoft)
+- [ ] Security questions
+- [ ] Login attempt monitoring
+
+#### 3. Signup Page (`src/components/Auth/SignupForm.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- New user registration
+- Email verification
+- Role assignment
+- Profile setup
+- Terms acceptance
+
+**Current Features**:
+- User registration with email verification
+- Automatic role assignment
+- Profile creation
+- Integration with user_profiles table
+
+**Enhancement Opportunities**:
+- [ ] Invitation-based signup for tenants
+- [ ] Admin approval workflow
+- [ ] Onboarding wizard
+- [ ] Welcome email automation
+
+---
+
+### 👑 **Admin Dashboard & Management**
+
+#### 4. Admin Dashboard (`src/pages/Dashboard.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Overview Statistics**:
+  - Total buildings, rooms, tenants
+  - Occupancy rates and vacancy statistics
+  - Monthly revenue calculations
+  - Outstanding payments tracking
+
+- **Financial Overview**:
+  - Monthly room revenue
+  - Asset rental revenue
+  - Expense tracking and categorization
+  - Utility bills status and amounts
+
+- **Quick Actions**:
+  - Add new building (modal form)
+  - Add new room (modal form)
+  - Export data in multiple formats
+  - Navigate to detail pages
+
+- **Recent Activity Feed**:
+  - Real-time system activities
+  - User actions and changes
+  - Payment status updates
+
+**Current Features**:
+- Comprehensive statistics dashboard
+- Real-time data updates
+- Export functionality (CSV)
+- Quick action modals
+- Activity monitoring
+- Responsive grid layout
+
+**Enhancement Opportunities**:
+- [ ] Advanced analytics charts
+- [ ] Predictive occupancy forecasting
+- [ ] Financial trending graphs
+- [ ] Customizable dashboard widgets
+- [ ] Real-time notifications
+- [ ] Performance KPIs
+
+#### 5. Buildings Management (`src/pages/BuildingsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Building Portfolio View**:
+  - Grid/list view of all properties
+  - Building cards with key information
+  - Occupancy status indicators
+  - Room count and availability
+
+- **Building Operations**:
+  - Add new buildings
+  - Edit existing buildings
+  - View building details
+  - Navigate to room management
+
+- **Building Information**:
+  - Name, address, description
+  - Total room count
+  - Occupied vs vacant rooms
+  - Building-specific statistics
+
+**Current Features**:
+- Complete CRUD operations
+- Search and filter capabilities
+- Building detail cards
+- Room count summaries
+- Navigation to building details
+
+**Enhancement Opportunities**:
+- [ ] Building images and gallery
+- [ ] Map integration for location
+- [ ] Building maintenance schedules
+- [ ] Property value tracking
+- [ ] Insurance and legal documents
+- [ ] Building-specific reports
+
+#### 6. Building Details (`src/pages/BuildingDetailsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Building Information Panel**:
+  - Complete building profile
+  - Edit building details
+  - Building statistics overview
+
+- **Room Management**:
+  - All rooms in the building
+  - Room status and occupancy
+  - Add new rooms to building
+  - Navigate to room details
+
+- **Building Activities**:
+  - Recent activities for this building
+  - Maintenance history
+  - Financial transactions
+
+**Current Features**:
+- Detailed building profile view
+- Integrated room management
+- Activity tracking
+- Edit capabilities
+- Room addition functionality
+
+**Enhancement Opportunities**:
+- [ ] Building floor plans
+- [ ] Maintenance request tracking
+- [ ] Building-specific financial reports
+- [ ] Utility consumption tracking
+- [ ] Photo documentation
+- [ ] Lease agreement management
+
+#### 7. Room Management (`src/pages/RoomsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Room Portfolio View**:
+  - All rooms across all buildings
+  - Room status indicators (vacant/occupied)
+  - Tenant assignment information
+  - Monthly rate display
+
+- **Room Operations**:
+  - Add new rooms
+  - Edit room details
+  - Assign/unassign tenants
+  - Update room status
+
+- **Room Filtering**:
+  - Filter by building
+  - Filter by occupancy status
+  - Search by room number
+  - Sort by various criteria
+
+**Current Features**:
+- Comprehensive room listing
+- Status management
+- Tenant assignment
+- Search and filtering
+- Building association
+
+**Enhancement Opportunities**:
+- [ ] Room photos and virtual tours
+- [ ] Amenity tracking
+- [ ] Maintenance history per room
+- [ ] Room condition reports
+- [ ] Lease terms tracking
+- [ ] Rental rate optimization
+
+#### 8. Room Details (`src/pages/RoomDetailsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Room Information**:
+  - Complete room profile
+  - Physical specifications
+  - Current tenant information
+  - Monthly rate and lease terms
+
+- **Tenant Management**:
+  - Current tenant details
+  - Tenant assignment/removal
+  - Move-in/move-out tracking
+  - Tenant communication history
+
+- **Financial Tracking**:
+  - Payment history for this room
+  - Outstanding balances
+  - Rental rate history
+  - Asset rentals for this room
+
+**Current Features**:
+- Detailed room profile
+- Tenant relationship management
+- Payment tracking
+- Asset association
+- Edit capabilities
+
+**Enhancement Opportunities**:
+- [ ] Room inspection reports
+- [ ] Maintenance request integration
+- [ ] Photo documentation
+- [ ] Lease agreement storage
+- [ ] Tenant satisfaction tracking
+- [ ] Energy consumption monitoring
+
+#### 9. Tenant Management (`src/pages/TenantsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Tenant Directory**:
+  - Complete tenant listing
+  - Contact information display
+  - Current room assignments
+  - Tenant status indicators
+
+- **Tenant Operations**:
+  - Add new tenants
+  - Edit tenant information
+  - Assign rooms to tenants
+  - Manage move-in/move-out dates
+
+- **Tenant Relationships**:
+  - Link tenants to user accounts
+  - Track tenant communication
+  - Monitor tenant history
+
+**Current Features**:
+- Comprehensive tenant management
+- Room assignment system
+- Contact information tracking
+- Move-in/move-out date management
+- Search and filter capabilities
+
+**Enhancement Opportunities**:
+- [ ] Tenant background checks
+- [ ] Emergency contact management
+- [ ] Tenant communication portal
+- [ ] Rental application processing
+- [ ] Credit score tracking
+- [ ] Tenant satisfaction surveys
+
+#### 10. Tenant Details (`src/pages/TenantDetailsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Tenant Profile**:
+  - Personal information
+  - Contact details
+  - Emergency contacts
+  - Tenant history and notes
+
+- **Room Assignment**:
+  - Current room details
+  - Move-in/move-out history
+  - Lease agreement information
+  - Room transfer capabilities
+
+- **Financial Overview**:
+  - Payment history
+  - Outstanding balances
+  - Invoice generation
+  - Late payment tracking
+
+**Current Features**:
+- Complete tenant profile management
+- Room relationship tracking
+- Financial history
+- Communication logs
+- Edit capabilities
+
+**Enhancement Opportunities**:
+- [ ] Tenant portal integration
+- [ ] Document storage (ID, lease)
+- [ ] Maintenance request history
+- [ ] Communication timeline
+- [ ] Rental agreement management
+- [ ] Tenant performance metrics
+
+#### 11. Payment Management (`src/pages/PaymentsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Payment Tracking**:
+  - All payments across all tenants
+  - Payment status management
+  - Due date tracking
+  - Late payment identification
+
+- **Payment Operations**:
+  - Record new payments
+  - Update payment status
+  - Process refunds
+  - Generate payment receipts
+
+- **Financial Reporting**:
+  - Payment summaries
+  - Outstanding balance reports
+  - Late payment analysis
+  - Revenue tracking
+
+**Current Features**:
+- Comprehensive payment tracking
+- Status management system
+- Search and filtering
+- Payment recording
+- Financial summaries
+
+**Enhancement Opportunities**:
+- [ ] Online payment processing
+- [ ] Automated payment reminders
+- [ ] Payment plan management
+- [ ] Late fee calculations
+- [ ] Payment analytics
+- [ ] Integration with accounting software
+
+#### 12. Utilities Management (`src/pages/UtilitiesPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Utility Bill Tracking**:
+  - Bills for all buildings
+  - Multiple utility types (electric, water, gas, internet)
+  - Meter reading management
+  - Provider information tracking
+
+- **Bill Management**:
+  - Add new utility bills
+  - Update payment status
+  - Track billing periods
+  - Monitor due dates
+
+- **Utility Analytics**:
+  - Consumption patterns
+  - Cost analysis
+  - Building comparisons
+  - Seasonal trends
+
+**Current Features**:
+- Multi-utility tracking system
+- Billing period management
+- Payment status tracking
+- Provider information
+- Cost analysis tools
+
+**Enhancement Opportunities**:
+- [ ] Automated meter reading integration
+- [ ] Energy efficiency tracking
+- [ ] Cost allocation to tenants
+- [ ] Utility bill automation
+- [ ] Environmental impact reporting
+- [ ] Vendor management system
+
+#### 13. Expense Management (`src/pages/ExpensesPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Expense Tracking**:
+  - All property-related expenses
+  - Categorized expense types
+  - Vendor information
+  - Receipt management
+
+- **Expense Operations**:
+  - Add new expenses
+  - Edit expense details
+  - Approve/reject expenses
+  - Track payment status
+
+- **Expense Analytics**:
+  - Category-wise spending
+  - Monthly expense trends
+  - Budget vs actual analysis
+  - ROI calculations
+
+**Current Features**:
+- Comprehensive expense tracking
+- Category management
+- Approval workflow
+- Receipt storage
+- Financial reporting
+
+**Enhancement Opportunities**:
+- [ ] Budget management system
+- [ ] Expense approval workflows
+- [ ] Vendor performance tracking
+- [ ] Tax categorization
+- [ ] Integration with accounting
+- [ ] Expense forecasting
+
+#### 14. Asset Management (`src/pages/AssetsPage.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Asset Inventory**:
+  - All property assets
+  - Asset categorization
+  - Location tracking (room/tenant)
+  - Rental value tracking
+
+- **Asset Operations**:
+  - Add new assets
+  - Assign to rooms/tenants
+  - Update asset status
+  - Track asset condition
+
+- **Asset Analytics**:
+  - Asset utilization rates
+  - Revenue from asset rentals
+  - Depreciation tracking
+  - Maintenance costs
+
+**Current Features**:
+- Complete asset inventory
+- Room/tenant assignment
+- Rental price tracking
+- Asset categorization
+- Search and filtering
+
+**Enhancement Opportunities**:
+- [ ] Asset maintenance scheduling
+- [ ] Barcode/QR code tracking
+- [ ] Asset photos and documentation
+- [ ] Depreciation calculations
+- [ ] Insurance tracking
+- [ ] Asset lifecycle management
+
+#### 15. Document Management (`src/pages/Documents.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Document Repository**:
+  - All system documents
+  - Document categorization
+  - Entity association (tenant, building, etc.)
+  - File management system
+
+- **Document Operations**:
+  - Upload new documents
+  - Organize by category
+  - Set expiry dates
+  - Access control management
+
+- **Document Search**:
+  - Search by name, type, category
+  - Filter by entity association
+  - Date-based filtering
+  - Tag-based organization
+
+**Current Features**:
+- File upload and storage
+- Document categorization
+- Entity association
+- Search and filtering
+- Access control
+
+**Enhancement Opportunities**:
+- [ ] Version control system
+- [ ] Document approval workflows
+- [ ] Digital signature integration
+- [ ] OCR for searchable documents
+- [ ] Automated document reminders
+- [ ] Template management
+
+#### 16. Document Upload (`src/pages/NewDocument.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **File Upload Interface**:
+  - Drag-and-drop functionality
+  - Multiple file upload
+  - File type validation
+  - Progress tracking
+
+- **Document Metadata**:
+  - Document categorization
+  - Entity association
+  - Description and tags
+  - Expiry date setting
+
+- **Upload Management**:
+  - Upload progress tracking
+  - Error handling
+  - Success confirmation
+  - Redirect to document list
+
+**Current Features**:
+- Multi-file upload interface
+- Metadata management
+- Progress tracking
+- Validation system
+- Success handling
+
+**Enhancement Opportunities**:
+- [ ] Bulk upload with CSV metadata
+- [ ] Image compression
+- [ ] Document scanning integration
+- [ ] Template-based uploads
+- [ ] Auto-categorization
+- [ ] Thumbnail generation
+
+#### 17. Invoice Management (`src/components/Invoices/Invoices.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Invoice Portfolio**:
+  - All invoices across tenants
+  - Invoice status tracking
+  - Payment status monitoring
+  - Due date management
+
+- **Invoice Operations**:
+  - Create new invoices
+  - Edit existing invoices
+  - Send invoices to tenants
+  - Track payment status
+
+- **Invoice Analytics**:
+  - Revenue tracking
+  - Outstanding amounts
+  - Payment trends
+  - Aging reports
+
+**Current Features**:
+- Complete invoice management
+- Status tracking system
+- Search and filtering
+- Financial summaries
+- Tenant association
+
+**Enhancement Opportunities**:
+- [ ] Automated invoice generation
+- [ ] Email invoice delivery
+- [ ] Online payment integration
+- [ ] Invoice templates
+- [ ] Recurring invoice setup
+- [ ] Late fee automation
+
+#### 18. Invoice Creation (`src/components/Invoices/NewInvoice.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Invoice Builder**:
+  - Line item management
+  - Tax calculations
+  - Discount applications
+  - Terms and conditions
+
+- **Invoice Configuration**:
+  - Tenant selection
+  - Billing period setup
+  - Due date configuration
+  - Recurring invoice options
+
+- **Invoice Preview**:
+  - Real-time invoice preview
+  - PDF generation
+  - Print capabilities
+  - Email preparation
+
+**Current Features**:
+- Dynamic invoice builder
+- Automatic calculations
+- Preview functionality
+- Tenant assignment
+- Line item management
+
+**Enhancement Opportunities**:
+- [ ] Invoice templates
+- [ ] Automated line item suggestions
+- [ ] Bulk invoice creation
+- [ ] Integration with payment systems
+- [ ] Custom branding options
+- [ ] Multi-currency support
+
+#### 19. Invoice Details (`src/components/Invoices/InvoiceDetails.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Invoice Information**:
+  - Complete invoice details
+  - Line item breakdown
+  - Payment history
+  - Status tracking
+
+- **Invoice Actions**:
+  - Edit invoice details
+  - Record payments
+  - Send reminders
+  - Generate receipts
+
+- **Payment Tracking**:
+  - Payment application
+  - Partial payment handling
+  - Outstanding balance calculation
+  - Payment method tracking
+
+**Current Features**:
+- Detailed invoice view
+- Payment recording
+- Status management
+- Edit capabilities
+- Payment history
+
+**Enhancement Opportunities**:
+- [ ] Payment plan setup
+- [ ] Automated reminders
+- [ ] Dispute management
+- [ ] Credit note generation
+- [ ] Payment portal integration
+- [ ] Collection workflow
+
+---
+
+### 👤 **Tenant Portal**
+
+#### 20. Tenant Dashboard (`src/pages/TenantDashboard.tsx`)
+**Status**: ✅ Complete  
+**Functionality**:
+- **Personal Overview**:
+  - Tenant profile information
+  - Current room details
+  - Building information
+  - Lease status
+
+- **Financial Summary**:
+  - Outstanding payments
+  - Payment history
+  - Recent invoices
+  - Account balance
+
+- **Quick Actions**:
+  - View payment details
+  - Access documents
+  - Contact property management
+  - Submit maintenance requests
+
+**Current Features**:
+- Personalized tenant dashboard
+- Financial overview
+- Property information display
+- Payment status tracking
+- Document access
+
+**Enhancement Opportunities**:
+- [ ] Online payment functionality
+- [ ] Maintenance request system
+- [ ] Communication portal
+- [ ] Lease renewal options
+- [ ] Neighbor directory
+- [ ] Community announcements
+
+---
+
+## 🚀 Development Priorities & Roadmap
+
+### Phase 1: Core Enhancements (Q1 2024)
+**Priority**: High  
+**Tasks**:
+1. **Enhanced Financial Management System** (Task #2)
+   - Online payment processing integration
+   - Automated invoice generation
+   - Payment plan management
+   - Financial reporting improvements
+
+2. **Document Management Enhancement** (Task #3)
+   - Version control system
+   - Digital signature integration
+   - Automated document reminders
+   - Template management
+
+3. **Security Audit & Enhancement** (Task #16)
+   - Comprehensive security review
+   - Additional security measures
+   - Data encryption improvements
+   - Access control refinements
+
+### Phase 2: Advanced Features (Q2 2024)
+**Priority**: High  
+**Tasks**:
+1. **Maintenance & Work Order System** (Task #4)
+   - Maintenance request portal
+   - Work order management
+   - Vendor assignment system
+   - Progress tracking
+
+2. **Payment Integration & Processing** (Task #14)
+   - Stripe/PayPal integration
+   - Online rent payments
+   - Automated payment processing
+   - Payment method management
+
+3. **Production Deployment & CI/CD** (Task #24)
+   - Production environment setup
+   - Continuous integration pipeline
+   - Automated testing
+   - Deployment automation
+
+### Phase 3: User Experience (Q3 2024)
+**Priority**: Medium  
+**Tasks**:
+1. **Communication & Messaging System** (Task #5)
+   - In-app messaging
+   - Notification system
+   - Announcement broadcasting
+   - Email integration
+
+2. **Tenant Portal Enhancements** (Task #13)
+   - Self-service capabilities
+   - Online lease renewal
+   - Community features
+   - Maintenance request integration
+
+3. **Mobile App Optimization** (Task #8)
+   - PWA implementation
+   - Mobile-specific features
+   - Offline capabilities
+   - Push notifications
+
+### Phase 4: Analytics & Automation (Q4 2024)
+**Priority**: Medium  
+**Tasks**:
+1. **Advanced Dashboard Analytics** (Task #6)
+   - Comprehensive reporting
+   - Predictive analytics
+   - Custom dashboards
+   - KPI tracking
+
+2. **Automated Email Notifications** (Task #9)
+   - Event-triggered emails
+   - Customizable templates
+   - Email scheduling
+   - Delivery tracking
+
+3. **Lease Management System** (Task #7)
+   - Lease agreement management
+   - Renewal automation
+   - Terms tracking
+   - Compliance monitoring
+
+### Phase 5: Advanced Features (2025)
+**Priority**: Low-Medium  
+**Tasks**:
+1. **Vendor Management System** (Task #12)
+2. **Bulk Operations & Data Export** (Task #10)
+3. **Advanced Search & Filtering** (Task #11)
+4. **Multi-Factor Authentication** (Task #17)
+5. **Automated Testing Suite** (Task #18)
+
+---
+
+## 📊 Current System Metrics
+
+### Development Status
+- **Total Features**: 25 major features identified
+- **Completed**: 1 feature (Debug Mode Cleanup) ✅
+- **In Development**: 24 features 🔄
+- **Completion Rate**: 4%
+
+### Page Status Summary
+- **Public Pages**: 1/1 Complete ✅
+- **Authentication**: 2/2 Complete ✅
+- **Admin Pages**: 15/15 Complete ✅
+- **Tenant Pages**: 1/1 Complete ✅
+- **Total Pages**: 19/19 Core Pages Complete ✅
+
+### Technical Debt & Improvements
+- [ ] Remove debug components from production build
+- [ ] Implement comprehensive error boundaries
+- [ ] Add automated testing suite
+- [ ] Optimize bundle size and performance
+- [ ] Implement advanced caching strategies
+- [ ] Add comprehensive logging system
+
+---
+
+## 🎯 Success Metrics
+
+### User Experience Metrics
+- **Page Load Time**: < 2 seconds
+- **User Session Duration**: > 10 minutes average
+- **Task Completion Rate**: > 95%
+- **Error Rate**: < 1%
+
+### Business Metrics
+- **Property Management Efficiency**: 50% reduction in manual tasks
+- **Payment Processing Time**: 80% faster collection
+- **Document Organization**: 100% digital document management
+- **Reporting Accuracy**: 99% automated report generation
+
+### Technical Metrics
+- **System Uptime**: 99.9%
+- **Database Query Performance**: < 100ms average
+- **API Response Time**: < 200ms
+- **Mobile Performance Score**: > 90
+
+---
+
+## 📝 Notes
+
+### Key Architectural Decisions
+1. **Context-based State Management**: Chosen for simplicity and React integration
+2. **Supabase Backend**: Provides authentication, database, and real-time features
+3. **TypeScript**: Ensures type safety and better developer experience
+4. **Component-based Architecture**: Promotes reusability and maintainability
+
+### Development Guidelines
+1. **Mobile-First Design**: All features must work on mobile devices
+2. **Accessibility**: WCAG 2.1 AA compliance required
+3. **Performance**: Core Web Vitals must meet "Good" thresholds
+4. **Security**: Regular security audits and updates
+5. **Testing**: Comprehensive test coverage for critical paths
+
+---
+
+**Last Updated**: December 2024  
+**Next Review**: Q1 2025  
+**Document Owner**: Development Team 

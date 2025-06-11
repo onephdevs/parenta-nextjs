@@ -1,0 +1,138 @@
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { verifyPassword, findUserById } from './db';
+import type { LoginCredentials, UserRole } from '@/types/auth.types';
+
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { 
+          label: 'Email', 
+          type: 'email',
+          placeholder: 'Enter your email' 
+        },
+        password: { 
+          label: 'Password', 
+          type: 'password',
+          placeholder: 'Enter your password' 
+        },
+        role: {
+          label: 'Role',
+          type: 'text'
+        }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password || !credentials?.role) {
+          throw new Error('Missing credentials');
+        }
+
+        const { email, password, role } = credentials as LoginCredentials;
+
+        // Validate role
+        if (role !== 'admin' && role !== 'tenant') {
+          throw new Error('Invalid role specified');
+        }
+
+        try {
+          // Verify user credentials
+          const user = await verifyPassword(email, role as UserRole, password);
+          
+          if (!user) {
+            throw new Error('Invalid credentials or user not found');
+          }
+
+          // Return user object that will be stored in JWT
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          };
+        } catch (error) {
+          console.error('Authentication error:', error);
+          throw new Error('Authentication failed');
+        }
+      },
+    }),
+  ],
+  
+  pages: {
+    signIn: '/auth/signin',
+    signOut: '/auth/signout',
+    error: '/auth/error',
+  },
+
+  session: {
+    strategy: 'jwt',
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+
+  callbacks: {
+    async jwt({ token, user }) {
+      // Store user info in JWT when user signs in
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+        token.firstName = user.firstName;
+        token.lastName = user.lastName;
+      }
+      return token;
+    },
+
+    async session({ session, token }) {
+      // Send properties to the client
+      if (token && session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as UserRole;
+        session.user.firstName = token.firstName as string;
+        session.user.lastName = token.lastName as string;
+      }
+      return session;
+    },
+
+    async redirect({ url, baseUrl }) {
+      // Handle redirects after sign in
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      // Allow callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      return baseUrl;
+    },
+  },
+
+  events: {
+    async signIn({ user }) {
+      console.log(`User ${user.email} signed in with role: ${user.role}`);
+    },
+    async signOut({ token }) {
+      console.log(`User signed out: ${token?.email || 'unknown'}`);
+    },
+  },
+
+  debug: process.env.NODE_ENV === 'development',
+};
+
+// Helper function to get user session with proper typing
+export async function getCurrentUser(session: unknown) {
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  try {
+    const user = await findUserById(session.user.id);
+    return user;
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    return null;
+  }
+} 
