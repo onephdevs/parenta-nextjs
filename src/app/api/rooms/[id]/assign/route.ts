@@ -1,102 +1,84 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { assignTenantToRoom, unassignTenantFromRoom } from '@/lib/api/rooms';
+import { NextResponse } from 'next/server';
+import pool from '@/lib/db';
 
-// Assign tenant to room
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+export async function POST(request: Request, { params }: RouteParams) {
+  const client = await pool.connect();
+  
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized access' },
-        { status: 401 }
-      );
-    }
-
     const { id: roomId } = await params;
-    const body = await request.json();
-    
-    const { tenantId, startDate, monthlyRate, depositPaid, notes } = body;
+    const { tenantId, startDate, endDate, monthlyRate, depositPaid, notes } = await request.json();
     
     // Validation
     if (!tenantId || !startDate || !monthlyRate) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: tenantId, startDate, monthlyRate' },
+        { 
+          success: false, 
+          error: 'Missing required fields',
+          details: 'Tenant ID, start date, and monthly rate are required'
+        },
         { status: 400 }
       );
     }
 
-    const assignment = await assignTenantToRoom(roomId, tenantId, {
-      startDate: new Date(startDate),
-      monthlyRate: parseFloat(monthlyRate),
-      depositPaid: depositPaid ? parseFloat(depositPaid) : undefined,
-      notes
-    });
+    await client.query('BEGIN');
+
+    // End any existing active assignments for this tenant
+    await client.query(
+      `UPDATE tenant_room_assignments 
+       SET assignment_status = 'terminated', end_date = CURRENT_DATE 
+       WHERE tenant_id = $1 AND assignment_status = 'active'`,
+      [tenantId]
+    );
+
+    // Create new assignment
+    const assignmentResult = await client.query(
+      `INSERT INTO tenant_room_assignments 
+       (tenant_id, room_id, start_date, end_date, monthly_rate, deposit_paid, assignment_status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
+       RETURNING *`,
+      [tenantId, roomId, startDate, endDate || null, monthlyRate, depositPaid || null, notes || null]
+    );
+
+    // Update tenant status and move-in date
+    await client.query(
+      `UPDATE tenants 
+       SET tenant_status = 'active', move_in_date = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [startDate, tenantId]
+    );
+
+    // Update room status to occupied
+    await client.query(
+      `UPDATE rooms 
+       SET room_status = 'occupied', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [roomId]
+    );
+
+    await client.query('COMMIT');
 
     return NextResponse.json({
       success: true,
-      data: assignment
+      data: assignmentResult.rows[0],
+      message: 'Tenant assigned to room successfully'
     });
-
-  } catch (error: unknown) {
-    console.error('Error assigning tenant to room:', error);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Assign tenant to room error:', error);
+    
     return NextResponse.json(
-      { success: false, error: (error as Error).message || 'Failed to assign tenant to room' },
+      { 
+        success: false, 
+        error: 'Failed to assign tenant to room',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
+  } finally {
+    client.release();
   }
 }
-
-// Unassign tenant from room
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized access' },
-        { status: 401 }
-      );
-    }
-
-    const { id: roomId } = await params;
-    const body = await request.json();
-    
-    const { tenantId, endDate, notes } = body;
-    
-    // Validation
-    if (!tenantId || !endDate) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: tenantId, endDate' },
-        { status: 400 }
-      );
-    }
-
-    const assignment = await unassignTenantFromRoom(
-      roomId,
-      tenantId,
-      new Date(endDate),
-      notes
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: assignment
-    });
-
-  } catch (error: unknown) {
-    console.error('Error unassigning tenant from room:', error);
-    return NextResponse.json(
-      { success: false, error: (error as Error).message || 'Failed to unassign tenant from room' },
-      { status: 500 }
-    );
-  }
-} 

@@ -1,159 +1,153 @@
 import pool from '../db';
-import { UtilityBill, DatabaseUtilityBill, CreateUtilityBillData } from '../../types/database';
 
-// Helper function to map database utility bill to UtilityBill interface
-function mapDatabaseUtilityBillToUtilityBill(dbBill: DatabaseUtilityBill): UtilityBill {
-  return {
-    id: dbBill.id,
-    buildingId: dbBill.building_id,
-    utilityType: dbBill.utility_type,
-    providerName: dbBill.provider_name,
-    providerAccountNumber: dbBill.provider_account_number,
-    billingPeriodStart: dbBill.billing_period_start,
-    billingPeriodEnd: dbBill.billing_period_end,
-    dueDate: dbBill.due_date,
-    amount: dbBill.amount,
-    usageAmount: dbBill.usage_amount,
-    usageUnit: dbBill.usage_unit,
-    billStatus: dbBill.bill_status,
-    billUrl: dbBill.bill_url,
-    notes: dbBill.notes,
-    createdAt: dbBill.created_at,
-    updatedAt: dbBill.updated_at
-  };
+export interface UtilityBill {
+  id: string;
+  buildingId: string;
+  roomId?: string;
+  utilityType: 'electricity' | 'water' | 'gas' | 'internet' | 'cable' | 'waste' | 'other';
+  amount: number;
+  billingPeriodStart: Date;
+  billingPeriodEnd: Date;
+  dueDate: Date;
+  billStatus: 'pending' | 'paid' | 'overdue' | 'cancelled';
+  provider: string;
+  accountNumber?: string;
+  meterReading?: number;
+  notes?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  buildingName?: string;
+  roomNumber?: string;
 }
 
-// Get all utility bills with optional filters
-export async function getAllUtilityBills(filters?: {
-  buildingId?: string;
+interface UtilityFilters {
+  buildingId?: number;
+  roomId?: number;
   utilityType?: string;
   billStatus?: string;
-  providerId?: string;
-  startDate?: string;
-  endDate?: string;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<{ bills: UtilityBill[]; total: number }> {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+interface UtilityBillResult {
+  bills: UtilityBill[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Get all utility bills with filtering and pagination
+ */
+export async function getUtilityBills(
+  filters: UtilityFilters = {},
+  page = 1,
+  limit = 20
+): Promise<UtilityBillResult> {
   try {
-    let countQuery = `
-      SELECT COUNT(*) as total
-      FROM utility_bills ub
-      LEFT JOIN buildings b ON ub.building_id = b.id
-      WHERE 1=1
-    `;
-    
-    let query = `
-      SELECT 
-        ub.*,
-        b.name as building_name,
-        b.address_line1,
-        b.city,
-        b.state
-      FROM utility_bills ub
-      LEFT JOIN buildings b ON ub.building_id = b.id
-      WHERE 1=1
-    `;
-    
+    const offset = (page - 1) * limit;
+    const conditions: string[] = ['ub.is_active = true'];
     const values: unknown[] = [];
     let paramCount = 0;
 
-    // Apply filters
-    if (filters?.buildingId) {
+    if (filters.buildingId) {
       paramCount++;
-      const condition = ` AND ub.building_id = $${paramCount}`;
-      query += condition;
-      countQuery += condition;
+      conditions.push(`ub.building_id = $${paramCount}`);
       values.push(filters.buildingId);
     }
 
-    if (filters?.utilityType) {
+    if (filters.roomId) {
       paramCount++;
-      const condition = ` AND ub.utility_type = $${paramCount}`;
-      query += condition;
-      countQuery += condition;
+      conditions.push(`ub.room_id = $${paramCount}`);
+      values.push(filters.roomId);
+    }
+
+    if (filters.utilityType) {
+      paramCount++;
+      conditions.push(`ub.utility_type = $${paramCount}`);
       values.push(filters.utilityType);
     }
 
-    if (filters?.billStatus) {
+    if (filters.billStatus) {
       paramCount++;
-      const condition = ` AND ub.bill_status = $${paramCount}`;
-      query += condition;
-      countQuery += condition;
+      conditions.push(`ub.bill_status = $${paramCount}`);
       values.push(filters.billStatus);
     }
 
-    if (filters?.startDate) {
+    if (filters.dateFrom) {
       paramCount++;
-      const condition = ` AND ub.billing_period_start >= $${paramCount}`;
-      query += condition;
-      countQuery += condition;
-      values.push(filters.startDate);
+      conditions.push(`ub.billing_period_start >= $${paramCount}`);
+      values.push(filters.dateFrom);
     }
 
-    if (filters?.endDate) {
+    if (filters.dateTo) {
       paramCount++;
-      const condition = ` AND ub.billing_period_end <= $${paramCount}`;
-      query += condition;
-      countQuery += condition;
-      values.push(filters.endDate);
+      conditions.push(`ub.billing_period_end <= $${paramCount}`);
+      values.push(filters.dateTo);
     }
 
-    if (filters?.search) {
-      paramCount++;
-      const condition = ` AND (
-        ub.provider_name ILIKE $${paramCount} OR 
-        ub.provider_account_number ILIKE $${paramCount} OR
-        b.name ILIKE $${paramCount} OR
-        ub.notes ILIKE $${paramCount}
-      )`;
-      query += condition;
-      countQuery += condition;
-      values.push(`%${filters.search}%`);
-    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as count
+      FROM utility_bills ub
+      ${whereClause}
+    `;
     const countResult = await pool.query(countQuery, values);
-    const total = parseInt(countResult.rows[0].total);
+    const total = parseInt(countResult.rows[0].count);
 
-    // Add sorting and pagination
-    query += ` ORDER BY ub.due_date DESC, ub.created_at DESC`;
-    
-    if (filters?.limit) {
-      paramCount++;
-      query += ` LIMIT $${paramCount}`;
-      values.push(filters.limit);
-    }
-    
-    if (filters?.offset) {
-      paramCount++;
-      query += ` OFFSET $${paramCount}`;
-      values.push(filters.offset);
-    }
+    // Get bills with related data
+    paramCount++;
+    const limitParam = paramCount;
+    paramCount++;
+    const offsetParam = paramCount;
 
-    const result = await pool.query(query, values);
-    const bills = result.rows.map(mapDatabaseUtilityBillToUtilityBill);
+    const query = `
+      SELECT 
+        ub.*,
+        b.building_name,
+        r.room_number
+      FROM utility_bills ub
+      INNER JOIN buildings b ON ub.building_id = b.id
+      LEFT JOIN rooms r ON ub.room_id = r.id
+      ${whereClause}
+      ORDER BY ub.due_date DESC, ub.created_at DESC
+      LIMIT $${limitParam} OFFSET $${offsetParam}
+    `;
 
-    return { bills, total };
+    const result = await pool.query(query, [...values, limit, offset]);
+    const bills = result.rows.map(mapRowToUtilityBill);
+
+    return {
+      bills,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   } catch (error) {
     console.error('Error fetching utility bills:', error);
-    throw error;
+    throw new Error('Failed to fetch utility bills');
   }
 }
 
-// Get utility bill by ID
+/**
+ * Get a single utility bill by ID
+ */
 export async function getUtilityBillById(id: string): Promise<UtilityBill | null> {
   try {
     const query = `
       SELECT 
         ub.*,
-        b.name as building_name,
-        b.address_line1,
-        b.city,
-        b.state
+        b.building_name,
+        r.room_number
       FROM utility_bills ub
-      LEFT JOIN buildings b ON ub.building_id = b.id
-      WHERE ub.id = $1
+      INNER JOIN buildings b ON ub.building_id = b.id
+      LEFT JOIN rooms r ON ub.room_id = r.id
+      WHERE ub.id = $1 AND ub.is_active = true
     `;
     
     const result = await pool.query(query, [id]);
@@ -162,108 +156,129 @@ export async function getUtilityBillById(id: string): Promise<UtilityBill | null
       return null;
     }
     
-    return mapDatabaseUtilityBillToUtilityBill(result.rows[0]);
+    return mapRowToUtilityBill(result.rows[0]);
   } catch (error) {
-    console.error('Error fetching utility bill:', error);
-    throw error;
+    console.error('Error fetching utility bill by ID:', error);
+    throw new Error('Failed to fetch utility bill');
   }
 }
 
-// Create utility bill
-export async function createUtilityBill(billData: CreateUtilityBillData): Promise<UtilityBill> {
+/**
+ * Create a new utility bill
+ */
+export async function createUtilityBill(billData: Partial<UtilityBill>): Promise<UtilityBill> {
   try {
     const query = `
       INSERT INTO utility_bills (
-        building_id, utility_type, provider_name, provider_account_number,
-        billing_period_start, billing_period_end, due_date, amount,
-        usage_amount, usage_unit, bill_status, bill_url, notes
+        building_id, room_id, utility_type, amount, billing_period_start,
+        billing_period_end, due_date, bill_status, provider, account_number,
+        meter_reading, notes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
     
     const values = [
       billData.buildingId,
+      billData.roomId || null,
       billData.utilityType,
-      billData.providerName,
-      billData.providerAccountNumber,
+      billData.amount,
       billData.billingPeriodStart,
       billData.billingPeriodEnd,
       billData.dueDate,
-      billData.amount,
-      billData.usageAmount,
-      billData.usageUnit,
       billData.billStatus || 'pending',
-      billData.billUrl,
-      billData.notes
+      billData.provider,
+      billData.accountNumber || null,
+      billData.meterReading || null,
+      billData.notes || null,
     ];
     
     const result = await pool.query(query, values);
-    return mapDatabaseUtilityBillToUtilityBill(result.rows[0]);
+    return mapRowToUtilityBill(result.rows[0]);
   } catch (error) {
     console.error('Error creating utility bill:', error);
-    throw error;
+    throw new Error('Failed to create utility bill');
   }
 }
 
-// Update utility bill
-export async function updateUtilityBill(id: string, billData: Partial<CreateUtilityBillData>): Promise<UtilityBill> {
+/**
+ * Update a utility bill
+ */
+export async function updateUtilityBill(
+  id: string,
+  updates: Partial<UtilityBill>
+): Promise<UtilityBill> {
   try {
-    const updates: string[] = [];
+    const allowedFields = [
+      'building_id',
+      'room_id',
+      'utility_type',
+      'amount',
+      'billing_period_start',
+      'billing_period_end',
+      'due_date',
+      'bill_status',
+      'provider',
+      'account_number',
+      'meter_reading',
+      'notes',
+    ];
+    
+    const setClauses: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
 
-    Object.entries(billData).forEach(([key, value]) => {
-      if (value !== undefined) {
+    Object.entries(updates).forEach(([key, value]) => {
+      const snakeKey = camelToSnake(key);
+      if (allowedFields.includes(snakeKey)) {
         paramCount++;
-        const dbKey = key === 'buildingId' ? 'building_id' : 
-                     key === 'utilityType' ? 'utility_type' :
-                     key === 'providerName' ? 'provider_name' :
-                     key === 'providerAccountNumber' ? 'provider_account_number' :
-                     key === 'billingPeriodStart' ? 'billing_period_start' :
-                     key === 'billingPeriodEnd' ? 'billing_period_end' :
-                     key === 'dueDate' ? 'due_date' :
-                     key === 'usageAmount' ? 'usage_amount' :
-                     key === 'usageUnit' ? 'usage_unit' :
-                     key === 'billStatus' ? 'bill_status' :
-                     key === 'billUrl' ? 'bill_url' :
-                     key;
-        updates.push(`${dbKey} = $${paramCount}`);
+        setClauses.push(`${snakeKey} = $${paramCount}`);
         values.push(value);
       }
     });
 
-    if (updates.length === 0) {
-      throw new Error('No fields to update');
+    if (setClauses.length === 0) {
+      throw new Error('No valid fields to update');
     }
+
+    paramCount++;
+    setClauses.push(`updated_at = $${paramCount}`);
+    values.push(new Date());
 
     paramCount++;
     values.push(id);
 
     const query = `
-      UPDATE utility_bills 
-      SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $${paramCount}
+      UPDATE utility_bills
+      SET ${setClauses.join(', ')}
+      WHERE id = $${paramCount} AND is_active = true
       RETURNING *
     `;
-    
+
     const result = await pool.query(query, values);
     
     if (result.rows.length === 0) {
       throw new Error('Utility bill not found');
     }
     
-    return mapDatabaseUtilityBillToUtilityBill(result.rows[0]);
+    return mapRowToUtilityBill(result.rows[0]);
   } catch (error) {
     console.error('Error updating utility bill:', error);
     throw error;
   }
 }
 
-// Delete utility bill
+/**
+ * Delete a utility bill (soft delete)
+ */
 export async function deleteUtilityBill(id: string): Promise<void> {
   try {
-    const query = 'DELETE FROM utility_bills WHERE id = $1';
+    const query = `
+      UPDATE utility_bills
+      SET is_active = false, updated_at = NOW()
+      WHERE id = $1 AND is_active = true
+    `;
+    
     const result = await pool.query(query, [id]);
     
     if (result.rowCount === 0) {
@@ -275,210 +290,258 @@ export async function deleteUtilityBill(id: string): Promise<void> {
   }
 }
 
-// Get utility statistics
-export async function getUtilityStats(buildingId?: string) {
-  try {
-    let query = `
-      SELECT 
-        COUNT(*) as total_bills,
-        COUNT(*) FILTER (WHERE bill_status = 'pending') as pending_bills,
-        COUNT(*) FILTER (WHERE bill_status = 'paid') as paid_bills,
-        COUNT(*) FILTER (WHERE bill_status = 'overdue') as overdue_bills,
-        COUNT(*) FILTER (WHERE bill_status = 'disputed') as disputed_bills,
-        COALESCE(SUM(amount), 0) as total_amount,
-        COALESCE(SUM(CASE WHEN bill_status = 'paid' THEN amount ELSE 0 END), 0) as paid_amount,
-        COALESCE(SUM(CASE WHEN bill_status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount,
-        COALESCE(SUM(CASE WHEN bill_status = 'overdue' THEN amount ELSE 0 END), 0) as overdue_amount,
-        COALESCE(AVG(amount), 0) as average_bill_amount,
-        COUNT(DISTINCT building_id) as buildings_count,
-        COUNT(DISTINCT utility_type) as utility_types_count,
-        COUNT(DISTINCT provider_name) as providers_count
-      FROM utility_bills
-      WHERE 1=1
-    `;
-    
-    const values: unknown[] = [];
-    
-    if (buildingId) {
-      query += ' AND building_id = $1';
-      values.push(buildingId);
-    }
-    
-    const result = await pool.query(query, values);
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error fetching utility stats:', error);
-    throw error;
-  }
-}
-
-// Get utility consumption trends
-export async function getUtilityTrends(buildingId?: string, months: number = 12) {
-  try {
-    let query = `
-      SELECT 
-        utility_type,
-        DATE_TRUNC('month', billing_period_start) as month,
-        COUNT(*) as bill_count,
-        SUM(amount) as total_amount,
-        AVG(amount) as average_amount,
-        SUM(usage_amount) as total_usage,
-        AVG(usage_amount) as average_usage
-      FROM utility_bills
-      WHERE billing_period_start >= CURRENT_DATE - INTERVAL '${months} months'
-    `;
-    
-    const values: unknown[] = [];
-    
-    if (buildingId) {
-      query += ' AND building_id = $1';
-      values.push(buildingId);
-    }
-    
-    query += `
-      GROUP BY utility_type, DATE_TRUNC('month', billing_period_start)
-      ORDER BY month DESC, utility_type ASC
-    `;
-    
-    const result = await pool.query(query, values);
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching utility trends:', error);
-    throw error;
-  }
-}
-
-// Get providers summary
-export async function getProvidersStats() {
+/**
+ * Mark utility bill as paid
+ */
+export async function markUtilityBillPaid(id: string): Promise<UtilityBill> {
   try {
     const query = `
-      SELECT 
-        provider_name,
-        utility_type,
-        COUNT(*) as bill_count,
-        SUM(amount) as total_amount,
-        AVG(amount) as average_bill,
-        COUNT(DISTINCT building_id) as buildings_served,
-        MIN(billing_period_start) as first_bill_date,
-        MAX(billing_period_end) as last_bill_date,
-        COUNT(*) FILTER (WHERE bill_status = 'overdue') as overdue_bills
-      FROM utility_bills
-      GROUP BY provider_name, utility_type
-      ORDER BY total_amount DESC, provider_name ASC
-    `;
-    
-    const result = await pool.query(query);
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching providers stats:', error);
-    throw error;
-  }
-}
-
-// Get utility bills by building
-export async function getUtilityBillsByBuilding(buildingId: string) {
-  try {
-    const query = `
-      SELECT 
-        utility_type,
-        COUNT(*) as bill_count,
-        SUM(amount) as total_amount,
-        AVG(amount) as average_amount,
-        COUNT(*) FILTER (WHERE bill_status = 'overdue') as overdue_count,
-        SUM(CASE WHEN bill_status = 'overdue' THEN amount ELSE 0 END) as overdue_amount,
-        MAX(due_date) as latest_due_date,
-        MIN(due_date) as earliest_due_date
-      FROM utility_bills
-      WHERE building_id = $1
-      GROUP BY utility_type
-      ORDER BY total_amount DESC
-    `;
-    
-    const result = await pool.query(query, [buildingId]);
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching utility bills by building:', error);
-    throw error;
-  }
-}
-
-// Get upcoming due bills
-export async function getUpcomingDueBills(days: number = 7) {
-  try {
-    const query = `
-      SELECT 
-        ub.*,
-        b.name as building_name,
-        b.address_line1,
-        b.city,
-        b.state,
-        (ub.due_date - CURRENT_DATE) as days_until_due
-      FROM utility_bills ub
-      LEFT JOIN buildings b ON ub.building_id = b.id
-      WHERE ub.bill_status IN ('pending', 'disputed')
-        AND ub.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${days} days'
-      ORDER BY ub.due_date ASC, ub.amount DESC
-    `;
-    
-    const result = await pool.query(query);
-    return result.rows.map(mapDatabaseUtilityBillToUtilityBill);
-  } catch (error) {
-    console.error('Error fetching upcoming due bills:', error);
-    throw error;
-  }
-}
-
-// Update bill status
-export async function updateBillStatus(id: string, status: 'pending' | 'paid' | 'overdue' | 'disputed'): Promise<UtilityBill> {
-  try {
-    const query = `
-      UPDATE utility_bills 
-      SET bill_status = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
+      UPDATE utility_bills
+      SET bill_status = 'paid', updated_at = NOW()
+      WHERE id = $1 AND is_active = true
       RETURNING *
     `;
     
-    const result = await pool.query(query, [status, id]);
+    const result = await pool.query(query, [id]);
     
     if (result.rows.length === 0) {
       throw new Error('Utility bill not found');
     }
     
-    return mapDatabaseUtilityBillToUtilityBill(result.rows[0]);
+    return mapRowToUtilityBill(result.rows[0]);
   } catch (error) {
-    console.error('Error updating bill status:', error);
+    console.error('Error marking utility bill as paid:', error);
     throw error;
   }
 }
 
-// Get monthly utility summary for all buildings
-export async function getMonthlyUtilitySummary(year?: number, month?: number) {
+/**
+ * Get utility bill summary statistics
+ */
+export async function getUtilityBillSummary(filters: UtilityFilters = {}): Promise<{
+  totalBills: number;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  overdueAmount: number;
+  byUtilityType: Array<{ type: string; amount: number; count: number }>;
+  monthlyTrend: Array<{ month: string; amount: number }>;
+}> {
   try {
-    const currentYear = year || new Date().getFullYear();
-    const currentMonth = month || new Date().getMonth() + 1;
-    
-    const query = `
+    const conditions: string[] = ['is_active = true'];
+    const values: unknown[] = [];
+    let paramCount = 0;
+
+    if (filters.buildingId) {
+      paramCount++;
+      conditions.push(`building_id = $${paramCount}`);
+      values.push(filters.buildingId);
+    }
+
+    if (filters.dateFrom) {
+      paramCount++;
+      conditions.push(`billing_period_start >= $${paramCount}`);
+      values.push(filters.dateFrom);
+    }
+
+    if (filters.dateTo) {
+      paramCount++;
+      conditions.push(`billing_period_end <= $${paramCount}`);
+      values.push(filters.dateTo);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get summary statistics
+    const summaryQuery = `
       SELECT 
-        b.id as building_id,
-        b.name as building_name,
-        ub.utility_type,
-        COUNT(*) as bill_count,
-        SUM(ub.amount) as total_amount,
-        AVG(ub.amount) as average_amount,
-        SUM(ub.usage_amount) as total_usage,
-        STRING_AGG(DISTINCT ub.provider_name, ', ') as providers
-      FROM utility_bills ub
-      JOIN buildings b ON ub.building_id = b.id
-      WHERE EXTRACT(YEAR FROM ub.billing_period_start) = $1
-        AND EXTRACT(MONTH FROM ub.billing_period_start) = $2
-      GROUP BY b.id, b.name, ub.utility_type
-      ORDER BY b.name ASC, total_amount DESC
+        COUNT(*) as total_bills,
+        COALESCE(SUM(amount), 0) as total_amount,
+        COALESCE(SUM(CASE WHEN bill_status = 'paid' THEN amount ELSE 0 END), 0) as paid_amount,
+        COALESCE(SUM(CASE WHEN bill_status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount,
+        COALESCE(SUM(CASE WHEN bill_status = 'overdue' THEN amount ELSE 0 END), 0) as overdue_amount
+      FROM utility_bills
+      ${whereClause}
     `;
-    
-    const result = await pool.query(query, [currentYear, currentMonth]);
-    return result.rows;
+    const summaryResult = await pool.query(summaryQuery, values);
+
+    // Get breakdown by utility type
+    const typeQuery = `
+      SELECT 
+        utility_type as type,
+        COUNT(*) as count,
+        COALESCE(SUM(amount), 0) as amount
+      FROM utility_bills
+      ${whereClause}
+      GROUP BY utility_type
+      ORDER BY amount DESC
+    `;
+    const typeResult = await pool.query(typeQuery, values);
+
+    // Get monthly trend
+    const trendQuery = `
+      SELECT 
+        TO_CHAR(billing_period_start, 'YYYY-MM') as month,
+        COALESCE(SUM(amount), 0) as amount
+      FROM utility_bills
+      ${whereClause}
+      GROUP BY TO_CHAR(billing_period_start, 'YYYY-MM')
+      ORDER BY month DESC
+      LIMIT 12
+    `;
+    const trendResult = await pool.query(trendQuery, values);
+
+    return {
+      totalBills: parseInt(summaryResult.rows[0].total_bills),
+      totalAmount: parseFloat(summaryResult.rows[0].total_amount),
+      paidAmount: parseFloat(summaryResult.rows[0].paid_amount),
+      pendingAmount: parseFloat(summaryResult.rows[0].pending_amount),
+      overdueAmount: parseFloat(summaryResult.rows[0].overdue_amount),
+      byUtilityType: typeResult.rows.map(row => ({
+        type: row.type,
+        amount: parseFloat(row.amount),
+        count: parseInt(row.count),
+      })),
+      monthlyTrend: trendResult.rows.map(row => ({
+        month: row.month,
+        amount: parseFloat(row.amount),
+      })),
+    };
   } catch (error) {
-    console.error('Error fetching monthly utility summary:', error);
-    throw error;
+    console.error('Error getting utility bill summary:', error);
+    throw new Error('Failed to get utility bill summary');
   }
-} 
+}
+
+/**
+ * Helper: Map database row to UtilityBill type
+ */
+function mapRowToUtilityBill(row: Record<string, unknown>): UtilityBill {
+  return {
+    id: String(row.id),
+    buildingId: String(row.building_id),
+    roomId: row.room_id ? String(row.room_id) : undefined,
+    utilityType: String(row.utility_type) as UtilityBill['utilityType'],
+    amount: Number(row.amount),
+    billingPeriodStart: new Date(String(row.billing_period_start)),
+    billingPeriodEnd: new Date(String(row.billing_period_end)),
+    dueDate: new Date(String(row.due_date)),
+    billStatus: String(row.bill_status) as UtilityBill['billStatus'],
+    provider: String(row.provider),
+    accountNumber: row.account_number ? String(row.account_number) : undefined,
+    meterReading: row.meter_reading ? Number(row.meter_reading) : undefined,
+    notes: row.notes ? String(row.notes) : undefined,
+    isActive: Boolean(row.is_active),
+    createdAt: new Date(String(row.created_at)),
+    updatedAt: new Date(String(row.updated_at)),
+    buildingName: row.building_name ? String(row.building_name) : undefined,
+    roomNumber: row.room_number ? String(row.room_number) : undefined,
+  };
+}
+
+/**
+ * Helper: Convert camelCase to snake_case
+ */
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+/**
+ * Update bill status
+ */
+export async function updateBillStatus(id: string, status: string): Promise<UtilityBill> {
+  const query = `
+    UPDATE utility_bills
+    SET bill_status = $1, updated_at = NOW()
+    WHERE id = $2
+    RETURNING *
+  `;
+  const result = await pool.query(query, [status, id]);
+  return mapRowToUtilityBill(result.rows[0]);
+}
+
+/**
+ * Get utility statistics
+ */
+export async function getUtilityStats(buildingId?: string) {
+  const whereClause = buildingId ? 'WHERE building_id = $1' : '';
+  const values = buildingId ? [buildingId] : [];
+  
+  const query = `
+    SELECT
+      COUNT(*) as total_bills,
+      SUM(amount) as total_amount,
+      SUM(CASE WHEN bill_status = 'paid' THEN amount ELSE 0 END) as paid_amount,
+      SUM(CASE WHEN bill_status = 'pending' THEN amount ELSE 0 END) as pending_amount,
+      SUM(CASE WHEN bill_status = 'overdue' THEN amount ELSE 0 END) as overdue_amount
+    FROM utility_bills
+    ${whereClause}
+  `;
+  
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
+/**
+ * Get utility trends over time
+ */
+export async function getUtilityTrends(buildingId?: string, months = 12) {
+  const whereClause = buildingId ? 'AND building_id = $2' : '';
+  const values = buildingId ? [months, buildingId] : [months];
+  
+  const query = `
+    SELECT
+      TO_CHAR(billing_period_start, 'YYYY-MM') as month,
+      utility_type,
+      SUM(amount) as amount
+    FROM utility_bills
+    WHERE billing_period_start >= NOW() - INTERVAL '${months} months' ${whereClause}
+    GROUP BY month, utility_type
+    ORDER BY month DESC, utility_type
+  `;
+  
+  const result = await pool.query(query, values);
+  return result.rows;
+}
+
+/**
+ * Get provider statistics
+ */
+export async function getProvidersStats() {
+  const query = `
+    SELECT
+      provider,
+      COUNT(*) as bill_count,
+      SUM(amount) as total_amount,
+      AVG(amount) as avg_amount
+    FROM utility_bills
+    WHERE is_active = true
+    GROUP BY provider
+    ORDER BY total_amount DESC
+  `;
+  
+  const result = await pool.query(query);
+  return result.rows;
+}
+
+/**
+ * Get upcoming due bills
+ */
+export async function getUpcomingDueBills(days = 7) {
+  const query = `
+    SELECT
+      ub.*,
+      b.name as building_name,
+      r.room_number
+    FROM utility_bills ub
+    LEFT JOIN buildings b ON ub.building_id = b.id
+    LEFT JOIN rooms r ON ub.room_id = r.id
+    WHERE ub.due_date BETWEEN NOW() AND NOW() + INTERVAL '${days} days'
+      AND ub.bill_status = 'pending'
+      AND ub.is_active = true
+    ORDER BY ub.due_date ASC
+  `;
+  
+  const result = await pool.query(query);
+  return result.rows.map(mapRowToUtilityBill);
+}

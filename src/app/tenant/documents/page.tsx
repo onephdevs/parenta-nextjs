@@ -14,7 +14,7 @@ import {
   Eye,
   File,
   FileImage,
-  FilePdf,
+  FileType,
   FileSpreadsheet,
   FileCode
 } from 'lucide-react';
@@ -112,7 +112,7 @@ export default function DocumentsPage() {
   const getFileIcon = (fileType: string) => {
     const type = fileType.toLowerCase();
     if (type.includes('pdf')) {
-      return <FilePdf className="h-8 w-8 text-red-500" />;
+      return <FileType className="h-8 w-8 text-red-500" />;
     } else if (type.includes('image')) {
       return <FileImage className="h-8 w-8 text-green-500" />;
     } else if (type.includes('spreadsheet') || type.includes('excel')) {

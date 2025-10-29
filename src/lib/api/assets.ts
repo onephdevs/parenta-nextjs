@@ -329,15 +329,15 @@ export async function assignAssetToRoom(
     // End any current assignment
     await client.query(`
       UPDATE asset_assignments 
-      SET assignment_status = 'terminated', end_date = NOW(), updated_at = NOW()
+      SET assignment_status = 'returned', return_date = NOW(), updated_at = NOW()
       WHERE asset_id = $1 AND assignment_status = 'active'
     `, [assetId]);
     
     // Create new assignment
     const assignmentQuery = `
       INSERT INTO asset_assignments (
-        asset_id, room_id, tenant_id, assignment_status, notes
-      ) VALUES ($1, $2, $3, 'active', $4)
+        asset_id, room_id, tenant_id, assignment_date, assignment_status, notes
+      ) VALUES ($1, $2, $3, CURRENT_DATE, 'active', $4)
     `;
     
     await client.query(assignmentQuery, [assetId, roomId, tenantId, notes]);

@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { getAssetById, updateAsset, deleteAsset } from '@/lib/api/assets';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
+    
     const asset = await getAssetById(id);
     
     if (!asset) {
-      return NextResponse.json(
-        { success: false, error: 'Asset not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
     
     return NextResponse.json({
@@ -23,89 +30,64 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching asset:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to fetch asset',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to fetch asset' },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     
-    // Validate required fields
-    if (!body.assetName || !body.assetType) {
+    if (Object.keys(body).length === 0) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Asset name and type are required' 
-        },
+        { error: 'No update data provided' },
         { status: 400 }
       );
     }
 
-    // Parse dates and numbers if provided
-    const assetData = {
-      ...body,
-      purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : undefined,
-      warrantyExpiry: body.warrantyExpiry ? new Date(body.warrantyExpiry) : undefined,
-      lastMaintenanceDate: body.lastMaintenanceDate ? new Date(body.lastMaintenanceDate) : undefined,
-      nextMaintenanceDate: body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : undefined,
-      purchasePrice: body.purchasePrice ? parseFloat(body.purchasePrice) : undefined,
-      currentValue: body.currentValue ? parseFloat(body.currentValue) : undefined,
-      rentalRate: body.rentalRate ? parseFloat(body.rentalRate) : undefined,
-      assetCondition: body.assetCondition || 'good',
-      assetStatus: body.assetStatus || 'available',
-      isActive: body.isActive !== undefined ? body.isActive : true
-    };
-
-    const asset = await updateAsset(id, assetData);
+    const asset = await updateAsset(id, body);
     
     if (!asset) {
-      return NextResponse.json(
-        { success: false, error: 'Asset not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
     
     return NextResponse.json({
       success: true,
-      data: asset
+      data: asset,
+      message: 'Asset updated successfully'
     });
   } catch (error) {
     console.error('Error updating asset:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to update asset',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to update asset' },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const success = await deleteAsset(id);
+    const session = await getServerSession(authOptions);
     
-    if (!success) {
-      return NextResponse.json(
-        { success: false, error: 'Asset not found' },
-        { status: 404 }
-      );
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    
+    const deleted = await deleteAsset(id);
+    
+    if (!deleted) {
+      return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
     
     return NextResponse.json({
@@ -115,12 +97,8 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting asset:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to delete asset',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to delete asset' },
       { status: 500 }
     );
   }
-} 
+}

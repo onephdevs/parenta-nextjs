@@ -3,6 +3,20 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { LogoutButton } from '@/components/features/LogoutButton';
+import { 
+  Building2, 
+  Home, 
+  Users, 
+  DollarSign,
+  TrendingUp,
+  ArrowRight,
+  Settings,
+  BarChart3,
+  FileText,
+  Package,
+  Shield,
+  Bell
+} from 'lucide-react';
 
 interface DashboardStats {
   buildings: {
@@ -41,12 +55,16 @@ interface DashboardStats {
 
 async function getDashboardStats(): Promise<DashboardStats | null> {
   try {
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/dashboard/stats`, {
-      cache: 'no-store'
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3001';
+    const response = await fetch(`${baseUrl}/api/dashboard/stats`, {
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
     
     if (!response.ok) {
-      console.error('Failed to fetch dashboard stats');
+      console.error(`Failed to fetch dashboard stats: ${response.status} ${response.statusText}`);
       return null;
     }
     
@@ -61,238 +79,311 @@ async function getDashboardStats(): Promise<DashboardStats | null> {
 export default async function AdminDashboard() {
   const session = await getServerSession(authOptions);
 
-  // Redirect if not authenticated or not admin
   if (!session || !session.user || session.user.role !== 'admin') {
     redirect('/auth/signin?role=admin');
   }
 
   const stats = await getDashboardStats();
 
+  const quickActions = [
+    {
+      title: 'Add Building',
+      description: 'Create a new property',
+      href: '/admin/buildings',
+      icon: Building2,
+      color: 'blue'
+    },
+    {
+      title: 'Add Room',
+      description: 'Add a new unit',
+      href: '/admin/rooms',
+      icon: Home,
+      color: 'green'
+    },
+    {
+      title: 'Add Tenant',
+      description: 'Register new tenant',
+      href: '/admin/tenants',
+      icon: Users,
+      color: 'purple'
+    },
+    {
+      title: 'Record Payment',
+      description: 'Log a payment',
+      href: '/admin/payments',
+      icon: DollarSign,
+      color: 'yellow'
+    },
+    {
+      title: 'Add Asset',
+      description: 'Track new asset',
+      href: '/admin/assets',
+      icon: Package,
+      color: 'indigo'
+    },
+    {
+      title: 'View Reports',
+      description: 'Financial reports',
+      href: '/admin/reports',
+      icon: BarChart3,
+      color: 'pink'
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-50">
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                  <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="bg-blue-600 p-2 rounded-lg">
+                  <Shield className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">Admin Portal</h1>
+                  <p className="text-xs text-gray-500">System Administration</p>
                 </div>
               </div>
-              <div className="ml-4">
-                <h1 className="text-lg font-semibold text-gray-900">Admin Dashboard</h1>
-                <p className="text-sm text-gray-500">System Administration Portal</p>
-              </div>
             </div>
+            
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                Welcome, {session.user.firstName} {session.user.lastName}
-              </span>
+              <button className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              </button>
+              
+              <div className="hidden md:flex items-center space-x-3 pl-4 border-l border-gray-200">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">
+                    {session.user.firstName} {session.user.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500">Administrator</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                  {session.user.firstName?.charAt(0)}{session.user.lastName?.charAt(0)}
+                </div>
+              </div>
+              
               <LogoutButton />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {/* Welcome Message */}
-          <div className="bg-purple-50 border-l-4 border-purple-400 p-4 mb-8">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-purple-700">
-                  Welcome to the Admin Dashboard! You have full system access and can manage all users and settings.
-                </p>
-              </div>
-            </div>
-          </div>
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Active Buildings</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats?.buildings.active || 0}</dd>
-                      <dd className="text-xs text-gray-500">{stats?.buildings.totalUnits || 0} total units</dd>
-                    </dl>
-                  </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {session.user.firstName}! 👋
+          </h2>
+          <p className="text-gray-600">
+            Here's what's happening with your properties today.
+          </p>
+        </div>
+
+        {/* Stats Grid */}
+        {stats ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Buildings */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-blue-100 p-3 rounded-lg">
+                  <Building2 className="h-6 w-6 text-blue-600" />
                 </div>
+                <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                  Active
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                {stats.buildings.total}
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">Total Buildings</p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">{stats.buildings.totalUnits} units</span>
+                <Link href="/admin/buildings" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                  View <ArrowRight className="h-3 w-3 ml-1" />
+                </Link>
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5 0a4 4 0 11-8-1.441" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Active Tenants</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats?.tenants.active || 0}</dd>
-                      <dd className="text-xs text-gray-500">{stats?.tenants.total || 0} total tenants</dd>
-                    </dl>
-                  </div>
+            {/* Occupancy */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-green-100 p-3 rounded-lg">
+                  <Home className="h-6 w-6 text-green-600" />
                 </div>
+                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                  {stats.rooms.occupancyRate}%
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                {stats.rooms.occupied}
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">Occupied Units</p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">{stats.rooms.vacant} vacant</span>
+                <Link href="/admin/rooms" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                  View <ArrowRight className="h-3 w-3 ml-1" />
+                </Link>
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Occupancy Rate</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats?.rooms.occupancyRate?.toFixed(1) || 0}%</dd>
-                      <dd className="text-xs text-gray-500">{stats?.rooms.occupied || 0} of {stats?.rooms.total || 0} rooms</dd>
-                    </dl>
-                  </div>
+            {/* Tenants */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-purple-100 p-3 rounded-lg">
+                  <Users className="h-6 w-6 text-purple-600" />
                 </div>
+                <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                  Active
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                {stats.tenants.active}
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">Active Tenants</p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">{stats.tenants.pending} pending</span>
+                <Link href="/admin/tenants" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                  View <ArrowRight className="h-3 w-3 ml-1" />
+                </Link>
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
-                      <dd className="text-lg font-medium text-gray-900">${stats?.financial.totalRevenue?.toLocaleString() || '0'}</dd>
-                      <dd className="text-xs text-gray-500">{stats?.financial.paidPayments || 0} payments received</dd>
-                    </dl>
-                  </div>
+            {/* Revenue */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-yellow-100 p-3 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-yellow-600" />
                 </div>
+                <TrendingUp className="h-5 w-5 text-green-500" />
               </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white shadow rounded-lg mb-8">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Link href="/admin/buildings" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Manage Buildings
-                </Link>
-                <Link href="/admin/rooms" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v0" />
-                  </svg>
-                  Manage Rooms
-                </Link>
-                <Link href="/admin/tenants" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 515.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 919.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Manage Tenants
-                </Link>
-                <Link href="/admin/financial" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                  Financial Management
-                </Link>
-                <Link href="/admin/financial/reports" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Financial Reports
-                </Link>
-                <Link href="/utilities" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Utilities Management
-                </Link>
-                <Link href="/admin/assets" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  Asset Management
-                </Link>
-                <Link href="/admin/analytics" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Analytics & Reports
-                </Link>
-                <Link href="/admin/documents/templates" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Document Templates
-                </Link>
-                <Link href="/admin/export" className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Advanced Export
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                ₱{stats.summary.monthlyRevenue.toLocaleString()}
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">Monthly Revenue</p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">{stats.financial.paidPayments} payments</span>
+                <Link href="/admin/payments" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                  View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
               </div>
             </div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+                <div className="h-12 w-12 bg-gray-200 rounded-lg mb-4"></div>
+                <div className="h-8 bg-gray-200 rounded w-20 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-32"></div>
+              </div>
+            ))}
+          </div>
+        )}
 
-          {/* User Session Info */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Session Information</h3>
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">User ID</dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono">{session.user.id}</dd>
+        {/* Quick Actions */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
+            <Link href="/admin/settings" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
+              Settings <Settings className="h-4 w-4 ml-1" />
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {quickActions.map((action) => (
+              <Link
+                key={action.title}
+                href={action.href}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition group"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className={`bg-${action.color}-100 p-2 rounded-lg w-fit mb-3 group-hover:scale-110 transition`}>
+                      <action.icon className={`h-5 w-5 text-${action.color}-600`} />
+                    </div>
+                    <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
+                    <p className="text-sm text-gray-600">{action.description}</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition" />
                 </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Email</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{session.user.email}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Role</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                      {session.user.role}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Full Name</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{session.user.firstName} {session.user.lastName}</dd>
-                </div>
-              </dl>
-            </div>
+              </Link>
+            ))}
           </div>
         </div>
+
+        {/* Additional Info */}
+        {stats && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Financial Overview */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
+                Financial Overview
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Total Payments</span>
+                  <span className="font-semibold text-gray-900">{stats.financial.totalPayments}</span>
+                </div>
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Paid Payments</span>
+                  <span className="font-semibold text-green-600">{stats.financial.paidPayments}</span>
+                </div>
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Pending Payments</span>
+                  <span className="font-semibold text-yellow-600">{stats.financial.pendingPayments}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Overdue Payments</span>
+                  <span className="font-semibold text-red-600">{stats.financial.overduePayments}</span>
+                </div>
+              </div>
+              <Link 
+                href="/admin/reports"
+                className="mt-6 w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium text-center block"
+              >
+                View Full Report
+              </Link>
+            </div>
+
+            {/* Property Status */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                <Home className="h-5 w-5 mr-2 text-blue-600" />
+                Property Status
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Total Units</span>
+                  <span className="font-semibold text-gray-900">{stats.rooms.total}</span>
+                </div>
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Occupied</span>
+                  <span className="font-semibold text-green-600">{stats.rooms.occupied}</span>
+                </div>
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Vacant</span>
+                  <span className="font-semibold text-blue-600">{stats.rooms.vacant}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Under Maintenance</span>
+                  <span className="font-semibold text-orange-600">{stats.rooms.maintenance}</span>
+                </div>
+              </div>
+              <Link 
+                href="/admin/analytics"
+                className="mt-6 w-full bg-gray-100 text-gray-900 py-3 px-4 rounded-lg hover:bg-gray-200 transition font-medium text-center block"
+              >
+                View Analytics
+              </Link>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
-} 
+}

@@ -151,6 +151,48 @@ export async function getTenantStats(): Promise<TenantStats> {
   }
 }
 
+// Create tenant
+export async function createTenant(tenantData: Partial<Tenant>): Promise<Tenant> {
+  const query = `
+    INSERT INTO tenants (
+      first_name, last_name, email, phone, date_of_birth,
+      emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+      employment_status, employer_name, monthly_income, previous_address,
+      security_deposit, tenant_status, lease_start_date, lease_end_date, notes
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    RETURNING *
+  `;
+
+  const values = [
+    tenantData.firstName,
+    tenantData.lastName,
+    tenantData.email,
+    tenantData.phone || null,
+    tenantData.dateOfBirth || null,
+    tenantData.emergencyContactName || null,
+    tenantData.emergencyContactPhone || null,
+    tenantData.emergencyContactRelationship || null,
+    tenantData.employmentStatus || null,
+    tenantData.employerName || null,
+    tenantData.monthlyIncome || null,
+    tenantData.previousAddress || null,
+    tenantData.securityDeposit || null,
+    tenantData.tenantStatus || 'pending',
+    tenantData.leaseStartDate || null,
+    tenantData.leaseEndDate || null,
+    tenantData.notes || null,
+  ];
+
+  try {
+    const result = await pool.query(query, values);
+    return mapRowToTenant(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating tenant:', error);
+    throw new Error(`Failed to create tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 // Helper function to map database row to Tenant object
 function mapRowToTenant(row: Record<string, unknown>): Tenant {
   return {

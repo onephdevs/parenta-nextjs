@@ -28,9 +28,9 @@ import {
   AnalyticsFilter,
   FinancialTrend,
   OccupancyTrend,
-  CashFlowData,
-  Building as BuildingType
+  CashFlowData
 } from '../../../types/analytics';
+import { Building as BuildingType } from '../../../types/database';
 import { format, subDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
 export default function AnalyticsPage() {
@@ -124,11 +124,7 @@ export default function AnalyticsPage() {
 
     } catch (error) {
       console.error('Error loading analytics:', error);
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load analytics data'
-      });
+      addNotification('Failed to load analytics data');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -142,26 +138,14 @@ export default function AnalyticsPage() {
 
   const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
     try {
-      addNotification({
-        type: 'info',
-        title: 'Export Started',
-        message: `Generating ${format.toUpperCase()} report...`
-      });
+      addNotification(`Generating ${format.toUpperCase()} report...`);
       
       // TODO: Implement export functionality
       setTimeout(() => {
-        addNotification({
-          type: 'success',
-          title: 'Export Complete',
-          message: `Analytics report exported as ${format.toUpperCase()}`
-        });
+        addNotification(`Analytics report exported as ${format.toUpperCase()}`);
       }, 2000);
     } catch (error) {
-      addNotification({
-        type: 'error',
-        title: 'Export Failed',
-        message: 'Failed to export analytics report'
-      });
+      addNotification('Failed to export analytics report');
     }
   };
 

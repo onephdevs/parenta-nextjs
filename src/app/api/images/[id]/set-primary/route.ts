@@ -5,7 +5,7 @@ import { setImageAsPrimary } from '@/lib/api/images';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,7 +40,8 @@ export async function PATCH(
       );
     }
 
-    const image = await setImageAsPrimary(params.id, entityType, entityId);
+    const { id } = await params;
+    const image = await setImageAsPrimary(id, entityType, entityId);
     
     return NextResponse.json({ 
       success: true,
