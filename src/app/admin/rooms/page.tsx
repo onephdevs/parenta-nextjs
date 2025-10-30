@@ -120,7 +120,7 @@ export default async function RoomsPage() {
               <div className="ml-5">
                 <dt className="text-sm font-medium text-gray-500">Avg Rent</dt>
                 <dd className="text-2xl font-semibold text-gray-900">
-                  ${stats?.average_rent ? Math.round(stats.average_rent).toLocaleString() : 0}
+                  ₱{stats?.average_rent ? Math.round(stats.average_rent).toLocaleString() : 0}
                 </dd>
                 <dd className="text-xs text-gray-500">per month</dd>
               </div>

@@ -39,7 +39,9 @@ export default function LandingPage() {
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setBuildings(result.data.slice(0, 6)); // Show top 6 buildings
+          // Handle both response formats: { data: { buildings: [] } } or { data: [] }
+          const buildingsArray = result.data.buildings || result.data || [];
+          setBuildings(buildingsArray.slice(0, 6)); // Show top 6 buildings
         }
       }
     } catch (error) {

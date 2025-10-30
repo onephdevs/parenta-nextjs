@@ -10,9 +10,7 @@ interface TenantFormData {
   email: string;
   phone?: string;
   dateOfBirth?: string;
-  tenantStatus: 'active' | 'pending' | 'inactive' | 'terminated';
   moveInDate?: string;
-  moveOutDate?: string;
   previousAddress?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -20,7 +18,9 @@ interface TenantFormData {
   employmentStatus?: 'employed' | 'unemployed' | 'student' | 'retired' | 'other';
   employerName?: string;
   monthlyIncome?: number;
-  securityDeposit?: number;
+  monthlyRent?: number;
+  depositMonths: number;
+  advanceMonths: number;
   leaseStartDate?: string;
   leaseEndDate?: string;
   notes?: string;
@@ -37,9 +37,7 @@ export default function TenantForm() {
     email: '',
     phone: '',
     dateOfBirth: '',
-    tenantStatus: 'pending',
     moveInDate: '',
-    moveOutDate: '',
     previousAddress: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
@@ -47,7 +45,9 @@ export default function TenantForm() {
     employmentStatus: 'employed',
     employerName: '',
     monthlyIncome: 0,
-    securityDeposit: 0,
+    monthlyRent: 0,
+    depositMonths: 1,
+    advanceMonths: 1,
     leaseStartDate: '',
     leaseEndDate: '',
     notes: '',
@@ -84,8 +84,16 @@ export default function TenantForm() {
       newErrors.monthlyIncome = 'Monthly income cannot be negative';
     }
 
-    if (formData.securityDeposit && formData.securityDeposit < 0) {
-      newErrors.securityDeposit = 'Security deposit cannot be negative';
+    if (formData.monthlyRent && formData.monthlyRent < 0) {
+      newErrors.monthlyRent = 'Monthly rent cannot be negative';
+    }
+
+    if (formData.depositMonths < 0) {
+      newErrors.depositMonths = 'Deposit months cannot be negative';
+    }
+
+    if (formData.advanceMonths < 0) {
+      newErrors.advanceMonths = 'Advance months cannot be negative';
     }
 
     setErrors(newErrors);
@@ -117,11 +125,12 @@ export default function TenantForm() {
           ...formData,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : null,
           moveInDate: formData.moveInDate ? new Date(formData.moveInDate) : null,
-          moveOutDate: formData.moveOutDate ? new Date(formData.moveOutDate) : null,
           leaseStartDate: formData.leaseStartDate ? new Date(formData.leaseStartDate) : null,
           leaseEndDate: formData.leaseEndDate ? new Date(formData.leaseEndDate) : null,
           monthlyIncome: formData.monthlyIncome || null,
-          securityDeposit: formData.securityDeposit || null,
+          monthlyRent: formData.monthlyRent || null,
+          depositMonths: formData.depositMonths,
+          advanceMonths: formData.advanceMonths,
         }),
       });
 
@@ -189,7 +198,7 @@ export default function TenantForm() {
               id="firstName"
               value={formData.firstName}
               onChange={handleInputChange}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                 errors.firstName ? 'border-red-300' : ''
               }`}
               required
@@ -209,7 +218,7 @@ export default function TenantForm() {
               id="lastName"
               value={formData.lastName}
               onChange={handleInputChange}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                 errors.lastName ? 'border-red-300' : ''
               }`}
               required
@@ -229,7 +238,7 @@ export default function TenantForm() {
               id="email"
               value={formData.email}
               onChange={handleInputChange}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                 errors.email ? 'border-red-300' : ''
               }`}
               required
@@ -249,7 +258,7 @@ export default function TenantForm() {
               id="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
@@ -263,31 +272,13 @@ export default function TenantForm() {
               id="dateOfBirth"
               value={formData.dateOfBirth}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
           <div>
-            <label htmlFor="tenantStatus" className="block text-sm font-medium text-gray-700">
-              Status
-            </label>
-            <select
-              name="tenantStatus"
-              id="tenantStatus"
-              value={formData.tenantStatus}
-              onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-            >
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="terminated">Terminated</option>
-            </select>
-          </div>
-
-          <div>
             <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-700">
-              Monthly Income ($)
+              Monthly Income (₱)
             </label>
             <input
               type="number"
@@ -297,7 +288,7 @@ export default function TenantForm() {
               step="0.01"
               value={formData.monthlyIncome}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
         </div>
@@ -319,7 +310,7 @@ export default function TenantForm() {
               id="emergencyContactName"
               value={formData.emergencyContactName}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
@@ -333,7 +324,7 @@ export default function TenantForm() {
               id="emergencyContactPhone"
               value={formData.emergencyContactPhone}
               onChange={handleInputChange}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                 errors.emergencyContactPhone ? 'border-red-300' : ''
               }`}
             />
@@ -353,7 +344,7 @@ export default function TenantForm() {
               value={formData.emergencyContactRelationship}
               onChange={handleInputChange}
               placeholder="e.g., Parent, Spouse, Friend"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
         </div>
@@ -374,7 +365,7 @@ export default function TenantForm() {
               id="employmentStatus"
               value={formData.employmentStatus}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             >
               <option value="employed">Employed</option>
               <option value="unemployed">Unemployed</option>
@@ -394,29 +385,87 @@ export default function TenantForm() {
               id="employerName"
               value={formData.employerName}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
           <div>
-            <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-700">
-              Security Deposit ($)
+            <label htmlFor="monthlyRent" className="block text-sm font-medium text-gray-700">
+              Monthly Rent (₱) *
             </label>
             <input
               type="number"
-              name="securityDeposit"
-              id="securityDeposit"
+              name="monthlyRent"
+              id="monthlyRent"
               min="0"
-              step="0.01"
-              value={formData.securityDeposit}
+              step="1"
+              value={formData.monthlyRent}
               onChange={handleInputChange}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
-                errors.securityDeposit ? 'border-red-300' : ''
+              required
+              placeholder="e.g., 5000, 8000, 12000"
+              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
+                errors.monthlyRent ? 'border-red-300' : ''
               }`}
             />
-            {errors.securityDeposit && (
-              <p className="mt-1 text-sm text-red-600">{errors.securityDeposit}</p>
+            {errors.monthlyRent && (
+              <p className="mt-1 text-sm text-red-600">{errors.monthlyRent}</p>
             )}
+            <p className="mt-1 text-xs text-gray-500">Enter amount in Philippine Pesos</p>
+          </div>
+
+          <div>
+            <label htmlFor="depositMonths" className="block text-sm font-medium text-gray-700">
+              Deposit Months *
+            </label>
+            <select
+              name="depositMonths"
+              id="depositMonths"
+              value={formData.depositMonths}
+              onChange={handleInputChange}
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+            >
+              <option value="0">0 month</option>
+              <option value="1">1 month</option>
+              <option value="2">2 months</option>
+              <option value="3">3 months</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Deposit: ₱{((formData.monthlyRent || 0) * formData.depositMonths).toLocaleString()}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="advanceMonths" className="block text-sm font-medium text-gray-700">
+              Advance Months *
+            </label>
+            <select
+              name="advanceMonths"
+              id="advanceMonths"
+              value={formData.advanceMonths}
+              onChange={handleInputChange}
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+            >
+              <option value="0">0 month</option>
+              <option value="1">1 month</option>
+              <option value="2">2 months</option>
+              <option value="3">3 months</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Advance: ₱{((formData.monthlyRent || 0) * formData.advanceMonths).toLocaleString()}
+            </p>
+          </div>
+
+          {/* Total Amount Display */}
+          <div className="sm:col-span-2 bg-purple-50 p-4 rounded-md border border-purple-200">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Total Initial Payment:</span>
+              <span className="text-lg font-bold text-purple-600">
+                ₱{((formData.monthlyRent || 0) * (formData.depositMonths + formData.advanceMonths)).toLocaleString()}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              ({formData.depositMonths} month{formData.depositMonths !== 1 ? 's' : ''} deposit + {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''} advance) × ₱{(formData.monthlyRent || 0).toLocaleString()}
+            </p>
           </div>
         </div>
       </div>
@@ -437,7 +486,7 @@ export default function TenantForm() {
               id="leaseStartDate"
               value={formData.leaseStartDate}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
@@ -451,7 +500,7 @@ export default function TenantForm() {
               id="leaseEndDate"
               value={formData.leaseEndDate}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
@@ -465,7 +514,7 @@ export default function TenantForm() {
               id="moveInDate"
               value={formData.moveInDate}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
@@ -479,7 +528,7 @@ export default function TenantForm() {
               id="moveOutDate"
               value={formData.moveOutDate}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
         </div>
@@ -501,7 +550,7 @@ export default function TenantForm() {
               id="previousAddress"
               value={formData.previousAddress}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
 
@@ -515,7 +564,7 @@ export default function TenantForm() {
               rows={4}
               value={formData.notes}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               placeholder="Any additional notes about this tenant..."
             />
           </div>

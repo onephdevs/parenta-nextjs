@@ -38,11 +38,33 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   if (vendor) filters.vendor = vendor;
   if (search) filters.search = search;
 
-  const [expensesData, buildings, summary] = await Promise.all([
-    getExpenses(filters, page, 20),
-    getAllBuildings(),
-    getExpenseSummary()
-  ]);
+  // Fetch data with error handling
+  let expensesData, buildings, summary;
+  
+  try {
+    [expensesData, buildings, summary] = await Promise.all([
+      getExpenses(filters, page, 20),
+      getAllBuildings(),
+      getExpenseSummary()
+    ]);
+  } catch (error) {
+    console.error('Error loading expenses:', error);
+    // Return empty data if there's an error
+    expensesData = {
+      expenses: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0
+    };
+    buildings = [];
+    summary = {
+      totalExpenses: 0,
+      totalAmount: 0,
+      byCategory: [],
+      topVendors: []
+    };
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

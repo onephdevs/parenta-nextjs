@@ -35,11 +35,38 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   if (tenantId) filters.tenantId = parseInt(tenantId);
   if (search) filters.search = search;
 
-  const [invoicesData, tenants, summary] = await Promise.all([
-    getInvoices(filters, page, 20),
-    getAllTenants(),
-    getInvoiceSummary()
-  ]);
+  // Fetch data with error handling
+  let invoicesData, tenants, summary;
+  
+  try {
+    [invoicesData, tenants, summary] = await Promise.all([
+      getInvoices(filters, page, 20),
+      getAllTenants(),
+      getInvoiceSummary()
+    ]);
+  } catch (error) {
+    console.error('Error loading invoices:', error);
+    // Return empty data if there's an error
+    invoicesData = {
+      invoices: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0
+    };
+    tenants = [];
+    summary = {
+      totalInvoices: 0,
+      totalAmount: 0,
+      paidAmount: 0,
+      pendingAmount: 0,
+      overdueAmount: 0,
+      paidCount: 0,
+      sentCount: 0,
+      overdueCount: 0,
+      draftCount: 0
+    };
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

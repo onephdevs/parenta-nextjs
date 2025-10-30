@@ -267,7 +267,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                 Amount *
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
+                <span className="absolute left-3 top-2 text-gray-500"></span>
                 <input
                   type="number"
                   step="0.01"
@@ -375,7 +375,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
             <textarea
               value={formData.notes}
               onChange={(e) => handleInputChange('notes', e.target.value)}
-              rows={3}
+              rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Additional notes or comments about this bill..."
             />

@@ -33,7 +33,8 @@ interface MaintenanceRequest {
 }
 
 interface MaintenanceData {
-  activeRequests: number;
+  active: number;
+  total: number;
   requests: MaintenanceRequest[];
 }
 
@@ -55,18 +56,28 @@ export default function MaintenancePage() {
     priority: 'medium'
   });
 
-  // Redirect if not authenticated or not tenant
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchMaintenanceData();
+    }
+  }, [status, session]);
+
+  // Show loading state while checking authentication
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Redirect if not authenticated or not tenant
   if (!session || session.user.role !== 'tenant') {
     redirect('/auth/signin?role=tenant');
   }
-
-  useEffect(() => {
-    fetchMaintenanceData();
-  }, []);
 
   const fetchMaintenanceData = async () => {
     try {
@@ -202,14 +213,14 @@ export default function MaintenancePage() {
     });
   };
 
-  const filteredRequests = maintenanceData?.requests.filter(request => {
+  const filteredRequests = (maintenanceData?.requests || []).filter(request => {
     const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || request.priority === filterPriority;
     const matchesSearch = request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          request.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          request.category.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesPriority && matchesSearch;
-  }) || [];
+  });
 
   const categories = [
     'plumbing',
@@ -289,7 +300,7 @@ export default function MaintenancePage() {
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">Active Requests</dt>
                           <dd className="text-lg font-medium text-gray-900">
-                            {maintenanceData.activeRequests}
+                            {maintenanceData?.active || 0}
                           </dd>
                         </dl>
                       </div>
@@ -357,7 +368,7 @@ export default function MaintenancePage() {
                 <div className="px-4 py-5 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Your Maintenance Requests ({maintenanceData.requests.length} total)
+                      Your Maintenance Requests ({maintenanceData?.requests?.length || 0} total)
                     </h3>
                     
                     {/* Filters */}

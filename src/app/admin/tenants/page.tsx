@@ -67,7 +67,7 @@ export default async function TenantsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Tenants</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.total_tenants || 0}</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.total || 0}</dd>
                     </dl>
                   </div>
                 </div>
@@ -85,7 +85,7 @@ export default async function TenantsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Active Tenants</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.active_tenants || 0}</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.active || 0}</dd>
                     </dl>
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export default async function TenantsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Pending Tenants</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.pending_tenants || 0}</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.pending || 0}</dd>
                     </dl>
                   </div>
                 </div>
@@ -122,7 +122,7 @@ export default async function TenantsPage() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Avg. Income</dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        ${stats.average_income ? Math.round(parseFloat(stats.average_income)).toLocaleString() : '0'}
+                        ₱{stats.averageIncome ? Math.round(stats.averageIncome).toLocaleString() : '0'}
                       </dd>
                     </dl>
                   </div>

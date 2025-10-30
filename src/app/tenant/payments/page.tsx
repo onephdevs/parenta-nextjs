@@ -44,18 +44,28 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { showNotification } = useNotifications();
 
-  // Redirect if not authenticated or not tenant
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchPaymentData();
+    }
+  }, [status, session]);
+
+  // Show loading state while checking authentication
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Redirect if not authenticated or not tenant
   if (!session || session.user.role !== 'tenant') {
     redirect('/auth/signin?role=tenant');
   }
-
-  useEffect(() => {
-    fetchPaymentData();
-  }, []);
 
   const fetchPaymentData = async () => {
     try {
@@ -129,14 +139,16 @@ export default function PaymentsPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amount: number | undefined | null) => {
+    const value = amount || 0;
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+      currency: 'PHP'
+    }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -144,13 +156,13 @@ export default function PaymentsPage() {
     });
   };
 
-  const filteredPayments = paymentData?.recentPayments.filter(payment => {
+  const filteredPayments = (paymentData?.recentPayments || []).filter(payment => {
     const matchesStatus = filterStatus === 'all' || payment.status === filterStatus;
     const matchesSearch = payment.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          payment.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          payment.reference?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
-  }) || [];
+  });
 
   if (isLoading) {
     return (
@@ -210,7 +222,7 @@ export default function PaymentsPage() {
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">Total Paid</dt>
                           <dd className="text-lg font-medium text-gray-900">
-                            {formatCurrency(paymentData.totalPaid)}
+                            {formatCurrency(paymentData?.totalPaid)}
                           </dd>
                         </dl>
                       </div>
@@ -228,10 +240,10 @@ export default function PaymentsPage() {
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">Next Due</dt>
                           <dd className="text-lg font-medium text-gray-900">
-                            {formatCurrency(paymentData.nextAmount)}
+                            {formatCurrency(paymentData?.nextAmount)}
                           </dd>
                           <dd className="text-xs text-gray-500">
-                            Due: {formatDate(paymentData.nextDueDate)}
+                            Due: {formatDate(paymentData?.nextDueDate)}
                           </dd>
                         </dl>
                       </div>
@@ -243,13 +255,13 @@ export default function PaymentsPage() {
                   <div className="p-5">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
-                        <AlertCircle className={`h-6 w-6 ${paymentData.outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}`} />
+                        <AlertCircle className={`h-6 w-6 ${(paymentData?.outstandingBalance || 0) > 0 ? 'text-red-600' : 'text-green-600'}`} />
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">Outstanding</dt>
                           <dd className="text-lg font-medium text-gray-900">
-                            {formatCurrency(paymentData.outstandingBalance)}
+                            {formatCurrency(paymentData?.outstandingBalance)}
                           </dd>
                         </dl>
                       </div>
@@ -259,7 +271,7 @@ export default function PaymentsPage() {
               </div>
 
               {/* Outstanding Balance Alert */}
-              {paymentData.outstandingBalance > 0 && (
+              {(paymentData?.outstandingBalance || 0) > 0 && (
                 <div className="bg-red-50 border-l-4 border-red-400 p-4">
                   <div className="flex">
                     <div className="flex-shrink-0">
@@ -267,7 +279,7 @@ export default function PaymentsPage() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-red-700">
-                        <strong>Outstanding Balance: {formatCurrency(paymentData.outstandingBalance)}</strong>
+                        <strong>Outstanding Balance: {formatCurrency(paymentData?.outstandingBalance)}</strong>
                         <br />
                         Please make a payment to avoid late fees. Late payments may result in additional charges.
                       </p>
@@ -300,10 +312,10 @@ export default function PaymentsPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-gray-900 mb-2">
-                      {formatCurrency(paymentData.nextAmount)}
+                      {formatCurrency(paymentData?.nextAmount)}
                     </div>
                     <div className="text-sm text-gray-500 mb-4">
-                      Due: {formatDate(paymentData.nextDueDate)}
+                      Due: {formatDate(paymentData?.nextDueDate)}
                     </div>
                     <button
                       onClick={handleMakePayment}

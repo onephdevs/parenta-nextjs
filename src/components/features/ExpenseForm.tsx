@@ -207,7 +207,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">$</span>
+                    <span className="text-gray-500 text-base"></span>
                   </div>
                   <input
                     type="number"
@@ -218,7 +218,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    className={`block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
+                    className={`block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base ${
                       errors.amount ? 'border-red-300' : ''
                     }`}
                   />
@@ -238,7 +238,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   name="category"
                   value={formData.category}
                   onChange={(e) => handleInputChange('category', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.category ? 'border-red-300' : ''
                   }`}
                 >
@@ -266,7 +266,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   name="expenseDate"
                   value={formData.expenseDate}
                   onChange={(e) => handleInputChange('expenseDate', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.expenseDate ? 'border-red-300' : ''
                   }`}
                 />
@@ -285,7 +285,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   name="buildingId"
                   value={formData.buildingId}
                   onChange={(e) => handleInputChange('buildingId', e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 >
                   <option value="">Select a building</option>
                   {buildings.map((building) => (
@@ -307,7 +307,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   value={formData.roomId}
                   onChange={(e) => handleInputChange('roomId', e.target.value)}
                   disabled={!formData.buildingId}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm disabled:bg-gray-100"
+                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base disabled:bg-gray-100"
                 >
                   <option value="">Select a room</option>
                   {filteredRooms.map((room) => (
@@ -333,7 +333,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   value={formData.vendor}
                   onChange={(e) => handleInputChange('vendor', e.target.value)}
                   placeholder="Vendor or service provider name"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 />
               </div>
 
@@ -349,7 +349,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Brief description of the expense"
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.description ? 'border-red-300' : ''
                   }`}
                 />
@@ -366,11 +366,11 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                 <textarea
                   id="notes"
                   name="notes"
-                  rows={3}
+                  rows={4}
                   value={formData.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Additional notes or details about the expense"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 />
               </div>
             </div>
@@ -383,14 +383,14 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
         <button
           type="button"
           onClick={handleCancel}
-          className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+          className="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
         >
           {isLoading ? 'Recording...' : 'Record Expense'}
         </button>

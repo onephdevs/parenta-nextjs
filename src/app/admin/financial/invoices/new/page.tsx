@@ -3,12 +3,23 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import CreateInvoiceForm from '@/components/features/CreateInvoiceForm';
 
-export default async function NewInvoicePage() {
+interface NewInvoicePageProps {
+  searchParams: Promise<{
+    roomId?: string;
+    tenantId?: string;
+  }>;
+}
+
+export default async function NewInvoicePage({ searchParams }: NewInvoicePageProps) {
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/signin');
   }
+
+  const params = await searchParams;
+  const roomId = params.roomId;
+  const tenantId = params.tenantId;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -32,7 +43,7 @@ export default async function NewInvoicePage() {
       </div>
 
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8">
-        <CreateInvoiceForm />
+        <CreateInvoiceForm roomId={roomId} tenantId={tenantId} />
       </div>
     </div>
   );

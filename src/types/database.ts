@@ -17,8 +17,10 @@ export interface Building {
   buildingType: string;
   yearBuilt?: number;
   totalFloors?: number;
-  totalUnits: number;
-  activeUnits: number;
+  totalUnits?: number;
+  activeUnits?: number;
+  occupiedUnits?: number;
+  vacantUnits?: number;
   amenities: string[];
   isActive: boolean;
   createdAt: Date;
@@ -566,7 +568,6 @@ export interface CreateRoomData {
   roomType?: string;
   squareFootage?: number;
   monthlyRate: number;
-  depositAmount?: number;
   roomStatus?: 'vacant' | 'occupied' | 'maintenance' | 'reserved';
   description?: string;
   amenities?: string[];

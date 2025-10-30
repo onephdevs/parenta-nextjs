@@ -23,7 +23,6 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     floorNumber: undefined,
     squareFootage: undefined,
     monthlyRate: 0,
-    depositAmount: undefined,
     amenities: [],
     description: ''
   });
@@ -34,7 +33,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'squareFootage' || name === 'monthlyRate' || name === 'depositAmount' || name === 'floorNumber'
+      [name]: name === 'squareFootage' || name === 'monthlyRate' || name === 'floorNumber'
         ? (value ? parseFloat(value) : undefined) 
         : value
     }));
@@ -190,8 +189,8 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
               type="number"
               id="squareFootage"
               name="squareFootage"
-              min="0"
-              step="0.01"
+              min="1"
+              step="1"
               value={formData.squareFootage || ''}
               onChange={handleInputChange}
               placeholder="e.g., 600, 800, 1200"
@@ -201,41 +200,23 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
         </div>
 
         {/* Financial Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
-              Monthly Rent ($) *
-            </label>
-            <input
-              type="number"
-              id="monthlyRate"
-              name="monthlyRate"
-              required
-              min="0"
-              step="0.01"
-              value={formData.monthlyRate || ''}
-              onChange={handleInputChange}
-              placeholder="e.g., 1500, 2000, 2500"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700 mb-1">
-              Security Deposit ($)
-            </label>
-            <input
-              type="number"
-              id="depositAmount"
-              name="depositAmount"
-              min="0"
-              step="0.01"
-              value={formData.depositAmount || ''}
-              onChange={handleInputChange}
-              placeholder="e.g., 1500, 2000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
+        <div>
+          <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
+            Monthly Rate (₱) *
+          </label>
+          <input
+            type="number"
+            id="monthlyRate"
+            name="monthlyRate"
+            required
+            min="0"
+            step="1"
+            value={formData.monthlyRate || ''}
+            onChange={handleInputChange}
+            placeholder="e.g., 5000, 8000, 12000"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          <p className="mt-1 text-sm text-gray-500">Enter amount in Philippine Pesos</p>
         </div>
 
         {/* Description */}

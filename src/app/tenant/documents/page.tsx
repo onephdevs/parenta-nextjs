@@ -44,18 +44,28 @@ export default function DocumentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { showNotification } = useNotifications();
 
-  // Redirect if not authenticated or not tenant
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchDocuments();
+    }
+  }, [status, session]);
+
+  // Show loading state while checking authentication
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Redirect if not authenticated or not tenant
   if (!session || session.user.role !== 'tenant') {
     redirect('/auth/signin?role=tenant');
   }
-
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
 
   const fetchDocuments = async () => {
     try {
@@ -157,12 +167,12 @@ export default function DocumentsPage() {
     });
   };
 
-  const filteredDocuments = documentsData?.documents.filter(document => {
+  const filteredDocuments = (documentsData?.documents || []).filter(document => {
     const matchesCategory = filterCategory === 'all' || document.category === filterCategory;
     const matchesSearch = document.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          document.description?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
-  }) || [];
+  });
 
   const categories = ['all', 'lease', 'payment', 'maintenance', 'insurance', 'legal', 'other'];
 

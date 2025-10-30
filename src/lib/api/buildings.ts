@@ -29,13 +29,28 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
 export async function getAllBuildings(): Promise<Building[]> {
   try {
     const query = `
-      SELECT * FROM buildings 
-      WHERE is_active = true 
-      ORDER BY name ASC
+      SELECT 
+        b.*,
+        COUNT(r.id) as total_units,
+        SUM(CASE WHEN r.room_status = 'occupied' THEN 1 ELSE 0 END) as occupied_units,
+        SUM(CASE WHEN r.room_status = 'vacant' THEN 1 ELSE 0 END) as vacant_units
+      FROM buildings b
+      LEFT JOIN rooms r ON r.building_id = b.id
+      WHERE b.is_active = true 
+      GROUP BY b.id
+      ORDER BY b.name ASC
     `;
     
     const result = await pool.query(query);
-    return result.rows.map(mapDatabaseBuildingToBuilding);
+    return result.rows.map(row => {
+      const building = mapDatabaseBuildingToBuilding(row);
+      return {
+        ...building,
+        totalUnits: parseInt(row.total_units) || 0,
+        occupiedUnits: parseInt(row.occupied_units) || 0,
+        vacantUnits: parseInt(row.vacant_units) || 0
+      };
+    });
   } catch (error) {
     console.error('Error fetching buildings:', error);
     throw error;

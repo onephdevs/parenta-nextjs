@@ -27,7 +27,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
     city: '',
     state: '',
     postalCode: '',
-    country: 'USA',
+    country: 'Philippines',
     description: '',
     buildingType: 'residential',
     yearBuilt: undefined,
@@ -90,7 +90,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
         city: '',
         state: '',
         postalCode: '',
-        country: 'USA',
+        country: 'Philippines',
         description: '',
         buildingType: 'residential',
         yearBuilt: undefined,
@@ -321,7 +321,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
               <textarea
                 id="description"
                 name="description"
-                rows={3}
+                rows={4}
                 value={formData.description}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"

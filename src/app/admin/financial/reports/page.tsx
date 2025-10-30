@@ -36,20 +36,48 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
   const startDate = resolvedSearchParams.startDate || currentMonthStart.toISOString().split('T')[0];
   const endDate = resolvedSearchParams.endDate || currentMonthEnd.toISOString().split('T')[0];
 
-  // Load all report data
-  const [
-    financialReport,
-    revenueByCategory,
-    expenseByCategory,
-    monthlyTrends,
-    outstandingBalances,
-  ] = await Promise.all([
-    generateFinancialReport(startDate, endDate),
-    getRevenueByCategory(startDate, endDate),
-    getExpenseByCategory(startDate, endDate),
-    getMonthlyTrends(6), // Last 6 months
-    getOutstandingBalances(),
-  ]);
+  // Load all report data with error handling
+  let financialReport, revenueByCategory, expenseByCategory, monthlyTrends, outstandingBalances;
+  
+  try {
+    [
+      financialReport,
+      revenueByCategory,
+      expenseByCategory,
+      monthlyTrends,
+      outstandingBalances,
+    ] = await Promise.all([
+      generateFinancialReport(startDate, endDate),
+      getRevenueByCategory(startDate, endDate),
+      getExpenseByCategory(startDate, endDate),
+      getMonthlyTrends(6), // Last 6 months
+      getOutstandingBalances(),
+    ]);
+  } catch (error) {
+    console.error('Error loading financial reports:', error);
+    // Return empty data if there's an error
+    financialReport = {
+      summary: {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        netIncome: 0,
+        profitMargin: 0,
+        totalPayments: 0,
+        totalInvoices: 0,
+        totalOutstanding: 0,
+      },
+      details: {
+        revenue: [],
+        expenses: [],
+        payments: [],
+        invoices: [],
+      },
+    };
+    revenueByCategory = [];
+    expenseByCategory = [];
+    monthlyTrends = [];
+    outstandingBalances = [];
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

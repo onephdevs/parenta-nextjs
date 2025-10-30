@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Building } from '@/types/database';
+import { useRouter } from 'next/navigation';
 
 interface BuildingCardProps {
   building: Building;
@@ -9,6 +11,24 @@ interface BuildingCardProps {
 }
 
 export default function BuildingCard({ building, viewMode }: BuildingCardProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isMenuOpen]);
+
   const formatAddress = (building: Building) => {
     return `${building.addressLine1}${building.addressLine2 ? `, ${building.addressLine2}` : ''}, ${building.city}, ${building.state} ${building.postalCode}`;
   };
@@ -29,11 +49,48 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     Active
                   </span>
-                  <button className="text-gray-400 hover:text-gray-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
+                  <div className="relative" ref={menuRef}>
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsMenuOpen(!isMenuOpen);
+                      }}
+                      className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
+
+                    {isMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 ring-1 ring-black ring-opacity-5">
+                        <div className="py-1">
+                          <Link
+                            href={`/admin/buildings/${building.id}`}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            View Details
+                          </Link>
+                          <button
+                            onClick={() => {
+                              router.push(`/admin/buildings/${building.id}`);
+                              setIsMenuOpen(false);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Edit Building
+                          </button>
+                          <Link
+                            href={`/admin/buildings/${building.id}/rooms`}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Manage Rooms
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -47,12 +104,14 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                   <p className="text-sm font-medium text-gray-900">{building.totalUnits} units</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Year Built</p>
-                  <p className="text-sm font-medium text-gray-900">{building.yearBuilt || 'N/A'}</p>
-                </div>
-                <div>
                   <p className="text-sm text-gray-500">Type</p>
                   <p className="text-sm font-medium text-gray-900 capitalize">{building.buildingType}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Occupancy</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {building.occupiedUnits || 0}/{building.totalUnits || 0}
+                  </p>
                 </div>
               </div>
 
@@ -92,11 +151,50 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
               {building.name}
             </Link>
           </h3>
-          <button className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-          </button>
+          <div className="relative" ref={menuRef}>
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsMenuOpen(!isMenuOpen);
+              }}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 ring-1 ring-black ring-opacity-5">
+                <div className="py-1">
+                  <Link
+                    href={`/admin/buildings/${building.id}`}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    View Details
+                  </Link>
+                  <button
+                    onClick={() => {
+                      router.push(`/admin/buildings/${building.id}`);
+                      setIsMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    Edit Building
+                  </button>
+                  <Link
+                    href={`/admin/buildings/${building.id}/rooms`}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Manage Rooms
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-2">
@@ -106,11 +204,13 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-500">Units</p>
-            <p className="text-lg font-semibold text-gray-900">{building.totalUnits}</p>
+            <p className="text-lg font-semibold text-gray-900">{building.totalUnits || 0}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Year Built</p>
-            <p className="text-lg font-semibold text-gray-900">{building.yearBuilt || 'N/A'}</p>
+            <p className="text-sm text-gray-500">Occupancy</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {building.occupiedUnits || 0}/{building.totalUnits || 0}
+            </p>
           </div>
         </div>
 

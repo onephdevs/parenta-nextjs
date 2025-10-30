@@ -25,7 +25,12 @@ interface InvoiceItem {
   itemType: 'rent' | 'utilities' | 'fees' | 'deposit' | 'other';
 }
 
-export default function CreateInvoiceForm() {
+interface CreateInvoiceFormProps {
+  roomId?: string;
+  tenantId?: string;
+}
+
+export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFormProps = {}) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,8 +39,8 @@ export default function CreateInvoiceForm() {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    tenantId: '',
-    roomId: '',
+    tenantId: tenantId || '',
+    roomId: roomId || '',
     dueDate: '',
     billingPeriodStart: '',
     billingPeriodEnd: '',
@@ -57,6 +62,20 @@ export default function CreateInvoiceForm() {
   useEffect(() => {
     fetchTenants();
   }, []);
+
+  // Fetch tenant rooms when tenantId prop is provided
+  useEffect(() => {
+    if (tenantId && formData.tenantId) {
+      fetchTenantRooms(formData.tenantId);
+    }
+  }, [tenantId]);
+
+  // Fetch room details if roomId is provided but no tenantId
+  useEffect(() => {
+    if (roomId && !tenantId) {
+      fetchRoomDetails(roomId);
+    }
+  }, [roomId, tenantId]);
 
   const fetchTenants = async () => {
     try {
@@ -93,6 +112,49 @@ export default function CreateInvoiceForm() {
     } catch (error) {
       console.error('Error fetching tenant rooms:', error);
       setTenantRooms([]);
+    }
+  };
+
+  const fetchRoomDetails = async (roomId: string) => {
+    try {
+      // Fetch room details
+      const roomResponse = await fetch(`/api/rooms/${roomId}`);
+      const roomResult = await roomResponse.json();
+      
+      if (roomResult.success && roomResult.data) {
+        const roomData = roomResult.data;
+        
+        // Create room object for dropdown
+        const room: Room = {
+          id: roomData.id,
+          roomNumber: roomData.roomNumber,
+          buildingName: roomData.buildingName || 'Unknown Building',
+          monthlyRate: roomData.monthlyRate || 0,
+        };
+        
+        setTenantRooms([room]);
+        
+        // If room has a tenant assigned, auto-select the tenant
+        if (roomData.currentTenantId) {
+          setFormData(prev => ({ 
+            ...prev, 
+            roomId: room.id,
+            tenantId: roomData.currentTenantId 
+          }));
+          
+          // Pre-fill invoice item with rent
+          if (room.monthlyRate > 0 && items[0].unitPrice === 0) {
+            setItems([{
+              description: `Monthly Rent - ${room.roomNumber}`,
+              quantity: 1,
+              unitPrice: room.monthlyRate,
+              itemType: 'rent' as const,
+            }]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching room details:', error);
     }
   };
 
@@ -520,7 +582,7 @@ export default function CreateInvoiceForm() {
             <textarea
               id="notes"
               name="notes"
-              rows={3}
+              rows={4}
               value={formData.notes}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"

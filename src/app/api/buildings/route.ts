@@ -7,7 +7,9 @@ export async function GET() {
     
     return NextResponse.json({
       success: true,
-      data: buildings
+      data: {
+        buildings: buildings
+      }
     });
   } catch (error) {
     console.error('Buildings API error:', error);

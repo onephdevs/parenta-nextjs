@@ -14,6 +14,7 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react';
+import Breadcrumb from '../../../components/ui/Breadcrumb';
 import {
   MetricCard,
   FinancialTrendChart,
@@ -169,48 +170,49 @@ export default function AnalyticsPage() {
     );
   }
 
-  return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Analytics & Reporting</h1>
-            <p className="text-gray-600">
-              Comprehensive insights into your property management business
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-            <div className="relative">
-              <select
-                onChange={(e) => handleExport(e.target.value as 'pdf' | 'excel' | 'csv')}
-                defaultValue=""
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                <option value="" disabled>Export</option>
-                <option value="pdf">Export PDF</option>
-                <option value="excel">Export Excel</option>
-                <option value="csv">Export CSV</option>
-              </select>
-            </div>
-          </div>
-        </div>
+  const breadcrumbItems = [
+    { label: 'Dashboard', href: '/admin' },
+    { label: 'Analytics & Reporting' }
+  ];
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow border p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header with Breadcrumb */}
+      <Breadcrumb 
+        items={breadcrumbItems}
+        subtitle="Comprehensive insights into your property management business"
+      >
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+        <select
+          onChange={(e) => handleExport(e.target.value as 'pdf' | 'excel' | 'csv')}
+          defaultValue=""
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+        >
+          <option value="" disabled>Export</option>
+          <option value="pdf">Export PDF</option>
+          <option value="excel">Export Excel</option>
+          <option value="csv">Export CSV</option>
+        </select>
+      </Breadcrumb>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
+
+          {/* Filters */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center mb-4">
+              <Filter className="h-5 w-5 text-purple-600 mr-2" />
+              <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Building
@@ -218,7 +220,7 @@ export default function AnalyticsPage() {
               <select
                 value={selectedBuildingId}
                 onChange={(e) => setSelectedBuildingId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
               >
                 <option value="">All Buildings</option>
                 {buildings.map(building => (
@@ -236,7 +238,7 @@ export default function AnalyticsPage() {
                 type="date"
                 value={dateRange.startDate}
                 onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
               />
             </div>
             <div>
@@ -247,7 +249,7 @@ export default function AnalyticsPage() {
                 type="date"
                 value={dateRange.endDate}
                 onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
               />
             </div>
             <div>
@@ -257,42 +259,43 @@ export default function AnalyticsPage() {
               <select
                 value={period}
                 onChange={(e) => setPeriod(e.target.value as 'monthly' | 'quarterly' | 'yearly')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
               >
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="yearly">Yearly</option>
               </select>
             </div>
+            </div>
           </div>
-        </div>
 
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+          {/* Tabs */}
+          <div className="bg-white rounded-lg shadow mb-6">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`${
+                        activeTab === tab.id
+                          ? 'border-purple-500 text-purple-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+                    >
+                      <Icon className="h-5 w-5 mr-2" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
 
-        {/* Content */}
-        {activeTab === 'overview' && metrics && (
-          <div className="space-y-6">
+            {/* Content */}
+            {activeTab === 'overview' && metrics && (
+              <div className="p-6 space-y-6">
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <MetricCard
@@ -339,11 +342,11 @@ export default function AnalyticsPage() {
                 <CashFlowChart data={cashFlowData} height={300} />
               </div>
             </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {activeTab === 'financial' && metrics && (
-          <div className="space-y-6">
+            {activeTab === 'financial' && metrics && (
+              <div className="p-6 space-y-6">
             {/* Financial Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <MetricCard
@@ -375,11 +378,11 @@ export default function AnalyticsPage() {
                 <CashFlowChart data={cashFlowData} height={400} />
               </div>
             </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {activeTab === 'occupancy' && metrics && (
-          <div className="space-y-6">
+            {activeTab === 'occupancy' && metrics && (
+              <div className="p-6 space-y-6">
             {/* Occupancy Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <MetricCard
@@ -409,11 +412,11 @@ export default function AnalyticsPage() {
             <div className="bg-white rounded-lg shadow border p-6">
               <OccupancyChart data={occupancyTrends} height={400} />
             </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {activeTab === 'buildings' && metrics && (
-          <div className="space-y-6">
+            {activeTab === 'buildings' && metrics && (
+              <div className="p-6 space-y-6">
             {/* Building Performance Chart */}
             <div className="bg-white rounded-lg shadow border p-6">
               <BuildingPerformanceChart data={metrics.buildings} height={400} />
@@ -475,9 +478,11 @@ export default function AnalyticsPage() {
                 </table>
               </div>
             </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 } 

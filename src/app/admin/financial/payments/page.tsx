@@ -38,11 +38,38 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   if (tenantId) filters.tenantId = parseInt(tenantId);
   if (search) filters.search = search;
 
-  const [paymentsData, tenants, summary] = await Promise.all([
-    getPayments(filters, page, 20),
-    getAllTenants(),
-    getPaymentSummary()
-  ]);
+  // Fetch data with error handling
+  let paymentsData, tenants, summary;
+  
+  try {
+    [paymentsData, tenants, summary] = await Promise.all([
+      getPayments(filters, page, 20),
+      getAllTenants(),
+      getPaymentSummary()
+    ]);
+  } catch (error) {
+    console.error('Error loading payments:', error);
+    // Return empty data if there's an error
+    paymentsData = {
+      payments: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0
+    };
+    tenants = [];
+    summary = {
+      totalPayments: 0,
+      totalAmount: 0,
+      completedAmount: 0,
+      pendingAmount: 0,
+      overdueAmount: 0,
+      completedCount: 0,
+      pendingCount: 0,
+      overdueCount: 0,
+      averagePaymentAmount: 0
+    };
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

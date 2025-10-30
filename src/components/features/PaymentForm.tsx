@@ -72,12 +72,16 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
         if (tenantsRes.ok) {
           const tenantsData = await tenantsRes.json();
-          setTenants(tenantsData.tenants || []);
+          // Handle both response formats: { success: true, data: [] } or { tenants: [] }
+          const tenantsList = tenantsData.data || tenantsData.tenants || [];
+          setTenants(tenantsList);
         }
 
         if (roomsRes.ok) {
           const roomsData = await roomsRes.json();
-          setRooms(roomsData.rooms || []);
+          // Handle both response formats: { success: true, data: [] } or { rooms: [] }
+          const roomsList = roomsData.data || roomsData.rooms || [];
+          setRooms(roomsList);
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -232,7 +236,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="tenantId"
                   value={formData.tenantId}
                   onChange={(e) => handleInputChange('tenantId', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.tenantId ? 'border-red-300' : ''
                   }`}
                 >
@@ -259,7 +263,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="roomId"
                   value={formData.roomId}
                   onChange={(e) => handleInputChange('roomId', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.roomId ? 'border-red-300' : ''
                   }`}
                 >
@@ -282,8 +286,8 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   Amount *
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">$</span>
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-base font-medium">₱</span>
                   </div>
                   <input
                     type="number"
@@ -294,7 +298,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    className={`block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
+                    className={`block w-full pl-9 pr-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 ${
                       errors.amount ? 'border-red-300' : ''
                     }`}
                   />
@@ -314,7 +318,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="type"
                   value={formData.type}
                   onChange={(e) => handleInputChange('type', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.type ? 'border-red-300' : ''
                   }`}
                 >
@@ -338,7 +342,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="status"
                   value={formData.status}
                   onChange={(e) => handleInputChange('status', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.status ? 'border-red-300' : ''
                   }`}
                 >
@@ -363,7 +367,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="paymentDate"
                   value={formData.paymentDate}
                   onChange={(e) => handleInputChange('paymentDate', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.paymentDate ? 'border-red-300' : ''
                   }`}
                 />
@@ -382,7 +386,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="paymentMethod"
                   value={formData.paymentMethod}
                   onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.paymentMethod ? 'border-red-300' : ''
                   }`}
                 >
@@ -409,7 +413,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   value={formData.transactionId}
                   onChange={(e) => handleInputChange('transactionId', e.target.value)}
                   placeholder="Optional transaction reference"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                 />
               </div>
 
@@ -421,11 +425,11 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                 <textarea
                   id="description"
                   name="description"
-                  rows={3}
+                  rows={4}
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Optional payment description or notes"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 resize-none"
                 />
               </div>
             </div>
@@ -438,14 +442,14 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         <button
           type="button"
           onClick={handleCancel}
-          className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+          className="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
         >
           {isLoading ? 'Recording...' : 'Record Payment'}
         </button>

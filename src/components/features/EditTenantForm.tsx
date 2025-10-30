@@ -183,7 +183,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="firstName"
                 value={formData.firstName}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.firstName ? 'border-red-300' : ''
                 }`}
                 required
@@ -203,7 +203,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="lastName"
                 value={formData.lastName}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.lastName ? 'border-red-300' : ''
                 }`}
                 required
@@ -223,7 +223,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.email ? 'border-red-300' : ''
                 }`}
                 required
@@ -243,7 +243,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.phone ? 'border-red-300' : ''
                 }`}
               />
@@ -262,7 +262,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
 
@@ -275,7 +275,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="tenantStatus"
                 value={formData.tenantStatus}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               >
                 <option value="pending">Pending</option>
                 <option value="active">Active</option>
@@ -292,10 +292,10 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             <textarea
               name="previousAddress"
               id="previousAddress"
-              rows={3}
+              rows={4}
               value={formData.previousAddress}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
         </div>
@@ -317,7 +317,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="emergencyContactName"
                 value={formData.emergencyContactName}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
 
@@ -331,7 +331,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="emergencyContactPhone"
                 value={formData.emergencyContactPhone}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.emergencyContactPhone ? 'border-red-300' : ''
                 }`}
               />
@@ -350,7 +350,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="emergencyContactRelationship"
                 value={formData.emergencyContactRelationship}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 placeholder="e.g., Parent, Sibling, Friend"
               />
             </div>
@@ -373,7 +373,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="employmentStatus"
                 value={formData.employmentStatus}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               >
                 <option value="employed">Employed</option>
                 <option value="unemployed">Unemployed</option>
@@ -393,7 +393,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="employerName"
                 value={formData.employerName}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
 
@@ -409,7 +409,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 step="0.01"
                 value={formData.monthlyIncome}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.monthlyIncome ? 'border-red-300' : ''
                 }`}
               />
@@ -430,7 +430,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 step="0.01"
                 value={formData.securityDeposit}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm ${
+                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.securityDeposit ? 'border-red-300' : ''
                 }`}
               />
@@ -458,7 +458,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="leaseStartDate"
                 value={formData.leaseStartDate}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
 
@@ -472,7 +472,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="leaseEndDate"
                 value={formData.leaseEndDate}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
 
@@ -486,7 +486,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="moveInDate"
                 value={formData.moveInDate}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
 
@@ -500,7 +500,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="moveOutDate"
                 value={formData.moveOutDate}
                 onChange={handleInputChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
             </div>
           </div>
@@ -517,7 +517,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             rows={4}
             value={formData.notes}
             onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+            className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             placeholder="Additional notes about the tenant..."
           />
         </div>

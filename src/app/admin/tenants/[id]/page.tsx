@@ -26,9 +26,9 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
 
     const formatCurrency = (amount?: number) => {
       if (!amount) return 'Not specified';
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat('en-PH', {
         style: 'currency',
-        currency: 'USD',
+        currency: 'PHP',
       }).format(amount);
     };
 
@@ -82,6 +82,15 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                 </span>
               </div>
               <div className="flex items-center space-x-3">
+                <Link
+                  href={`/admin/financial/payments/new?tenantId=${tenant.id}`}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                >
+                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Record Payment
+                </Link>
                 <Link
                   href={`/admin/tenants/${tenant.id}/edit`}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"

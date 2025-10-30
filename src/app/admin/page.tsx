@@ -55,21 +55,82 @@ interface DashboardStats {
 
 async function getDashboardStats(): Promise<DashboardStats | null> {
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3001';
-    const response = await fetch(`${baseUrl}/api/dashboard/stats`, {
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
+    const { getBuildingStats, getOccupancyStats } = await import('@/lib/api/buildings');
+    const pool = (await import('@/lib/db')).default;
+    
+    // Get building and occupancy stats
+    const [buildingStats, occupancyStats] = await Promise.all([
+      getBuildingStats(),
+      getOccupancyStats()
+    ]);
+    
+    // Get tenant stats
+    const tenantStatsQuery = `
+      SELECT 
+        COUNT(*) as total_tenants,
+        COUNT(*) FILTER (WHERE tenant_status = 'active') as active_tenants,
+        COUNT(*) FILTER (WHERE tenant_status = 'pending') as pending_tenants
+      FROM tenants 
+      WHERE is_active = true
+    `;
+    
+    const tenantStatsResult = await pool.query(tenantStatsQuery);
+    const tenantStats = tenantStatsResult.rows[0];
+    
+    // Get financial stats
+    const financialStatsQuery = `
+      SELECT 
+        COUNT(*) as total_payments,
+        COUNT(*) FILTER (WHERE payment_status = 'paid') as paid_payments,
+        COUNT(*) FILTER (WHERE payment_status = 'pending') as pending_payments,
+        COUNT(*) FILTER (WHERE payment_status = 'overdue') as overdue_payments,
+        COALESCE(SUM(amount) FILTER (WHERE payment_status = 'paid'), 0) as total_revenue,
+        COALESCE(SUM(amount) FILTER (WHERE payment_status = 'pending'), 0) as pending_revenue
+      FROM payments
+    `;
+    
+    const financialStatsResult = await pool.query(financialStatsQuery);
+    const financialStats = financialStatsResult.rows[0];
+    
+    // Calculate metrics
+    const occupancyRate = parseFloat(occupancyStats.occupancy_rate || '0');
+    const activeTenantsCount = parseInt(tenantStats.active_tenants || '0');
+    const totalRevenue = parseFloat(financialStats.total_revenue || '0');
+    
+    return {
+      buildings: {
+        total: parseInt(buildingStats.total_buildings || '0'),
+        active: parseInt(buildingStats.active_buildings || '0'),
+        totalUnits: parseInt(buildingStats.total_units || '0'),
+        activeUnits: parseInt(buildingStats.active_units || '0')
       },
-    });
-    
-    if (!response.ok) {
-      console.error(`Failed to fetch dashboard stats: ${response.status} ${response.statusText}`);
-      return null;
-    }
-    
-    const result = await response.json();
-    return result.success ? result.data : null;
+      rooms: {
+        total: parseInt(occupancyStats.total_rooms || '0'),
+        occupied: parseInt(occupancyStats.occupied_rooms || '0'),
+        vacant: parseInt(occupancyStats.vacant_rooms || '0'),
+        maintenance: parseInt(occupancyStats.maintenance_rooms || '0'),
+        occupancyRate: occupancyRate
+      },
+      tenants: {
+        total: parseInt(tenantStats.total_tenants || '0'),
+        active: activeTenantsCount,
+        pending: parseInt(tenantStats.pending_tenants || '0')
+      },
+      financial: {
+        totalPayments: parseInt(financialStats.total_payments || '0'),
+        paidPayments: parseInt(financialStats.paid_payments || '0'),
+        pendingPayments: parseInt(financialStats.pending_payments || '0'),
+        overduePayments: parseInt(financialStats.overdue_payments || '0'),
+        totalRevenue: totalRevenue,
+        pendingRevenue: parseFloat(financialStats.pending_revenue || '0')
+      },
+      summary: {
+        occupancyRate: occupancyRate,
+        activeBuildings: parseInt(buildingStats.active_buildings || '0'),
+        activeTenants: activeTenantsCount,
+        monthlyRevenue: totalRevenue
+      }
+    };
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     return null;
@@ -110,7 +171,7 @@ export default async function AdminDashboard() {
     {
       title: 'Record Payment',
       description: 'Log a payment',
-      href: '/admin/payments',
+      href: '/admin/financial/payments/new',
       icon: DollarSign,
       color: 'yellow'
     },
@@ -180,10 +241,10 @@ export default async function AdminDashboard() {
           </h2>
           <p className="text-gray-600">
             Here's what's happening with your properties today.
-          </p>
-        </div>
+                </p>
+              </div>
 
-        {/* Stats Grid */}
+          {/* Stats Grid */}
         {stats ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {/* Buildings */}
@@ -386,4 +447,4 @@ export default async function AdminDashboard() {
       </main>
     </div>
   );
-}
+} 

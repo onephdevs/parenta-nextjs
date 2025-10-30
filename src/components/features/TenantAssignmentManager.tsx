@@ -180,15 +180,26 @@ export default function TenantAssignmentManager({
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-900">Current Tenant</h3>
           {currentTenant ? (
-            <button
-              onClick={() => setShowUnassignForm(true)}
-              className="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              End Assignment
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowAssignForm(true)}
+                className="inline-flex items-center px-3 py-2 border border-purple-300 text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+                Add Occupant
+              </button>
+              <button
+                onClick={() => setShowUnassignForm(true)}
+                className="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                End Assignment
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => setShowAssignForm(true)}
@@ -227,11 +238,11 @@ export default function TenantAssignmentManager({
                     <span className="font-medium">Move-in Date:</span> {new Date(currentTenant.start_date).toLocaleDateString()}
                   </div>
                   <div>
-                    <span className="font-medium">Monthly Rate:</span> ${parseFloat(currentTenant.monthly_rate.toString()).toLocaleString()}
+                    <span className="font-medium">Monthly Rate:</span> ₱{parseFloat(currentTenant.monthly_rate.toString()).toLocaleString()}
                   </div>
                   {currentTenant.deposit_paid && (
                     <div>
-                      <span className="font-medium">Deposit Paid:</span> ${parseFloat(currentTenant.deposit_paid.toString()).toLocaleString()}
+                      <span className="font-medium">Deposit Paid:</span> ₱{parseFloat(currentTenant.deposit_paid.toString()).toLocaleString()}
                     </div>
                   )}
                   <div>
@@ -277,7 +288,7 @@ export default function TenantAssignmentManager({
                       {new Date(assignment.start_date).toLocaleDateString()} - 
                       {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'Current'}
                     </div>
-                    <div className="font-medium">${parseFloat(assignment.monthly_rate.toString()).toLocaleString()}/month</div>
+                    <div className="font-medium">₱{parseFloat(assignment.monthly_rate.toString()).toLocaleString()}/month</div>
                     <div className={`inline-flex px-2 py-1 text-xs rounded-full ${
                       assignment.assignment_status === 'active' 
                         ? 'bg-green-100 text-green-800' 
@@ -305,7 +316,7 @@ export default function TenantAssignmentManager({
                   <select
                     value={assignFormData.tenantId}
                     onChange={(e) => setAssignFormData({ ...assignFormData, tenantId: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
                   >
                     <option value="">Choose a tenant...</option>
@@ -323,19 +334,19 @@ export default function TenantAssignmentManager({
                     type="date"
                     value={assignFormData.startDate}
                     onChange={(e) => setAssignFormData({ ...assignFormData, startDate: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Monthly Rate ($)</label>
+                  <label className="block text-sm font-medium text-gray-700">Monthly Rate (₱)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={assignFormData.monthlyRate}
                     onChange={(e) => setAssignFormData({ ...assignFormData, monthlyRate: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
                   />
                 </div>
@@ -347,7 +358,7 @@ export default function TenantAssignmentManager({
                     step="0.01"
                     value={assignFormData.depositPaid}
                     onChange={(e) => setAssignFormData({ ...assignFormData, depositPaid: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     placeholder="Optional"
                   />
                 </div>
@@ -357,8 +368,8 @@ export default function TenantAssignmentManager({
                   <textarea
                     value={assignFormData.notes}
                     onChange={(e) => setAssignFormData({ ...assignFormData, notes: e.target.value })}
-                    rows={3}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    rows={4}
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     placeholder="Optional notes about the assignment..."
                   />
                 </div>
@@ -403,7 +414,7 @@ export default function TenantAssignmentManager({
                     type="date"
                     value={unassignFormData.endDate}
                     onChange={(e) => setUnassignFormData({ ...unassignFormData, endDate: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
                   />
                 </div>
@@ -413,8 +424,8 @@ export default function TenantAssignmentManager({
                   <textarea
                     value={unassignFormData.notes}
                     onChange={(e) => setUnassignFormData({ ...unassignFormData, notes: e.target.value })}
-                    rows={3}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    rows={4}
+                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     placeholder="Reason for ending assignment..."
                   />
                 </div>

@@ -9,23 +9,26 @@ import FullScreenModal from '@/components/ui/FullScreenModal';
 interface AddRoomModalProps {
   isOpen: boolean;
   onClose: () => void;
-  buildings: Building[];
+  buildings?: Building[];
+  building?: Building;
+  buildingId?: string;
 }
 
-export default function AddRoomModal({ isOpen, onClose, buildings }: AddRoomModalProps) {
+export default function AddRoomModal({ isOpen, onClose, buildings, building, buildingId }: AddRoomModalProps) {
+  // If a specific building or buildingId is provided, use it as the only option
+  const buildingOptions = buildings || (building ? [building] : []);
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<CreateRoomData>({
-    buildingId: '',
+    buildingId: buildingId || building?.id || '',
     roomNumber: '',
     roomType: 'bedroom',
     floorNumber: undefined,
     squareFootage: undefined,
     monthlyRate: 0,
-    depositAmount: undefined,
     amenities: [],
     description: ''
   });
@@ -36,7 +39,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings }: AddRoomModa
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'squareFootage' || name === 'monthlyRate' || name === 'depositAmount' || name === 'floorNumber'
+      [name]: name === 'squareFootage' || name === 'monthlyRate' || name === 'floorNumber'
         ? (value ? parseFloat(value) : undefined) 
         : value
     }));
@@ -168,11 +171,12 @@ export default function AddRoomModal({ isOpen, onClose, buildings }: AddRoomModa
                   required
                   value={formData.buildingId}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  disabled={!!(buildingId || building)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select a building</option>
-                  {buildings.map(building => (
-                    <option key={building.id} value={building.id}>{building.name}</option>
+                  {buildingOptions.map(bldg => (
+                    <option key={bldg.id} value={bldg.id}>{bldg.name}</option>
                   ))}
                 </select>
               </div>
@@ -245,9 +249,9 @@ export default function AddRoomModal({ isOpen, onClose, buildings }: AddRoomModa
                   type="number"
                   id="squareFootage"
                   name="squareFootage"
-                  min="50"
+                  min="1"
                   max="5000"
-                  step="10"
+                  step="1"
                   value={formData.squareFootage || ''}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -260,39 +264,23 @@ export default function AddRoomModal({ isOpen, onClose, buildings }: AddRoomModa
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Information</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
-                  Monthly Rate ($) *
-                </label>
-                <input
-                  type="number"
-                  id="monthlyRate"
-                  name="monthlyRate"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={formData.monthlyRate || ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700 mb-1">
-                  Deposit Amount ($)
-                </label>
-                <input
-                  type="number"
-                  id="depositAmount"
-                  name="depositAmount"
-                  min="0"
-                  step="0.01"
-                  value={formData.depositAmount || ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
+            <div>
+              <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
+                Monthly Rate (₱) *
+              </label>
+              <input
+                type="number"
+                id="monthlyRate"
+                name="monthlyRate"
+                required
+                min="0"
+                step="1"
+                value={formData.monthlyRate || ''}
+                onChange={handleInputChange}
+                placeholder="e.g., 5000, 8000, 12000"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-sm text-gray-500">Enter amount in Philippine Pesos</p>
             </div>
           </div>
 
@@ -307,7 +295,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings }: AddRoomModa
               <textarea
                 id="description"
                 name="description"
-                rows={3}
+                rows={4}
                 value={formData.description}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"

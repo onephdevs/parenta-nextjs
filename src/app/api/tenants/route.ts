@@ -68,7 +68,11 @@ export async function POST(request: Request) {
       
       return NextResponse.json({
         success: true,
-        data: result,
+        data: {
+          id: result.tenantId, // Add id field for frontend compatibility
+          tenantId: result.tenantId,
+          userId: result.userId
+        },
         message: 'Tenant and user account created successfully'
       });
     } else {
