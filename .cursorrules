@@ -140,10 +140,264 @@ Each task should include:
 - Document API endpoints and data structures
 - Keep task documentation current
 
+## Deployment Workflow
+
+### Production Environment
+- **Hosting:** Hostinger Shared Hosting
+- **Domain:** https://parenta.com.mx
+- **Server:** Node.js 18.20.8 with PM2 process manager
+- **Database:** Supabase PostgreSQL (external)
+- **SSL:** Automatic HTTPS via LiteSpeed
+
+### Deployment Process
+
+#### Development Workflow
+1. **Develop Locally:**
+   ```bash
+   npm run dev
+   # Test at http://localhost:3030
+   ```
+
+2. **Test Changes:**
+   - Test all CRUD operations
+   - Verify authentication flows
+   - Check responsive design
+   - Test database connections
+   - Ensure no console errors
+
+3. **Commit to GitHub:**
+   ```bash
+   git add .
+   git commit -m "feat: your feature description"
+   git push origin main
+   ```
+
+4. **Deploy to Production:**
+   ```bash
+   ./scripts/deploy-with-manual-nodejs.sh
+   ```
+
+#### Automated Deployment Script
+The deployment script performs these steps automatically:
+1. Pushes latest changes to GitHub
+2. Connects to Hostinger server via SSH
+3. Pulls latest code from GitHub repository
+4. Installs/updates dependencies on server
+5. Builds application locally and uploads (to avoid server resource limits)
+6. Restarts PM2 process manager
+7. Verifies application is running
+
+#### Deployment Methods
+
+**Method 1: Automated Script (Recommended)**
+```bash
+cd /Users/adrianestopace/Documents/oneph/parenta-nextjs
+./scripts/deploy-with-manual-nodejs.sh
+```
+
+**Method 2: Manual Deployment**
+```bash
+# 1. Build locally
+npm run build
+
+# 2. Upload built files
+sshpass -p 'Theanswer001!!!' rsync -avz -e "ssh -p 65002" \
+  .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
+
+# 3. Restart application
+sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
+  'cd ~/domains/parenta.com.mx/nodejs-app && \
+   export NVM_DIR="$HOME/.nvm" && \
+   source "$NVM_DIR/nvm.sh" && \
+   pm2 restart parenta-app'
+```
+
+**Method 3: Git-Based Deployment**
+```bash
+./scripts/deploy-git-auto.sh
+```
+This pulls code directly from GitHub on the server and builds there.
+
+### Deployment Timing
+
+**When to Deploy:**
+- ✅ After completing a feature (all acceptance criteria met)
+- ✅ After fixing a critical bug
+- ✅ After testing locally and confirming everything works
+- ✅ End of day with significant changes
+- ✅ Before showing client/stakeholders new features
+
+**When NOT to Deploy:**
+- ❌ During active development (wait for feature completion)
+- ❌ With failing tests or linter errors
+- ❌ Without testing locally first
+- ❌ With console errors or warnings
+- ❌ During high-traffic hours (if possible)
+
+### Post-Deployment Checklist
+After deploying, ALWAYS verify:
+- [ ] Application is accessible at https://parenta.com.mx
+- [ ] PM2 status shows app is running: `pm2 status`
+- [ ] No errors in logs: `pm2 logs parenta-app --lines 50`
+- [ ] Login functionality works
+- [ ] Database connections are working
+- [ ] Recently changed features are working
+- [ ] No console errors in browser
+
+### Server Management
+
+#### SSH Access
+```bash
+ssh -p 65002 u876334876@145.79.25.103
+# Or use helper script:
+./scripts/ssh-hostinger.sh connect
+```
+
+#### PM2 Commands
+```bash
+# View status
+pm2 status
+
+# View logs
+pm2 logs parenta-app
+
+# Restart application
+pm2 restart parenta-app
+
+# Stop application
+pm2 stop parenta-app
+
+# Monitor CPU/Memory
+pm2 monit
+```
+
+#### Application Location
+```
+Server Path: ~/domains/parenta.com.mx/nodejs-app
+Environment: ~/domains/parenta.com.mx/nodejs-app/.env.production
+Logs: ~/.pm2/logs/parenta-app-*.log
+```
+
+### Environment Variables
+
+**Local Development:** `.env.local`
+```env
+DATABASE_URL="postgresql://..."
+NEXTAUTH_URL="http://localhost:3030"
+NODE_ENV="development"
+PORT=3030
+```
+
+**Production:** `.env.production` (on server)
+```env
+DATABASE_URL="postgresql://..."
+NEXTAUTH_URL="https://parenta.com.mx"
+NODE_ENV="production"
+PORT=3030
+```
+
+**Important:**
+- Never commit `.env*` files to Git
+- Keep production credentials secure
+- Use different database for development/production
+- Verify environment variables after deployment
+
+### Deployment Best Practices
+
+1. **Version Control:**
+   - Always commit before deploying
+   - Use descriptive commit messages
+   - Tag releases: `git tag v1.0.0`
+   - Keep main branch stable
+
+2. **Testing:**
+   - Test locally before deploying
+   - Verify all features work
+   - Check mobile responsiveness
+   - Test authentication flows
+   - Verify database operations
+
+3. **Monitoring:**
+   - Check PM2 logs after deployment
+   - Monitor for errors in first 5 minutes
+   - Verify key features are working
+   - Check application performance
+
+4. **Rollback Plan:**
+   - If deployment fails, previous version keeps running
+   - Can quickly revert Git commit and redeploy
+   - PM2 auto-restarts on crashes
+   - Database backups available in Supabase
+
+### Troubleshooting Deployment
+
+**Issue: Application won't start**
+```bash
+# Check logs
+pm2 logs parenta-app --lines 100
+
+# Check environment variables
+cat ~/domains/parenta.com.mx/nodejs-app/.env.production
+
+# Restart PM2
+pm2 restart parenta-app
+```
+
+**Issue: Database connection fails**
+```bash
+# Verify environment variables
+grep DATABASE_URL ~/domains/parenta.com.mx/nodejs-app/.env.production
+
+# Test database connection
+cd ~/domains/parenta.com.mx/nodejs-app
+node -e "require('pg').Pool({connectionString: process.env.DATABASE_URL}).query('SELECT NOW()')"
+```
+
+**Issue: Changes not appearing**
+```bash
+# Clear Next.js cache and rebuild
+rm -rf ~/domains/parenta.com.mx/nodejs-app/.next
+cd ~/domains/parenta.com.mx/nodejs-app
+npm run build
+pm2 restart parenta-app
+```
+
+### Emergency Procedures
+
+**Quick Restart:**
+```bash
+ssh -p 65002 u876334876@145.79.25.103
+cd ~/domains/parenta.com.mx/nodejs-app
+export NVM_DIR="$HOME/.nvm"
+source "$NVM_DIR/nvm.sh"
+pm2 restart parenta-app
+```
+
+**Full Redeployment:**
+```bash
+./scripts/deploy-with-manual-nodejs.sh
+```
+
+**Check if App is Accessible:**
+```bash
+curl -I https://parenta.com.mx
+# Should return: HTTP/2 200
+```
+
+### Deployment Documentation
+- **DEPLOYMENT-CONFIRMED.md** - Deployment verification and summary
+- **DEPLOYMENT-SUCCESS.md** - Complete deployment guide
+- **QUICK-REFERENCE.md** - Quick command reference
+- **scripts/deploy-with-manual-nodejs.sh** - Automated deployment script
+- **scripts/deploy-git-auto.sh** - Git-based deployment script
+- **scripts/ssh-hostinger.sh** - SSH connection helper
+
 ## AI Assistance Guidelines
 When working with AI:
 - Provide clear context about the current task
 - Reference existing code patterns and conventions
 - Ask for explanations of complex implementations
 - Request code reviews and suggestions for improvements
-- Ensure generated code follows project standards 
+- Ensure generated code follows project standards
+- Mention if changes need to be deployed after completion
+- Ask for deployment verification steps if needed 

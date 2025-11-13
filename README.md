@@ -737,30 +737,131 @@ vercel
 
 See **[VERCEL-DEPLOYMENT-GUIDE.md](./VERCEL-DEPLOYMENT-GUIDE.md)** for detailed instructions.
 
-### Deploy to Hostinger VPS
+### Deploy to Hostinger (Production - LIVE!)
 
-**NEW!** Complete Hostinger deployment automation with scripts.
+**✅ PRODUCTION:** Application is live at **https://parenta.com.mx**
 
-1. **Quick Start** (3 commands, 15 minutes)
+#### Current Setup
+- **Hosting:** Hostinger Shared Hosting
+- **Server:** Node.js 18.20.8 with PM2 process manager
+- **Database:** Supabase PostgreSQL (external)
+- **SSL:** Automatic HTTPS via LiteSpeed
+- **Status:** ✅ LIVE and operational
+
+#### Deployment Workflow
+
+**Standard Deployment (After Development):**
+
+1. **Develop & Test Locally:**
 ```bash
-# 1. Setup server
-./scripts/setup-server.sh
-
-# 2. Deploy application
-./scripts/deploy-to-hostinger.sh
-
-# 3. Initialize database
-./scripts/ssh-hostinger.sh connect
-node scripts/init-database.js
+npm run dev
+# Test at http://localhost:3030
 ```
 
-2. **Complete Guide**: See **[START-HERE-DEPLOYMENT.md](./START-HERE-DEPLOYMENT.md)**
+2. **Commit Changes:**
+```bash
+git add .
+git commit -m "feat: your feature description"
+git push origin main
+```
 
-3. **Documentation**:
-   - [START-HERE-DEPLOYMENT.md](./START-HERE-DEPLOYMENT.md) - Quick start overview
-   - [DEPLOYMENT-SUMMARY.md](./DEPLOYMENT-SUMMARY.md) - Complete deployment guide
-   - [DEPLOYMENT-CHECKLIST.md](./DEPLOYMENT-CHECKLIST.md) - Step-by-step checklist
-   - [HOSTINGER-DEPLOYMENT-PLAN.md](./HOSTINGER-DEPLOYMENT-PLAN.md) - Technical details
+3. **Deploy to Production:**
+```bash
+./scripts/deploy-with-manual-nodejs.sh
+```
+
+This automated script will:
+- Push changes to GitHub
+- Connect to Hostinger via SSH
+- Pull latest code from GitHub
+- Build application locally and upload (faster)
+- Restart PM2 process manager
+- Verify application is running
+
+4. **Verify Deployment:**
+```bash
+# Check if app is accessible
+curl -I https://parenta.com.mx
+
+# Check PM2 status
+./scripts/ssh-hostinger.sh connect
+pm2 status
+pm2 logs parenta-app
+```
+
+#### Alternative Deployment Methods
+
+**Method 1: Git-Based Deployment**
+```bash
+./scripts/deploy-git-auto.sh
+```
+Pulls code directly from GitHub on the server and builds there.
+
+**Method 2: Manual Deployment**
+```bash
+# 1. Build locally
+npm run build
+
+# 2. Upload built files
+sshpass -p 'Theanswer001!!!' rsync -avz -e "ssh -p 65002" \
+  .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
+
+# 3. Restart application
+sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
+  'cd ~/domains/parenta.com.mx/nodejs-app && pm2 restart parenta-app'
+```
+
+#### Server Management
+
+**SSH Access:**
+```bash
+ssh -p 65002 u876334876@145.79.25.103
+# Or use helper script:
+./scripts/ssh-hostinger.sh connect
+```
+
+**PM2 Commands:**
+```bash
+# View status
+pm2 status
+
+# View logs (real-time)
+pm2 logs parenta-app
+
+# Restart application
+pm2 restart parenta-app
+
+# Monitor CPU/Memory
+pm2 monit
+```
+
+#### When to Deploy
+
+**✅ Deploy when:**
+- After completing a feature (all tests pass)
+- After fixing a critical bug
+- End of day with significant changes
+- Before showing client/stakeholders
+
+**❌ Don't deploy when:**
+- During active development
+- With failing tests or linter errors
+- Without testing locally first
+- With console errors
+
+#### Post-Deployment Checklist
+- [ ] Application accessible at https://parenta.com.mx
+- [ ] PM2 shows app is running: `pm2 status`
+- [ ] No errors in logs: `pm2 logs parenta-app --lines 50`
+- [ ] Login functionality works
+- [ ] Database connections working
+- [ ] Recent features working as expected
+
+#### Complete Documentation
+- **[DEPLOYMENT-CONFIRMED.md](./DEPLOYMENT-CONFIRMED.md)** - Deployment verification
+- **[DEPLOYMENT-SUCCESS.md](./DEPLOYMENT-SUCCESS.md)** - Complete deployment guide
+- **[QUICK-REFERENCE.md](./QUICK-REFERENCE.md)** - Quick command reference
+- **[.cursorrules](./.cursorrules)** - Deployment workflow in cursor rules
 
 ### Deployment Checklist
 
