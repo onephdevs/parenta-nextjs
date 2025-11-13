@@ -737,6 +737,31 @@ vercel
 
 See **[VERCEL-DEPLOYMENT-GUIDE.md](./VERCEL-DEPLOYMENT-GUIDE.md)** for detailed instructions.
 
+### Deploy to Hostinger VPS
+
+**NEW!** Complete Hostinger deployment automation with scripts.
+
+1. **Quick Start** (3 commands, 15 minutes)
+```bash
+# 1. Setup server
+./scripts/setup-server.sh
+
+# 2. Deploy application
+./scripts/deploy-to-hostinger.sh
+
+# 3. Initialize database
+./scripts/ssh-hostinger.sh connect
+node scripts/init-database.js
+```
+
+2. **Complete Guide**: See **[START-HERE-DEPLOYMENT.md](./START-HERE-DEPLOYMENT.md)**
+
+3. **Documentation**:
+   - [START-HERE-DEPLOYMENT.md](./START-HERE-DEPLOYMENT.md) - Quick start overview
+   - [DEPLOYMENT-SUMMARY.md](./DEPLOYMENT-SUMMARY.md) - Complete deployment guide
+   - [DEPLOYMENT-CHECKLIST.md](./DEPLOYMENT-CHECKLIST.md) - Step-by-step checklist
+   - [HOSTINGER-DEPLOYMENT-PLAN.md](./HOSTINGER-DEPLOYMENT-PLAN.md) - Technical details
+
 ### Deployment Checklist
 
 - [ ] Update NEXTAUTH_URL to production domain
