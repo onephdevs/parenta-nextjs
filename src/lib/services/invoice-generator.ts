@@ -135,11 +135,11 @@ export async function generateInvoicesForTenant(
           billingPeriodEnd,
           invoiceAmount,
           0, // No tax
-          invoiceAmount,
-          0, // Not paid yet
-          'pending',
-          `Auto-generated invoice for ${room.building_name} - ${room.room_number}`
-        ]
+        invoiceAmount,
+        0, // Not paid yet
+        'sent',
+        `Auto-generated invoice for ${room.building_name} - ${room.room_number}`
+      ]
       );
 
       const invoiceId = invoiceResult.rows[0].id;
@@ -255,11 +255,11 @@ export async function generateSingleInvoice(
         dueDate,
         subtotal,
         taxAmount,
-        totalAmount,
-        0,
-        'pending',
-        notes || 'Manually generated invoice'
-      ]
+      totalAmount,
+      0,
+      'sent',
+      notes || 'Manually generated invoice'
+    ]
     );
 
     const invoiceId = invoiceResult.rows[0].id;
@@ -308,7 +308,7 @@ export async function updateOverdueInvoices(): Promise<number> {
     const result = await pool.query(
       `UPDATE invoices 
        SET invoice_status = 'overdue' 
-       WHERE invoice_status IN ('pending', 'sent', 'partial') 
+       WHERE invoice_status IN ('sent', 'partial') 
        AND due_date < CURRENT_DATE 
        AND balance_due > 0
        RETURNING id`
@@ -345,7 +345,7 @@ export async function getUnpaidInvoicesForTenant(tenantId: string): Promise<Arra
         invoice_status as status
        FROM invoices
        WHERE tenant_id = $1 
-       AND invoice_status IN ('pending', 'sent', 'partial', 'overdue')
+       AND invoice_status IN ('sent', 'partial', 'overdue')
        AND balance_due > 0
        ORDER BY due_date ASC`,
       [tenantId]

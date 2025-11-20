@@ -86,7 +86,7 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
     paymentData.paymentType,
     paymentData.paymentMethod || null,
     paymentData.paymentDate.toISOString().split('T')[0],
-    paymentData.dueDate?.toISOString().split('T')[0] || null,
+    paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0], // Default to payment_date if not provided
     paymentData.referenceNumber || null,
     paymentData.notes || null,
     'pending'

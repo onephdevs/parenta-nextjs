@@ -64,10 +64,10 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
     const loadFinancialData = async () => {
       try {
         const [invoicesRes, paymentsRes, creditsRes, depositsRes] = await Promise.all([
-          fetch(`/api/invoices?tenantId=${tenantId}`),
-          fetch(`/api/payments?tenantId=${tenantId}`),
-          fetch(`/api/tenant-credits/${tenantId}`),
-          fetch(`/api/deposit-ledger/${tenantId}`)
+          fetch(`/api/invoices?tenantId=${tenantId}`, { credentials: 'include' }),
+          fetch(`/api/payments?tenantId=${tenantId}`, { credentials: 'include' }),
+          fetch(`/api/tenant-credits/${tenantId}`, { credentials: 'include' }),
+          fetch(`/api/deposit-ledger/${tenantId}`, { credentials: 'include' })
         ]);
 
         if (invoicesRes.ok) {
