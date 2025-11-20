@@ -390,4 +390,152 @@ export interface PaymentAllocationResult {
   creditAmount: number;
   depositUsed: number;
   message: string;
+}
+
+// =====================================================
+// LATE FEE TYPES
+// =====================================================
+
+export type LateFeeType = 'percentage' | 'flat_rate' | 'tiered';
+export type LateFeeStatus = 'pending' | 'applied' | 'waived' | 'cancelled';
+
+export interface LateFeeSettings {
+  id: string;
+  building_id?: string;
+  name: string;
+  description?: string;
+  
+  // Fee calculation
+  fee_type: LateFeeType;
+  percentage_amount?: number;
+  flat_rate_amount?: number;
+  
+  // Grace period
+  grace_period_days: number;
+  apply_after_days: number;
+  
+  // Recurrence
+  is_recurring: boolean;
+  recurring_interval_days?: number;
+  max_occurrences?: number;
+  
+  // Limits
+  max_fee_amount?: number;
+  min_invoice_amount?: number;
+  
+  // Application settings
+  is_active: boolean;
+  auto_apply: boolean;
+  send_notification: boolean;
+  
+  // Metadata
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LateFeeApplication {
+  id: string;
+  invoice_id: string;
+  tenant_id: string;
+  late_fee_setting_id: string;
+  
+  // Fee details
+  fee_amount: number;
+  calculation_method: string;
+  days_overdue: number;
+  original_amount: number;
+  
+  // Status
+  status: LateFeeStatus;
+  applied_at?: string;
+  waived_at?: string;
+  waived_by?: string;
+  waived_reason?: string;
+  
+  // Generated invoice
+  late_fee_invoice_id?: string;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LateFeeTier {
+  id: string;
+  late_fee_setting_id: string;
+  min_days_overdue: number;
+  max_days_overdue?: number;
+  fee_type: 'percentage' | 'flat_rate';
+  percentage_amount?: number;
+  flat_rate_amount?: number;
+  tier_order: number;
+  created_at: string;
+}
+
+export interface OverdueInvoiceForLateFee {
+  invoice_id: string;
+  tenant_id: string;
+  building_id: string;
+  days_overdue: number;
+  outstanding_amount: number;
+  applicable_setting_id: string;
+}
+
+export interface LateFeeCalculationResult {
+  invoice_id: string;
+  tenant_id: string;
+  fee_amount: number;
+  days_overdue: number;
+  original_amount: number;
+  calculation_method: string;
+  setting_used: LateFeeSettings;
+}
+
+export interface CreateLateFeeSettingsData {
+  building_id?: string;
+  name: string;
+  description?: string;
+  fee_type: LateFeeType;
+  percentage_amount?: number;
+  flat_rate_amount?: number;
+  grace_period_days: number;
+  apply_after_days: number;
+  is_recurring?: boolean;
+  recurring_interval_days?: number;
+  max_occurrences?: number;
+  max_fee_amount?: number;
+  min_invoice_amount?: number;
+  is_active?: boolean;
+  auto_apply?: boolean;
+  send_notification?: boolean;
+  tiers?: CreateLateFeeTierData[];
+}
+
+export interface CreateLateFeeTierData {
+  min_days_overdue: number;
+  max_days_overdue?: number;
+  fee_type: 'percentage' | 'flat_rate';
+  percentage_amount?: number;
+  flat_rate_amount?: number;
+  tier_order: number;
+}
+
+export interface LateFeeApplicationRequest {
+  invoice_ids?: string[];
+  dry_run?: boolean;
+}
+
+export interface LateFeeApplicationResult {
+  success: boolean;
+  fees_applied: number;
+  total_fee_amount: number;
+  applications: {
+    invoice_id: string;
+    tenant_id: string;
+    fee_amount: number;
+    late_fee_invoice_id?: string;
+    status: string;
+  }[];
+  message: string;
 } 
