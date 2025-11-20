@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getTenantById } from '@/lib/api/tenants';
+import TenantFinancialDetails from '@/components/features/TenantFinancialDetails';
 
 interface TenantDetailPageProps {
   params: Promise<{ id: string }>;
@@ -209,6 +210,9 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                   )}
                 </div>
               </div>
+
+              {/* Financial Details: Invoices, Payments, Credits, Deposits */}
+              <TenantFinancialDetails tenantId={tenant.id} />
             </div>
 
             {/* Sidebar Information */}
