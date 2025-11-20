@@ -1,8 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
+
+interface Building {
+  id: number;
+  name: string;
+}
+
+interface Room {
+  id: number;
+  roomNumber: string;
+  buildingId: number;
+  buildingName: string;
+  rentAmount: number;
+  status: string;
+}
 
 interface TenantFormData {
   firstName: string;
@@ -18,6 +32,8 @@ interface TenantFormData {
   employmentStatus?: 'employed' | 'unemployed' | 'student' | 'retired' | 'other';
   employerName?: string;
   monthlyIncome?: number;
+  buildingId?: string;
+  roomId?: string;
   monthlyRent?: number;
   depositMonths: number;
   advanceMonths: number;
@@ -30,6 +46,9 @@ export default function TenantForm() {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
 
   const [formData, setFormData] = useState<TenantFormData>({
     firstName: '',
@@ -45,6 +64,8 @@ export default function TenantForm() {
     employmentStatus: 'employed',
     employerName: '',
     monthlyIncome: 0,
+    buildingId: '',
+    roomId: '',
     monthlyRent: 0,
     depositMonths: 1,
     advanceMonths: 1,
@@ -54,6 +75,62 @@ export default function TenantForm() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Load buildings and rooms
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [buildingsRes, roomsRes] = await Promise.all([
+          fetch('/api/buildings'),
+          fetch('/api/rooms')
+        ]);
+
+        if (buildingsRes.ok) {
+          const buildingsData = await buildingsRes.json();
+          setBuildings(buildingsData.buildings || buildingsData.data || []);
+        }
+
+        if (roomsRes.ok) {
+          const roomsData = await roomsRes.json();
+          const roomsList = roomsData.rooms || roomsData.data || [];
+          setRooms(roomsList);
+          // Initially show only available rooms
+          setFilteredRooms(roomsList.filter((r: Room) => r.status === 'available'));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Filter rooms when building is selected
+  useEffect(() => {
+    if (formData.buildingId) {
+      const filtered = rooms.filter(
+        r => r.buildingId === parseInt(formData.buildingId!) && r.status === 'available'
+      );
+      setFilteredRooms(filtered);
+      
+      // Reset room if it's not in the filtered list
+      if (formData.roomId && !filtered.find(r => r.id === parseInt(formData.roomId!))) {
+        setFormData(prev => ({ ...prev, roomId: '' }));
+      }
+    } else {
+      setFilteredRooms(rooms.filter(r => r.status === 'available'));
+    }
+  }, [formData.buildingId, rooms, formData.roomId]);
+
+  // Auto-fill monthly rent when room is selected
+  useEffect(() => {
+    if (formData.roomId) {
+      const selectedRoom = rooms.find(r => r.id === parseInt(formData.roomId!));
+      if (selectedRoom && selectedRoom.rentAmount) {
+        setFormData(prev => ({ ...prev, monthlyRent: selectedRoom.rentAmount }));
+      }
+    }
+  }, [formData.roomId, rooms]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -112,10 +189,13 @@ export default function TenantForm() {
     const loadingNotificationId = showNotification({
       type: 'loading',
       title: 'Creating tenant...',
-      message: 'Please wait while we create the tenant profile.'
+      message: formData.roomId 
+        ? 'Creating tenant profile and assigning room...' 
+        : 'Please wait while we create the tenant profile.'
     });
 
     try {
+      // Create tenant
       const response = await fetch('/api/tenants', {
         method: 'POST',
         headers: {
@@ -131,6 +211,8 @@ export default function TenantForm() {
           monthlyRent: formData.monthlyRent || null,
           depositMonths: formData.depositMonths,
           advanceMonths: formData.advanceMonths,
+          buildingId: formData.buildingId ? parseInt(formData.buildingId) : null,
+          roomId: formData.roomId ? parseInt(formData.roomId) : null,
         }),
       });
 
@@ -140,15 +222,53 @@ export default function TenantForm() {
         throw new Error(result.error || 'Failed to create tenant');
       }
 
-      updateNotification(loadingNotificationId, {
-        type: 'success',
-        title: 'Tenant created successfully!',
-        message: `${formData.firstName} ${formData.lastName} has been added.`
-      });
+      const tenantId = result.data.id;
+
+      // If room is selected, assign tenant to room (this will trigger auto-invoicing)
+      if (formData.roomId) {
+        updateNotification(loadingNotificationId, {
+          type: 'loading',
+          title: 'Assigning room...',
+          message: 'Generating invoices automatically...'
+        });
+
+        const assignResponse = await fetch(`/api/rooms/${formData.roomId}/assign`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tenantId: tenantId,
+            startDate: formData.leaseStartDate || new Date().toISOString(),
+            endDate: formData.leaseEndDate,
+            monthlyRent: formData.monthlyRent,
+            depositAmount: (formData.monthlyRent || 0) * formData.depositMonths,
+            advanceMonths: formData.advanceMonths,
+          }),
+        });
+
+        const assignResult = await assignResponse.json();
+
+        if (!assignResult.success) {
+          throw new Error(assignResult.error || 'Failed to assign room');
+        }
+
+        updateNotification(loadingNotificationId, {
+          type: 'success',
+          title: 'Tenant created and room assigned!',
+          message: `${formData.firstName} ${formData.lastName} has been added and ${assignResult.invoicesGenerated || 0} invoices generated.`
+        });
+      } else {
+        updateNotification(loadingNotificationId, {
+          type: 'success',
+          title: 'Tenant created successfully!',
+          message: `${formData.firstName} ${formData.lastName} has been added. You can assign a room later.`
+        });
+      }
 
       setTimeout(() => {
-        router.push(`/admin/tenants/${result.data.id}`);
-      }, 1000);
+        router.push(`/admin/tenants/${tenantId}`);
+      }, 1500);
 
     } catch (error) {
       console.error('Error creating tenant:', error);
@@ -388,7 +508,106 @@ export default function TenantForm() {
               className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
           </div>
+        </div>
+      </div>
 
+      <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-6">
+        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">
+          Property & Room Assignment
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Assign a property and room now to automatically generate invoices based on lease details.
+        </p>
+        
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label htmlFor="buildingId" className="block text-sm font-medium text-gray-700">
+              Property (Optional)
+            </label>
+            <select
+              name="buildingId"
+              id="buildingId"
+              value={formData.buildingId}
+              onChange={handleInputChange}
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base bg-white"
+            >
+              <option value="">Select a property</option>
+              {buildings.map((building) => (
+                <option key={building.id} value={building.id}>
+                  {building.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Select a property to filter available rooms
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="roomId" className="block text-sm font-medium text-gray-700">
+              Room (Optional)
+            </label>
+            <select
+              name="roomId"
+              id="roomId"
+              value={formData.roomId}
+              onChange={handleInputChange}
+              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base bg-white ${
+                !filteredRooms.length ? 'bg-gray-50 text-gray-400' : ''
+              }`}
+              disabled={!filteredRooms.length}
+            >
+              <option value="">
+                {formData.buildingId && !filteredRooms.length 
+                  ? 'No available rooms in this property' 
+                  : 'Select a room'}
+              </option>
+              {filteredRooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.buildingName} - Room {room.roomNumber} (₱{room.rentAmount.toLocaleString()}/month)
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              {formData.roomId 
+                ? 'Invoices will be auto-generated after tenant creation' 
+                : 'You can assign a room later from the tenant detail page'}
+            </p>
+          </div>
+
+          {formData.roomId && (
+            <div className="sm:col-span-2 bg-purple-100 border border-purple-300 rounded-md p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h4 className="text-sm font-medium text-purple-900">
+                    Auto-Invoicing Enabled
+                  </h4>
+                  <p className="mt-1 text-sm text-purple-700">
+                    When you create this tenant, the system will automatically:
+                  </p>
+                  <ul className="mt-2 text-sm text-purple-700 list-disc list-inside space-y-1">
+                    <li>Generate the initial invoice for advance payment</li>
+                    <li>Create monthly invoices for the entire lease period</li>
+                    <li>Set all invoices to "Pending" status</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+          Rent & Payment Details
+        </h3>
+        
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
             <label htmlFor="monthlyRent" className="block text-sm font-medium text-gray-700">
               Monthly Rent (₱) *
@@ -513,20 +732,6 @@ export default function TenantForm() {
               name="moveInDate"
               id="moveInDate"
               value={formData.moveInDate}
-              onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="moveOutDate" className="block text-sm font-medium text-gray-700">
-              Move Out Date
-            </label>
-            <input
-              type="date"
-              name="moveOutDate"
-              id="moveOutDate"
-              value={formData.moveOutDate}
               onChange={handleInputChange}
               className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
