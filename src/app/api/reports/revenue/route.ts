@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getRevenueReport } from '@/lib/api/reports';
+import { generateRevenueReport } from '@/lib/services/reports-service';
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    const { searchParams } = new URL(request.url);
-    
-    const filters = {
-      dateFrom: searchParams.get('dateFrom') || undefined,
-      dateTo: searchParams.get('dateTo') || undefined,
-      buildingId: searchParams.get('buildingId') ? parseInt(searchParams.get('buildingId')!) : undefined,
-      roomId: searchParams.get('roomId') ? parseInt(searchParams.get('roomId')!) : undefined,
-    };
+    const body = await request.json();
+    const { startDate, endDate } = body;
 
-    const report = await getRevenueReport(filters);
-    
+    if (!startDate || !endDate) {
+      return NextResponse.json(
+        { error: 'Start date and end date are required' },
+        { status: 400 }
+      );
+    }
+
+    const report = await generateRevenueReport(startDate, endDate);
+
     return NextResponse.json({
       success: true,
       data: report
@@ -29,9 +33,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error generating revenue report:', error);
     return NextResponse.json(
-      { error: 'Failed to generate revenue report' },
+      { 
+        success: false,
+        error: 'Failed to generate revenue report' 
+      },
       { status: 500 }
     );
   }
 }
-

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { generateExpenseReport } from '@/lib/services/reports-service';
+import { generateOccupancyReport } from '@/lib/services/reports-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,20 +24,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const report = await generateExpenseReport(startDate, endDate);
+    const report = await generateOccupancyReport(startDate, endDate);
 
     return NextResponse.json({
       success: true,
       data: report
     });
   } catch (error) {
-    console.error('Error generating expense report:', error);
+    console.error('Error generating occupancy report:', error);
     return NextResponse.json(
       { 
         success: false,
-        error: 'Failed to generate expense report' 
+        error: 'Failed to generate occupancy report' 
       },
       { status: 500 }
     );
   }
 }
+
