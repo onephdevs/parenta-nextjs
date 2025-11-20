@@ -14,19 +14,11 @@ interface Tenant {
   roomNumber?: string;
 }
 
-interface Room {
-  id: number;
-  roomNumber: string;
-  buildingName: string;
-  rentAmount: number;
-}
-
 interface PaymentFormData {
   tenantId: string;
-  roomId: string;
   amount: string;
+  depositAmount: string;
   type: string;
-  status: string;
   paymentDate: string;
   description: string;
   paymentMethod: string;
@@ -44,15 +36,13 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
   const { addNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   
   const [formData, setFormData] = useState<PaymentFormData>({
     tenantId: initialData?.tenantId || '',
-    roomId: initialData?.roomId || '',
     amount: initialData?.amount || '',
+    depositAmount: initialData?.depositAmount || '0',
     type: initialData?.type || 'rent',
-    status: initialData?.status || 'completed',
     paymentDate: initialData?.paymentDate || new Date().toISOString().split('T')[0],
     description: initialData?.description || '',
     paymentMethod: initialData?.paymentMethod || 'cash',
@@ -61,14 +51,11 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
   const [errors, setErrors] = useState<Partial<PaymentFormData>>({});
 
-  // Load tenants and rooms on mount
+  // Load tenants on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [tenantsRes, roomsRes] = await Promise.all([
-          fetch('/api/tenants'),
-          fetch('/api/rooms')
-        ]);
+        const tenantsRes = await fetch('/api/tenants');
 
         if (tenantsRes.ok) {
           const tenantsData = await tenantsRes.json();
@@ -76,16 +63,9 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           const tenantsList = tenantsData.data || tenantsData.tenants || [];
           setTenants(tenantsList);
         }
-
-        if (roomsRes.ok) {
-          const roomsData = await roomsRes.json();
-          // Handle both response formats: { success: true, data: [] } or { rooms: [] }
-          const roomsList = roomsData.data || roomsData.rooms || [];
-          setRooms(roomsList);
-        }
       } catch (error) {
         console.error('Error loading data:', error);
-        addNotification('Failed to load tenant and room data', 'error');
+        addNotification('Failed to load tenant data', 'error');
       }
     };
 
@@ -97,39 +77,33 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
     if (formData.tenantId) {
       const tenant = tenants.find(t => t.id === parseInt(formData.tenantId));
       setSelectedTenant(tenant || null);
-      
-      // Auto-select current room if tenant has one
-      if (tenant?.currentRoomId && !formData.roomId) {
-        setFormData(prev => ({ ...prev, roomId: tenant.currentRoomId!.toString() }));
-      }
     } else {
       setSelectedTenant(null);
     }
-  }, [formData.tenantId, tenants, formData.roomId]);
-
-  // Auto-fill amount based on room rent
-  useEffect(() => {
-    if (formData.roomId && formData.type === 'rent') {
-      const room = rooms.find(r => r.id === parseInt(formData.roomId));
-      if (room && !formData.amount) {
-        setFormData(prev => ({ ...prev, amount: room.rentAmount.toString() }));
-      }
-    }
-  }, [formData.roomId, formData.type, rooms, formData.amount]);
+  }, [formData.tenantId, tenants]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<PaymentFormData> = {};
 
     if (!formData.tenantId) newErrors.tenantId = 'Tenant is required';
-    if (!formData.roomId) newErrors.roomId = 'Room is required';
     if (!formData.amount) {
       newErrors.amount = 'Amount is required';
     } else if (parseFloat(formData.amount) <= 0) {
       newErrors.amount = 'Amount must be greater than 0';
     }
+    
+    // Validate deposit amount
+    const depositAmount = parseFloat(formData.depositAmount) || 0;
+    const totalAmount = parseFloat(formData.amount) || 0;
+    
+    if (depositAmount < 0) {
+      newErrors.depositAmount = 'Deposit amount cannot be negative';
+    } else if (depositAmount > totalAmount) {
+      newErrors.depositAmount = 'Deposit amount cannot exceed total amount';
+    }
+    
     if (!formData.paymentDate) newErrors.paymentDate = 'Payment date is required';
     if (!formData.type) newErrors.type = 'Payment type is required';
-    if (!formData.status) newErrors.status = 'Payment status is required';
     if (!formData.paymentMethod) newErrors.paymentMethod = 'Payment method is required';
 
     setErrors(newErrors);
@@ -150,7 +124,17 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
       if (onSubmit) {
         await onSubmit(formData);
       } else {
-        // Default submission to API
+        // Calculate payment and deposit amounts
+        const totalAmount = parseFloat(formData.amount);
+        const depositAmount = parseFloat(formData.depositAmount) || 0;
+        const paymentAmount = totalAmount - depositAmount;
+        
+        // Get tenant's current room for payment
+        if (!selectedTenant?.currentRoomId) {
+          throw new Error('Tenant must be assigned to a room to record payment');
+        }
+
+        // Record payment (will auto-allocate to invoices via backend)
         const response = await fetch('/api/payments', {
           method: 'POST',
           headers: {
@@ -158,10 +142,10 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           },
           body: JSON.stringify({
             tenantId: parseInt(formData.tenantId),
-            roomId: parseInt(formData.roomId),
-            amount: parseFloat(formData.amount),
+            roomId: selectedTenant.currentRoomId,
+            amount: paymentAmount > 0 ? paymentAmount : totalAmount, // If no deposit, use total amount
             type: formData.type,
-            status: formData.status,
+            status: 'completed', // Always completed since payment is received
             paymentDate: formData.paymentDate,
             description: formData.description || null,
             paymentMethod: formData.paymentMethod,
@@ -174,8 +158,43 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           throw new Error(errorData.error || 'Failed to record payment');
         }
 
+        // If there's a deposit amount, record it separately in deposit ledger
+        if (depositAmount > 0) {
+          const depositResponse = await fetch('/api/deposit-ledger', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              tenantId: parseInt(formData.tenantId),
+              transactionType: 'deposit',
+              amount: depositAmount,
+              description: `Deposit payment - ${formData.description || 'No description'}`,
+              transactionDate: formData.paymentDate,
+              paymentMethod: formData.paymentMethod,
+              referenceNumber: formData.transactionId || null,
+            }),
+          });
+
+          if (!depositResponse.ok) {
+            const errorData = await depositResponse.json();
+            console.error('Failed to record deposit:', errorData);
+            addNotification('Payment recorded but deposit ledger update failed', 'warning');
+          }
+        }
+
         const result = await response.json();
-        addNotification('Payment recorded successfully', 'success');
+        
+        // Show success notification with details
+        if (depositAmount > 0) {
+          addNotification(
+            `Payment recorded: ₱${paymentAmount.toLocaleString()} to invoices, ₱${depositAmount.toLocaleString()} to deposit`,
+            'success'
+          );
+        } else {
+          addNotification('Payment recorded and allocated successfully', 'success');
+        }
+        
         router.push(`/admin/financial/payments/${result.payment.id}`);
       }
     } catch (error) {
@@ -204,16 +223,6 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
     }
   };
 
-  const getFilteredRooms = () => {
-    if (!selectedTenant) return rooms;
-    
-    // Show current room first, then other available rooms
-    const currentRoom = rooms.filter(r => r.id === selectedTenant.currentRoomId);
-    const otherRooms = rooms.filter(r => r.id !== selectedTenant.currentRoomId);
-    
-    return [...currentRoom, ...otherRooms];
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6">
@@ -227,7 +236,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           <div className="mt-5 md:mt-0 md:col-span-2">
             <div className="grid grid-cols-6 gap-6">
               {/* Tenant Selection */}
-              <div className="col-span-6 sm:col-span-3">
+              <div className="col-span-6">
                 <label htmlFor="tenantId" className="block text-sm font-medium text-gray-700">
                   Tenant *
                 </label>
@@ -251,39 +260,17 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                 {errors.tenantId && (
                   <p className="mt-2 text-sm text-red-600">{errors.tenantId}</p>
                 )}
-              </div>
-
-              {/* Room Selection */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="roomId" className="block text-sm font-medium text-gray-700">
-                  Room *
-                </label>
-                <select
-                  id="roomId"
-                  name="roomId"
-                  value={formData.roomId}
-                  onChange={(e) => handleInputChange('roomId', e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
-                    errors.roomId ? 'border-red-300' : ''
-                  }`}
-                >
-                  <option value="">Select a room</option>
-                  {getFilteredRooms().map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.buildingName} {room.roomNumber} (₱{room.rentAmount.toLocaleString()}/month)
-                      {selectedTenant?.currentRoomId === room.id && ' - Current Room'}
-                    </option>
-                  ))}
-                </select>
-                {errors.roomId && (
-                  <p className="mt-2 text-sm text-red-600">{errors.roomId}</p>
+                {selectedTenant && !selectedTenant.currentRoomId && (
+                  <p className="mt-2 text-sm text-amber-600">
+                    ⚠️ This tenant is not assigned to a room. Please assign them to a room first.
+                  </p>
                 )}
               </div>
 
-              {/* Amount */}
-              <div className="col-span-6 sm:col-span-2">
+              {/* Total Amount Paid */}
+              <div className="col-span-6 sm:col-span-3">
                 <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
-                  Amount *
+                  Total Amount Paid *
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -306,10 +293,65 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                 {errors.amount && (
                   <p className="mt-2 text-sm text-red-600">{errors.amount}</p>
                 )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Total amount received from tenant
+                </p>
               </div>
 
+              {/* Deposit Amount */}
+              <div className="col-span-6 sm:col-span-3">
+                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700">
+                  Deposit Amount
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-base font-medium">₱</span>
+                  </div>
+                  <input
+                    type="number"
+                    id="depositAmount"
+                    name="depositAmount"
+                    value={formData.depositAmount}
+                    onChange={(e) => handleInputChange('depositAmount', e.target.value)}
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className={`block w-full pl-9 pr-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 ${
+                      errors.depositAmount ? 'border-red-300' : ''
+                    }`}
+                  />
+                </div>
+                {errors.depositAmount && (
+                  <p className="mt-2 text-sm text-red-600">{errors.depositAmount}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Amount to add to deposit ledger (remainder goes to invoices)
+                </p>
+              </div>
+
+              {/* Payment Breakdown Info */}
+              {parseFloat(formData.amount) > 0 && (
+                <div className="col-span-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-purple-900 mb-2">Payment Breakdown</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-purple-700">To Deposit Ledger:</span>
+                      <span className="ml-2 font-semibold text-purple-900">
+                        ₱{(parseFloat(formData.depositAmount) || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-purple-700">To Invoice Payment:</span>
+                      <span className="ml-2 font-semibold text-purple-900">
+                        ₱{(parseFloat(formData.amount) - (parseFloat(formData.depositAmount) || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Payment Type */}
-              <div className="col-span-6 sm:col-span-2">
+              <div className="col-span-6 sm:col-span-3">
                 <label htmlFor="type" className="block text-sm font-medium text-gray-700">
                   Payment Type *
                 </label>
@@ -326,33 +368,10 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   <option value="deposit">Deposit</option>
                   <option value="fee">Fee</option>
                   <option value="utilities">Utilities</option>
+                  <option value="other">Other</option>
                 </select>
                 {errors.type && (
                   <p className="mt-2 text-sm text-red-600">{errors.type}</p>
-                )}
-              </div>
-
-              {/* Payment Status */}
-              <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700">
-                  Status *
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
-                    errors.status ? 'border-red-300' : ''
-                  }`}
-                >
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="failed">Failed</option>
-                  <option value="refunded">Refunded</option>
-                </select>
-                {errors.status && (
-                  <p className="mt-2 text-sm text-red-600">{errors.status}</p>
                 )}
               </div>
 
