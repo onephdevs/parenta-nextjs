@@ -101,7 +101,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       },
       message: invoiceResult 
         ? `Tenant assigned successfully. ${invoiceResult.invoicesCreated} invoice(s) generated.`
-        : 'Tenant assigned to room successfully'
+        : 'Tenant assigned to room successfully',
+      invoicesGenerated: invoiceResult?.invoicesCreated || 0,
+      invoiceDetails: invoiceResult ? {
+        totalInvoices: invoiceResult.invoicesCreated,
+        totalAmount: invoiceResult.invoices?.reduce((sum: number, inv: any) => sum + parseFloat(inv.amount), 0) || 0,
+        firstInvoiceNumber: invoiceResult.invoices?.[0]?.invoiceNumber,
+        lastInvoiceNumber: invoiceResult.invoices?.[invoiceResult.invoices.length - 1]?.invoiceNumber
+      } : null
     });
   } catch (error) {
     await client.query('ROLLBACK');

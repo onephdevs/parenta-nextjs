@@ -141,15 +141,27 @@ export async function POST(request: Request) {
       }
     }
     
+    // Create detailed response message
+    let detailedMessage = 'Payment recorded successfully';
+    const allocationDetails: any = {};
+    
+    if (allocationResult) {
+      allocationDetails.invoicesPaid = allocationResult.invoicesPaid || 0;
+      allocationDetails.totalAllocated = allocationResult.totalAllocated || 0;
+      allocationDetails.creditCreated = allocationResult.creditCreated || 0;
+      allocationDetails.invoices = allocationResult.invoices || [];
+      
+      detailedMessage = allocationResult.message || 'Payment allocated successfully';
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         payment,
         allocation: allocationResult || null
       },
-      message: allocationResult 
-        ? allocationResult.message
-        : 'Payment created successfully'
+      message: detailedMessage,
+      allocationDetails: allocationDetails.invoicesPaid > 0 ? allocationDetails : null
     }, { status: 201 });
   } catch (error) {
     console.error('Create payment error:', error);

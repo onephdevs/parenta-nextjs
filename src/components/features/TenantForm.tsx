@@ -253,10 +253,28 @@ export default function TenantForm() {
           throw new Error(assignResult.error || 'Failed to assign room');
         }
 
+        // Create detailed success message
+        const invoiceDetails = assignResult.invoiceDetails;
+        let detailMessage = `${formData.firstName} ${formData.lastName} has been added successfully.`;
+        
+        if (invoiceDetails && invoiceDetails.totalInvoices > 0) {
+          const formatCurrency = (amount: number) => {
+            return new Intl.NumberFormat('en-PH', {
+              style: 'currency',
+              currency: 'PHP',
+            }).format(amount);
+          };
+          
+          detailMessage += `\n\n✅ Auto-Invoicing Complete:`;
+          detailMessage += `\n📄 ${invoiceDetails.totalInvoices} invoices generated`;
+          detailMessage += `\n💰 Total amount: ${formatCurrency(invoiceDetails.totalAmount)}`;
+          detailMessage += `\n📊 Invoice range: ${invoiceDetails.firstInvoiceNumber} - ${invoiceDetails.lastInvoiceNumber}`;
+        }
+
         updateNotification(loadingNotificationId, {
           type: 'success',
-          title: 'Tenant created and room assigned!',
-          message: `${formData.firstName} ${formData.lastName} has been added and ${assignResult.invoicesGenerated || 0} invoices generated.`
+          title: 'Tenant Created & Room Assigned!',
+          message: detailMessage
         });
       } else {
         updateNotification(loadingNotificationId, {
