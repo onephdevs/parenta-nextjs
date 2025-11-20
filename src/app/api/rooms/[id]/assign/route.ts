@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { generateInvoicesForTenant } from '@/lib/services/invoice-generator';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -10,7 +11,15 @@ export async function POST(request: Request, { params }: RouteParams) {
   
   try {
     const { id: roomId } = await params;
-    const { tenantId, startDate, endDate, monthlyRate, depositPaid, notes } = await request.json();
+    const { 
+      tenantId, 
+      startDate, 
+      endDate, 
+      monthlyRate, 
+      depositPaid, 
+      notes,
+      generateInvoices = true // Option to auto-generate invoices
+    } = await request.json();
     
     // Validation
     if (!tenantId || !startDate || !monthlyRate) {
@@ -46,9 +55,13 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Update tenant status and move-in date
     await client.query(
       `UPDATE tenants 
-       SET tenant_status = 'active', move_in_date = $1, updated_at = CURRENT_TIMESTAMP
+       SET tenant_status = 'active', 
+           move_in_date = $1,
+           lease_start_date = $1,
+           lease_end_date = $3,
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = $2`,
-      [startDate, tenantId]
+      [startDate, tenantId, endDate || null]
     );
 
     // Update room status to occupied
@@ -61,10 +74,34 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     await client.query('COMMIT');
 
+    // Auto-generate invoices if requested and end date is provided
+    let invoiceResult;
+    if (generateInvoices && endDate) {
+      try {
+        invoiceResult = await generateInvoicesForTenant({
+          tenantId,
+          roomId,
+          leaseStartDate: new Date(startDate),
+          leaseEndDate: new Date(endDate),
+          monthlyRent: parseFloat(monthlyRate),
+          depositAmount: depositPaid ? parseFloat(depositPaid) : undefined
+        });
+      } catch (invoiceError) {
+        console.error('Error generating invoices:', invoiceError);
+        // Don't fail the assignment if invoice generation fails
+        // Just log the error and continue
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: assignmentResult.rows[0],
-      message: 'Tenant assigned to room successfully'
+      data: {
+        assignment: assignmentResult.rows[0],
+        invoices: invoiceResult || null
+      },
+      message: invoiceResult 
+        ? `Tenant assigned successfully. ${invoiceResult.invoicesCreated} invoice(s) generated.`
+        : 'Tenant assigned to room successfully'
     });
   } catch (error) {
     await client.query('ROLLBACK');

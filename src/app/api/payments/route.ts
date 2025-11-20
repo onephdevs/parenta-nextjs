@@ -121,10 +121,35 @@ export async function POST(request: Request) {
     
     const payment = await createPayment(createData);
     
+    // Auto-allocate payment to invoices if payment type is rent and auto-allocation is enabled
+    let allocationResult;
+    if (paymentData.autoAllocate !== false && paymentData.paymentType === 'rent') {
+      try {
+        const { allocatePaymentToInvoices } = await import('@/lib/services/payment-allocator');
+        
+        allocationResult = await allocatePaymentToInvoices({
+          paymentId: payment.id.toString(),
+          tenantId: paymentData.tenantId,
+          paymentAmount: payment.amount,
+          depositAmount: paymentData.depositAmount || 0,
+          useDeposit: paymentData.useDeposit || false
+        });
+      } catch (allocationError) {
+        console.error('Error allocating payment:', allocationError);
+        // Don't fail the payment creation if allocation fails
+        // Just log the error and return payment without allocation
+      }
+    }
+    
     return NextResponse.json({
       success: true,
-      data: payment,
-      message: 'Payment created successfully'
+      data: {
+        payment,
+        allocation: allocationResult || null
+      },
+      message: allocationResult 
+        ? allocationResult.message
+        : 'Payment created successfully'
     }, { status: 201 });
   } catch (error) {
     console.error('Create payment error:', error);

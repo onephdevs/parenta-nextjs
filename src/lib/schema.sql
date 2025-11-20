@@ -186,6 +186,60 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 -- =====================================================
+-- AUTO-INVOICING & PAYMENT PROCESSING
+-- =====================================================
+
+-- Tenant Credits - Track advance payments and credit balances
+CREATE TABLE IF NOT EXISTS tenant_credits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  amount DECIMAL(10,2) NOT NULL,
+  source VARCHAR(50) NOT NULL CHECK (source IN ('excess_payment', 'refund', 'adjustment', 'manual')),
+  description TEXT,
+  payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+  applied_to_invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'applied', 'refunded')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_credits_tenant_id ON tenant_credits(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_credits_status ON tenant_credits(status);
+
+-- Deposit Ledger - Track deposit transactions separately
+CREATE TABLE IF NOT EXISTS deposit_ledger (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  amount DECIMAL(10,2) NOT NULL,
+  transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('deposit', 'refund', 'applied', 'adjustment')),
+  applied_to_invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+  payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+  description TEXT,
+  transaction_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_deposit_ledger_tenant_id ON deposit_ledger(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_deposit_ledger_transaction_type ON deposit_ledger(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_deposit_ledger_transaction_date ON deposit_ledger(transaction_date);
+
+-- Payment Allocations - Track how payments are distributed across invoices
+CREATE TABLE IF NOT EXISTS payment_allocations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  allocated_amount DECIMAL(10,2) NOT NULL,
+  allocation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_allocations_payment_id ON payment_allocations(payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_allocations_invoice_id ON payment_allocations(invoice_id);
+
+-- =====================================================
 -- UTILITIES MANAGEMENT
 -- =====================================================
 

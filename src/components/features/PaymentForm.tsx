@@ -270,7 +270,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   <option value="">Select a room</option>
                   {getFilteredRooms().map((room) => (
                     <option key={room.id} value={room.id}>
-                      {room.buildingName} {room.roomNumber} (${room.rentAmount}/month)
+                      {room.buildingName} {room.roomNumber} (₱{room.rentAmount.toLocaleString()}/month)
                       {selectedTenant?.currentRoomId === room.id && ' - Current Room'}
                     </option>
                   ))}

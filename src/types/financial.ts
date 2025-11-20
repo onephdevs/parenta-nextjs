@@ -237,4 +237,157 @@ export interface ExpenseFormData {
   vendor: string;
   expenseDate: string;
   notes: string;
+}
+
+// Tenant Credit types
+export interface TenantCredit {
+  id: string;
+  tenantId: string;
+  amount: number;
+  source: 'excess_payment' | 'refund' | 'adjustment' | 'manual';
+  description?: string;
+  paymentId?: string;
+  appliedToInvoiceId?: string;
+  status: 'available' | 'applied' | 'refunded';
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Joined data
+  tenantName?: string;
+  invoiceNumber?: string;
+  paymentReference?: string;
+}
+
+export interface TenantCreditSummary {
+  tenantId: string;
+  tenantName: string;
+  totalCredits: number;
+  availableCredits: number;
+  appliedCredits: number;
+  refundedCredits: number;
+}
+
+export interface CreateTenantCreditData {
+  tenantId: string;
+  amount: number;
+  source: 'excess_payment' | 'refund' | 'adjustment' | 'manual';
+  description?: string;
+  paymentId?: string;
+}
+
+// Deposit Ledger types
+export interface DepositTransaction {
+  id: string;
+  tenantId: string;
+  amount: number;
+  transactionType: 'deposit' | 'refund' | 'applied' | 'adjustment';
+  appliedToInvoiceId?: string;
+  paymentId?: string;
+  description?: string;
+  transactionDate: Date;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Joined data
+  tenantName?: string;
+  invoiceNumber?: string;
+  createdByName?: string;
+}
+
+export interface DepositLedgerSummary {
+  tenantId: string;
+  tenantName: string;
+  totalDeposits: number;
+  totalRefunds: number;
+  totalApplied: number;
+  currentBalance: number;
+}
+
+export interface CreateDepositTransactionData {
+  tenantId: string;
+  amount: number;
+  transactionType: 'deposit' | 'refund' | 'applied' | 'adjustment';
+  description?: string;
+  appliedToInvoiceId?: string;
+  paymentId?: string;
+  transactionDate?: Date;
+}
+
+// Payment Allocation types
+export interface PaymentAllocation {
+  id: string;
+  paymentId: string;
+  invoiceId: string;
+  allocatedAmount: number;
+  allocationDate: Date;
+  notes?: string;
+  createdAt: Date;
+  
+  // Joined data
+  invoiceNumber?: string;
+  paymentReference?: string;
+  tenantName?: string;
+}
+
+export interface CreatePaymentAllocationData {
+  paymentId: string;
+  invoiceId: string;
+  allocatedAmount: number;
+  notes?: string;
+}
+
+export interface PaymentAllocationSummary {
+  paymentId: string;
+  totalAllocated: number;
+  allocations: {
+    invoiceId: string;
+    invoiceNumber: string;
+    amount: number;
+    dueDate: Date;
+  }[];
+  excessAmount: number;
+}
+
+// Auto-invoicing types
+export interface InvoiceGenerationRequest {
+  tenantId: string;
+  roomId: string;
+  leaseStartDate: Date;
+  leaseEndDate: Date;
+  monthlyRent: number;
+  depositAmount?: number;
+}
+
+export interface InvoiceGenerationResult {
+  success: boolean;
+  invoicesCreated: number;
+  invoiceIds: string[];
+  depositRecorded: boolean;
+  depositAmount?: number;
+  message: string;
+}
+
+// Payment allocation types
+export interface PaymentAllocationRequest {
+  paymentId: string;
+  tenantId: string;
+  paymentAmount: number;
+  depositAmount?: number;
+  useDeposit?: boolean;
+}
+
+export interface PaymentAllocationResult {
+  success: boolean;
+  totalAllocated: number;
+  allocations: {
+    invoiceId: string;
+    invoiceNumber: string;
+    amountAllocated: number;
+    invoiceStatus: string;
+  }[];
+  creditCreated: boolean;
+  creditAmount: number;
+  depositUsed: number;
+  message: string;
 } 
