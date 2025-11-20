@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getTenantById } from '@/lib/api/tenants';
 import TenantFinancialDetails from '@/components/features/TenantFinancialDetails';
+import TenantCreditsManager from '@/components/features/TenantCreditsManager';
+import DepositLedgerManager from '@/components/features/DepositLedgerManager';
 
 interface TenantDetailPageProps {
   params: Promise<{ id: string }>;
@@ -213,6 +215,18 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
 
               {/* Financial Details: Invoices, Payments, Credits, Deposits */}
               <TenantFinancialDetails tenantId={tenant.id} />
+
+              {/* Tenant Credits Management */}
+              <TenantCreditsManager 
+                tenantId={tenant.id} 
+                tenantName={`${tenant.firstName} ${tenant.lastName}`}
+              />
+
+              {/* Deposit Ledger Management */}
+              <DepositLedgerManager 
+                tenantId={tenant.id} 
+                tenantName={`${tenant.firstName} ${tenant.lastName}`}
+              />
             </div>
 
             {/* Sidebar Information */}
