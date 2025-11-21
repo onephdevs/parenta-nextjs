@@ -57,6 +57,10 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
     console.error('Error loading financial reports:', error);
     // Return empty data if there's an error
     financialReport = {
+      period: {
+        start: new Date(startDate),
+        end: new Date(endDate),
+      },
       summary: {
         totalRevenue: 0,
         totalExpenses: 0,
@@ -65,6 +69,20 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
         totalPayments: 0,
         totalInvoices: 0,
         totalOutstanding: 0,
+      },
+      revenue: {
+        totalRevenue: 0,
+      },
+      expenses: {
+        totalExpenses: 0,
+      },
+      profitLoss: {
+        netProfit: 0,
+        profitMargin: 0,
+      },
+      outstandingBalances: {
+        totalOutstanding: 0,
+        overdueOutstanding: 0,
       },
       details: {
         revenue: [],
