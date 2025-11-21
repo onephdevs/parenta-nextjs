@@ -5,8 +5,16 @@
 
 import { Resend } from 'resend';
 
-// Initialize Resend with API key from environment
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization of Resend (only when actually sending emails)
+let resend: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resend) {
+    const apiKey = process.env.RESEND_API_KEY || 're_dummy_key_for_build';
+    resend = new Resend(apiKey);
+  }
+  return resend;
+}
 
 export interface EmailOptions {
   to: string | string[];
@@ -28,10 +36,20 @@ export interface SendEmailResult {
  */
 export async function sendEmail(options: EmailOptions): Promise<SendEmailResult> {
   try {
+    // Check if API key is configured (skip in build/development)
+    if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 're_dummy_key_for_build') {
+      console.warn('[Email Service] RESEND_API_KEY not configured. Email will not be sent.');
+      return {
+        success: false,
+        error: 'Email service not configured. Please set RESEND_API_KEY environment variable.',
+      };
+    }
+    
     // Default from address (you can configure this in environment)
     const fromAddress = options.from || process.env.EMAIL_FROM || 'Parenta <noreply@parenta.com.mx>';
     
-    const result = await resend.emails.send({
+    const client = getResendClient();
+    const result = await client.emails.send({
       from: fromAddress,
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
