@@ -282,16 +282,38 @@ Logs: ~/.pm2/logs/parenta-app-*.log
 
 **Local Development:** `.env.local`
 ```env
+# Database
 DATABASE_URL="postgresql://..."
+
+# Authentication
 NEXTAUTH_URL="http://localhost:3030"
+NEXTAUTH_SECRET="your-secret-key"
+
+# Gmail Email Notifications
+GMAIL_USER="your-email@gmail.com"
+GMAIL_APP_PASSWORD="your-16-char-app-password"
+EMAIL_FROM="Parenta <your-email@gmail.com>"
+
+# Environment
 NODE_ENV="development"
 PORT=3030
 ```
 
 **Production:** `.env.production` (on server)
 ```env
+# Database
 DATABASE_URL="postgresql://..."
+
+# Authentication
 NEXTAUTH_URL="https://parenta.com.mx"
+NEXTAUTH_SECRET="your-secret-key"
+
+# Gmail Email Notifications
+GMAIL_USER="your-email@gmail.com"
+GMAIL_APP_PASSWORD="your-16-char-app-password"
+EMAIL_FROM="Parenta <your-email@gmail.com>"
+
+# Environment
 NODE_ENV="production"
 PORT=3030
 ```
@@ -300,6 +322,8 @@ PORT=3030
 - Never commit `.env*` files to Git
 - Keep production credentials secure
 - Use different database for development/production
+- Gmail requires an App Password (not regular password) - see `GMAIL-EMAIL-SETUP.md`
+- Test email configuration with: `POST /api/notifications/test-email`
 - Verify environment variables after deployment
 
 ### Deployment Best Practices
