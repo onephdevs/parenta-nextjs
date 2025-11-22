@@ -3,6 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createImage, saveUploadedImage, getImagesByEntity } from '@/lib/api/images';
 
+// Route segment config - increase body size limit for image uploads
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 30; // 30 seconds timeout
+
 // Supported image types
 const SUPPORTED_IMAGE_TYPES = [
   'image/jpeg',
