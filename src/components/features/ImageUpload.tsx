@@ -111,17 +111,70 @@ export default function ImageUpload({
 
   const createPreview = (file: File): Promise<string | null> => {
     return new Promise((resolve) => {
+      // Create smaller thumbnail preview to avoid memory issues with large images
+      const img = new Image();
       const reader = new FileReader();
       
       reader.onload = (e) => {
         const result = e.target?.result;
-        if (result && typeof result === 'string') {
-          console.log('✅ Preview created successfully for:', file.name);
-          resolve(result);
-        } else {
-          console.error('❌ Failed to create preview for:', file.name, 'Result:', result);
+        if (!result || typeof result !== 'string') {
+          console.error('❌ Failed to read file for:', file.name);
           resolve(null);
+          return;
         }
+
+        img.onload = () => {
+          try {
+            // Create canvas for thumbnail (max 400x400)
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              console.error('❌ Failed to get canvas context');
+              resolve(result); // Fallback to original
+              return;
+            }
+
+            const MAX_SIZE = 400;
+            let width = img.width;
+            let height = img.height;
+
+            // Calculate scaled dimensions
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height = (height * MAX_SIZE) / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width = (width * MAX_SIZE) / height;
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            // Draw resized image
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Convert to data URL with quality
+            const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            console.log('✅ Preview created successfully for:', file.name, 
+              `(Original: ${img.width}x${img.height}, Thumbnail: ${width}x${height})`);
+            resolve(thumbnailDataUrl);
+          } catch (error) {
+            console.error('❌ Error creating thumbnail for:', file.name, error);
+            resolve(result); // Fallback to original
+          }
+        };
+
+        img.onerror = () => {
+          console.error('❌ Failed to load image for preview:', file.name);
+          resolve(null);
+        };
+
+        img.src = result;
       };
       
       reader.onerror = (error) => {
@@ -135,7 +188,7 @@ export default function ImageUpload({
       };
       
       try {
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
       } catch (error) {
         console.error('❌ Error reading file:', file.name, error);
         resolve(null);

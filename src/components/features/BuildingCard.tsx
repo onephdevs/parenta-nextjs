@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Building } from '@/types/database';
 import { useRouter } from 'next/navigation';
+import { useNotifications } from '@/hooks/useNotifications';
+import DeleteBuildingModal from '@/components/features/DeleteBuildingModal';
 
 interface BuildingCardProps {
   building: Building;
@@ -12,8 +14,10 @@ interface BuildingCardProps {
 
 export default function BuildingCard({ building, viewMode }: BuildingCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { showNotification } = useNotifications();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -28,6 +32,34 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [isMenuOpen]);
+
+  const handleDeleteBuilding = async () => {
+    try {
+      const response = await fetch(`/api/buildings/${building.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete building');
+      }
+
+      showNotification({
+        type: 'success',
+        title: 'Building deleted',
+        message: `${building.name} has been deleted successfully.`,
+      });
+
+      // Refresh the page to update the list
+      router.refresh();
+    } catch (error) {
+      console.error('Error deleting building:', error);
+      showNotification({
+        type: 'error',
+        title: 'Delete failed',
+        message: error instanceof Error ? error.message : 'Failed to delete building. Please try again.',
+      });
+    }
+  };
 
   const formatAddress = (building: Building) => {
     return `${building.addressLine1}${building.addressLine2 ? `, ${building.addressLine2}` : ''}, ${building.city}, ${building.state} ${building.postalCode}`;
@@ -87,6 +119,16 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                           >
                             Manage Rooms
                           </Link>
+                          <div className="border-t border-gray-100"></div>
+                          <button
+                            onClick={() => {
+                              setIsDeleteModalOpen(true);
+                              setIsMenuOpen(false);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                          >
+                            Delete Building
+                          </button>
                         </div>
                       </div>
                     )}
@@ -138,6 +180,13 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
           </div>
         </div>
       </div>
+
+      <DeleteBuildingModal
+        building={building}
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDelete={handleDeleteBuilding}
+      />
     );
   }
 
@@ -191,6 +240,16 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                   >
                     Manage Rooms
                   </Link>
+                  <div className="border-t border-gray-100"></div>
+                  <button
+                    onClick={() => {
+                      setIsDeleteModalOpen(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                  >
+                    Delete Building
+                  </button>
                 </div>
               </div>
             )}
@@ -252,6 +311,13 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
           </Link>
         </div>
       </div>
+
+      <DeleteBuildingModal
+        building={building}
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDelete={handleDeleteBuilding}
+      />
     </div>
   );
 } 
