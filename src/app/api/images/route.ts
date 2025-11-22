@@ -6,11 +6,14 @@ import { createImage, saveUploadedImage, getImagesByEntity } from '@/lib/api/ima
 // Supported image types
 const SUPPORTED_IMAGE_TYPES = [
   'image/jpeg',
+  'image/jpg',
+  'image/pjpeg', // Progressive JPEG
   'image/png',
   'image/gif',
-  'image/webp',
-  'image/jpg'
+  'image/webp'
 ];
+
+const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -100,16 +103,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
-      console.log('Error: Unsupported file type', { fileType: file.type, supportedTypes: SUPPORTED_IMAGE_TYPES });
+    // Validate file type (check both MIME type and extension)
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const hasValidExtension = SUPPORTED_EXTENSIONS.includes(extension || '');
+    const hasValidMimeType = SUPPORTED_IMAGE_TYPES.includes(file.type);
+
+    if (!hasValidMimeType && !hasValidExtension) {
+      console.log('Error: Unsupported file type', { 
+        fileName: file.name,
+        fileType: file.type, 
+        extension: extension,
+        supportedTypes: SUPPORTED_IMAGE_TYPES,
+        supportedExtensions: SUPPORTED_EXTENSIONS
+      });
       return NextResponse.json(
         { 
           success: false,
-          error: `File type ${file.type} is not supported. Please use JPEG, PNG, GIF, or WebP.` 
+          error: `File type not supported. File: ${file.name}, Type: ${file.type}. Please use: ${SUPPORTED_EXTENSIONS.join(', ')}` 
         },
         { status: 400 }
       );
+    }
+
+    if (!hasValidMimeType && hasValidExtension) {
+      console.warn('⚠️ MIME type mismatch but extension is valid, proceeding:', {
+        fileName: file.name,
+        mimeType: file.type,
+        extension: extension
+      });
     }
 
     // Validate file size

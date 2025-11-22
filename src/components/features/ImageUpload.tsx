@@ -6,11 +6,14 @@ import { useNotifications } from '@/hooks/useNotifications';
 // Supported image types
 const SUPPORTED_IMAGE_TYPES = [
   'image/jpeg',
+  'image/jpg',
+  'image/pjpeg', // Progressive JPEG
   'image/png',
   'image/gif',
-  'image/webp',
-  'image/jpg'
+  'image/webp'
 ];
+
+const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB limit for images
 
@@ -55,12 +58,50 @@ export default function ImageUpload({
   const [isUploading, setIsUploading] = useState(false);
 
   const validateFile = (file: File): string | null => {
-    if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
-      return `File type ${file.type} is not supported. Please use JPEG, PNG, GIF, or WebP.`;
+    console.log('🔍 Validating file:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      sizeInMB: (file.size / 1024 / 1024).toFixed(2) + 'MB'
+    });
+
+    // Check file extension as fallback if MIME type is not recognized
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const hasValidExtension = SUPPORTED_EXTENSIONS.includes(extension || '');
+    const hasValidMimeType = SUPPORTED_IMAGE_TYPES.includes(file.type);
+
+    if (!hasValidMimeType && !hasValidExtension) {
+      const error = `File type not supported. 
+      File: ${file.name}
+      Detected type: ${file.type || 'unknown'}
+      Supported: ${SUPPORTED_EXTENSIONS.join(', ')}`;
+      console.error('❌ Validation failed - unsupported type:', error);
+      return error;
     }
+
+    if (!hasValidMimeType && hasValidExtension) {
+      console.warn('⚠️ MIME type mismatch but extension is valid:', {
+        mimeType: file.type,
+        extension: extension,
+        proceeding: true
+      });
+    }
+
     if (file.size > MAX_IMAGE_SIZE) {
-      return `File size exceeds ${MAX_IMAGE_SIZE / 1024 / 1024}MB limit`;
+      const error = `File "${file.name}" is too large.
+      Size: ${(file.size / 1024 / 1024).toFixed(2)}MB
+      Maximum: ${(MAX_IMAGE_SIZE / 1024 / 1024)}MB`;
+      console.error('❌ Validation failed - file too large:', error);
+      return error;
     }
+
+    if (file.size === 0) {
+      const error = `File "${file.name}" is empty (0 bytes)`;
+      console.error('❌ Validation failed - empty file:', error);
+      return error;
+    }
+
+    console.log('✅ File validation passed');
     return null;
   };
 
