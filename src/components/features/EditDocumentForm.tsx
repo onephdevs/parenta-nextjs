@@ -15,6 +15,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
   const router = useRouter();
   const { addNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     documentName: document.documentName,
@@ -89,6 +90,42 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Are you sure you want to delete "${document.documentName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(`/api/documents/${document.id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        addNotification({
+          type: 'success',
+          title: 'Document deleted',
+          message: 'Document has been deleted successfully.'
+        });
+        
+        router.push('/admin/documents');
+      } else {
+        throw new Error(result.error || 'Failed to delete document');
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      addNotification({
+        type: 'error',
+        title: 'Delete failed',
+        message: error instanceof Error ? error.message : 'Failed to delete document'
+      });
+      setIsDeleting(false);
     }
   };
 
@@ -367,7 +404,19 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
               </div>
             </div>
 
-            <div className="mt-8 flex justify-end space-x-3">
+            <div className="mt-8 flex justify-between items-center">
+              {/* Delete Button - Left Side */}
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting || isSubmitting}
+                className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Document'}
+              </button>
+
+              {/* Cancel & Save Buttons - Right Side */}
+              <div className="flex space-x-3">
               <Link
                 href="/admin/documents"
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
@@ -376,7 +425,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
               </Link>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isDeleting}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
@@ -391,6 +440,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
                   'Update Document'
                 )}
               </button>
+              </div>
             </div>
           </form>
         </div>
