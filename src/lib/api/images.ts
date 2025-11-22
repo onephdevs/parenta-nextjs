@@ -1,6 +1,6 @@
 import pool from '@/lib/db';
 import path from 'path';
-import fs from 'fs/promises';
+import { put, del } from '@vercel/blob';
 
 export interface Image {
   id: string;
@@ -251,12 +251,16 @@ export async function deleteImage(imageId: string): Promise<boolean> {
     
     await client.query('COMMIT');
     
-    // Delete physical file
+    // Delete from Vercel Blob
     try {
-      const fullPath = path.join(process.cwd(), 'public', image.filePath);
-      await fs.unlink(fullPath);
+      // If filePath is a Blob URL, delete it from Vercel Blob
+      if (image.filePath.startsWith('https://')) {
+        console.log('🗑️  Deleting from Vercel Blob:', image.filePath);
+        await del(image.filePath);
+        console.log('✅ Blob deleted successfully');
+      }
     } catch (fileError) {
-      console.warn('Failed to delete physical file:', fileError);
+      console.warn('Failed to delete blob file:', fileError);
       // Don't throw error for file deletion failure
     }
     
@@ -269,7 +273,7 @@ export async function deleteImage(imageId: string): Promise<boolean> {
   }
 }
 
-// Save uploaded image file
+// Save uploaded image file to Vercel Blob
 export async function saveUploadedImage(
   file: File,
   entityType: 'building' | 'room' | 'asset',
@@ -279,26 +283,28 @@ export async function saveUploadedImage(
   filePath: string;
   fileSize: number;
 }> {
-  // Create upload directory based on entity type
-  const uploadDir = path.join('uploads', 'images', entityType);
-  const fullUploadDir = path.join(process.cwd(), 'public', uploadDir);
-  await fs.mkdir(fullUploadDir, { recursive: true });
-
   // Generate unique filename
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 15);
   const fileExtension = path.extname(file.name);
   const fileName = `${entityId}-${timestamp}-${randomSuffix}${fileExtension}`;
-  const filePath = path.join(fullUploadDir, fileName);
+  
+  // Create blob path: images/{entityType}/{fileName}
+  const blobPath = `images/${entityType}/${fileName}`;
 
-  // Save file
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  await fs.writeFile(filePath, buffer);
+  console.log('📤 Uploading to Vercel Blob:', blobPath);
+
+  // Upload to Vercel Blob
+  const blob = await put(blobPath, file, {
+    access: 'public',
+    addRandomSuffix: false, // We already have a unique name
+  });
+
+  console.log('✅ Blob uploaded successfully:', blob.url);
 
   return {
     fileName,
-    filePath: path.join(uploadDir, fileName), // Relative path for storing in DB
+    filePath: blob.url, // Store the full blob URL
     fileSize: file.size,
   };
 }

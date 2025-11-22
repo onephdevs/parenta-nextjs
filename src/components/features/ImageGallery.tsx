@@ -164,7 +164,12 @@ export default function ImageGallery({
   };
 
   const getImageUrl = (filePath: string) => {
-    // Use API route to serve images
+    // If it's a Vercel Blob URL (starts with https://), use it directly
+    if (filePath.startsWith('https://')) {
+      return filePath;
+    }
+    
+    // Otherwise, use API route to serve images (for backward compatibility with old filesystem images)
     // filePath format: "uploads/images/building/file.jpg"
     // Convert to: "/api/images/serve/building/file.jpg"
     const pathParts = filePath.replace('uploads/images/', '').split('/');

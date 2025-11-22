@@ -135,7 +135,7 @@ export default function ImageUpload({
       };
       
       try {
-        reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
       } catch (error) {
         console.error('❌ Error reading file:', file.name, error);
         resolve(null);
