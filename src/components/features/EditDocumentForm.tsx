@@ -13,7 +13,7 @@ interface EditDocumentFormProps {
 
 export default function EditDocumentForm({ document, categories }: EditDocumentFormProps) {
   const router = useRouter();
-  const { addNotification } = useNotifications();
+  const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -44,6 +44,12 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
     e.preventDefault();
     setIsSubmitting(true);
 
+    const loadingNotificationId = showNotification({
+      type: 'loading',
+      title: 'Updating document...',
+      message: 'Please wait while we save your changes.'
+    });
+
     try {
       const updateData = {
         documentName: formData.documentName,
@@ -71,10 +77,10 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
       const result = await response.json();
 
       if (result.success) {
-        addNotification({
+        updateNotification(loadingNotificationId, {
           type: 'success',
-          title: 'Document updated',
-          message: 'Document has been updated successfully.'
+          title: 'Document updated successfully!',
+          message: `${formData.documentName} has been updated.`
         });
         
         router.push('/admin/documents');
@@ -83,10 +89,10 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
       }
     } catch (error) {
       console.error('Error updating document:', error);
-      addNotification({
+      updateNotification(loadingNotificationId, {
         type: 'error',
-        title: 'Update failed',
-        message: error instanceof Error ? error.message : 'Failed to update document'
+        title: 'Failed to update document',
+        message: error instanceof Error ? error.message : 'An error occurred'
       });
     } finally {
       setIsSubmitting(false);
@@ -100,6 +106,12 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
     setIsDeleting(true);
 
+    const loadingNotificationId = showNotification({
+      type: 'loading',
+      title: 'Deleting document...',
+      message: 'Please wait while we delete the document.'
+    });
+
     try {
       const response = await fetch(`/api/documents/${document.id}`, {
         method: 'DELETE',
@@ -108,10 +120,10 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
       const result = await response.json();
 
       if (result.success) {
-        addNotification({
+        updateNotification(loadingNotificationId, {
           type: 'success',
-          title: 'Document deleted',
-          message: 'Document has been deleted successfully.'
+          title: 'Document deleted successfully!',
+          message: `${document.documentName} has been removed.`
         });
         
         router.push('/admin/documents');
@@ -120,10 +132,10 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
       }
     } catch (error) {
       console.error('Error deleting document:', error);
-      addNotification({
+      updateNotification(loadingNotificationId, {
         type: 'error',
-        title: 'Delete failed',
-        message: error instanceof Error ? error.message : 'Failed to delete document'
+        title: 'Failed to delete document',
+        message: error instanceof Error ? error.message : 'An error occurred'
       });
       setIsDeleting(false);
     }

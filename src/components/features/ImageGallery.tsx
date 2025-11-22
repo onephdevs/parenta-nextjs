@@ -164,8 +164,11 @@ export default function ImageGallery({
   };
 
   const getImageUrl = (filePath: string) => {
-    // Convert relative path to absolute URL
-    return filePath.startsWith('/') ? filePath : `/${filePath}`;
+    // Use API route to serve images
+    // filePath format: "uploads/images/building/file.jpg"
+    // Convert to: "/api/images/serve/building/file.jpg"
+    const pathParts = filePath.replace('uploads/images/', '').split('/');
+    return `/api/images/serve/${pathParts.join('/')}`;
   };
 
   if (images.length === 0) {

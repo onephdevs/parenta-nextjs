@@ -25,11 +25,15 @@ interface ImageUploadProps {
   className?: string;
 }
 
-interface UploadFile extends File {
+interface UploadFile {
   id: string;
+  file: File;
   preview?: string;
   progress?: number;
   error?: string;
+  name: string;
+  size: number;
+  type: string;
 }
 
 interface UploadedImage {
@@ -150,18 +154,23 @@ export default function ImageUpload({
       const error = validateFile(file);
       const preview = error ? undefined : await createPreview(file);
       
-      // Create UploadFile without spreading to preserve File properties
-      const uploadFile: UploadFile = Object.assign(file, {
+      // Create UploadFile object properly
+      const uploadFile: UploadFile = {
         id: Math.random().toString(36).substring(7),
+        file: file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
         preview,
         error
-      });
+      };
       
       console.log('Created UploadFile:', { 
         id: uploadFile.id, 
         name: uploadFile.name, 
         type: uploadFile.type, 
         size: uploadFile.size,
+        hasPreview: !!uploadFile.preview,
         error: uploadFile.error 
       });
       
@@ -192,41 +201,36 @@ export default function ImageUpload({
   }, []);
 
   const removeFile = (fileId: string) => {
-    setFiles(prev => {
-      const fileToRemove = prev.find(f => f.id === fileId);
-      if (fileToRemove?.preview) {
-        URL.revokeObjectURL(fileToRemove.preview);
-      }
-      return prev.filter(file => file.id !== fileId);
-    });
+    setFiles(prev => prev.filter(file => file.id !== fileId));
   };
 
-  const uploadFile = async (file: UploadFile): Promise<UploadedImage | null> => {
+  const uploadFile = async (uploadFile: UploadFile): Promise<UploadedImage | null> => {
     // Additional validation before upload
-    if (!file || !file.name || !file.type || file.size === 0) {
+    if (!uploadFile || !uploadFile.file || !uploadFile.name || !uploadFile.type || uploadFile.size === 0) {
       console.error('Invalid file object:', { 
-        hasFile: !!file, 
-        name: file?.name, 
-        type: file?.type, 
-        size: file?.size 
+        hasUploadFile: !!uploadFile,
+        hasFile: !!uploadFile?.file,
+        name: uploadFile?.name, 
+        type: uploadFile?.type, 
+        size: uploadFile?.size 
       });
       
       setFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, error: 'Invalid file. Please select the file again.' } : f
+        f.id === uploadFile.id ? { ...f, error: 'Invalid file. Please select the file again.' } : f
       ));
       return null;
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', uploadFile.file);
     formData.append('entityType', entityType);
     formData.append('entityId', entityId);
     formData.append('imageType', 'photo'); // Default type
     
     console.log('Uploading file:', {
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: file.size,
+      fileName: uploadFile.name,
+      fileType: uploadFile.type,
+      fileSize: uploadFile.size,
       entityType,
       entityId
     });
@@ -248,25 +252,25 @@ export default function ImageUpload({
       if (result.success) {
         // Update file progress to 100%
         setFiles(prev => prev.map(f => 
-          f.id === file.id ? { ...f, progress: 100 } : f
+          f.id === uploadFile.id ? { ...f, progress: 100 } : f
         ));
         return result.data;
       } else {
         // Update file with specific error message from API
         const errorMessage = result.error || 'Upload failed';
         setFiles(prev => prev.map(f => 
-          f.id === file.id ? { ...f, error: errorMessage } : f
+          f.id === uploadFile.id ? { ...f, error: errorMessage } : f
         ));
-        console.error('Upload failed for file:', file.name, 'Error:', errorMessage);
+        console.error('Upload failed for file:', uploadFile.name, 'Error:', errorMessage);
         return null;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
       // Update file with specific error
       setFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, error: errorMessage } : f
+        f.id === uploadFile.id ? { ...f, error: errorMessage } : f
       ));
-      console.error('Upload error for file:', file.name, 'Error:', error);
+      console.error('Upload error for file:', uploadFile.name, 'Error:', error);
       return null;
     }
   };

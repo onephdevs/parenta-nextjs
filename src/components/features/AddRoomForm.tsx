@@ -12,7 +12,7 @@ interface AddRoomFormProps {
 
 export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) {
   const router = useRouter();
-  const { showNotification } = useNotifications();
+  const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -51,6 +51,12 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     setIsSubmitting(true);
     setError(null);
 
+    const loadingNotificationId = showNotification({
+      type: 'loading',
+      title: 'Creating room...',
+      message: 'Please wait while we create the room.'
+    });
+
     try {
       const response = await fetch('/api/rooms', {
         method: 'POST',
@@ -66,7 +72,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
         throw new Error(result.error || 'Failed to create room');
       }
 
-      showNotification({
+      updateNotification(loadingNotificationId, {
         type: 'success',
         title: 'Room created successfully!',
         message: `Room ${formData.roomNumber} has been created in ${building.name}.`
@@ -78,7 +84,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       
-      showNotification({
+      updateNotification(loadingNotificationId, {
         type: 'error',
         title: 'Failed to create room',
         message: errorMessage

@@ -109,6 +109,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
     setLoading(true);
 
+    const loadingNotificationId = showNotification({
+      type: 'loading',
+      title: 'Updating tenant...',
+      message: 'Please wait while we save your changes.'
+    });
+
     try {
       const response = await fetch(`/api/tenants/${tenant.id}`, {
         method: 'PUT',
@@ -132,14 +138,20 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         throw new Error(errorData.error || 'Failed to update tenant');
       }
 
-      showNotification('Tenant updated successfully', 'success');
+      updateNotification(loadingNotificationId, {
+        type: 'success',
+        title: 'Tenant updated successfully!',
+        message: `${formData.firstName} ${formData.lastName} has been updated.`
+      });
+      
       router.push(`/admin/tenants/${tenant.id}`);
     } catch (error) {
       console.error('Error updating tenant:', error);
-      showNotification(
-        error instanceof Error ? error.message : 'Failed to update tenant',
-        'error'
-      );
+      updateNotification(loadingNotificationId, {
+        type: 'error',
+        title: 'Failed to update tenant',
+        message: error instanceof Error ? error.message : 'An error occurred'
+      });
     } finally {
       setLoading(false);
     }

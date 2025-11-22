@@ -133,19 +133,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
   };
 
   const actionButtons = (
-    <div className="flex justify-between items-center w-full">
-      <button
-        type="button"
-        onClick={() => setShowDeleteConfirm(true)}
-        disabled={isDeleting || isSubmitting}
-        className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-        Delete Building
-      </button>
-
+    <div className="flex justify-end items-center w-full">
       <div className="flex space-x-3">
         <button
           type="button"
@@ -156,7 +144,19 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
           Cancel
         </button>
         <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          disabled={isDeleting || isSubmitting}
+          className="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete Building
+        </button>
+        <button
           type="submit"
+          form="edit-building-form"
           disabled={isSubmitting || isDeleting}
           className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -203,7 +203,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form id="edit-building-form" onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information Section */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
