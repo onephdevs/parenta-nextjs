@@ -109,11 +109,37 @@ export default function ImageUpload({
     return null;
   };
 
-  const createPreview = (file: File): Promise<string> => {
+  const createPreview = (file: File): Promise<string | null> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
+      
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (result && typeof result === 'string') {
+          console.log('✅ Preview created successfully for:', file.name);
+          resolve(result);
+        } else {
+          console.error('❌ Failed to create preview for:', file.name, 'Result:', result);
+          resolve(null);
+        }
+      };
+      
+      reader.onerror = (error) => {
+        console.error('❌ FileReader error for:', file.name, error);
+        resolve(null);
+      };
+      
+      reader.onabort = () => {
+        console.error('❌ FileReader aborted for:', file.name);
+        resolve(null);
+      };
+      
+      try {
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('❌ Error reading file:', file.name, error);
+        resolve(null);
+      }
     });
   };
 
@@ -121,7 +147,7 @@ export default function ImageUpload({
     const remainingSlots = maxImages - files.length;
     const filesToProcess = Array.from(selectedFiles).slice(0, remainingSlots);
 
-    console.log('Files selected:', filesToProcess.map(f => ({
+    console.log('📁 Files selected:', filesToProcess.map(f => ({
       name: f.name,
       type: f.type,
       size: f.size
@@ -138,11 +164,11 @@ export default function ImageUpload({
     const newFiles: UploadFile[] = [];
     
     for (const file of filesToProcess) {
-      console.log('Processing file:', { name: file.name, type: file.type, size: file.size });
+      console.log('🔄 Processing file:', { name: file.name, type: file.type, size: file.size });
       
       // Additional validation to ensure file is valid
-      if (!file.name || !file.type || file.size === 0) {
-        console.error('Invalid file detected:', { name: file.name, type: file.type, size: file.size });
+      if (!file.name || file.size === 0) {
+        console.error('❌ Invalid file detected:', { name: file.name, type: file.type, size: file.size });
         showNotification({
           type: 'error',
           title: 'Invalid file',
@@ -151,8 +177,22 @@ export default function ImageUpload({
         continue;
       }
       
+      // Validate file first
       const error = validateFile(file);
-      const preview = error ? undefined : await createPreview(file);
+      
+      // Only create preview if file is valid
+      let preview: string | undefined = undefined;
+      if (!error) {
+        console.log('🖼️ Creating preview for:', file.name);
+        const previewResult = await createPreview(file);
+        preview = previewResult || undefined;
+        
+        if (!previewResult) {
+          console.warn('⚠️ Preview creation failed for:', file.name, '- will show placeholder');
+        }
+      } else {
+        console.log('⚠️ Skipping preview creation due to validation error:', error);
+      }
       
       // Create UploadFile object properly
       const uploadFile: UploadFile = {
@@ -165,12 +205,13 @@ export default function ImageUpload({
         error
       };
       
-      console.log('Created UploadFile:', { 
+      console.log('📦 Created UploadFile:', { 
         id: uploadFile.id, 
         name: uploadFile.name, 
         type: uploadFile.type, 
         size: uploadFile.size,
         hasPreview: !!uploadFile.preview,
+        previewLength: uploadFile.preview?.length,
         error: uploadFile.error 
       });
       
@@ -295,9 +336,14 @@ export default function ImageUpload({
     const uploadPromises = validFiles.map(uploadFile);
     const results = await Promise.all(uploadPromises);
     
+    console.log('Upload results:', results);
+    console.log('Valid files count:', validFiles.length);
+    
     const uploadedImages = results.filter((result): result is UploadedImage => result !== null);
     const successCount = uploadedImages.length;
     const errorCount = validFiles.length - successCount;
+
+    console.log('Success count:', successCount, 'Error count:', errorCount);
 
     if (successCount > 0) {
       showNotification({
@@ -310,14 +356,46 @@ export default function ImageUpload({
         onUploadComplete(uploadedImages);
       }
       
-      // Clear successful uploads
+      // Clear successful uploads, keep failed ones temporarily for user to see errors
       setFiles(prev => prev.filter(f => f.error || f.progress !== 100));
+      
+      // If there were any failures, show additional info
+      if (errorCount > 0) {
+        const failedFiles = files.filter(f => f.error);
+        const errorDetails = failedFiles.map(f => `${f.name}: ${f.error}`).join('; ');
+        console.error('Failed uploads:', errorDetails);
+        
+        setTimeout(() => {
+          showNotification({
+            type: 'error',
+            title: `${errorCount} upload${errorCount > 1 ? 's' : ''} failed`,
+            message: `Failed files: ${failedFiles.map(f => f.name).join(', ')}. Check below for details.`
+          });
+        }, 500);
+      }
     } else {
+      // Get detailed error messages from failed files
+      const failedFiles = files.filter(f => f.error);
+      const errorMessages = [...new Set(failedFiles.map(f => f.error))]; // Unique errors
+      const fileNames = failedFiles.map(f => f.name).join(', ');
+      
+      console.error('All uploads failed:', {
+        files: fileNames,
+        errors: errorMessages
+      });
+      
       showNotification({
         type: 'error',
         title: 'Upload failed',
-        message: 'All uploads failed. Please check the files and try again.'
+        message: errorMessages.length === 1 
+          ? `${errorMessages[0]} (Files: ${fileNames})`
+          : `${errorCount} file${errorCount > 1 ? 's' : ''} failed to upload. Check the error messages below each image for details.`
       });
+      
+      // Remove failed files after user has time to read the error
+      setTimeout(() => {
+        setFiles(prev => prev.filter(f => !f.error));
+      }, 5000); // Clear after 5 seconds
     }
     
     setIsUploading(false);
@@ -401,18 +479,49 @@ export default function ImageUpload({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {files.map((file) => (
               <div key={file.id} className="relative group">
-                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                <div className={`aspect-square bg-gray-100 rounded-lg overflow-hidden ${
+                  file.error ? 'ring-2 ring-red-500' : ''
+                }`}>
                   {file.preview ? (
                     <img
                       src={file.preview}
                       alt={file.name}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${file.error ? 'opacity-50' : ''}`}
+                      onError={(e) => {
+                        console.error('❌ Failed to display preview for:', file.name);
+                        // Hide the broken image and show placeholder
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const placeholder = document.createElement('div');
+                          placeholder.className = 'w-full h-full flex flex-col items-center justify-center bg-gray-50';
+                          placeholder.innerHTML = `
+                            <svg class="w-12 h-12 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-xs text-gray-400">Preview unavailable</span>
+                          `;
+                          parent.insertBefore(placeholder, e.currentTarget);
+                        }
+                      }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+                      <svg className="w-12 h-12 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
+                      <span className="text-xs text-gray-400">Preview unavailable</span>
+                    </div>
+                  )}
+                  
+                  {/* Error Overlay */}
+                  {file.error && (
+                    <div className="absolute inset-0 bg-red-500 bg-opacity-10 flex items-center justify-center p-2">
+                      <div className="bg-white rounded-full p-2">
+                        <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -423,6 +532,7 @@ export default function ImageUpload({
                     onClick={() => removeFile(file.id)}
                     disabled={isUploading}
                     className="opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-all duration-200 disabled:opacity-50"
+                    title="Remove file"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -432,21 +542,39 @@ export default function ImageUpload({
 
                 {/* File Info */}
                 <div className="mt-2">
-                  <p className="text-xs font-medium text-gray-900 truncate">{file.name}</p>
+                  <p className="text-xs font-medium text-gray-900 truncate" title={file.name}>{file.name}</p>
                   <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                   
                   {file.error && (
-                    <p className="text-xs text-red-600 mt-1">{file.error}</p>
+                    <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded">
+                      <div className="flex items-start gap-1">
+                        <svg className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-xs text-red-700 leading-tight">{file.error}</p>
+                      </div>
+                    </div>
                   )}
                   
                   {file.progress !== undefined && !file.error && (
                     <div className="mt-1">
-                      <div className="bg-gray-200 rounded-full h-1">
+                      <div className="bg-gray-200 rounded-full h-1.5">
                         <div
-                          className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
                           style={{ width: `${file.progress}%` }}
                         ></div>
                       </div>
+                      {file.progress < 100 && (
+                        <p className="text-xs text-gray-500 mt-0.5">Uploading... {file.progress}%</p>
+                      )}
+                      {file.progress === 100 && (
+                        <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Uploaded
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
