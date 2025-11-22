@@ -46,26 +46,32 @@ export default function FullScreenModal({
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3 flex-1">
-              {actionButtons ? (
-                <div className="flex-1 flex items-center">
-                  {actionButtons}
-                </div>
-              ) : (
-                <>
-                  {secondaryButton}
-                  {primaryButton}
-                </>
-              )}
-            </div>
-            {/* Close X button */}
-            <button
-              onClick={onClose}
-              className="ml-4 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-              aria-label="Close modal"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {actionButtons ? (
+              <>
+                {actionButtons}
+                {/* Close X button */}
+                <button
+                  onClick={onClose}
+                  className="ml-4 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-3">
+                {secondaryButton}
+                {primaryButton}
+                {/* Close X button */}
+                <button
+                  onClick={onClose}
+                  className="ml-4 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
