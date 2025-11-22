@@ -7,18 +7,22 @@ interface FullScreenModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: string;
   children: React.ReactNode;
   primaryButton?: React.ReactNode;
   secondaryButton?: React.ReactNode;
+  actionButtons?: React.ReactNode;
 }
 
 export default function FullScreenModal({
   isOpen,
   onClose,
   title,
+  subtitle,
   children,
   primaryButton,
   secondaryButton,
+  actionButtons,
 }: FullScreenModalProps) {
   if (!isOpen) return null;
 
@@ -35,11 +39,22 @@ export default function FullScreenModal({
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+                {subtitle && (
+                  <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
-              {secondaryButton}
-              {primaryButton}
+              {actionButtons ? (
+                actionButtons
+              ) : (
+                <>
+                  {secondaryButton}
+                  {primaryButton}
+                </>
+              )}
               {/* Close X button */}
               <button
                 onClick={onClose}
