@@ -119,10 +119,11 @@ export async function getBuildingStats() {
     const query = `
       SELECT 
         COUNT(*) as total_buildings,
-        COUNT(*) FILTER (WHERE is_active = true) as active_buildings,
+        COUNT(*) as active_buildings,
         SUM(total_units) as total_units,
-        SUM(total_units) FILTER (WHERE is_active = true) as active_units
+        SUM(total_units) as active_units
       FROM buildings
+      WHERE is_active = true
     `;
     
     const result = await pool.query(query);
@@ -138,16 +139,17 @@ export async function getOccupancyStats() {
   try {
     const query = `
       SELECT 
-        COUNT(*) as total_rooms,
-        COUNT(*) FILTER (WHERE room_status = 'occupied') as occupied_rooms,
-        COUNT(*) FILTER (WHERE room_status = 'vacant') as vacant_rooms,
-        COUNT(*) FILTER (WHERE room_status = 'maintenance') as maintenance_rooms,
+        COUNT(r.*) as total_rooms,
+        COUNT(*) FILTER (WHERE r.room_status = 'occupied') as occupied_rooms,
+        COUNT(*) FILTER (WHERE r.room_status = 'vacant') as vacant_rooms,
+        COUNT(*) FILTER (WHERE r.room_status = 'maintenance') as maintenance_rooms,
         ROUND(
-          (COUNT(*) FILTER (WHERE room_status = 'occupied')::DECIMAL / 
-           NULLIF(COUNT(*), 0)) * 100, 2
+          (COUNT(*) FILTER (WHERE r.room_status = 'occupied')::DECIMAL / 
+           NULLIF(COUNT(r.*), 0)) * 100, 2
         ) as occupancy_rate
-      FROM rooms 
-      WHERE is_active = true
+      FROM rooms r
+      INNER JOIN buildings b ON r.building_id = b.id
+      WHERE r.is_active = true AND b.is_active = true
     `;
     
     const result = await pool.query(query);
