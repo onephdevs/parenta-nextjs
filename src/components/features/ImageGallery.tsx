@@ -203,6 +203,17 @@ export default function ImageGallery({
                   src={getImageUrl(image.filePath)}
                   alt={image.caption || image.fileName}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                  style={{ 
+                    display: 'block',
+                    position: 'relative',
+                    zIndex: 1,
+                    backgroundColor: 'transparent'
+                  }}
+                  onError={(e) => {
+                    console.error('❌ Failed to load image:', image.fileName, 'URL:', getImageUrl(image.filePath));
+                    // Show placeholder on error
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
                 
                 {/* Primary Badge */}
@@ -218,8 +229,8 @@ export default function ImageGallery({
                 )}
 
                 {/* Hover Actions */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 flex space-x-2">
+                <div className="absolute inset-0 bg-transparent group-hover:bg-black group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
+                  <div className="opacity-0 group-hover:opacity-100 flex space-x-2 pointer-events-auto">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
