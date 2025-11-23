@@ -129,28 +129,55 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         const depositAmount = parseFloat(formData.depositAmount) || 0;
         const paymentAmount = totalAmount - depositAmount;
         
-        // Get tenant's current room for payment
-        if (!selectedTenant?.currentRoomId) {
-          throw new Error('Tenant must be assigned to a room to record payment');
+        // Try to get tenant's current room assignment (optional)
+        let roomAssignmentId: string | undefined;
+        if (selectedTenant?.currentRoomId) {
+          // If we have currentRoomId, try to fetch the assignment ID
+          try {
+            const tenantRes = await fetch(`/api/tenants/${formData.tenantId}`);
+            if (tenantRes.ok) {
+              const tenantData = await tenantRes.json();
+              if (tenantData.success && tenantData.data?.currentAssignment?.id) {
+                roomAssignmentId = tenantData.data.currentAssignment.id;
+              }
+            }
+          } catch (error) {
+            console.warn('Could not fetch room assignment, proceeding without it:', error);
+            // Continue without room assignment - it's optional
+          }
         }
 
         // Record payment (will auto-allocate to invoices via backend)
+        // roomAssignmentId is optional - payments can be recorded without room assignment
+        const paymentPayload: any = {
+          tenantId: parseInt(formData.tenantId),
+          amount: paymentAmount > 0 ? paymentAmount : totalAmount, // If no deposit, use total amount
+          paymentType: formData.type,
+          paymentStatus: 'completed', // Always completed since payment is received
+          paymentDate: formData.paymentDate,
+          paymentMethod: formData.paymentMethod,
+        };
+
+        // Add optional fields
+        if (roomAssignmentId) {
+          paymentPayload.roomAssignmentId = roomAssignmentId;
+        }
+        if (formData.description) {
+          paymentPayload.notes = formData.description;
+        }
+        if (formData.transactionId) {
+          paymentPayload.referenceNumber = formData.transactionId;
+        }
+        if (depositAmount > 0) {
+          paymentPayload.depositAmount = depositAmount;
+        }
+
         const response = await fetch('/api/payments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            tenantId: parseInt(formData.tenantId),
-            roomId: selectedTenant.currentRoomId,
-            amount: paymentAmount > 0 ? paymentAmount : totalAmount, // If no deposit, use total amount
-            type: formData.type,
-            status: 'completed', // Always completed since payment is received
-            paymentDate: formData.paymentDate,
-            description: formData.description || null,
-            paymentMethod: formData.paymentMethod,
-            transactionId: formData.transactionId || null,
-          }),
+          body: JSON.stringify(paymentPayload),
         });
 
         if (!response.ok) {
@@ -261,8 +288,8 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   <p className="mt-2 text-sm text-red-600">{errors.tenantId}</p>
                 )}
                 {selectedTenant && !selectedTenant.currentRoomId && (
-                  <p className="mt-2 text-sm text-amber-600">
-                    ⚠️ This tenant is not assigned to a room. Please assign them to a room first.
+                  <p className="mt-2 text-sm text-blue-600">
+                    ℹ️ This tenant is not currently assigned to a room. Payment can still be recorded, but it won't be automatically allocated to invoices.
                   </p>
                 )}
               </div>
