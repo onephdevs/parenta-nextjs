@@ -185,44 +185,64 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           throw new Error(errorData.error || 'Failed to record payment');
         }
 
+        const result = await response.json();
+        const paymentId = result.data?.payment?.id || result.payment?.id || result.data?.id;
+        
         // If there's a deposit amount, record it separately in deposit ledger
+        let depositRecorded = false;
         if (depositAmount > 0) {
-          const depositResponse = await fetch('/api/deposit-ledger', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              tenantId: formData.tenantId, // Keep as string (UUID)
-              transactionType: 'deposit',
-              amount: depositAmount,
-              description: `Deposit payment - ${formData.description || 'No description'}`,
-              transactionDate: formData.paymentDate,
-              paymentMethod: formData.paymentMethod,
-              referenceNumber: formData.transactionId || null,
-            }),
-          });
+          try {
+            const depositResponse = await fetch('/api/deposit-ledger', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                tenantId: formData.tenantId,
+                action: 'deposit', // API expects 'action' not 'transactionType'
+                amount: depositAmount,
+                description: `Deposit payment - ${formData.description || 'No description'}`,
+              }),
+            });
 
-          if (!depositResponse.ok) {
-            const errorData = await depositResponse.json();
-            console.error('Failed to record deposit:', errorData);
-            addNotification('Payment recorded but deposit ledger update failed', 'warning');
+            if (depositResponse.ok) {
+              depositRecorded = true;
+            } else {
+              const errorData = await depositResponse.json();
+              console.warn('Deposit ledger update failed (non-critical):', errorData);
+              // Don't show warning - payment was successful, deposit can be added manually
+            }
+          } catch (depositError) {
+            console.warn('Deposit ledger update error (non-critical):', depositError);
+            // Don't throw - payment was successful
           }
         }
-
-        const result = await response.json();
         
-        // Show success notification with details
-        if (depositAmount > 0) {
-          addNotification(
-            `Payment recorded: ₱${paymentAmount.toLocaleString()} to invoices, ₱${depositAmount.toLocaleString()} to deposit`,
-            'success'
-          );
-        } else {
-          addNotification('Payment recorded and allocated successfully', 'success');
+        // Show single consolidated success notification
+        let successMessage = 'Payment recorded successfully';
+        if (result.allocationDetails) {
+          const { invoicesPaid, totalAllocated } = result.allocationDetails;
+          if (invoicesPaid > 0) {
+            successMessage = `Payment recorded: ₱${totalAllocated.toLocaleString()} allocated to ${invoicesPaid} invoice(s)`;
+          }
         }
         
-        router.push(`/admin/financial/payments/${result.payment.id}`);
+        if (depositAmount > 0) {
+          if (depositRecorded) {
+            successMessage += `, ₱${depositAmount.toLocaleString()} added to deposit ledger`;
+          } else {
+            successMessage += `. Note: Deposit amount (₱${depositAmount.toLocaleString()}) should be added to deposit ledger manually`;
+          }
+        }
+        
+        addNotification(successMessage, 'success');
+        
+        // Navigate to payment detail page if we have an ID, otherwise to payments list
+        if (paymentId) {
+          router.push(`/admin/financial/payments/${paymentId}`);
+        } else {
+          router.push('/admin/financial/payments');
+        }
       }
     } catch (error) {
       console.error('Error recording payment:', error);
