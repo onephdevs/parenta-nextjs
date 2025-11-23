@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 
 // Supported image types
@@ -61,6 +61,18 @@ export default function ImageUpload({
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Cleanup object URLs when component unmounts or files change
+  useEffect(() => {
+    return () => {
+      // Revoke all object URLs to prevent memory leaks
+      files.forEach(file => {
+        if (file.preview && file.preview.startsWith('blob:')) {
+          URL.revokeObjectURL(file.preview);
+        }
+      });
+    };
+  }, [files]);
+
   const validateFile = (file: File): string | null => {
     console.log('🔍 Validating file:', {
       name: file.name,
@@ -111,86 +123,14 @@ export default function ImageUpload({
 
   const createPreview = (file: File): Promise<string | null> => {
     return new Promise((resolve) => {
-      // Create smaller thumbnail preview to avoid memory issues with large images
-      const img = new Image();
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (!result || typeof result !== 'string') {
-          console.error('❌ Failed to read file for:', file.name);
-          resolve(null);
-          return;
-        }
-
-        img.onload = () => {
-          try {
-            // Create canvas for thumbnail (max 400x400)
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            if (!ctx) {
-              console.error('❌ Failed to get canvas context');
-              resolve(result); // Fallback to original
-              return;
-            }
-
-            const MAX_SIZE = 400;
-            let width = img.width;
-            let height = img.height;
-
-            // Calculate scaled dimensions
-            if (width > height) {
-              if (width > MAX_SIZE) {
-                height = (height * MAX_SIZE) / width;
-                width = MAX_SIZE;
-              }
-            } else {
-              if (height > MAX_SIZE) {
-                width = (width * MAX_SIZE) / height;
-                height = MAX_SIZE;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-
-            // Draw resized image
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // Convert to data URL with quality
-            const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            console.log('✅ Preview created successfully for:', file.name, 
-              `(Original: ${img.width}x${img.height}, Thumbnail: ${width}x${height})`);
-            resolve(thumbnailDataUrl);
-          } catch (error) {
-            console.error('❌ Error creating thumbnail for:', file.name, error);
-            resolve(result); // Fallback to original
-          }
-        };
-
-        img.onerror = () => {
-          console.error('❌ Failed to load image for preview:', file.name);
-          resolve(null);
-        };
-
-        img.src = result;
-      };
-      
-      reader.onerror = (error) => {
-        console.error('❌ FileReader error for:', file.name, error);
-        resolve(null);
-      };
-      
-      reader.onabort = () => {
-        console.error('❌ FileReader aborted for:', file.name);
-        resolve(null);
-      };
-      
       try {
-        reader.readAsDataURL(file);
+        // Use createObjectURL for instant, reliable preview
+        // This creates a blob URL directly from the file without processing
+        const objectUrl = URL.createObjectURL(file);
+        console.log('✅ Preview created successfully for:', file.name, `(Size: ${(file.size / 1024).toFixed(2)}KB)`);
+        resolve(objectUrl);
       } catch (error) {
-        console.error('❌ Error reading file:', file.name, error);
+        console.error('❌ Error creating preview for:', file.name, error);
         resolve(null);
       }
     });
@@ -295,7 +235,14 @@ export default function ImageUpload({
   }, []);
 
   const removeFile = (fileId: string) => {
-    setFiles(prev => prev.filter(file => file.id !== fileId));
+    setFiles(prev => {
+      const fileToRemove = prev.find(f => f.id === fileId);
+      // Revoke object URL to free memory
+      if (fileToRemove?.preview && fileToRemove.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(fileToRemove.preview);
+      }
+      return prev.filter(file => file.id !== fileId);
+    });
   };
 
   const uploadFile = async (uploadFile: UploadFile): Promise<UploadedImage | null> => {
