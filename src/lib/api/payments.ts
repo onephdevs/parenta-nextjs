@@ -19,8 +19,11 @@ export interface Payment {
 export interface PaymentWithDetails extends Payment {
   tenantName: string;
   tenantEmail: string;
+  tenantPhone?: string;
+  roomId?: string;
   roomNumber?: string;
   buildingName?: string;
+  monthlyRate?: number;
 }
 
 export interface PaymentSummary {
@@ -233,7 +236,11 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
       t.first_name,
       t.last_name,
       t.email,
+      t.phone,
+      r.id as room_id,
       r.room_number,
+      r.monthly_rate as room_monthly_rate,
+      ra.monthly_rate as assignment_monthly_rate,
       b.name as building_name
     FROM payments p
     INNER JOIN tenants t ON p.tenant_id = t.id
@@ -251,10 +258,14 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
     }
 
     const row = result.rows[0];
+    // Use assignment monthly_rate if available, otherwise use room monthly_rate
+    const monthlyRate = row.assignment_monthly_rate || row.room_monthly_rate;
+    
     return {
       id: row.id,
       tenantId: row.tenant_id,
       roomAssignmentId: row.assignment_id,
+      roomId: row.room_id,
       amount: parseFloat(row.amount),
       paymentType: row.payment_type,
       paymentMethod: row.payment_method,
@@ -267,8 +278,10 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
       updatedAt: new Date(row.updated_at),
       tenantName: `${row.first_name} ${row.last_name}`,
       tenantEmail: row.email,
+      tenantPhone: row.phone,
       roomNumber: row.room_number,
       buildingName: row.building_name,
+      monthlyRate: monthlyRate ? parseFloat(monthlyRate) : undefined,
     };
   } catch (error) {
     console.error('Error fetching payment:', error);

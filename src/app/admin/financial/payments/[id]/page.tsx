@@ -204,24 +204,33 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Building</span>
-                    <span className="text-sm text-gray-900">{payment.buildingName}</span>
+                    <span className="text-sm text-gray-900">{payment.buildingName || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Room Number</span>
-                    <span className="text-sm text-gray-900">{payment.roomNumber}</span>
+                    <span className="text-sm text-gray-900">{payment.roomNumber || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Monthly Rent</span>
-                    <span className="text-sm text-gray-900">{formatCurrency(payment.rentAmount)}</span>
+                    <span className="text-sm text-gray-900">
+                      {payment.monthlyRate ? formatCurrency(payment.monthlyRate) : 'N/A'}
+                    </span>
                   </div>
-                  <div className="pt-3 border-t">
-                    <Link
-                      href={`/admin/rooms/${payment.roomId}`}
-                      className="text-purple-600 hover:text-purple-900 text-sm font-medium"
-                    >
-                      View Room Details →
-                    </Link>
-                  </div>
+                  {payment.roomId && (
+                    <div className="pt-3 border-t">
+                      <Link
+                        href={`/admin/rooms/${payment.roomId}`}
+                        className="text-purple-600 hover:text-purple-900 text-sm font-medium"
+                      >
+                        View Room Details →
+                      </Link>
+                    </div>
+                  )}
+                  {!payment.roomId && payment.roomNumber && (
+                    <div className="pt-3 border-t">
+                      <p className="text-sm text-gray-500 italic">No room assignment linked to this payment</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -249,7 +258,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Transaction ID</span>
-                    <span className="text-sm text-gray-900">{payment.transactionId || 'N/A'}</span>
+                    <span className="text-sm text-gray-900">{payment.referenceNumber || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Created</span>
