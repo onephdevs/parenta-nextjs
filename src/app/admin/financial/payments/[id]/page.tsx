@@ -18,14 +18,16 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
     redirect('/auth/signin');
   }
 
-  const paymentId = parseInt(id);
-  if (isNaN(paymentId)) {
+  // Payment IDs are UUIDs (strings), not integers
+  // Basic validation: check if it looks like a UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
     notFound();
   }
 
   let payment;
   try {
-    payment = await getPaymentById(paymentId);
+    payment = await getPaymentById(id);
     if (!payment) {
       notFound();
     }
@@ -154,11 +156,11 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(payment.status)}`}>
-                    {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(payment.paymentStatus)}`}>
+                    {payment.paymentStatus.charAt(0).toUpperCase() + payment.paymentStatus.slice(1)}
                   </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPaymentTypeClass(payment.type)}`}>
-                    {payment.type.charAt(0).toUpperCase() + payment.type.slice(1)}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPaymentTypeClass(payment.paymentType)}`}>
+                    {payment.paymentType.charAt(0).toUpperCase() + payment.paymentType.slice(1)}
                   </span>
                 </div>
               </div>
@@ -260,10 +262,10 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                 </div>
               </div>
               
-              {payment.description && (
+              {payment.notes && (
                 <div className="mt-6 pt-4 border-t">
                   <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
-                  <p className="text-sm text-gray-900">{payment.description}</p>
+                  <p className="text-sm text-gray-900">{payment.notes}</p>
                 </div>
               )}
             </div>
