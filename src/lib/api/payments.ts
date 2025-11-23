@@ -237,16 +237,29 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
       t.last_name,
       t.email,
       t.phone,
-      r.id as room_id,
-      r.room_number,
-      r.monthly_rate as room_monthly_rate,
-      ra.monthly_rate as assignment_monthly_rate,
-      b.name as building_name
+      -- Use payment's assignment room if available, otherwise use tenant's current assignment
+      COALESCE(ra.room_id, current_ra.room_id) as room_id,
+      COALESCE(r.room_number, current_r.room_number) as room_number,
+      COALESCE(r.monthly_rate, current_r.monthly_rate) as room_monthly_rate,
+      COALESCE(ra.monthly_rate, current_ra.monthly_rate) as assignment_monthly_rate,
+      COALESCE(b.name, current_b.name) as building_name
     FROM payments p
     INNER JOIN tenants t ON p.tenant_id = t.id
+    -- Get room from payment's assignment (if payment was linked to a specific assignment)
     LEFT JOIN tenant_room_assignments ra ON p.assignment_id = ra.id
     LEFT JOIN rooms r ON ra.room_id = r.id
     LEFT JOIN buildings b ON r.building_id = b.id
+    -- Get tenant's current active room assignment as fallback
+    LEFT JOIN LATERAL (
+      SELECT tra.room_id, tra.monthly_rate
+      FROM tenant_room_assignments tra
+      WHERE tra.tenant_id = p.tenant_id 
+        AND tra.assignment_status = 'active'
+      ORDER BY tra.start_date DESC
+      LIMIT 1
+    ) current_ra ON true
+    LEFT JOIN rooms current_r ON current_ra.room_id = current_r.id
+    LEFT JOIN buildings current_b ON current_r.building_id = current_b.id
     WHERE p.id = $1
   `;
 
