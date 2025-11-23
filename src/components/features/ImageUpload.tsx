@@ -124,10 +124,34 @@ export default function ImageUpload({
   const createPreview = (file: File): Promise<string | null> => {
     return new Promise((resolve) => {
       try {
+        // Validate file first
+        if (!file || !(file instanceof File)) {
+          console.error('❌ Invalid file object:', file);
+          resolve(null);
+          return;
+        }
+
+        if (file.size === 0) {
+          console.error('❌ File is empty:', file.name);
+          resolve(null);
+          return;
+        }
+
         // Use createObjectURL for instant, reliable preview
         // This creates a blob URL directly from the file without processing
         const objectUrl = URL.createObjectURL(file);
-        console.log('✅ Preview created successfully for:', file.name, `(Size: ${(file.size / 1024).toFixed(2)}KB)`);
+        console.log('✅ Preview created successfully for:', file.name);
+        console.log('✅ Blob URL:', objectUrl);
+        console.log('✅ File size:', (file.size / 1024).toFixed(2), 'KB');
+        console.log('✅ File type:', file.type);
+        
+        // Verify the URL is valid
+        if (!objectUrl || !objectUrl.startsWith('blob:')) {
+          console.error('❌ Invalid blob URL created:', objectUrl);
+          resolve(null);
+          return;
+        }
+        
         resolve(objectUrl);
       } catch (error) {
         console.error('❌ Error creating preview for:', file.name, error);
@@ -504,7 +528,7 @@ export default function ImageUpload({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {files.map((file) => (
               <div key={file.id} className="relative group">
-                <div className={`aspect-square rounded-lg overflow-hidden ${
+                <div className={`relative aspect-square rounded-lg overflow-hidden ${
                   file.error ? 'ring-2 ring-red-500 bg-red-50' : 'bg-white'
                 }`}>
                   {file.preview ? (
@@ -512,20 +536,29 @@ export default function ImageUpload({
                       src={file.preview}
                       alt={file.name}
                       className={`w-full h-full object-cover ${file.error ? 'opacity-50' : ''}`}
-                      onLoad={() => {
-                        console.log('✅ Preview image loaded successfully for:', file.name, 'URL:', file.preview);
+                      style={{ 
+                        display: 'block',
+                        position: 'relative',
+                        zIndex: 1
+                      }}
+                      onLoad={(e) => {
+                        console.log('✅ Preview image loaded successfully for:', file.name);
+                        console.log('✅ Image URL:', file.preview);
+                        console.log('✅ Image dimensions:', e.currentTarget.naturalWidth, 'x', e.currentTarget.naturalHeight);
+                        console.log('✅ Image display size:', e.currentTarget.offsetWidth, 'x', e.currentTarget.offsetHeight);
                       }}
                       onError={(e) => {
                         console.error('❌ Failed to display preview for:', file.name);
-                        console.error('Preview URL:', file.preview);
-                        console.error('Error event:', e);
+                        console.error('❌ Preview URL:', file.preview);
+                        console.error('❌ URL type:', file.preview?.startsWith('blob:') ? 'blob URL' : 'other');
+                        console.error('❌ Error event:', e);
                         // Set error state so placeholder shows
                         setFiles(prev => prev.map(f => 
                           f.id === file.id ? { ...f, preview: undefined } : f
                         ));
                       }}
-                      loading="lazy"
-                      decoding="async"
+                      loading="eager"
+                      decoding="sync"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
@@ -538,7 +571,7 @@ export default function ImageUpload({
                   
                   {/* Error Overlay */}
                   {file.error && (
-                    <div className="absolute inset-0 bg-red-500 bg-opacity-10 flex items-center justify-center p-2">
+                    <div className="absolute inset-0 bg-red-500 bg-opacity-10 flex items-center justify-center p-2 z-10">
                       <div className="bg-white rounded-full p-2">
                         <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -546,20 +579,20 @@ export default function ImageUpload({
                       </div>
                     </div>
                   )}
-                </div>
-                
-                {/* File Info Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-center justify-center">
-                  <button
-                    onClick={() => removeFile(file.id)}
-                    disabled={isUploading}
-                    className="opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-all duration-200 disabled:opacity-50"
-                    title="Remove file"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  
+                  {/* File Info Overlay - Only show on hover, use pointer-events-none when not hovered */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-center justify-center pointer-events-none group-hover:pointer-events-auto z-20">
+                    <button
+                      onClick={() => removeFile(file.id)}
+                      disabled={isUploading}
+                      className="opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-all duration-200 disabled:opacity-50 pointer-events-auto"
+                      title="Remove file"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 {/* File Info */}
