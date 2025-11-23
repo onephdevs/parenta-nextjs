@@ -3,16 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Room, CreateRoomData, Building } from '@/types/database';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import toast from 'react-hot-toast';
 
 interface EditRoomFormProps {
   room: Room & { buildingName?: string };
+  onRoomUpdated?: () => void;
+  startInEditMode?: boolean;
 }
 
-export default function EditRoomForm({ room }: EditRoomFormProps) {
+export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = false }: EditRoomFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(startInEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,11 +80,7 @@ export default function EditRoomForm({ room }: EditRoomFormProps) {
     setSuccess(null);
 
     // Show loading notification
-    const loadingId = showNotification({
-      type: 'loading',
-      title: 'Updating room...',
-      message: 'Please wait while we save your changes.'
-    });
+    const loadingId = showNotification('Updating room...', 'loading');
 
     try {
       const response = await fetch(`/api/rooms/${room.id}`, {
@@ -99,14 +98,16 @@ export default function EditRoomForm({ room }: EditRoomFormProps) {
       }
 
       // Update loading notification to success
-      updateNotification(loadingId, {
-        type: 'success',
-        title: 'Room updated successfully!',
-        message: `Room ${formData.roomNumber} has been updated with your changes.`
-      });
+      toast.dismiss(loadingId);
+      showNotification(`Room ${formData.roomNumber} has been updated successfully!`, 'success');
 
       setSuccess('Room updated successfully!');
       setIsEditing(false);
+      
+      // Call onRoomUpdated callback if provided
+      if (onRoomUpdated) {
+        onRoomUpdated();
+      }
       
       // Refresh the page to show updated data
       setTimeout(() => {
@@ -116,11 +117,8 @@ export default function EditRoomForm({ room }: EditRoomFormProps) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       
       // Update loading notification to error
-      updateNotification(loadingId, {
-        type: 'error',
-        title: 'Failed to update room',
-        message: errorMessage
-      });
+      toast.dismiss(loadingId);
+      showNotification(`Failed to update room: ${errorMessage}`, 'error');
       
       setError(errorMessage);
     } finally {
@@ -137,11 +135,7 @@ export default function EditRoomForm({ room }: EditRoomFormProps) {
     setError(null);
 
     // Show loading notification
-    const loadingId = showNotification({
-      type: 'loading',
-      title: 'Deleting room...',
-      message: 'Please wait while we delete the room.'
-    });
+    const loadingId = showNotification('Deleting room...', 'loading');
 
     try {
       const response = await fetch(`/api/rooms/${room.id}`, {
@@ -155,11 +149,8 @@ export default function EditRoomForm({ room }: EditRoomFormProps) {
       }
 
       // Update loading notification to success
-      updateNotification(loadingId, {
-        type: 'success',
-        title: 'Room deleted successfully!',
-        message: `Room ${room.roomNumber} has been deleted and you'll be redirected to the rooms list.`
-      });
+      toast.dismiss(loadingId);
+      showNotification(`Room ${room.roomNumber} has been deleted successfully!`, 'success');
 
       // Redirect to rooms list
       setTimeout(() => {
@@ -169,11 +160,8 @@ export default function EditRoomForm({ room }: EditRoomFormProps) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       
       // Update loading notification to error
-      updateNotification(loadingId, {
-        type: 'error',
-        title: 'Failed to delete room',
-        message: errorMessage
-      });
+      toast.dismiss(loadingId);
+      showNotification(`Failed to delete room: ${errorMessage}`, 'error');
       
       setError(errorMessage);
       setIsDeleting(false);

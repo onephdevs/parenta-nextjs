@@ -82,6 +82,8 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
   const [activeTab, setActiveTab] = useState('overview');
 
   const refreshRoomData = () => {
+    // Switch back to overview tab after update
+    setActiveTab('overview');
     // Refresh by reloading the page since data is fetched server-side
     window.location.reload();
   };
@@ -312,12 +314,11 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
         )}
 
         {activeTab === 'edit' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <EditRoomForm 
-              room={roomDetails.room}
-              onRoomUpdated={refreshRoomData}
-            />
-          </div>
+          <EditRoomForm 
+            room={roomDetails.room}
+            onRoomUpdated={refreshRoomData}
+            startInEditMode={true}
+          />
         )}
       </div>
     </div>
