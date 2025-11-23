@@ -38,22 +38,34 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
     room.amenities ? room.amenities.join(', ') : ''
   );
 
-  // Fetch buildings when edit mode is activated
+  // Fetch buildings when edit mode is activated or when component mounts with startInEditMode
   useEffect(() => {
-    if (isEditing && buildings.length === 0) {
+    if ((isEditing || startInEditMode) && buildings.length === 0) {
       fetchBuildings();
     }
-  }, [isEditing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, startInEditMode]);
 
   const fetchBuildings = async () => {
     try {
       const response = await fetch('/api/buildings');
       const result = await response.json();
       if (result.success) {
-        setBuildings(result.data);
+        // API returns { success: true, data: { buildings: [...] } }
+        const buildingsData = result.data?.buildings || result.data || [];
+        if (Array.isArray(buildingsData)) {
+          setBuildings(buildingsData);
+        } else {
+          console.error('Invalid buildings data format:', buildingsData);
+          setBuildings([]);
+        }
+      } else {
+        console.error('Failed to fetch buildings:', result.error);
+        setBuildings([]);
       }
     } catch (error) {
       console.error('Error fetching buildings:', error);
+      setBuildings([]); // Ensure it's always an array on error
     }
   };
 
@@ -272,9 +284,10 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                 value={formData.buildingId}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={!Array.isArray(buildings) || buildings.length === 0}
               >
-                <option value="">Select a building</option>
-                {buildings.map(building => (
+                <option value="">{Array.isArray(buildings) && buildings.length === 0 ? 'Loading buildings...' : 'Select a building'}</option>
+                {Array.isArray(buildings) && buildings.map(building => (
                   <option key={building.id} value={building.id}>{building.name}</option>
                 ))}
               </select>
