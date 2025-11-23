@@ -263,6 +263,13 @@ export default function ImageUpload({
     }
 
     const formData = new FormData();
+    
+    // Verify file is still valid before appending
+    if (!uploadFile.file || !(uploadFile.file instanceof File)) {
+      console.error('❌ File object is invalid:', uploadFile.file);
+      throw new Error('File object is invalid. Please select the file again.');
+    }
+    
     formData.append('file', uploadFile.file);
     formData.append('entityType', entityType);
     formData.append('entityId', entityId);
@@ -273,7 +280,11 @@ export default function ImageUpload({
       fileType: uploadFile.type,
       fileSize: uploadFile.size,
       entityType,
-      entityId
+      entityId,
+      fileObjectValid: uploadFile.file instanceof File,
+      fileObjectName: uploadFile.file.name,
+      fileObjectSize: uploadFile.file.size,
+      fileObjectType: uploadFile.file.type
     });
     
     try {
@@ -282,12 +293,26 @@ export default function ImageUpload({
         body: formData,
       });
 
+      // Get response text first to see what the error is
+      const responseText = await response.text();
+      console.log('Upload response status:', response.status);
+      console.log('Upload response text:', responseText);
+
       // Check if response is ok before parsing JSON
       if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status} ${response.statusText}`);
+        let errorMessage = `Upload failed with status: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          console.error('Upload error details:', errorData);
+        } catch (e) {
+          // If response isn't JSON, use the text
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
+      const result = JSON.parse(responseText);
       console.log('Upload response:', result);
 
       if (result.success) {
@@ -479,31 +504,28 @@ export default function ImageUpload({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {files.map((file) => (
               <div key={file.id} className="relative group">
-                <div className={`aspect-square bg-gray-100 rounded-lg overflow-hidden ${
-                  file.error ? 'ring-2 ring-red-500' : ''
+                <div className={`aspect-square rounded-lg overflow-hidden ${
+                  file.error ? 'ring-2 ring-red-500 bg-red-50' : 'bg-white'
                 }`}>
                   {file.preview ? (
                     <img
                       src={file.preview}
                       alt={file.name}
                       className={`w-full h-full object-cover ${file.error ? 'opacity-50' : ''}`}
+                      onLoad={() => {
+                        console.log('✅ Preview image loaded successfully for:', file.name, 'URL:', file.preview);
+                      }}
                       onError={(e) => {
                         console.error('❌ Failed to display preview for:', file.name);
-                        // Hide the broken image and show placeholder
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          const placeholder = document.createElement('div');
-                          placeholder.className = 'w-full h-full flex flex-col items-center justify-center bg-gray-50';
-                          placeholder.innerHTML = `
-                            <svg class="w-12 h-12 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-xs text-gray-400">Preview unavailable</span>
-                          `;
-                          parent.insertBefore(placeholder, e.currentTarget);
-                        }
+                        console.error('Preview URL:', file.preview);
+                        console.error('Error event:', e);
+                        // Set error state so placeholder shows
+                        setFiles(prev => prev.map(f => 
+                          f.id === file.id ? { ...f, preview: undefined } : f
+                        ));
                       }}
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
