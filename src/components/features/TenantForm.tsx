@@ -87,15 +87,29 @@ export default function TenantForm() {
 
         if (buildingsRes.ok) {
           const buildingsData = await buildingsRes.json();
-          setBuildings(buildingsData.buildings || buildingsData.data || []);
+          // API returns { success: true, data: { buildings: [...] } }
+          const buildingsList = buildingsData.data?.buildings || buildingsData.buildings || buildingsData.data || [];
+          if (Array.isArray(buildingsList)) {
+            setBuildings(buildingsList);
+          } else {
+            console.error('Invalid buildings data format:', buildingsList);
+            setBuildings([]);
+          }
         }
 
         if (roomsRes.ok) {
           const roomsData = await roomsRes.json();
-          const roomsList = roomsData.rooms || roomsData.data || [];
-          setRooms(roomsList);
-          // Initially show only available rooms
-          setFilteredRooms(roomsList.filter((r: Room) => r.status === 'available'));
+          // API returns { success: true, data: [...] }
+          const roomsList = roomsData.data || roomsData.rooms || [];
+          if (Array.isArray(roomsList)) {
+            setRooms(roomsList);
+            // Initially show only available rooms
+            setFilteredRooms(roomsList.filter((r: Room) => r.status === 'available'));
+          } else {
+            console.error('Invalid rooms data format:', roomsList);
+            setRooms([]);
+            setFilteredRooms([]);
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -548,9 +562,10 @@ export default function TenantForm() {
               value={formData.buildingId}
               onChange={handleInputChange}
               className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base bg-white"
+              disabled={!Array.isArray(buildings) || buildings.length === 0}
             >
-              <option value="">Select a property</option>
-              {buildings.map((building) => (
+              <option value="">{Array.isArray(buildings) && buildings.length === 0 ? 'Loading properties...' : 'Select a property'}</option>
+              {Array.isArray(buildings) && buildings.map((building) => (
                 <option key={building.id} value={building.id}>
                   {building.name}
                 </option>
