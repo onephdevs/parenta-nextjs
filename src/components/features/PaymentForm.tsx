@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 
 interface Tenant {
-  id: number;
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
-  currentRoomId?: number;
+  currentRoomId?: string;
   buildingName?: string;
   roomNumber?: string;
 }
@@ -75,7 +75,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
   // Update selected tenant when tenantId changes
   useEffect(() => {
     if (formData.tenantId) {
-      const tenant = tenants.find(t => t.id === parseInt(formData.tenantId));
+      const tenant = tenants.find(t => t.id === formData.tenantId);
       setSelectedTenant(tenant || null);
     } else {
       setSelectedTenant(null);
@@ -150,7 +150,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         // Record payment (will auto-allocate to invoices via backend)
         // roomAssignmentId is optional - payments can be recorded without room assignment
         const paymentPayload: any = {
-          tenantId: parseInt(formData.tenantId),
+          tenantId: formData.tenantId, // Keep as string (UUID)
           amount: paymentAmount > 0 ? paymentAmount : totalAmount, // If no deposit, use total amount
           paymentType: formData.type,
           paymentStatus: 'completed', // Always completed since payment is received
@@ -193,7 +193,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              tenantId: parseInt(formData.tenantId),
+              tenantId: formData.tenantId, // Keep as string (UUID)
               transactionType: 'deposit',
               amount: depositAmount,
               description: `Deposit payment - ${formData.description || 'No description'}`,
