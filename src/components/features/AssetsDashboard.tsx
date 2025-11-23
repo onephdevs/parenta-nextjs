@@ -76,10 +76,18 @@ export function AssetsDashboard() {
         const result = await response.json();
         
         if (result.success) {
-          setBuildings(result.data || []);
+          // API returns { success: true, data: { buildings: [...] } }
+          const buildingsList = result.data?.buildings || result.data || [];
+          if (Array.isArray(buildingsList)) {
+            setBuildings(buildingsList);
+          } else {
+            console.error('Invalid buildings data format:', buildingsList);
+            setBuildings([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching buildings:', error);
+        setBuildings([]);
       } finally {
         setLoading(false);
       }
@@ -289,9 +297,10 @@ export function AssetsDashboard() {
                   value={filters.buildingId || ''}
                   onChange={(e) => handleFilterChange({ buildingId: e.target.value || undefined })}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={!Array.isArray(buildings) || buildings.length === 0}
                 >
-                  <option value="">All Buildings</option>
-                  {buildings.map(building => (
+                  <option value="">{Array.isArray(buildings) && buildings.length === 0 ? 'Loading buildings...' : 'All Buildings'}</option>
+                  {Array.isArray(buildings) && buildings.map(building => (
                     <option key={building.id} value={building.id}>
                       {building.name}
                     </option>
