@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import AddOccupantModal from './AddOccupantModal';
 
 interface Tenant {
   id: string;
@@ -41,6 +42,18 @@ interface AssignmentHistory {
   email: string;
 }
 
+interface Occupant {
+  id: string;
+  first_name: string;
+  last_name: string;
+  relationship_to_tenant?: string;
+  phone?: string;
+  email?: string;
+  move_in_date: string;
+  move_out_date?: string;
+  is_active: boolean;
+}
+
 interface TenantAssignmentManagerProps {
   roomId: string;
   currentTenant: CurrentTenant | null;
@@ -58,7 +71,9 @@ export default function TenantAssignmentManager({
 }: TenantAssignmentManagerProps) {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [showUnassignForm, setShowUnassignForm] = useState(false);
+  const [showAddOccupantModal, setShowAddOccupantModal] = useState(false);
   const [availableTenants, setAvailableTenants] = useState<Tenant[]>([]);
+  const [occupants, setOccupants] = useState<Occupant[]>([]);
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError } = useNotifications();
   const [assignFormData, setAssignFormData] = useState({
@@ -88,11 +103,26 @@ export default function TenantAssignmentManager({
     }
   };
 
+  // Fetch occupants for this room
+  const fetchOccupants = async () => {
+    try {
+      const response = await fetch(`/api/occupants?roomId=${roomId}&activeOnly=true`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setOccupants(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching occupants:', error);
+    }
+  };
+
   useEffect(() => {
     if (showAssignForm) {
       fetchAvailableTenants();
     }
-  }, [showAssignForm]);
+    fetchOccupants();
+  }, [showAssignForm, roomId]);
 
   // Handle tenant assignment
   const handleAssignTenant = async (e: React.FormEvent) => {
@@ -182,7 +212,7 @@ export default function TenantAssignmentManager({
           {currentTenant ? (
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => setShowAssignForm(true)}
+                onClick={() => setShowAddOccupantModal(true)}
                 className="inline-flex items-center px-3 py-2 border border-purple-300 text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,6 +298,58 @@ export default function TenantAssignmentManager({
           </div>
         )}
       </div>
+
+      {/* Occupants Section */}
+      {occupants.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Other Occupants</h3>
+            <button
+              onClick={() => setShowAddOccupantModal(true)}
+              className="inline-flex items-center px-3 py-2 border border-purple-300 text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            >
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Occupant
+            </button>
+          </div>
+          <div className="space-y-3">
+            {occupants.map((occupant) => (
+              <div key={occupant.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      {occupant.first_name} {occupant.last_name}
+                    </h4>
+                    {occupant.relationship_to_tenant && (
+                      <p className="text-sm text-gray-600 capitalize">
+                        {occupant.relationship_to_tenant}
+                      </p>
+                    )}
+                    {occupant.phone && (
+                      <p className="text-sm text-gray-600">Phone: {occupant.phone}</p>
+                    )}
+                    {occupant.email && (
+                      <p className="text-sm text-gray-600">Email: {occupant.email}</p>
+                    )}
+                  </div>
+                  <div className="text-right text-sm text-gray-600">
+                    <div>
+                      Moved in: {new Date(occupant.move_in_date).toLocaleDateString()}
+                    </div>
+                    {occupant.move_out_date && (
+                      <div>
+                        Moved out: {new Date(occupant.move_out_date).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Assignment History */}
       {assignmentHistory.length > 0 && (
@@ -451,6 +533,18 @@ export default function TenantAssignmentManager({
           </div>
         </div>
       )}
+
+      {/* Add Occupant Modal */}
+      <AddOccupantModal
+        isOpen={showAddOccupantModal}
+        onClose={() => setShowAddOccupantModal(false)}
+        roomId={roomId}
+        tenantId={currentTenant?.tenant_id}
+        onSuccess={() => {
+          fetchOccupants();
+          onAssignmentChange();
+        }}
+      />
     </div>
   );
 } 
