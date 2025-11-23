@@ -43,7 +43,7 @@ export default async function BuildingsPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -92,27 +92,6 @@ export default async function BuildingsPage() {
                 <dt className="text-sm font-medium text-gray-500">Locations</dt>
                 <dd className="text-2xl font-semibold text-gray-900">
                   {new Set(buildings.map(b => `${b.city}, ${b.state}`)).size}
-                </dd>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-100 rounded-md flex items-center justify-center">
-                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Avg Year Built</dt>
-                <dd className="text-2xl font-semibold text-gray-900">
-                  {buildings.length > 0 
-                    ? Math.round(buildings.filter(b => b.yearBuilt).reduce((total, building) => total + (building.yearBuilt || 0), 0) / buildings.filter(b => b.yearBuilt).length) || 'N/A'
-                    : 'N/A'
-                  }
                 </dd>
               </div>
             </div>
