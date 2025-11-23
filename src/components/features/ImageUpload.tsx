@@ -539,13 +539,15 @@ export default function ImageUpload({
                       style={{ 
                         display: 'block',
                         position: 'relative',
-                        zIndex: 1
+                        zIndex: 10,
+                        backgroundColor: 'transparent'
                       }}
                       onLoad={(e) => {
                         console.log('✅ Preview image loaded successfully for:', file.name);
                         console.log('✅ Image URL:', file.preview);
                         console.log('✅ Image dimensions:', e.currentTarget.naturalWidth, 'x', e.currentTarget.naturalHeight);
                         console.log('✅ Image display size:', e.currentTarget.offsetWidth, 'x', e.currentTarget.offsetHeight);
+                        console.log('✅ Image computed style:', window.getComputedStyle(e.currentTarget).display);
                       }}
                       onError={(e) => {
                         console.error('❌ Failed to display preview for:', file.name);
@@ -580,8 +582,8 @@ export default function ImageUpload({
                     </div>
                   )}
                   
-                  {/* File Info Overlay - Only show on hover, use pointer-events-none when not hovered */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-center justify-center pointer-events-none group-hover:pointer-events-auto z-20">
+                  {/* File Info Overlay - Only show on hover */}
+                  <div className="absolute inset-0 bg-transparent group-hover:bg-black group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-center justify-center pointer-events-none group-hover:pointer-events-auto z-20">
                     <button
                       onClick={() => removeFile(file.id)}
                       disabled={isUploading}
