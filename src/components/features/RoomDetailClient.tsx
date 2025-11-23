@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useNotifications } from '@/hooks/useNotifications';
 import TenantAssignmentManager from './TenantAssignmentManager';
 import RoomFinancialDashboard from './RoomFinancialDashboard';
 import EditRoomForm from './EditRoomForm';
 import RoomDetailWithImages from './RoomDetailWithImages';
+import DeleteRoomModal from './DeleteRoomModal';
 
 interface Room {
   id: string;
@@ -78,14 +81,45 @@ interface RoomDetailClientProps {
 }
 
 export default function RoomDetailClient({ roomDetails: initialData }: RoomDetailClientProps) {
+  const router = useRouter();
+  const { showNotification } = useNotifications();
   const [roomDetails] = useState(initialData);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const refreshRoomData = () => {
     // Switch back to overview tab after update
     setActiveTab('overview');
     // Refresh by reloading the page since data is fetched server-side
     window.location.reload();
+  };
+
+  const handleDeleteRoom = async () => {
+    try {
+      const response = await fetch(`/api/rooms/${roomDetails.room.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete room');
+      }
+
+      showNotification({
+        type: 'success',
+        title: 'Room deleted',
+        message: `Room ${roomDetails.room.roomNumber} has been deleted successfully.`,
+      });
+
+      // Redirect to rooms list
+      router.push('/admin/rooms');
+    } catch (error) {
+      console.error('Error deleting room:', error);
+      showNotification({
+        type: 'error',
+        title: 'Delete failed',
+        message: error instanceof Error ? error.message : 'Failed to delete room. Please try again.',
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -159,6 +193,15 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 Edit Room
+              </button>
+              <button
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete Room
               </button>
               <button
                 onClick={refreshRoomData}
@@ -321,6 +364,14 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
           />
         )}
       </div>
+
+      {/* Delete Room Modal */}
+      <DeleteRoomModal
+        room={roomDetails.room}
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDelete={handleDeleteRoom}
+      />
     </div>
   );
 } 
