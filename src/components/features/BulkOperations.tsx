@@ -185,7 +185,7 @@ export default function BulkOperations() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6">Bulk Operations</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Bulk Operations</h2>
 
       {/* Tabs */}
       <div className="border-b border-gray-300 mb-6">
@@ -195,7 +195,7 @@ export default function BulkOperations() {
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               activeTab === 'invoices'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                : 'border-transparent text-gray-900 hover:text-gray-900'
             }`}
           >
             📄 Generate Invoices
@@ -205,7 +205,7 @@ export default function BulkOperations() {
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               activeTab === 'payments'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                : 'border-transparent text-gray-900 hover:text-gray-900'
             }`}
           >
             💰 Import Payments
@@ -215,7 +215,7 @@ export default function BulkOperations() {
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               activeTab === 'tenants'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                : 'border-transparent text-gray-900 hover:text-gray-900'
             }`}
           >
             👥 Update Tenants
@@ -227,8 +227,8 @@ export default function BulkOperations() {
       {activeTab === 'invoices' && (
         <div className="space-y-6">
           <div className="p-4 bg-blue-50 border border-blue-200 rounded">
-            <h3 className="font-semibold mb-2">Generate Monthly Invoices</h3>
-            <p className="text-sm">
+            <h3 className="font-semibold text-gray-900 mb-2">Generate Monthly Invoices</h3>
+            <p className="text-sm text-gray-900">
               Generate invoices for all active tenants for a specific month. This will create
               an invoice for each tenant's monthly rent.
             </p>
@@ -236,7 +236,7 @@ export default function BulkOperations() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Target Month</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Target Month</label>
               <input
                 type="month"
                 value={invoiceMonth}
@@ -244,12 +244,12 @@ export default function BulkOperations() {
                 className="w-full px-3 py-2 border rounded"
                 placeholder="Leave empty for next month"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-900 mt-1">
                 Leave empty to generate for next month
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Building Filter (Optional)</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Building Filter (Optional)</label>
               <input
                 type="text"
                 value={buildingFilter}
@@ -257,7 +257,7 @@ export default function BulkOperations() {
                 className="w-full px-3 py-2 border rounded"
                 placeholder="Building ID"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-900 mt-1">
                 Leave empty to generate for all buildings
               </p>
             </div>
@@ -277,20 +277,20 @@ export default function BulkOperations() {
       {activeTab === 'payments' && (
         <div className="space-y-6">
           <div className="p-4 bg-green-50 border border-green-200 rounded">
-            <h3 className="font-semibold mb-2">Import Payments from CSV</h3>
-            <p className="text-sm mb-3">
+            <h3 className="font-semibold text-gray-900 mb-2">Import Payments from CSV</h3>
+            <p className="text-sm text-gray-900 mb-3">
               Upload a CSV file with the following columns:
             </p>
-            <code className="text-xs bg-white px-2 py-1 rounded block">
+            <code className="text-xs bg-white px-2 py-1 rounded block text-gray-900">
               tenant_id, amount, payment_date, payment_method, reference_number, notes, deposit_amount
             </code>
-            <p className="text-xs text-gray-600 mt-2">
+            <p className="text-xs text-gray-900 mt-2">
               Example: "tenant-123", 5000, "2025-01-15", "bank_transfer", "REF-001", "Monthly rent", 1000
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Select CSV File</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Select CSV File</label>
             <input
               type="file"
               accept=".csv"
@@ -301,13 +301,13 @@ export default function BulkOperations() {
 
           {csvPreview.length > 0 && (
             <div className="border border-gray-300 rounded p-4">
-              <h4 className="font-medium mb-2">Preview (First 5 rows)</h4>
+              <h4 className="font-medium text-gray-900 mb-2">Preview (First 5 rows)</h4>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm text-gray-900">
                   <thead className="bg-gray-100">
                     <tr>
                       {Object.keys(csvPreview[0]).map(header => (
-                        <th key={header} className="px-2 py-1 text-left">{header}</th>
+                        <th key={header} className="px-2 py-1 text-left text-gray-900">{header}</th>
                       ))}
                     </tr>
                   </thead>
@@ -315,7 +315,7 @@ export default function BulkOperations() {
                     {csvPreview.map((row, index) => (
                       <tr key={index} className="border-t">
                         {Object.values(row).map((value: any, i) => (
-                          <td key={i} className="px-2 py-1">{value}</td>
+                          <td key={i} className="px-2 py-1 text-gray-900">{value}</td>
                         ))}
                       </tr>
                     ))}
@@ -339,14 +339,14 @@ export default function BulkOperations() {
       {activeTab === 'tenants' && (
         <div className="space-y-6">
           <div className="p-4 bg-purple-50 border border-purple-200 rounded">
-            <h3 className="font-semibold mb-2">Bulk Update Tenant Statuses</h3>
-            <p className="text-sm">
+            <h3 className="font-semibold text-gray-900 mb-2">Bulk Update Tenant Statuses</h3>
+            <p className="text-sm text-gray-900">
               Update the status of multiple tenants at once. Enter comma-separated tenant IDs.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Tenant IDs (comma-separated)</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Tenant IDs (comma-separated)</label>
             <textarea
               value={tenantIds}
               onChange={(e) => setTenantIds(e.target.value)}
@@ -354,13 +354,13 @@ export default function BulkOperations() {
               rows={4}
               placeholder="tenant-1, tenant-2, tenant-3"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-900 mt-1">
               Example: tenant-123, tenant-456, tenant-789
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">New Status</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">New Status</label>
             <select
               value={newStatus}
               onChange={(e) => setNewStatus(e.target.value as any)}
