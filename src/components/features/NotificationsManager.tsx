@@ -59,7 +59,7 @@ export default function NotificationsManager() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6">Notifications & Reminders</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-900">Notifications & Reminders</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Generate Reminders Card */}

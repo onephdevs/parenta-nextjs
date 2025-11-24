@@ -77,7 +77,7 @@ export default function LeaseManagement() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Lease Management</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Lease Management</h2>
         {activeTab === 'alerts' && (
           <button
             onClick={handleGenerateAlerts}
