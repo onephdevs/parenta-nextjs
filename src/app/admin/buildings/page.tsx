@@ -6,7 +6,6 @@ import { getAllBuildings } from '@/lib/api/buildings';
 import { Building } from '@/types/database';
 import BuildingsList from '@/components/features/BuildingsList';
 import AddBuildingButton from '@/components/features/AddBuildingButton';
-import Breadcrumb from '@/components/ui/Breadcrumb';
 
 export default async function BuildingsPage() {
   const session = await getServerSession(authOptions);
@@ -26,19 +25,26 @@ export default async function BuildingsPage() {
     error = 'Failed to load buildings';
   }
 
-  const breadcrumbItems = [
-    { label: 'Dashboard', href: '/admin' },
-    { label: 'Buildings' }
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <Breadcrumb 
-        items={breadcrumbItems} 
-        subtitle="Manage your property portfolio"
-      >
-        <AddBuildingButton />
-      </Breadcrumb>
+      {/* Page Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="md:flex md:items-center md:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                Buildings
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Manage your property portfolio
+              </p>
+            </div>
+            <div className="mt-4 flex md:mt-0 md:ml-4">
+              <AddBuildingButton />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -20,7 +20,8 @@ import {
   Save
 } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
-import Breadcrumb from '@/components/ui/Breadcrumb';
+import SkeletonCard from '@/components/ui/SkeletonCard';
+import SkeletonList from '@/components/ui/SkeletonList';
 
 interface MaintenanceRequest {
   id: string;
@@ -84,11 +85,6 @@ export default function AdminMaintenancePage() {
     assignedTo: ''
   });
 
-  const breadcrumbItems = [
-    { label: 'Dashboard', href: '/admin' },
-    { label: 'Maintenance Requests' }
-  ];
-
   useEffect(() => {
     if (status === 'authenticated' && (session?.user.role === 'admin' || session?.user.role === 'staff')) {
       fetchMaintenanceRequests();
@@ -100,12 +96,19 @@ export default function AdminMaintenancePage() {
   }, [requests, filterStatus, filterPriority, filterCategory, searchTerm]);
 
   // Show loading state while checking authentication
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCard key={i} showHeader={false} lines={2} />
+              ))}
+            </div>
+            <SkeletonList items={5} showAvatar={true} showActions={true} />
+          </div>
         </div>
       </div>
     );
@@ -278,7 +281,21 @@ export default function AdminMaintenancePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Breadcrumb items={breadcrumbItems} />
+      {/* Page Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="md:flex md:items-center md:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                Maintenance Requests
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Track and manage property maintenance requests
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}

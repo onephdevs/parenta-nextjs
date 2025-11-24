@@ -3,25 +3,29 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface RevenueChartProps {
-  data: any;
+  data: Array<{ month: string; revenue: number; payments: number }>;
 }
 
 export default function RevenueChart({ data }: RevenueChartProps) {
-  // Mock data for demonstration - in real app, this would come from API
-  const chartData = [
-    { month: 'Jan', revenue: 45000 },
-    { month: 'Feb', revenue: 52000 },
-    { month: 'Mar', revenue: 48000 },
-    { month: 'Apr', revenue: 61000 },
-    { month: 'May', revenue: 55000 },
-    { month: 'Jun', revenue: 67000 },
-    { month: 'Jul', revenue: 72000 },
-    { month: 'Aug', revenue: 68000 },
-    { month: 'Sep', revenue: 74000 },
-    { month: 'Oct', revenue: 79000 },
-    { month: 'Nov', revenue: 85000 },
-    { month: 'Dec', revenue: data?.monthly || 90000 },
-  ];
+  // Use real data from database
+  const chartData = data && data.length > 0 
+    ? data 
+    : [];
+
+  if (chartData.length === 0) {
+    return (
+      <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Monthly Revenue Trend
+          </h3>
+          <div className="flex items-center justify-center h-[300px] text-gray-500">
+            No revenue data available for the last 12 months
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -29,6 +33,9 @@ export default function RevenueChart({ data }: RevenueChartProps) {
         <h3 className="text-lg font-medium text-gray-900 mb-4">
           Monthly Revenue Trend
         </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Last 12 months of payment data
+        </p>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />

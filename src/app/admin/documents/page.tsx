@@ -6,7 +6,6 @@ import { getDocuments, getDocumentStats, getDocumentCategories } from '@/lib/api
 import { DOCUMENT_TYPES } from '@/types/document';
 import DocumentsList from '@/components/features/DocumentsList';
 import DocumentUpload from '@/components/features/DocumentUpload';
-import Breadcrumb from '@/components/ui/Breadcrumb';
 
 interface DocumentsPageProps {
   searchParams: Promise<{
@@ -87,11 +86,6 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
   const resolvedSearchParams = await searchParams;
   const { documents, total, page, limit, stats, categories } = await getDocumentsData(resolvedSearchParams);
 
-  const breadcrumbItems = [
-    { label: 'Dashboard', href: '/admin' },
-    { label: 'Document Management' }
-  ];
-
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -141,18 +135,33 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Breadcrumb items={breadcrumbItems}>
-        <DocumentUpload />
-        <Link
-          href="/admin/documents/categories"
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-        >
-          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.414 1.414 0 01-2.828 0l-7-7A1.414 1.414 0 013 12V7a4 4 0 014-4z" />
-          </svg>
-          Manage Categories
-        </Link>
-      </Breadcrumb>
+      {/* Page Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="md:flex md:items-center md:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                Documents
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Manage and organize all property-related documents
+              </p>
+            </div>
+            <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
+              <DocumentUpload />
+              <Link
+                href="/admin/documents/categories"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.414 1.414 0 01-2.828 0l-7-7A1.414 1.414 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Manage Categories
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics Cards */}

@@ -22,6 +22,7 @@ import {
   Mail
 } from 'lucide-react';
 import { LogoutButton } from '@/components/features/LogoutButton';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
@@ -32,12 +33,19 @@ export default function TenantDashboard() {
     setTimeout(() => setIsLoading(false), 1000);
   }, []);
 
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCard key={i} showHeader={false} lines={2} />
+              ))}
+            </div>
+            <SkeletonCard showHeader={true} lines={5} />
+          </div>
         </div>
       </div>
     );

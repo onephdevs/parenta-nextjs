@@ -189,15 +189,21 @@ export default function DocumentsList({
     return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
   };
 
+  const handleDocumentsUpdated = () => {
+    // Refresh the page to show updated data
+    router.refresh();
+    setSelectedDocuments([]);
+  };
+
   return (
     <div className="space-y-6">
       {/* Bulk Operations */}
       <BulkDocumentOperations
         selectedDocuments={selectedDocuments}
-        onDocumentsUpdated={onDocumentsUpdated}
+        onDocumentsUpdated={handleDocumentsUpdated}
         onSelectionCleared={handleSelectionCleared}
-        buildings={buildings}
-        tenants={tenants}
+        buildings={[]}
+        tenants={[]}
       />
 
       <div className="bg-white shadow rounded-lg">

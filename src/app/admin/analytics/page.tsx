@@ -14,7 +14,7 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react';
-import Breadcrumb from '../../../components/ui/Breadcrumb';
+import SkeletonCard from '../../../components/ui/SkeletonCard';
 import {
   MetricCard,
   FinancialTrendChart,
@@ -159,48 +159,63 @@ export default function AnalyticsPage() {
 
   if (isLoading && !metrics) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex items-center justify-center min-h-96">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-600">Loading analytics data...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCard key={i} showHeader={false} lines={2} />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SkeletonCard showHeader={true} lines={8} />
+              <SkeletonCard showHeader={true} lines={8} />
+            </div>
+            <SkeletonCard showHeader={true} lines={10} />
           </div>
         </div>
       </div>
     );
   }
 
-  const breadcrumbItems = [
-    { label: 'Dashboard', href: '/admin' },
-    { label: 'Analytics & Reporting' }
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Breadcrumb */}
-      <Breadcrumb 
-        items={breadcrumbItems}
-        subtitle="Comprehensive insights into your property management business"
-      >
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-        <select
-          onChange={(e) => handleExport(e.target.value as 'pdf' | 'excel' | 'csv')}
-          defaultValue=""
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-        >
-          <option value="" disabled>Export</option>
-          <option value="pdf">Export PDF</option>
-          <option value="excel">Export Excel</option>
-          <option value="csv">Export CSV</option>
-        </select>
-      </Breadcrumb>
+      {/* Page Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="md:flex md:items-center md:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                Analytics & Reporting
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Comprehensive insights into your property management business
+              </p>
+            </div>
+            <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+              <select
+                onChange={(e) => handleExport(e.target.value as 'pdf' | 'excel' | 'csv')}
+                defaultValue=""
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                <option value="" disabled>Export</option>
+                <option value="pdf">Export PDF</option>
+                <option value="excel">Export Excel</option>
+                <option value="csv">Export CSV</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -25,3 +25,4 @@ CREATE INDEX IF NOT EXISTS idx_occupants_room_id ON occupants(room_id);
 CREATE INDEX IF NOT EXISTS idx_occupants_tenant_id ON occupants(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_occupants_active ON occupants(is_active) WHERE is_active = true;
 
+

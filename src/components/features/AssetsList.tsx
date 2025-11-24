@@ -154,9 +154,9 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
 
   const formatCurrency = (amount?: number) => {
     if (!amount) return '-';
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'PHP'
     }).format(amount);
   };
 

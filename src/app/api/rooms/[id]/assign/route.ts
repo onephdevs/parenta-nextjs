@@ -17,6 +17,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       endDate, 
       monthlyRate, 
       depositPaid, 
+      advanceAmount,
       notes,
       generateInvoices = true // Option to auto-generate invoices
     } = await request.json();
@@ -84,7 +85,8 @@ export async function POST(request: Request, { params }: RouteParams) {
           leaseStartDate: new Date(startDate),
           leaseEndDate: new Date(endDate),
           monthlyRent: parseFloat(monthlyRate),
-          depositAmount: depositPaid ? parseFloat(depositPaid) : undefined
+          depositAmount: depositPaid ? parseFloat(depositPaid) : undefined,
+          advanceAmount: advanceAmount ? parseFloat(advanceAmount) : undefined
         });
       } catch (invoiceError) {
         console.error('Error generating invoices:', invoiceError);

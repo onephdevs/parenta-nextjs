@@ -6,6 +6,7 @@ import { getTenantById } from '@/lib/api/tenants';
 import TenantFinancialDetails from '@/components/features/TenantFinancialDetails';
 import TenantCreditsManager from '@/components/features/TenantCreditsManager';
 import DepositLedgerManager from '@/components/features/DepositLedgerManager';
+import TenantDetailClient from '@/components/features/TenantDetailClient';
 
 interface TenantDetailPageProps {
   params: Promise<{ id: string }>;
@@ -231,6 +232,13 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
 
             {/* Sidebar Information */}
             <div className="space-y-6">
+              <TenantDetailClient
+                tenantId={tenant.id}
+                profilePictureUrl={(tenant as any).profilePictureUrl}
+                agreementDocumentUrl={(tenant as any).agreementDocumentUrl}
+                agreementDocumentName={(tenant as any).agreementDocumentName}
+              />
+
               {/* Emergency Contact */}
               {tenant.emergencyContactName && (
                 <div className="bg-white shadow rounded-lg">

@@ -1,16 +1,7 @@
-import { Pool } from 'pg';
 import { Document, DocumentCategory, DocumentFilters, DocumentsResponse, DocumentStats } from '@/types/document';
 import path from 'path';
 import fs from 'fs/promises';
-
-// Use the same pool configuration as other API files
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT || '5432'),
-});
+import pool from '@/lib/db';
 
 // Get all documents with filtering and pagination
 export async function getDocuments(

@@ -3,7 +3,7 @@
  * Provides real-time metrics and calculations for the financial dashboard
  */
 
-import { pool } from '@/lib/db';
+import pool from '@/lib/db';
 
 export interface RevenueMetrics {
   monthly: number;
@@ -436,7 +436,8 @@ export async function getAllDashboardMetrics() {
     recentPayments,
     upcomingDueDates,
     topTenants,
-    invoiceBreakdown
+    invoiceBreakdown,
+    monthlyRevenueTrend
   ] = await Promise.all([
     getTotalRevenue(),
     getOutstandingInvoices(),
@@ -445,6 +446,7 @@ export async function getAllDashboardMetrics() {
     getUpcomingDueDates(30),
     getTopTenantsByPayments(5),
     getInvoiceStatusBreakdown(),
+    getMonthlyRevenueTrend(),
   ]);
   
   return {
@@ -455,6 +457,7 @@ export async function getAllDashboardMetrics() {
     upcomingDueDates,
     topTenants,
     invoiceBreakdown,
+    monthlyRevenueTrend,
     generatedAt: new Date().toISOString(),
   };
 }

@@ -28,7 +28,8 @@ export async function generateInvoicesForTenant(
       leaseStartDate,
       leaseEndDate,
       monthlyRent,
-      depositAmount
+      depositAmount,
+      advanceAmount
     } = request;
 
     // Validate input
@@ -67,10 +68,101 @@ export async function generateInvoicesForTenant(
 
     const room = roomResult.rows[0];
 
-    // Calculate number of months in lease
     const startDate = new Date(leaseStartDate);
     const endDate = new Date(leaseEndDate);
     
+    // Generate invoices
+    const invoiceIds: string[] = [];
+    let invoiceCounter = 0;
+
+    // Create initial payment invoice (deposit + advance) as the first invoice
+    const initialPaymentAmount = (depositAmount || 0) + (advanceAmount || 0);
+    if (initialPaymentAmount > 0) {
+      const initialInvoiceNumber = `INV-${Date.now()}-${invoiceCounter}`;
+      const initialDueDate = new Date(startDate);
+      initialDueDate.setDate(5); // Due on the 5th of the month
+
+      const initialInvoiceResult = await client.query(
+        `INSERT INTO invoices (
+          tenant_id,
+          invoice_number,
+          issue_date,
+          due_date,
+          billing_period_start,
+          billing_period_end,
+          subtotal,
+          tax_amount,
+          total_amount,
+          amount_paid,
+          invoice_status,
+          notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING id`,
+        [
+          tenantId,
+          initialInvoiceNumber,
+          startDate,
+          initialDueDate,
+          startDate,
+          startDate,
+          initialPaymentAmount,
+          0, // No tax
+          initialPaymentAmount,
+          0, // Not paid yet
+          'sent',
+          `Initial Payment - Deposit and Advance for ${room.building_name} - ${room.room_number}`
+        ]
+      );
+
+      const initialInvoiceId = initialInvoiceResult.rows[0].id;
+      invoiceIds.push(initialInvoiceId);
+      invoiceCounter++;
+
+      // Create invoice line items for initial payment
+      if (depositAmount && depositAmount > 0) {
+        const depositMonths = monthlyRent > 0 ? depositAmount / monthlyRent : 0;
+        const depositMonthsRounded = Math.round(depositMonths * 100) / 100; // Round to 2 decimal places
+        await client.query(
+          `INSERT INTO invoice_line_items (
+            invoice_id,
+            description,
+            quantity,
+            unit_price,
+            item_type
+          ) VALUES ($1, $2, $3, $4, $5)`,
+          [
+            initialInvoiceId,
+            `Security Deposit${depositMonthsRounded > 0 ? ` (${depositMonthsRounded} month${depositMonthsRounded !== 1 ? 's' : ''})` : ''}`,
+            1,
+            depositAmount,
+            'deposit'
+          ]
+        );
+      }
+
+      if (advanceAmount && advanceAmount > 0) {
+        const advanceMonths = monthlyRent > 0 ? advanceAmount / monthlyRent : 0;
+        const advanceMonthsRounded = Math.round(advanceMonths * 100) / 100; // Round to 2 decimal places
+        await client.query(
+          `INSERT INTO invoice_line_items (
+            invoice_id,
+            description,
+            quantity,
+            unit_price,
+            item_type
+          ) VALUES ($1, $2, $3, $4, $5)`,
+          [
+            initialInvoiceId,
+            `Advance Payment${advanceMonthsRounded > 0 ? ` (${advanceMonthsRounded} month${advanceMonthsRounded !== 1 ? 's' : ''})` : ''}`,
+            1,
+            advanceAmount,
+            'rent'
+          ]
+        );
+      }
+    }
+
+    // Calculate number of months in lease for monthly invoices
     const months: Date[] = [];
     const current = new Date(startDate);
     
@@ -79,9 +171,7 @@ export async function generateInvoicesForTenant(
       current.setMonth(current.getMonth() + 1);
     }
 
-    // Generate invoices for each month
-    const invoiceIds: string[] = [];
-    
+    // Generate monthly rent invoices for each month
     for (let i = 0; i < months.length; i++) {
       const invoiceMonth = months[i];
       const dueDate = new Date(invoiceMonth);
@@ -103,7 +193,8 @@ export async function generateInvoicesForTenant(
       }
 
       // Generate invoice number
-      const invoiceNumber = `INV-${Date.now()}-${i}`;
+      const invoiceNumber = `INV-${Date.now()}-${invoiceCounter}`;
+      invoiceCounter++;
       
       // Determine billing period
       const billingPeriodStart = i === 0 ? startDate : new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth(), 1);

@@ -357,6 +357,7 @@ export interface InvoiceGenerationRequest {
   leaseEndDate: Date;
   monthlyRent: number;
   depositAmount?: number;
+  advanceAmount?: number;
 }
 
 export interface InvoiceGenerationResult {

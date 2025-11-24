@@ -19,6 +19,8 @@ import {
   FileCode
 } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
+import SkeletonList from '@/components/ui/SkeletonList';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 
 interface Document {
   id: string;
@@ -51,13 +53,22 @@ export default function DocumentsPage() {
   }, [status, session]);
 
   // Show loading state while checking authentication
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="space-y-6">
+              <SkeletonCard showHeader={true} lines={3} />
+              <SkeletonList items={5} showAvatar={true} />
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

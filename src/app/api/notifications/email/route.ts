@@ -146,9 +146,9 @@ function replaceTemplateVariables(template: string, variables: Record<string, an
     
     // Format based on variable type
     if (typeof value === 'number' && key.toLowerCase().includes('amount')) {
-      formattedValue = new Intl.NumberFormat('en-US', {
+      formattedValue = new Intl.NumberFormat('en-PH', {
         style: 'currency',
-        currency: 'USD',
+        currency: 'PHP',
       }).format(value);
     } else if (value instanceof Date || (typeof value === 'string' && Date.parse(value))) {
       const date = new Date(value);

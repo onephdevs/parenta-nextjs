@@ -69,9 +69,9 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
     }).format(amount);
   };
 

@@ -2,7 +2,6 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
-import { LogoutButton } from '@/components/features/LogoutButton';
 import { 
   Building2, 
   Home, 
@@ -10,12 +9,8 @@ import {
   DollarSign,
   TrendingUp,
   ArrowRight,
-  Settings,
   BarChart3,
-  FileText,
-  Package,
-  Shield,
-  Bell
+  Package
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -193,47 +188,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="bg-blue-600 p-2 rounded-lg">
-                  <Shield className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">Admin Portal</h1>
-                  <p className="text-xs text-gray-500">System Administration</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-              </button>
-              
-              <div className="hidden md:flex items-center space-x-3 pl-4 border-l border-gray-200">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
-                    {session.user.firstName} {session.user.lastName}
-                  </p>
-                  <p className="text-xs text-gray-500">Administrator</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                  {session.user.firstName?.charAt(0)}{session.user.lastName?.charAt(0)}
-                </div>
-              </div>
-              
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -349,9 +304,6 @@ export default async function AdminDashboard() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
-            <Link href="/admin/settings" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
-              Settings <Settings className="h-4 w-4 ml-1" />
-            </Link>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -444,7 +396,7 @@ export default async function AdminDashboard() {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 } 

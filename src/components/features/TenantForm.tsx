@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 
@@ -10,12 +10,12 @@ interface Building {
 }
 
 interface Room {
-  id: number;
+  id: string;
   roomNumber: string;
-  buildingId: number;
+  buildingId: string;
   buildingName: string;
-  rentAmount: number;
-  status: string;
+  monthlyRate: number;
+  roomStatus: 'vacant' | 'occupied' | 'maintenance' | 'reserved';
 }
 
 interface TenantFormData {
@@ -49,6 +49,10 @@ export default function TenantForm() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
+  const [overrideMonthlyRent, setOverrideMonthlyRent] = useState(false);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<TenantFormData>({
     firstName: '',
@@ -103,8 +107,8 @@ export default function TenantForm() {
           const roomsList = roomsData.data || roomsData.rooms || [];
           if (Array.isArray(roomsList)) {
             setRooms(roomsList);
-            // Initially show only available rooms
-            setFilteredRooms(roomsList.filter((r: Room) => r.status === 'available'));
+            // Initially show only vacant rooms
+            setFilteredRooms(roomsList.filter((r: Room) => r.roomStatus === 'vacant'));
           } else {
             console.error('Invalid rooms data format:', roomsList);
             setRooms([]);
@@ -123,28 +127,31 @@ export default function TenantForm() {
   useEffect(() => {
     if (formData.buildingId) {
       const filtered = rooms.filter(
-        r => r.buildingId === parseInt(formData.buildingId!) && r.status === 'available'
+        r => r.buildingId === formData.buildingId && r.roomStatus === 'vacant'
       );
       setFilteredRooms(filtered);
       
       // Reset room if it's not in the filtered list
-      if (formData.roomId && !filtered.find(r => r.id === parseInt(formData.roomId!))) {
+      if (formData.roomId && !filtered.find(r => r.id === formData.roomId)) {
         setFormData(prev => ({ ...prev, roomId: '' }));
       }
     } else {
-      setFilteredRooms(rooms.filter(r => r.status === 'available'));
+      setFilteredRooms(rooms.filter(r => r.roomStatus === 'vacant'));
     }
   }, [formData.buildingId, rooms, formData.roomId]);
 
-  // Auto-fill monthly rent when room is selected
+  // Auto-fill monthly rent when room is selected (only if override is not checked)
   useEffect(() => {
-    if (formData.roomId) {
-      const selectedRoom = rooms.find(r => r.id === parseInt(formData.roomId!));
-      if (selectedRoom && selectedRoom.rentAmount) {
-        setFormData(prev => ({ ...prev, monthlyRent: selectedRoom.rentAmount }));
+    if (formData.roomId && !overrideMonthlyRent) {
+      const selectedRoom = rooms.find(r => r.id === formData.roomId);
+      if (selectedRoom && selectedRoom.monthlyRate) {
+        setFormData(prev => ({ ...prev, monthlyRent: selectedRoom.monthlyRate }));
       }
+    } else if (!formData.roomId && !overrideMonthlyRent) {
+      // Clear monthly rent when room is deselected and override is not checked
+      setFormData(prev => ({ ...prev, monthlyRent: 0 }));
     }
-  }, [formData.roomId, rooms]);
+  }, [formData.roomId, rooms, overrideMonthlyRent]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -255,9 +262,9 @@ export default function TenantForm() {
             tenantId: tenantId,
             startDate: formData.leaseStartDate || new Date().toISOString(),
             endDate: formData.leaseEndDate,
-            monthlyRent: formData.monthlyRent,
-            depositAmount: (formData.monthlyRent || 0) * formData.depositMonths,
-            advanceMonths: formData.advanceMonths,
+            monthlyRate: formData.monthlyRent,
+            depositPaid: (formData.monthlyRent || 0) * formData.depositMonths,
+            advanceAmount: (formData.monthlyRent || 0) * formData.advanceMonths,
           }),
         });
 
@@ -423,6 +430,20 @@ export default function TenantForm() {
               name="dateOfBirth"
               id="dateOfBirth"
               value={formData.dateOfBirth}
+              onChange={handleInputChange}
+              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-700">
+              Previous Address
+            </label>
+            <input
+              type="text"
+              name="previousAddress"
+              id="previousAddress"
+              value={formData.previousAddress}
               onChange={handleInputChange}
               className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
@@ -597,7 +618,7 @@ export default function TenantForm() {
               </option>
               {filteredRooms.map((room) => (
                 <option key={room.id} value={room.id}>
-                  {room.buildingName} - Room {room.roomNumber} (₱{room.rentAmount.toLocaleString()}/month)
+                  {room.buildingName} - Room {room.roomNumber} (₱{room.monthlyRate.toLocaleString()}/month)
                 </option>
               ))}
             </select>
@@ -645,6 +666,26 @@ export default function TenantForm() {
             <label htmlFor="monthlyRent" className="block text-sm font-medium text-gray-700">
               Monthly Rent (₱) *
             </label>
+            <div className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                id="overrideMonthlyRent"
+                checked={overrideMonthlyRent}
+                onChange={(e) => {
+                  setOverrideMonthlyRent(e.target.checked);
+                  if (!e.target.checked && formData.roomId) {
+                    const selectedRoom = rooms.find(r => r.id === formData.roomId);
+                    if (selectedRoom) {
+                      setFormData(prev => ({ ...prev, monthlyRent: selectedRoom.monthlyRate }));
+                    }
+                  }
+                }}
+                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+              />
+              <label htmlFor="overrideMonthlyRent" className="ml-2 block text-sm text-gray-700">
+                Override monthly rent
+              </label>
+            </div>
             <input
               type="number"
               name="monthlyRent"
@@ -654,15 +695,20 @@ export default function TenantForm() {
               value={formData.monthlyRent}
               onChange={handleInputChange}
               required
+              disabled={!overrideMonthlyRent && !formData.roomId}
               placeholder="e.g., 5000, 8000, 12000"
               className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                 errors.monthlyRent ? 'border-red-300' : ''
-              }`}
+              } ${!overrideMonthlyRent && !formData.roomId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             />
             {errors.monthlyRent && (
               <p className="mt-1 text-sm text-red-600">{errors.monthlyRent}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">Enter amount in Philippine Pesos</p>
+            <p className="mt-1 text-xs text-gray-500">
+              {formData.roomId && !overrideMonthlyRent 
+                ? 'Monthly rent is automatically set from the selected room' 
+                : 'Enter amount in Philippine Pesos'}
+            </p>
           </div>
 
           <div>
@@ -716,7 +762,7 @@ export default function TenantForm() {
               </span>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              ({formData.depositMonths} month{formData.depositMonths !== 1 ? 's' : ''} deposit + {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''} advance) × ₱{(formData.monthlyRent || 0).toLocaleString()}
+              (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths} month{formData.depositMonths !== 1 ? 's' : ''} deposit) + (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''} advance)
             </p>
           </div>
         </div>
@@ -778,20 +824,6 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6">
-          <div>
-            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-700">
-              Previous Address
-            </label>
-            <input
-              type="text"
-              name="previousAddress"
-              id="previousAddress"
-              value={formData.previousAddress}
-              onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-            />
-          </div>
-
           <div>
             <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
               Notes

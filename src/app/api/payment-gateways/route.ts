@@ -12,7 +12,7 @@ const mockGateways: PaymentGateway[] = [
     isActive: true,
     webhookUrl: 'https://your-domain.com/api/webhooks/stripe',
     settings: {
-      currency: 'USD',
+      currency: 'PHP',
       testMode: true,
       autoCapture: true,
       allowSaveCard: true,
@@ -38,7 +38,7 @@ const mockGateways: PaymentGateway[] = [
     isActive: false,
     webhookUrl: 'https://your-domain.com/api/webhooks/paypal',
     settings: {
-      currency: 'USD',
+      currency: 'PHP',
       testMode: true,
       autoCapture: true,
       allowSaveCard: true,

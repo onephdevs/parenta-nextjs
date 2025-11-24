@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -17,7 +18,8 @@ export default function AdminSidebar() {
     'Dashboard',
     'Properties',
     'Tenants',
-    'Financial'
+    'Financial',
+    'Utilities'
   ]);
 
   const toggleSection = (sectionName: string) => {
@@ -160,6 +162,15 @@ export default function AdminSidebar() {
             </svg>
           ),
         },
+        {
+          name: 'Reports & Analytics',
+          href: '/admin/financial/reports',
+          icon: (
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          ),
+        },
       ],
     },
     {
@@ -171,8 +182,8 @@ export default function AdminSidebar() {
       ),
       children: [
         {
-          name: 'Overview',
-          href: '/admin/utilities',
+          name: 'Meter Readings',
+          href: '/admin/utilities/readings',
           icon: (
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -180,8 +191,8 @@ export default function AdminSidebar() {
           ),
         },
         {
-          name: 'Bills',
-          href: '/admin/utilities/bills',
+          name: 'Cost Allocation',
+          href: '/admin/utilities/cost-allocation',
           icon: (
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -192,31 +203,12 @@ export default function AdminSidebar() {
     },
     {
       name: 'Assets',
+      href: '/admin/assets',
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
         </svg>
       ),
-      children: [
-        {
-          name: 'All Assets',
-          href: '/admin/assets',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          ),
-        },
-        {
-          name: 'Add Asset',
-          href: '/admin/assets/add',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          ),
-        },
-      ],
     },
     {
       name: 'Bulk Operations',
@@ -350,15 +342,15 @@ export default function AdminSidebar() {
             <p className="text-sm font-medium text-gray-900 truncate">Admin User</p>
             <p className="text-xs text-gray-500 truncate">admin@parenta.com</p>
           </div>
-          <Link
-            href="/api/auth/signout"
+          <button
+            onClick={() => signOut({ callbackUrl: '/auth/signin?role=admin' })}
             className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
             title="Sign out"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-          </Link>
+          </button>
         </div>
       </div>
     </div>

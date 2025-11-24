@@ -17,9 +17,9 @@ interface AssetStatsCardsProps {
 
 export function AssetStatsCards({ stats }: AssetStatsCardsProps) {
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);

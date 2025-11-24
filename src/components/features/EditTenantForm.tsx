@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TenantWithAssignments } from '@/lib/api/tenants';
 import { useNotifications } from '@/hooks/useNotifications';
+import ProfilePictureUpload from './ProfilePictureUpload';
+import DocumentUpload from './DocumentUpload';
 
 interface EditTenantFormProps {
   tenant: TenantWithAssignments;
@@ -228,6 +230,23 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
             Personal Information
           </h3>
+
+          {/* Profile Picture Upload */}
+          <div className="mb-6">
+            <ProfilePictureUpload
+              tenantId={tenant.id}
+              currentPictureUrl={(tenant as any).profilePictureUrl}
+              onUploadComplete={() => {
+                // Refresh page to show new picture
+                window.location.reload();
+              }}
+              onDeleteComplete={() => {
+                // Refresh page to remove picture
+                window.location.reload();
+              }}
+              size="md"
+            />
+          </div>
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
@@ -576,6 +595,24 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             onChange={handleInputChange}
             className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             placeholder="Additional notes about the tenant..."
+          />
+        </div>
+
+        {/* Tenant Agreement Document */}
+        <div>
+          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Tenant Agreement
+          </h3>
+          <DocumentUpload
+            tenantId={tenant.id}
+            currentDocumentUrl={(tenant as any).agreementDocumentUrl}
+            currentDocumentName={(tenant as any).agreementDocumentName}
+            onUploadComplete={() => {
+              window.location.reload();
+            }}
+            onDeleteComplete={() => {
+              window.location.reload();
+            }}
           />
         </div>
 

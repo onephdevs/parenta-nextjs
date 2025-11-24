@@ -68,7 +68,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <RevenueChart data={data.revenue} />
+        <RevenueChart data={data.monthlyRevenueTrend} />
         <InvoiceStatusChart data={data.invoiceBreakdown} />
       </div>
 

@@ -2,8 +2,8 @@ import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import AdminLayout from '@/components/layout/AdminLayout';
 import DashboardClient from '@/components/features/dashboard/DashboardClient';
+import { getAllDashboardMetrics } from '@/lib/services/dashboard-service';
 
 export const metadata = {
   title: 'Financial Dashboard | Parenta',
@@ -12,21 +12,9 @@ export const metadata = {
 
 async function getDashboardData() {
   try {
-    // In a server component, we can call the service directly
-    // Or fetch from the API endpoint
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3030'}/api/dashboard/metrics`, {
-      cache: 'no-store', // Always fetch fresh data
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch dashboard data');
-    }
-
-    const data = await response.json();
-    return data.data;
+    // Call the service directly from server component
+    const data = await getAllDashboardMetrics();
+    return data;
   } catch (error) {
     console.error('Error loading dashboard data:', error);
     return null;
@@ -41,24 +29,22 @@ export default async function DashboardPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="border-b border-gray-200 pb-5">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Financial Dashboard
-          </h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Real-time overview of your property management performance
-          </p>
-        </div>
-
-        {/* Dashboard Content */}
-        <Suspense fallback={<DashboardSkeleton />}>
-          <DashboardContent />
-        </Suspense>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="border-b border-gray-200 pb-5">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Financial Dashboard
+        </h1>
+        <p className="mt-2 text-sm text-gray-700">
+          Real-time overview of your property management performance
+        </p>
       </div>
-    </AdminLayout>
+
+      {/* Dashboard Content */}
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent />
+      </Suspense>
+    </div>
   );
 }
 

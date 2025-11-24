@@ -25,9 +25,9 @@ export default function TenantCard({ tenant }: TenantCardProps) {
 
   const formatCurrency = (amount?: number) => {
     if (!amount) return 'Not specified';
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
     }).format(amount);
   };
 

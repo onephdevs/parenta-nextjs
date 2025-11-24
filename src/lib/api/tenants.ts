@@ -21,6 +21,7 @@ export interface Tenant {
   leaseStartDate?: Date;
   leaseEndDate?: Date;
   notes?: string;
+  profilePictureUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,8 +67,36 @@ export async function getAllTenants(): Promise<Tenant[]> {
 }
 
 // Get tenant by ID with assignments
-export async function getTenantById(id: string): Promise<TenantWithAssignments | null> {
-  const tenantQuery = `SELECT * FROM tenants WHERE id = $1`;
+export async function getTenantById(id: string): Promise<TenantWithAssignments & { agreementDocumentId?: string | null; agreementDocumentName?: string | null; agreementDocumentUrl?: string | null } | null> {
+  // First, check if tenant_agreement_document_id column exists
+  let hasAgreementColumn = false;
+  try {
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'tenants' AND column_name = 'tenant_agreement_document_id'
+    `);
+    hasAgreementColumn = columnCheck.rows.length > 0;
+  } catch (error) {
+    // If check fails, assume column doesn't exist
+    hasAgreementColumn = false;
+  }
+
+  // Build query based on whether column exists
+  let tenantQuery: string;
+  if (hasAgreementColumn) {
+    tenantQuery = `
+      SELECT t.*, 
+             d.id as agreement_document_id,
+             d.document_name as agreement_document_name,
+             d.file_path as agreement_document_url
+      FROM tenants t
+      LEFT JOIN documents d ON t.tenant_agreement_document_id = d.id
+      WHERE t.id = $1
+    `;
+  } else {
+    tenantQuery = `SELECT * FROM tenants WHERE id = $1`;
+  }
   
   try {
     const tenantResult = await pool.query(tenantQuery, [id]);
@@ -76,7 +105,8 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments |
       return null;
     }
 
-    const tenant = mapRowToTenant(tenantResult.rows[0]);
+    const row = tenantResult.rows[0];
+    const tenant = mapRowToTenant(row);
 
     // Get current assignment
     const currentAssignmentQuery = `
@@ -115,6 +145,9 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments |
       ...tenant,
       currentAssignment,
       assignmentHistory,
+      agreementDocumentId: hasAgreementColumn ? (row.agreement_document_id as string | null | undefined) : undefined,
+      agreementDocumentName: hasAgreementColumn ? (row.agreement_document_name as string | null | undefined) : undefined,
+      agreementDocumentUrl: hasAgreementColumn ? (row.agreement_document_url as string | null | undefined) : undefined,
     };
   } catch (error) {
     console.error('Error fetching tenant:', error);
@@ -194,7 +227,7 @@ export async function createTenant(tenantData: Partial<Tenant>): Promise<Tenant>
 }
 
 // Helper function to map database row to Tenant object
-function mapRowToTenant(row: Record<string, unknown>): Tenant {
+function mapRowToTenant(row: Record<string, unknown>): Tenant & { profilePictureUrl?: string | null } {
   return {
     id: row.id as string,
     firstName: row.first_name as string,
@@ -216,6 +249,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant {
     leaseStartDate: row.lease_start_date ? new Date(row.lease_start_date as string) : undefined,
     leaseEndDate: row.lease_end_date ? new Date(row.lease_end_date as string) : undefined,
     notes: row.notes as string,
+    profilePictureUrl: row.profile_picture_url as string | null | undefined,
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
   };
