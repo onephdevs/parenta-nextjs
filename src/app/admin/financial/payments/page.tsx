@@ -42,11 +42,15 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   let paymentsData, tenants, summary;
   
   try {
-    [paymentsData, tenants, summary] = await Promise.all([
+    const [paymentsResult, tenantsData, summaryResult] = await Promise.all([
       getPayments(filters, page, 20),
-      getAllTenants(),
+      getAllTenants({ limit: 1000 }), // Get all tenants for dropdown
       getPaymentSummary()
     ]);
+    
+    paymentsData = paymentsResult;
+    tenants = tenantsData.tenants; // Extract tenants array from paginated response
+    summary = summaryResult;
   } catch (error) {
     console.error('Error loading payments:', error);
     // Return empty data if there's an error

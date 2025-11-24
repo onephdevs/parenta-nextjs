@@ -3,12 +3,13 @@ import { getAllBuildings, createBuilding } from '@/lib/api/buildings';
 
 export async function GET() {
   try {
-    const buildings = await getAllBuildings();
+    const buildingsData = await getAllBuildings({ limit: 1000 }); // Get all buildings for API
     
     return NextResponse.json({
       success: true,
       data: {
-        buildings: buildings
+        buildings: buildingsData.buildings,
+        pagination: buildingsData.pagination
       }
     });
   } catch (error) {

@@ -4,11 +4,14 @@ import { createTenantWithUser } from '@/lib/api/tenant-user-link';
 
 export async function GET() {
   try {
-    const tenants = await getAllTenants();
+    const tenantsData = await getAllTenants({ limit: 1000 }); // Get all tenants for API
     
     return NextResponse.json({
       success: true,
-      data: tenants
+      data: {
+        tenants: tenantsData.tenants,
+        pagination: tenantsData.pagination
+      }
     });
   } catch (error) {
     console.error('Get tenants error:', error);

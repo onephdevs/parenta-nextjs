@@ -42,11 +42,15 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   let expensesData, buildings, summary;
   
   try {
-    [expensesData, buildings, summary] = await Promise.all([
+    const [expensesResult, buildingsData, summaryResult] = await Promise.all([
       getExpenses(filters, page, 20),
-      getAllBuildings(),
+      getAllBuildings({ limit: 1000 }), // Get all buildings for dropdown
       getExpenseSummary()
     ]);
+    
+    expensesData = expensesResult;
+    buildings = buildingsData.buildings; // Extract buildings array from paginated response
+    summary = summaryResult;
   } catch (error) {
     console.error('Error loading expenses:', error);
     // Return empty data if there's an error

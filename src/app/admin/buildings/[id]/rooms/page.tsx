@@ -13,13 +13,13 @@ interface BuildingRoomsPageProps {
 
 async function getBuildingRoomsData(buildingId: string) {
   try {
-    const [building, rooms, allBuildings] = await Promise.all([
+    const [building, rooms, buildingsData] = await Promise.all([
       getBuildingById(buildingId),
       getRoomsByBuildingId(buildingId),
-      getAllBuildings()
+      getAllBuildings({ limit: 1000 }) // Get all buildings for navigation
     ]);
     
-    return { building, rooms, allBuildings };
+    return { building, rooms, allBuildings: buildingsData.buildings };
   } catch (error) {
     console.error('Error fetching building rooms data:', error);
     return { building: null, rooms: [], allBuildings: [] };

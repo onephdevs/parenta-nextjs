@@ -39,11 +39,15 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   let invoicesData, tenants, summary;
   
   try {
-    [invoicesData, tenants, summary] = await Promise.all([
+    const [invoicesResult, tenantsData, summaryResult] = await Promise.all([
       getInvoices(filters, page, 20),
-      getAllTenants(),
+      getAllTenants({ limit: 1000 }), // Get all tenants for dropdown
       getInvoiceSummary()
     ]);
+    
+    invoicesData = invoicesResult;
+    tenants = tenantsData.tenants; // Extract tenants array from paginated response
+    summary = summaryResult;
   } catch (error) {
     console.error('Error loading invoices:', error);
     // Return empty data if there's an error
