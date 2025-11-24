@@ -7,6 +7,9 @@ import { Building } from '@/types/database';
 import BuildingsList from '@/components/features/BuildingsList';
 import AddBuildingButton from '@/components/features/AddBuildingButton';
 
+// Enable ISR (Incremental Static Regeneration) with 60 second revalidation
+export const revalidate = 60;
+
 export default async function BuildingsPage() {
   const session = await getServerSession(authOptions);
 

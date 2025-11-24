@@ -7,6 +7,9 @@ import { DOCUMENT_TYPES } from '@/types/document';
 import DocumentsList from '@/components/features/DocumentsList';
 import DocumentUpload from '@/components/features/DocumentUpload';
 
+// Enable ISR (Incremental Static Regeneration) with 60 second revalidation
+export const revalidate = 60;
+
 interface DocumentsPageProps {
   searchParams: Promise<{
     page?: string;

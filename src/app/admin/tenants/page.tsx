@@ -6,6 +6,9 @@ import { getAllTenants, getTenantStats } from '@/lib/api/tenants';
 import { getAllBuildings } from '@/lib/api/buildings';
 import TenantsList from '@/components/features/TenantsList';
 
+// Enable ISR (Incremental Static Regeneration) with 60 second revalidation
+export const revalidate = 60;
+
 async function getTenantsData() {
   try {
     const [tenants, stats, buildings] = await Promise.all([
