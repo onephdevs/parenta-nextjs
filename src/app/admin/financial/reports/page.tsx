@@ -151,7 +151,7 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
           <div className="px-6 py-4">
             <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-4">
               <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="startDate" className="block text-sm font-medium text-gray-900 mb-1">
                   Start Date
                 </label>
                 <input
@@ -159,12 +159,12 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
                   name="startDate"
                   id="startDate"
                   defaultValue={startDate}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm h-[38px]"
                 />
               </div>
 
               <div>
-                <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="endDate" className="block text-sm font-medium text-gray-900 mb-1">
                   End Date
                 </label>
                 <input
@@ -172,18 +172,18 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
                   name="endDate"
                   id="endDate"
                   defaultValue={endDate}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm h-[38px]"
                 />
               </div>
 
               <div>
-                <label htmlFor="period" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="period" className="block text-sm font-medium text-gray-900 mb-1">
                   Quick Period
                 </label>
                 <select
                   name="period"
                   id="period"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                  className="block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm h-[38px]"
                 >
                   <option value="">Custom Range</option>
                   <option value="this-month">This Month</option>
@@ -196,7 +196,7 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
               <div className="flex items-end">
                 <button
                   type="submit"
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 h-[38px]"
                 >
                   Generate Report
                 </button>
