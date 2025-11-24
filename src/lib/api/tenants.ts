@@ -50,16 +50,78 @@ export interface TenantStats {
   averageIncome: number;
 }
 
-// Get all tenants
-export async function getAllTenants(): Promise<Tenant[]> {
-  const query = `
-    SELECT * FROM tenants 
-    ORDER BY created_at DESC
-  `;
+export interface PaginatedTenantsResponse {
+  tenants: Tenant[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
 
+// Get all tenants with pagination
+export async function getAllTenants(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}): Promise<PaginatedTenantsResponse> {
   try {
-    const result = await pool.query(query);
-    return result.rows.map(mapRowToTenant);
+    const page = options?.page || 1;
+    const limit = options?.limit || 50;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE clause
+    let whereClause = '';
+    const values: unknown[] = [];
+    let paramCount = 0;
+
+    if (options?.status) {
+      paramCount++;
+      whereClause += ` WHERE tenant_status = $${paramCount}`;
+      values.push(options.status);
+    }
+
+    if (options?.search) {
+      paramCount++;
+      whereClause += whereClause ? ' AND' : ' WHERE';
+      whereClause += ` (first_name ILIKE $${paramCount} OR last_name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+      values.push(`%${options.search}%`);
+    }
+
+    // Get total count
+    const countQuery = `SELECT COUNT(*) FROM tenants${whereClause}`;
+    const countResult = await pool.query(countQuery, values);
+    const total = parseInt(countResult.rows[0].count);
+
+    // Get paginated tenants
+    const query = `
+      SELECT * FROM tenants
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `;
+    
+    values.push(limit, offset);
+    const result = await pool.query(query, values);
+    const tenants = result.rows.map(mapRowToTenant);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      tenants,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   } catch (error) {
     console.error('Error fetching tenants:', error);
     throw new Error(`Failed to fetch tenants: ${error instanceof Error ? error.message : 'Unknown error'}`);

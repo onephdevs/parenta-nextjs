@@ -25,9 +25,50 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   };
 }
 
-// Get all buildings
-export async function getAllBuildings(): Promise<Building[]> {
+export interface PaginatedBuildingsResponse {
+  buildings: Building[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+// Get all buildings with optional pagination
+export async function getAllBuildings(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<PaginatedBuildingsResponse> {
   try {
+    const page = options?.page || 1;
+    const limit = options?.limit || 50;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE clause
+    let whereClause = 'WHERE b.is_active = true';
+    const values: unknown[] = [];
+    let paramCount = 0;
+
+    if (options?.search) {
+      paramCount++;
+      whereClause += ` AND (b.name ILIKE $${paramCount} OR b.city ILIKE $${paramCount})`;
+      values.push(`%${options.search}%`);
+    }
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(DISTINCT b.id)
+      FROM buildings b
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, values);
+    const total = parseInt(countResult.rows[0].count);
+
+    // Get paginated buildings
     const query = `
       SELECT 
         b.*,
@@ -36,13 +77,15 @@ export async function getAllBuildings(): Promise<Building[]> {
         SUM(CASE WHEN r.room_status = 'vacant' THEN 1 ELSE 0 END) as vacant_units
       FROM buildings b
       LEFT JOIN rooms r ON r.building_id = b.id
-      WHERE b.is_active = true 
+      ${whereClause}
       GROUP BY b.id
       ORDER BY b.name ASC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
     
-    const result = await pool.query(query);
-    return result.rows.map(row => {
+    values.push(limit, offset);
+    const result = await pool.query(query, values);
+    const buildings = result.rows.map(row => {
       const building = mapDatabaseBuildingToBuilding(row);
       return {
         ...building,
@@ -51,6 +94,20 @@ export async function getAllBuildings(): Promise<Building[]> {
         vacantUnits: parseInt(row.vacant_units) || 0
       };
     });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      buildings,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   } catch (error) {
     console.error('Error fetching buildings:', error);
     throw error;

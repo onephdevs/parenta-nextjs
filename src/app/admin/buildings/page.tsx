@@ -1,28 +1,37 @@
-import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { authOptions } from '@/lib/auth';
 import { getAllBuildings } from '@/lib/api/buildings';
 import { Building } from '@/types/database';
 import BuildingsList from '@/components/features/BuildingsList';
 import AddBuildingButton from '@/components/features/AddBuildingButton';
+import Pagination from '@/components/ui/Pagination';
 
 // Enable ISR (Incremental Static Regeneration) with 60 second revalidation
 export const revalidate = 60;
 
-export default async function BuildingsPage() {
-  const session = await getServerSession(authOptions);
+interface BuildingsPageProps {
+  searchParams: Promise<{ page?: string }>;
+}
 
-  // Redirect if not authenticated or not admin
-  if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/signin?role=admin');
-  }
+export default async function BuildingsPage({ searchParams }: BuildingsPageProps) {
+  // Auth check removed - handled by layout.tsx
+  const params = await searchParams;
+  const page = parseInt(params.page || '1');
 
   let buildings: Building[] = [];
+  let pagination = {
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  };
   let error: string | null = null;
 
   try {
-    buildings = await getAllBuildings();
+    const buildingsData = await getAllBuildings({ page, limit: 50 });
+    buildings = buildingsData.buildings;
+    pagination = buildingsData.pagination;
   } catch (err) {
     console.error('Error fetching buildings:', err);
     error = 'Failed to load buildings';
@@ -128,6 +137,14 @@ export default async function BuildingsPage() {
 
         {/* Buildings List */}
         <BuildingsList buildings={buildings} />
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+        />
       </main>
     </div>
   );

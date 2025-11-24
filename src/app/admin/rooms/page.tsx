@@ -1,35 +1,54 @@
-import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { authOptions } from '@/lib/auth';
 import { getAllRooms, getRoomStats } from '@/lib/api/rooms';
 import { getAllBuildings } from '@/lib/api/buildings';
 import RoomsList from '@/components/features/RoomsList';
+import Pagination from '@/components/ui/Pagination';
 
-async function getRoomData() {
+// Add ISR caching
+export const revalidate = 60;
+
+interface RoomsPageProps {
+  searchParams: Promise<{ page?: string }>;
+}
+
+async function getRoomData(page: number) {
   try {
-    const [rooms, stats, buildings] = await Promise.all([
-      getAllRooms(),
+    const [roomsData, stats, buildingsData] = await Promise.all([
+      getAllRooms({ page, limit: 50 }),
       getRoomStats(),
-      getAllBuildings()
+      getAllBuildings({ limit: 100 }) // Get all buildings for filter dropdown
     ]);
     
-    return { rooms, stats, buildings };
+    return { 
+      rooms: roomsData.rooms, 
+      pagination: roomsData.pagination,
+      stats, 
+      buildings: buildingsData.buildings 
+    };
   } catch (error) {
     console.error('Error fetching room data:', error);
-    return { rooms: [], stats: null, buildings: [] };
+    return { 
+      rooms: [], 
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+      stats: null, 
+      buildings: [] 
+    };
   }
 }
 
-export default async function RoomsPage() {
-  const session = await getServerSession(authOptions);
+export default async function RoomsPage({ searchParams }: RoomsPageProps) {
+  // Auth check removed - handled by layout.tsx
+  const params = await searchParams;
+  const page = parseInt(params.page || '1');
 
-  // Redirect if not authenticated or not admin
-  if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/signin?role=admin');
-  }
-
-  const { rooms, stats, buildings } = await getRoomData();
+  const { rooms, pagination, stats, buildings } = await getRoomData(page);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,6 +157,14 @@ export default async function RoomsPage() {
         <RoomsList 
           rooms={rooms} 
           buildings={buildings}
+        />
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
         />
       </main>
     </div>

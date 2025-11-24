@@ -1,37 +1,54 @@
-import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { authOptions } from '@/lib/auth';
 import { getAllTenants, getTenantStats } from '@/lib/api/tenants';
 import { getAllBuildings } from '@/lib/api/buildings';
 import TenantsList from '@/components/features/TenantsList';
+import Pagination from '@/components/ui/Pagination';
 
 // Enable ISR (Incremental Static Regeneration) with 60 second revalidation
 export const revalidate = 60;
 
-async function getTenantsData() {
+interface TenantsPageProps {
+  searchParams: Promise<{ page?: string }>;
+}
+
+async function getTenantsData(page: number) {
   try {
-    const [tenants, stats, buildings] = await Promise.all([
-      getAllTenants(),
+    const [tenantsData, stats, buildingsData] = await Promise.all([
+      getAllTenants({ page, limit: 50 }),
       getTenantStats(),
-      getAllBuildings()
+      getAllBuildings({ limit: 100 })
     ]);
     
-    return { tenants, stats, buildings };
+    return { 
+      tenants: tenantsData.tenants,
+      pagination: tenantsData.pagination,
+      stats, 
+      buildings: buildingsData.buildings 
+    };
   } catch (error) {
     console.error('Error fetching tenants data:', error);
-    return { tenants: [], stats: null, buildings: [] };
+    return { 
+      tenants: [], 
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+      stats: null, 
+      buildings: [] 
+    };
   }
 }
 
-export default async function TenantsPage() {
-  const session = await getServerSession(authOptions);
-  
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
-  }
+export default async function TenantsPage({ searchParams }: TenantsPageProps) {
+  // Auth check removed - handled by layout.tsx
+  const params = await searchParams;
+  const page = parseInt(params.page || '1');
 
-  const { tenants, stats, buildings } = await getTenantsData();
+  const { tenants, pagination, stats, buildings } = await getTenantsData(page);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -146,6 +163,14 @@ export default async function TenantsPage() {
         <TenantsList 
           tenants={tenants} 
           buildings={buildings}
+        />
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
         />
       </div>
     </div>

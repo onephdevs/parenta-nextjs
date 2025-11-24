@@ -21,44 +21,59 @@ function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
   };
 }
 
-// Get all rooms with optional filters
+// Pagination response interface
+export interface PaginatedRoomsResponse {
+  rooms: Room[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+// Get all rooms with optional filters and pagination
 export async function getAllRooms(filters?: {
   buildingId?: string;
   roomType?: string;
   roomStatus?: string;
   search?: string;
-}): Promise<Room[]> {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedRoomsResponse> {
   try {
-    let query = `
-      SELECT r.*, b.name as building_name 
-      FROM rooms r
-      LEFT JOIN buildings b ON r.building_id = b.id
-      WHERE r.is_active = true
-    `;
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 50;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE clause
+    let whereClause = 'WHERE r.is_active = true';
     const values: unknown[] = [];
     let paramCount = 0;
 
     if (filters?.buildingId) {
       paramCount++;
-      query += ` AND r.building_id = $${paramCount}`;
+      whereClause += ` AND r.building_id = $${paramCount}`;
       values.push(filters.buildingId);
     }
 
     if (filters?.roomType) {
       paramCount++;
-      query += ` AND r.room_type = $${paramCount}`;
+      whereClause += ` AND r.room_type = $${paramCount}`;
       values.push(filters.roomType);
     }
 
     if (filters?.roomStatus) {
       paramCount++;
-      query += ` AND r.room_status = $${paramCount}`;
+      whereClause += ` AND r.room_status = $${paramCount}`;
       values.push(filters.roomStatus);
     }
 
     if (filters?.search) {
       paramCount++;
-      query += ` AND (
+      whereClause += ` AND (
         r.room_number ILIKE $${paramCount} OR 
         b.name ILIKE $${paramCount} OR
         r.description ILIKE $${paramCount}
@@ -66,10 +81,43 @@ export async function getAllRooms(filters?: {
       values.push(`%${filters.search}%`);
     }
 
-    query += ` ORDER BY b.name ASC, r.room_number ASC`;
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*)
+      FROM rooms r
+      LEFT JOIN buildings b ON r.building_id = b.id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, values);
+    const total = parseInt(countResult.rows[0].count);
 
+    // Get paginated rooms
+    const query = `
+      SELECT r.*, b.name as building_name 
+      FROM rooms r
+      LEFT JOIN buildings b ON r.building_id = b.id
+      ${whereClause}
+      ORDER BY b.name ASC, r.room_number ASC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `;
+    
+    values.push(limit, offset);
     const result = await pool.query(query, values);
-    return result.rows.map(mapDatabaseRoomToRoom);
+    const rooms = result.rows.map(mapDatabaseRoomToRoom);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      rooms,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   } catch (error) {
     console.error('Error fetching rooms:', error);
     throw error;
