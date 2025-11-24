@@ -6,6 +6,7 @@ import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
+import GlobalSearchModal from '@/components/features/search/GlobalSearchModal';
 import { Bell, Search, Settings, Menu, X, ChevronRight } from 'lucide-react';
 
 interface AdminLayoutClientProps {
@@ -16,6 +17,7 @@ interface AdminLayoutClientProps {
 export default function AdminLayoutClient({ children, session }: AdminLayoutClientProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const pathname = usePathname();
 
   // Generate breadcrumbs from pathname
@@ -119,7 +121,11 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
             {/* Right Section: Search, Notifications, Profile */}
             <div className="flex items-center space-x-3">
               {/* Search Button */}
-              <button className="hidden md:flex p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md">
+              <button 
+                onClick={() => setSearchModalOpen(true)}
+                className="hidden md:flex p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                title="Search"
+              >
                 <Search className="w-5 h-5" />
               </button>
 
@@ -199,6 +205,12 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
           {children}
         </main>
       </div>
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+      />
     </div>
   );
 }

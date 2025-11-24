@@ -68,11 +68,11 @@ export default function LateFeeApplication() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6">Late Fee Application</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-900">Late Fee Application</h2>
 
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
-        <h3 className="font-semibold mb-2">How It Works</h3>
-        <ol className="list-decimal list-inside text-sm space-y-1">
+        <h3 className="font-semibold mb-2 text-gray-900">How It Works</h3>
+        <ol className="list-decimal list-inside text-sm space-y-1 text-gray-900">
           <li>Click "Calculate Eligible Fees" to see which invoices are eligible for late fees</li>
           <li>Review the list of invoices and calculated fees</li>
           <li>Click "Apply Late Fees" to create late fee invoices for all eligible tenants</li>
@@ -112,11 +112,11 @@ export default function LateFeeApplication() {
       {hasCalculated && (
         <div className="border border-gray-300 rounded-lg bg-white">
           <div className="p-4 border-b border-gray-300 bg-gray-50">
-            <h3 className="text-lg font-semibold">
+            <h3 className="text-lg font-semibold text-gray-900">
               Eligible Invoices ({calculations.length})
             </h3>
             {calculations.length > 0 && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-900 mt-1">
                 Total Late Fees: ₱
                 {calculations
                   .reduce((sum, calc) => sum + calc.fee_amount, 0)
@@ -126,7 +126,7 @@ export default function LateFeeApplication() {
           </div>
 
           {calculations.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-900">
               No invoices are currently eligible for late fees.
             </div>
           ) : (
@@ -136,12 +136,12 @@ export default function LateFeeApplication() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium">Invoice ID:</span>
-                        <code className="text-sm bg-gray-100 px-2 py-0.5 rounded">
+                        <span className="font-medium text-gray-900">Invoice ID:</span>
+                        <code className="text-sm bg-gray-100 px-2 py-0.5 rounded text-gray-900">
                           {calc.invoice_id}
                         </code>
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
+                      <div className="text-sm text-gray-900 space-y-1">
                         <p>
                           <span className="font-medium">Tenant ID:</span> {calc.tenant_id}
                         </p>
@@ -162,7 +162,7 @@ export default function LateFeeApplication() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600 mb-1">Late Fee</p>
+                      <p className="text-sm text-gray-900 mb-1">Late Fee</p>
                       <p className="text-2xl font-bold text-red-600">
                         ₱{calc.fee_amount.toFixed(2)}
                       </p>
