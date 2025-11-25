@@ -61,8 +61,14 @@ export async function createReservation(
     }
 
     // Validate expiry date is after reservation date
-    const reservationDate = reservationData.reservationDate || new Date();
-    const expiryDate = new Date(reservationData.expiryDate);
+    const reservationDate = reservationData.reservationDate 
+      ? (reservationData.reservationDate instanceof Date 
+          ? reservationData.reservationDate 
+          : new Date(reservationData.reservationDate))
+      : new Date();
+    const expiryDate = reservationData.expiryDate instanceof Date 
+      ? reservationData.expiryDate 
+      : new Date(reservationData.expiryDate);
     
     if (expiryDate <= reservationDate) {
       throw new Error('Expiry date must be after reservation date');

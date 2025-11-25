@@ -83,13 +83,33 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Create reservation error:', error);
     
+    // Determine status code based on error type
+    let statusCode = 500;
+    let errorMessage = 'Failed to create reservation';
+    let errorDetails = 'Unknown error';
+    
+    if (error instanceof Error) {
+      errorDetails = error.message;
+      
+      // Set appropriate status codes for specific errors
+      if (error.message.includes('not found') || error.message.includes('Room not found')) {
+        statusCode = 404;
+      } else if (error.message.includes('already') || error.message.includes('expired') || error.message.includes('Invalid')) {
+        statusCode = 400; // Bad request for validation errors
+      } else if (error.message.includes('Unauthorized')) {
+        statusCode = 401;
+      }
+      
+      errorMessage = errorDetails; // Use the actual error message
+    }
+    
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to create reservation',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage,
+        details: errorDetails
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }

@@ -206,7 +206,9 @@ export default function CreateReservationModal({
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || result.details || 'Failed to create reservation');
+        // Use details if available, otherwise use error, otherwise default message
+        const errorMessage = result.details || result.error || 'Failed to create reservation';
+        throw new Error(errorMessage);
       }
 
       updateNotification(loadingId, {
