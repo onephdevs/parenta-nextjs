@@ -161,19 +161,12 @@ export default function BuildingDetailWithImages({ building }: BuildingDetailWit
       </div>
 
       {/* Amenities */}
-      {building.amenities && building.amenities.length > 0 && (
+      {building.amenities && (
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Amenities</h3>
-            <div className="flex flex-wrap gap-2">
-              {building.amenities.map((amenity) => (
-                <span
-                  key={amenity}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800"
-                >
-                  {amenity}
-                </span>
-              ))}
+            <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
+              {building.amenities}
             </div>
           </div>
         </div>

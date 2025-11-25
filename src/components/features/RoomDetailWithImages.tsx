@@ -313,19 +313,12 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
       )}
 
       {/* Amenities */}
-      {roomDetails.room.amenities && roomDetails.room.amenities.length > 0 && (
+      {roomDetails.room.amenities && (
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">Amenities</h3>
-            <div className="flex flex-wrap gap-2">
-              {roomDetails.room.amenities.map((amenity, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
-                >
-                  {amenity}
-                </span>
-              ))}
+            <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
+              {roomDetails.room.amenities}
             </div>
           </div>
         </div>

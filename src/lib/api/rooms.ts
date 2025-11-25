@@ -12,9 +12,13 @@ function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
     squareFootage: dbRoom.square_footage,
     monthlyRate: dbRoom.monthly_rate,
     depositAmount: dbRoom.deposit_amount,
+    depositRequired: dbRoom.deposit_required,
+    depositType: dbRoom.deposit_type,
+    depositFixedAmount: dbRoom.deposit_amount, // For now, using deposit_amount as fixed amount
+    depositPercentage: dbRoom.deposit_percentage,
     roomStatus: dbRoom.room_status,
     description: dbRoom.description,
-    amenities: dbRoom.amenities || [],
+    amenities: dbRoom.amenities || '',
     isActive: dbRoom.is_active,
     createdAt: dbRoom.created_at,
     updatedAt: dbRoom.updated_at
@@ -170,9 +174,10 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
     const query = `
       INSERT INTO rooms (
         building_id, room_number, floor_number, room_type, square_footage,
-        monthly_rate, deposit_amount, room_status, amenities, description
+        monthly_rate, deposit_amount, deposit_required, deposit_type, 
+        deposit_percentage, room_status, amenities, description
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
     
@@ -184,8 +189,11 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
       roomData.squareFootage,
       roomData.monthlyRate,
       roomData.depositAmount,
+      roomData.depositRequired || false,
+      roomData.depositType || 'one_month',
+      roomData.depositPercentage,
       'vacant', // Default status
-      roomData.amenities || [],
+      roomData.amenities || '',
       roomData.description
     ];
     

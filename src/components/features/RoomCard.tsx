@@ -142,23 +142,11 @@ export default function RoomCard({
         </div>
 
         {/* Amenities */}
-        {currentRoom.amenities && currentRoom.amenities.length > 0 && (
+        {currentRoom.amenities && (
           <div className="mt-4">
             <div className="text-sm text-gray-500 mb-2">Amenities</div>
-            <div className="flex flex-wrap gap-1">
-              {currentRoom.amenities.slice(0, 3).map((amenity) => (
-                <span
-                  key={amenity}
-                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800"
-                >
-                  {amenity}
-                </span>
-              ))}
-              {currentRoom.amenities.length > 3 && (
-                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                  +{currentRoom.amenities.length - 3} more
-                </span>
-              )}
+            <div className="text-sm text-gray-900">
+              {currentRoom.amenities}
             </div>
           </div>
         )}

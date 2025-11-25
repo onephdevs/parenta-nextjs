@@ -30,12 +30,16 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
     squareFootage: room.squareFootage,
     monthlyRate: parseFloat(room.monthlyRate),
     depositAmount: room.depositAmount ? parseFloat(room.depositAmount) : undefined,
+    depositRequired: room.depositRequired || false,
+    depositType: room.depositType || 'one_month',
+    depositFixedAmount: room.depositFixedAmount,
+    depositPercentage: room.depositPercentage,
     description: room.description || '',
-    amenities: room.amenities || []
+    amenities: room.amenities || ''
   });
 
   const [amenitiesInput, setAmenitiesInput] = useState(
-    room.amenities ? room.amenities.join(', ') : ''
+    room.amenities || ''
   );
 
   // Fetch buildings when edit mode is activated or when component mounts with startInEditMode
@@ -81,8 +85,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
 
   const handleAmenitiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAmenitiesInput(e.target.value);
-    const amenities = e.target.value.split(',').map(a => a.trim()).filter(a => a.length > 0);
-    setFormData(prev => ({ ...prev, amenities }));
+    setFormData(prev => ({ ...prev, amenities: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -194,9 +197,13 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
       monthlyRate: parseFloat(room.monthlyRate),
       depositAmount: room.depositAmount ? parseFloat(room.depositAmount) : undefined,
       description: room.description || '',
-      amenities: room.amenities || []
+      depositRequired: room.depositRequired || false,
+      depositType: room.depositType || 'one_month',
+      depositFixedAmount: room.depositFixedAmount,
+      depositPercentage: room.depositPercentage,
+      amenities: room.amenities || ''
     });
-    setAmenitiesInput(room.amenities ? room.amenities.join(', ') : '');
+    setAmenitiesInput(room.amenities || '');
   };
 
   return (
@@ -353,7 +360,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
-                  Monthly Rent ($) *
+                  Monthly Rent (₱) *
                 </label>
                 <input
                   type="number"
@@ -364,13 +371,14 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                   step="0.01"
                   value={formData.monthlyRate || ''}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  disabled={!isEditing}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
               <div>
                 <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700 mb-1">
-                  Deposit ($)
+                  Deposit (₱)
                 </label>
                 <input
                   type="number"
@@ -380,9 +388,140 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                   step="0.01"
                   value={formData.depositAmount || ''}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  disabled={!isEditing}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
+            </div>
+
+            {/* Deposit Configuration */}
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+              <div className="flex items-center mb-4">
+                <input
+                  type="checkbox"
+                  id="depositRequired"
+                  name="depositRequired"
+                  checked={formData.depositRequired || false}
+                  onChange={(e) =>
+                    setFormData(prev => ({ ...prev, depositRequired: e.target.checked }))
+                  }
+                  disabled={!isEditing}
+                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded disabled:opacity-50"
+                />
+                <label htmlFor="depositRequired" className="ml-2 block text-sm font-medium text-gray-900">
+                  Require deposit for reservation
+                </label>
+              </div>
+
+              {formData.depositRequired && (
+                <div className="space-y-4 ml-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Deposit Type
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="depositType"
+                          value="one_month"
+                          checked={formData.depositType === 'one_month'}
+                          onChange={(e) =>
+                            setFormData(prev => ({ ...prev, depositType: e.target.value as any }))
+                          }
+                          disabled={!isEditing}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 disabled:opacity-50"
+                        />
+                        <span className="ml-2 text-sm text-gray-900">One Month Rent</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="depositType"
+                          value="percentage"
+                          checked={formData.depositType === 'percentage'}
+                          onChange={(e) =>
+                            setFormData(prev => ({ ...prev, depositType: e.target.value as any }))
+                          }
+                          disabled={!isEditing}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 disabled:opacity-50"
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Percentage of Rent</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="depositType"
+                          value="fixed"
+                          checked={formData.depositType === 'fixed'}
+                          onChange={(e) =>
+                            setFormData(prev => ({ ...prev, depositType: e.target.value as any }))
+                          }
+                          disabled={!isEditing}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 disabled:opacity-50"
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Fixed Amount</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {formData.depositType === 'percentage' && (
+                    <div>
+                      <label htmlFor="depositPercentage" className="block text-sm font-medium text-gray-900 mb-1">
+                        Deposit Percentage (%)
+                      </label>
+                      <input
+                        type="number"
+                        id="depositPercentage"
+                        name="depositPercentage"
+                        min="0"
+                        max="200"
+                        step="1"
+                        value={formData.depositPercentage || ''}
+                        onChange={(e) =>
+                          setFormData(prev => ({ ...prev, depositPercentage: e.target.value ? parseFloat(e.target.value) : undefined }))
+                        }
+                        disabled={!isEditing}
+                        placeholder="e.g., 50, 100"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                      <p className="mt-1 text-sm text-gray-600">
+                        {formData.monthlyRate && formData.depositPercentage
+                          ? `Deposit: ₱${((formData.monthlyRate * formData.depositPercentage) / 100).toLocaleString()}`
+                          : 'Enter percentage to see calculated amount'}
+                      </p>
+                    </div>
+                  )}
+
+                  {formData.depositType === 'fixed' && (
+                    <div>
+                      <label htmlFor="depositFixedAmount" className="block text-sm font-medium text-gray-900 mb-1">
+                        Fixed Deposit Amount (₱)
+                      </label>
+                      <input
+                        type="number"
+                        id="depositFixedAmount"
+                        name="depositFixedAmount"
+                        min="0"
+                        step="1"
+                        value={formData.depositFixedAmount || ''}
+                        onChange={(e) =>
+                          setFormData(prev => ({ ...prev, depositFixedAmount: e.target.value ? parseFloat(e.target.value) : undefined }))
+                        }
+                        disabled={!isEditing}
+                        placeholder="e.g., 5000, 10000"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  )}
+
+                  {formData.depositType === 'one_month' && formData.monthlyRate && formData.monthlyRate > 0 && (
+                    <div className="text-sm text-gray-900 bg-purple-50 p-3 rounded border border-purple-200">
+                      <strong>Deposit Required:</strong> ₱{formData.monthlyRate.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Square Footage */}

@@ -316,18 +316,11 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
             )}
 
             {/* Amenities */}
-            {roomDetails.room.amenities && roomDetails.room.amenities.length > 0 && (
+            {roomDetails.room.amenities && (
               <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Amenities</h3>
-                <div className="flex flex-wrap gap-2">
-                  {roomDetails.room.amenities.map((amenity, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
-                    >
-                      {amenity}
-                    </span>
-                  ))}
+                <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
+                  {roomDetails.room.amenities}
                 </div>
               </div>
             )}
@@ -344,6 +337,12 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
             currentTenant={roomDetails.currentTenant}
             assignmentHistory={roomDetails.assignmentHistory}
             roomMonthlyRate={roomDetails.room.monthlyRate}
+            room={{
+              depositRequired: roomDetails.room.depositRequired,
+              depositType: roomDetails.room.depositType,
+              depositFixedAmount: roomDetails.room.depositFixedAmount,
+              depositPercentage: roomDetails.room.depositPercentage,
+            }}
             onAssignmentChange={refreshRoomData}
           />
         )}

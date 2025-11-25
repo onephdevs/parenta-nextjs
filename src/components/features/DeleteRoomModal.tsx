@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 import { Room } from '@/types/database';
 
@@ -17,6 +18,7 @@ export default function DeleteRoomModal({
   onClose,
   onDelete,
 }: DeleteRoomModalProps) {
+  const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
@@ -24,6 +26,7 @@ export default function DeleteRoomModal({
     setIsDeleting(true);
     try {
       await onDelete();
+      router.refresh(); // Refresh to update dashboard stats
       onClose();
     } catch (error) {
       console.error('Error deleting room:', error);
@@ -40,7 +43,9 @@ export default function DeleteRoomModal({
     }
   };
 
-  const isConfirmValid = confirmText.toLowerCase() === 'delete';
+  const isConfirmValid = 
+    confirmText.toLowerCase() === 'delete' || 
+    confirmText === room.roomNumber;
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -125,7 +130,7 @@ export default function DeleteRoomModal({
                       htmlFor="confirmText"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >
-                      Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
+                      Type <span className="font-mono font-bold text-red-600">DELETE</span> or Room Number <span className="font-mono font-bold text-red-600">{room.roomNumber}</span> to confirm:
                     </label>
                     <input
                       type="text"
@@ -133,7 +138,7 @@ export default function DeleteRoomModal({
                       value={confirmText}
                       onChange={(e) => setConfirmText(e.target.value)}
                       disabled={isDeleting}
-                      placeholder="Type DELETE to confirm"
+                      placeholder={`Type DELETE or ${room.roomNumber}`}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       autoComplete="off"
                     />

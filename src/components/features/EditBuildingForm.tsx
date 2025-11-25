@@ -335,15 +335,14 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
                   type="text"
                   id="amenities"
                   name="amenities"
-                  value={formData.amenities ? formData.amenities.join(', ') : ''}
+                  value={formData.amenities || ''}
                   onChange={(e) => {
-                    const amenitiesArray = e.target.value.split(',').map(item => item.trim()).filter(item => item.length > 0);
-                    setFormData(prev => ({ ...prev, amenities: amenitiesArray }));
+                    setFormData(prev => ({ ...prev, amenities: e.target.value }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Enter amenities separated by commas (e.g., Parking, Pool, Gym)"
+                  placeholder="e.g., Parking, Pool (heated), Gym, 24/7 Security"
                 />
-                <p className="text-xs text-gray-500 mt-1">Separate multiple amenities with commas</p>
+                <p className="text-xs text-gray-900 mt-1">Enter amenities freely with spaces and commas as needed</p>
               </div>
             </div>
           </div>

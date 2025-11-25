@@ -32,10 +32,8 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
     buildingType: 'residential',
     yearBuilt: undefined,
     totalFloors: undefined,
-    amenities: []
+    amenities: ''
   });
-
-  const [amenitiesInput, setAmenitiesInput] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -43,12 +41,6 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
       ...prev,
       [name]: name === 'yearBuilt' || name === 'totalFloors' ? (value ? parseInt(value) : undefined) : value
     }));
-  };
-
-  const handleAmenitiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAmenitiesInput(e.target.value);
-    const amenities = e.target.value.split(',').map(a => a.trim()).filter(a => a.length > 0);
-    setFormData(prev => ({ ...prev, amenities }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -330,17 +322,18 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
 
             <div>
               <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-1">
-                Amenities (comma-separated)
+                Amenities
               </label>
               <input
                 type="text"
                 id="amenities"
                 name="amenities"
-                value={amenitiesInput}
-                onChange={handleAmenitiesChange}
-                placeholder="Pool, Gym, Parking, etc."
+                value={formData.amenities || ''}
+                onChange={handleInputChange}
+                placeholder="e.g., Parking, Pool (heated), Gym, 24/7 Security"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
+              <p className="text-xs text-gray-900 mt-1">Enter amenities freely with spaces and commas as needed</p>
             </div>
           </div>
         </div>

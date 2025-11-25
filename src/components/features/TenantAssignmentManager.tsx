@@ -59,6 +59,12 @@ interface TenantAssignmentManagerProps {
   currentTenant: CurrentTenant | null;
   assignmentHistory: AssignmentHistory[];
   roomMonthlyRate: number;
+  room?: {
+    depositRequired?: boolean;
+    depositType?: 'fixed' | 'percentage' | 'one_month';
+    depositFixedAmount?: number;
+    depositPercentage?: number;
+  };
   onAssignmentChange: () => void;
 }
 
@@ -67,6 +73,7 @@ export default function TenantAssignmentManager({
   currentTenant,
   assignmentHistory,
   roomMonthlyRate,
+  room,
   onAssignmentChange
 }: TenantAssignmentManagerProps) {
   const [showAssignForm, setShowAssignForm] = useState(false);
@@ -124,10 +131,42 @@ export default function TenantAssignmentManager({
     fetchOccupants();
   }, [showAssignForm, roomId]);
 
+  // Calculate required deposit based on room configuration
+  const calculateRequiredDeposit = (): number => {
+    if (!room?.depositRequired) return 0;
+
+    const monthlyRate = parseFloat(assignFormData.monthlyRate) || roomMonthlyRate;
+
+    switch (room.depositType) {
+      case 'one_month':
+        return monthlyRate;
+      case 'percentage':
+        return room.depositPercentage
+          ? (monthlyRate * room.depositPercentage) / 100
+          : 0;
+      case 'fixed':
+        return room.depositFixedAmount || 0;
+      default:
+        return 0;
+    }
+  };
+
   // Handle tenant assignment
   const handleAssignTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Validate deposit if required
+    if (room?.depositRequired) {
+      const requiredDeposit = calculateRequiredDeposit();
+      const depositPaid = assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : 0;
+
+      if (depositPaid < requiredDeposit) {
+        showError(`Deposit required: ₱${requiredDeposit.toLocaleString()}. Current: ₱${depositPaid.toLocaleString()}`);
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       const response = await fetch(`/api/rooms/${roomId}/assign`, {
@@ -434,15 +473,31 @@ export default function TenantAssignmentManager({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Deposit Paid ($)</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Deposit Paid (₱)
+                    {room?.depositRequired && (
+                      <span className="ml-2 text-red-600">*</span>
+                    )}
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     value={assignFormData.depositPaid}
                     onChange={(e) => setAssignFormData({ ...assignFormData, depositPaid: e.target.value })}
                     className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Optional"
+                    placeholder={room?.depositRequired ? "Required" : "Optional"}
+                    required={room?.depositRequired}
                   />
+                  {room?.depositRequired && (
+                    <p className="mt-1 text-sm text-gray-900">
+                      <strong>Required deposit:</strong> ₱{calculateRequiredDeposit().toLocaleString()}
+                    </p>
+                  )}
+                  {!room?.depositRequired && assignFormData.depositPaid && parseFloat(assignFormData.depositPaid) < calculateRequiredDeposit() && (
+                    <p className="mt-1 text-sm text-red-600">
+                      Insufficient deposit. Required: ₱{calculateRequiredDeposit().toLocaleString()}
+                    </p>
+                  )}
                 </div>
 
                 <div>

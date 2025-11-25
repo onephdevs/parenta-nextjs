@@ -23,7 +23,11 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     floorNumber: undefined,
     squareFootage: undefined,
     monthlyRate: 0,
-    amenities: [],
+    depositRequired: false,
+    depositType: 'one_month',
+    depositFixedAmount: undefined,
+    depositPercentage: undefined,
+    amenities: '',
     description: ''
   });
 
@@ -41,9 +45,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
 
   const handleAmenitiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAmenitiesInput(e.target.value);
-    // Split by comma and clean up
-    const amenities = e.target.value.split(',').map(a => a.trim()).filter(a => a.length > 0);
-    setFormData(prev => ({ ...prev, amenities }));
+    setFormData(prev => ({ ...prev, amenities: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -222,7 +224,131 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
             placeholder="e.g., 5000, 8000, 12000"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          <p className="mt-1 text-sm text-gray-500">Enter amount in Philippine Pesos</p>
+          <p className="mt-1 text-sm text-gray-900">Enter amount in Philippine Pesos</p>
+        </div>
+
+        {/* Deposit Configuration */}
+        <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+          <div className="flex items-center mb-4">
+            <input
+              type="checkbox"
+              id="depositRequired"
+              name="depositRequired"
+              checked={formData.depositRequired || false}
+              onChange={(e) =>
+                setFormData(prev => ({ ...prev, depositRequired: e.target.checked }))
+              }
+              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+            />
+            <label htmlFor="depositRequired" className="ml-2 block text-sm font-medium text-gray-900">
+              Require deposit for reservation
+            </label>
+          </div>
+
+          {formData.depositRequired && (
+            <div className="space-y-4 ml-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Deposit Type
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="depositType"
+                      value="one_month"
+                      checked={formData.depositType === 'one_month'}
+                      onChange={(e) =>
+                        setFormData(prev => ({ ...prev, depositType: e.target.value as any }))
+                      }
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                    />
+                    <span className="ml-2 text-sm text-gray-900">One Month Rent</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="depositType"
+                      value="percentage"
+                      checked={formData.depositType === 'percentage'}
+                      onChange={(e) =>
+                        setFormData(prev => ({ ...prev, depositType: e.target.value as any }))
+                      }
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                    />
+                    <span className="ml-2 text-sm text-gray-900">Percentage of Rent</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="depositType"
+                      value="fixed"
+                      checked={formData.depositType === 'fixed'}
+                      onChange={(e) =>
+                        setFormData(prev => ({ ...prev, depositType: e.target.value as any }))
+                      }
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                    />
+                    <span className="ml-2 text-sm text-gray-900">Fixed Amount</span>
+                  </label>
+                </div>
+              </div>
+
+              {formData.depositType === 'percentage' && (
+                <div>
+                  <label htmlFor="depositPercentage" className="block text-sm font-medium text-gray-900 mb-1">
+                    Deposit Percentage (%)
+                  </label>
+                  <input
+                    type="number"
+                    id="depositPercentage"
+                    name="depositPercentage"
+                    min="0"
+                    max="200"
+                    step="1"
+                    value={formData.depositPercentage || ''}
+                    onChange={(e) =>
+                      setFormData(prev => ({ ...prev, depositPercentage: e.target.value ? parseFloat(e.target.value) : undefined }))
+                    }
+                    placeholder="e.g., 50, 100"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-sm text-gray-600">
+                    {formData.monthlyRate && formData.depositPercentage
+                      ? `Deposit: ₱${((formData.monthlyRate * formData.depositPercentage) / 100).toLocaleString()}`
+                      : 'Enter percentage to see calculated amount'}
+                  </p>
+                </div>
+              )}
+
+              {formData.depositType === 'fixed' && (
+                <div>
+                  <label htmlFor="depositFixedAmount" className="block text-sm font-medium text-gray-900 mb-1">
+                    Fixed Deposit Amount (₱)
+                  </label>
+                  <input
+                    type="number"
+                    id="depositFixedAmount"
+                    name="depositFixedAmount"
+                    min="0"
+                    step="1"
+                    value={formData.depositFixedAmount || ''}
+                    onChange={(e) =>
+                      setFormData(prev => ({ ...prev, depositFixedAmount: e.target.value ? parseFloat(e.target.value) : undefined }))
+                    }
+                    placeholder="e.g., 5000, 10000"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+
+              {formData.depositType === 'one_month' && formData.monthlyRate > 0 && (
+                <div className="text-sm text-gray-900 bg-purple-50 p-3 rounded border border-purple-200">
+                  <strong>Deposit Required:</strong> ₱{formData.monthlyRate.toLocaleString()}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -255,20 +381,6 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
             placeholder="e.g., Air Conditioning, Private Bathroom, Balcony, WiFi"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          {formData.amenities && formData.amenities.length > 0 && (
-            <div className="mt-2">
-              <div className="flex flex-wrap gap-2">
-                {formData.amenities.map((amenity, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800"
-                  >
-                    {amenity}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Form Actions */}

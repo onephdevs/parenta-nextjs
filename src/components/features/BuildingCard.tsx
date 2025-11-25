@@ -158,22 +158,10 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                   </div>
                 </div>
 
-                {building.amenities && building.amenities.length > 0 && (
+                {building.amenities && (
                   <div className="mt-3">
-                    <div className="flex flex-wrap gap-1">
-                      {building.amenities.slice(0, 4).map((amenity) => (
-                        <span
-                          key={amenity}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
-                        >
-                          {amenity}
-                        </span>
-                      ))}
-                      {building.amenities.length > 4 && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                          +{building.amenities.length - 4} more
-                        </span>
-                      )}
+                    <div className="text-xs text-gray-800 bg-gray-100 px-2 py-1 rounded-md">
+                      {building.amenities}
                     </div>
                   </div>
                 )}
@@ -280,23 +268,11 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
           <p className="text-sm font-medium text-gray-900 capitalize">{building.buildingType}</p>
         </div>
 
-        {building.amenities && building.amenities.length > 0 && (
+        {building.amenities && (
           <div className="mt-4">
             <p className="text-sm text-gray-500 mb-2">Amenities</p>
-            <div className="flex flex-wrap gap-1">
-              {building.amenities.slice(0, 3).map((amenity) => (
-                <span
-                  key={amenity}
-                  className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
-                >
-                  {amenity}
-                </span>
-              ))}
-              {building.amenities.length > 3 && (
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                  +{building.amenities.length - 3}
-                </span>
-              )}
+            <div className="text-sm text-gray-900">
+              {building.amenities}
             </div>
           </div>
         )}

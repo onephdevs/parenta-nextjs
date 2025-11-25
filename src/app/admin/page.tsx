@@ -13,6 +13,9 @@ import {
   Package
 } from 'lucide-react';
 
+// Force fresh data on every page load (no caching)
+export const revalidate = 0;
+
 interface DashboardStats {
   buildings: {
     total: number;

@@ -57,9 +57,13 @@ export interface Room {
   squareFootage?: number;
   monthlyRate: number;
   depositAmount?: number;
+  depositRequired?: boolean;
+  depositType?: 'fixed' | 'percentage' | 'one_month';
+  depositFixedAmount?: number;
+  depositPercentage?: number;
   roomStatus: 'vacant' | 'occupied' | 'maintenance' | 'reserved';
   description?: string;
-  amenities: string[];
+  amenities: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -74,9 +78,12 @@ export interface DatabaseRoom {
   square_footage?: number;
   monthly_rate: number;
   deposit_amount?: number;
+  deposit_required?: boolean;
+  deposit_type?: 'fixed' | 'percentage' | 'one_month';
+  deposit_percentage?: number;
   room_status: 'vacant' | 'occupied' | 'maintenance' | 'reserved';
   description?: string;
-  amenities: string[];
+  amenities: string;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -558,7 +565,7 @@ export interface CreateBuildingData {
   buildingType?: string;
   yearBuilt?: number;
   totalFloors?: number;
-  amenities?: string[];
+  amenities?: string;
 }
 
 export interface CreateRoomData {
@@ -568,9 +575,13 @@ export interface CreateRoomData {
   roomType?: string;
   squareFootage?: number;
   monthlyRate: number;
+  depositRequired?: boolean;
+  depositType?: 'fixed' | 'percentage' | 'one_month';
+  depositFixedAmount?: number;
+  depositPercentage?: number;
   roomStatus?: 'vacant' | 'occupied' | 'maintenance' | 'reserved';
   description?: string;
-  amenities?: string[];
+  amenities?: string;
 }
 
 export interface CreateTenantData {

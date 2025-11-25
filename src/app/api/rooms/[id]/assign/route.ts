@@ -34,6 +34,58 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Check room deposit requirements
+    const roomResult = await client.query(
+      `SELECT deposit_required, deposit_type, deposit_amount, deposit_percentage, monthly_rate
+       FROM rooms
+       WHERE id = $1`,
+      [roomId]
+    );
+
+    if (roomResult.rows.length === 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Room not found'
+        },
+        { status: 404 }
+      );
+    }
+
+    const room = roomResult.rows[0];
+    
+    // Validate deposit if required
+    if (room.deposit_required) {
+      let requiredDeposit = 0;
+      
+      switch (room.deposit_type) {
+        case 'one_month':
+          requiredDeposit = parseFloat(monthlyRate);
+          break;
+        case 'percentage':
+          requiredDeposit = room.deposit_percentage
+            ? (parseFloat(monthlyRate) * parseFloat(room.deposit_percentage)) / 100
+            : 0;
+          break;
+        case 'fixed':
+          requiredDeposit = room.deposit_amount ? parseFloat(room.deposit_amount) : 0;
+          break;
+      }
+
+      const depositAmount = depositPaid ? parseFloat(depositPaid) : 0;
+
+      if (depositAmount < requiredDeposit) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Deposit required: ₱${requiredDeposit.toLocaleString()}`,
+            details: `This room requires a deposit of ₱${requiredDeposit.toLocaleString()}. Current deposit: ₱${depositAmount.toLocaleString()}`
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     await client.query('BEGIN');
 
     // End any existing active assignments for this tenant

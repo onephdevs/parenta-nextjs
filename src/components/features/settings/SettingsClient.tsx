@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Session } from 'next-auth';
 import { Bell, Lock, Globe, Mail, Shield, Database } from 'lucide-react';
 
@@ -26,22 +26,58 @@ export default function SettingsClient({ session }: SettingsClientProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
+  // Load settings from database on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const response = await fetch('/api/settings');
+      const data = await response.json();
+
+      if (data.success && data.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          currency: data.settings.currency || 'PHP',
+          language: data.settings.language || 'en',
+          timezone: data.settings.timezone || 'Asia/Manila',
+          dateFormat: data.settings.date_format || 'MM/DD/YYYY',
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setSaveMessage('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, save to database via API
-      // await fetch('/api/settings', {
-      //   method: 'PUT',
-      //   body: JSON.stringify(settings),
-      // });
+      const response = await fetch('/api/settings/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            currency: settings.currency,
+            language: settings.language,
+            timezone: settings.timezone,
+            date_format: settings.dateFormat,
+          },
+        }),
+      });
 
-      setSaveMessage('Settings saved successfully!');
-      setTimeout(() => setSaveMessage(''), 3000);
+      const data = await response.json();
+
+      if (data.success) {
+        setSaveMessage('Settings saved successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+        // Refresh the page to apply new settings
+        window.location.reload();
+      } else {
+        setSaveMessage('Failed to save settings');
+      }
     } catch (error) {
       setSaveMessage('Failed to save settings');
     } finally {

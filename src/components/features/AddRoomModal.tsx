@@ -47,8 +47,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
 
   const handleAmenitiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAmenitiesInput(e.target.value);
-    const amenities = e.target.value.split(',').map(a => a.trim()).filter(a => a.length > 0);
-    setFormData(prev => ({ ...prev, amenities }));
+    setFormData(prev => ({ ...prev, amenities: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
