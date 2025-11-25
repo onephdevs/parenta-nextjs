@@ -615,11 +615,12 @@ export async function getBuildingPerformance(filters: AnalyticsFilter): Promise<
           -- Average rent
           AVG(CASE WHEN l.monthly_rent > 0 THEN l.monthly_rent END) as average_rent
         FROM buildings b
-        LEFT JOIN rooms r ON b.id = r.building_id
+        LEFT JOIN rooms r ON b.id = r.building_id AND r.is_active = true
         LEFT JOIN leases l ON r.id = l.room_id
         LEFT JOIN payments p ON l.id = p.lease_id AND p.payment_date BETWEEN $1 AND $2
         LEFT JOIN utility_bills ub ON b.id = ub.building_id AND ub.bill_date BETWEEN $1 AND $2
         LEFT JOIN maintenance_requests mr ON r.id = mr.room_id AND mr.created_at BETWEEN $1 AND $2
+        WHERE b.is_active = true
         GROUP BY b.id, b.name
       )
       SELECT 

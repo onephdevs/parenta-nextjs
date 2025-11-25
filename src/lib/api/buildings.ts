@@ -76,7 +76,7 @@ export async function getAllBuildings(options?: {
         SUM(CASE WHEN r.room_status = 'occupied' THEN 1 ELSE 0 END) as occupied_units,
         SUM(CASE WHEN r.room_status = 'vacant' THEN 1 ELSE 0 END) as vacant_units
       FROM buildings b
-      LEFT JOIN rooms r ON r.building_id = b.id
+      LEFT JOIN rooms r ON r.building_id = b.id AND r.is_active = true
       ${whereClause}
       GROUP BY b.id
       ORDER BY b.name ASC
