@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface DepositTransaction {
   id: number;
@@ -21,6 +22,7 @@ interface DepositLedgerManagerProps {
 
 export default function DepositLedgerManager({ tenantId, tenantName }: DepositLedgerManagerProps) {
   const { addNotification } = useNotifications();
+  const { formatCurrency } = useCurrency();
   const [balance, setBalance] = useState<number>(0);
   const [history, setHistory] = useState<DepositTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
       }
 
       addNotification(
-        `Successfully ${actionType === 'refund' ? 'refunded' : 'applied'} ₱${parseFloat(formData.amount).toLocaleString()}`,
+        `Successfully ${actionType === 'refund' ? 'refunded' : 'applied'} ${formatCurrency(parseFloat(formData.amount))}`,
         'success'
       );
 
@@ -111,13 +113,6 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
   };
 
   const formatDate = (date: string) => {

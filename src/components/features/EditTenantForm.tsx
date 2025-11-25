@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TenantWithAssignments } from '@/lib/api/tenants';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import ProfilePictureUpload from './ProfilePictureUpload';
 import DocumentUpload from './DocumentUpload';
 
@@ -37,6 +38,7 @@ interface TenantFormData {
 export function EditTenantForm({ tenant }: EditTenantFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const { currencySymbol } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -496,7 +498,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
             <div>
               <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-900">
-                Security Deposit ($)
+                Security Deposit ({currencySymbol})
               </label>
               <input
                 type="number"

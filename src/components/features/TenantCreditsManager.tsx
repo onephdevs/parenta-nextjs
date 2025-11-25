@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface CreditTransaction {
   id: number;
@@ -19,6 +20,7 @@ interface TenantCreditsManagerProps {
 
 export default function TenantCreditsManager({ tenantId, tenantName }: TenantCreditsManagerProps) {
   const { addNotification } = useNotifications();
+  const { formatCurrency } = useCurrency();
   const [balance, setBalance] = useState<number>(0);
   const [history, setHistory] = useState<CreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +82,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
       }
 
       addNotification(
-        `Successfully ${formData.type === 'credit' ? 'added' : 'deducted'} ₱${parseFloat(formData.amount).toLocaleString()}`,
+        `Successfully ${formData.type === 'credit' ? 'added' : 'deducted'} ${formatCurrency(parseFloat(formData.amount))}`,
         'success'
       );
 
@@ -97,13 +99,6 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
   };
 
   const formatDate = (date: string) => {
