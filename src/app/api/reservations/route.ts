@@ -1,0 +1,96 @@
+import { NextResponse } from 'next/server';
+import { getAllReservations, createReservation } from '@/lib/api/reservations';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    
+    // Extract query parameters for filtering
+    const filters = {
+      status: searchParams.get('status') || undefined,
+      tenantId: searchParams.get('tenantId') || undefined,
+      roomId: searchParams.get('roomId') || undefined,
+      expiredOnly: searchParams.get('expiredOnly') === 'true' || undefined,
+      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : undefined,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined,
+    };
+
+    // Remove undefined values
+    const cleanFilters = Object.fromEntries(
+      Object.entries(filters).filter(([, value]) => value !== undefined)
+    );
+
+    const result = await getAllReservations(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
+    
+    return NextResponse.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Reservations API error:', error);
+    
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to fetch reservations',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Unauthorized'
+        },
+        { status: 401 }
+      );
+    }
+
+    const reservationData = await request.json();
+    
+    // Basic validation
+    if (!reservationData.tenantId || !reservationData.roomId || !reservationData.expiryDate || !reservationData.monthlyRate) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Missing required fields',
+          details: 'Tenant ID, room ID, expiry date, and monthly rate are required'
+        },
+        { status: 400 }
+      );
+    }
+    
+    const reservation = await createReservation(
+      reservationData,
+      session.user.id
+    );
+    
+    return NextResponse.json({
+      success: true,
+      data: reservation,
+      message: 'Reservation created successfully'
+    });
+  } catch (error) {
+    console.error('Create reservation error:', error);
+    
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to create reservation',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+

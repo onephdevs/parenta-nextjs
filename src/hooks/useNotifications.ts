@@ -153,12 +153,37 @@ export const useNotifications = () => {
   }, []);
 
   const updateNotification = useCallback((id: string, updates: Partial<Notification>) => {
-    // For simple updates, dismiss and show new
-    toast.dismiss(id);
-    if (updates.message || updates.title) {
-      showNotification(updates.title || updates.message || '', updates.type || 'info');
+    // Use toast.update to update existing toast
+    const message = updates.title ? `${updates.title}: ${updates.message || ''}` : (updates.message || '');
+    const type = updates.type || 'info';
+    
+    const toastOptions: any = {
+      id,
+      duration: type === 'error' ? 6000 : 4000,
+      position: 'top-right' as const,
+    };
+
+    switch (type) {
+      case 'success':
+        toastOptions.style = { background: '#10B981', color: '#fff' };
+        toast.success(message, toastOptions);
+        break;
+      case 'error':
+        toastOptions.style = { background: '#EF4444', color: '#fff' };
+        toast.error(message, toastOptions);
+        break;
+      case 'warning':
+        toastOptions.style = { background: '#F59E0B', color: '#fff' };
+        toast(message, { ...toastOptions, icon: '⚠️' });
+        break;
+      case 'loading':
+        toast.loading(message, toastOptions);
+        break;
+      default:
+        toastOptions.style = { background: '#3B82F6', color: '#fff' };
+        toast(message, toastOptions);
     }
-  }, [showNotification]);
+  }, []);
 
   const clearAll = useCallback(() => {
     toast.dismiss();

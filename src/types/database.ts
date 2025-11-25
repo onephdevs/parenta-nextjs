@@ -157,6 +157,42 @@ export interface TenantRoomAssignment {
   updatedAt: Date;
 }
 
+export interface Reservation {
+  id: string;
+  tenantId: string;
+  roomId: string;
+  reservationDate: Date;
+  expiryDate: Date;
+  monthlyRate: number;
+  reservationDeposit: number;
+  depositPaymentId?: string;
+  reservationStatus: 'active' | 'converted' | 'expired' | 'cancelled';
+  convertedToAssignmentId?: string;
+  notes?: string;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ReservationWithDetails extends Reservation {
+  tenantName: string;
+  tenantEmail: string;
+  roomNumber: string;
+  buildingName: string;
+  daysUntilExpiry: number;
+  isExpired: boolean;
+}
+
+export interface CreateReservationData {
+  tenantId: string;
+  roomId: string;
+  reservationDate?: Date;
+  expiryDate: Date;
+  monthlyRate: number;
+  reservationDeposit: number;
+  notes?: string;
+}
+
 export interface DatabaseTenantRoomAssignment {
   id: string;
   tenant_id: string;

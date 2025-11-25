@@ -436,6 +436,8 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
       throw new Error('Room is already occupied');
     }
     
+    // Allow assignment to reserved rooms (they will be converted to occupied)
+    
     // Check if tenant is already assigned to another room
     const existingAssignment = await client.query(`
       SELECT room_id FROM tenant_room_assignments 
