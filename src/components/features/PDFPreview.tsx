@@ -66,7 +66,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
             <h2 className="text-lg font-semibold text-gray-900 truncate">
               {document.documentName}
             </h2>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-900">
               ({document.fileName})
             </span>
           </div>
@@ -77,19 +77,19 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
               <>
                 <button
                   onClick={handleZoomOut}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
                   title="Zoom Out"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
                   </svg>
                 </button>
-                <span className="text-sm text-gray-500 px-2">
+                <span className="text-sm text-gray-900 px-2">
                   {Math.round(scale * 100)}%
                 </span>
                 <button
                   onClick={handleZoomIn}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
                   title="Zoom In"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,7 +98,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
                 </button>
                 <button
                   onClick={handleResetZoom}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
                   title="Reset Zoom"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,7 +111,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
             {/* Download Button */}
             <button
               onClick={handleDownload}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -122,7 +122,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -140,7 +140,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p className="text-gray-500">Loading preview...</p>
+                <p className="text-gray-900">Loading preview...</p>
               </div>
             </div>
           ) : error ? (
@@ -150,7 +150,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Cannot Preview File</h3>
-                <p className="text-gray-500 mb-4">{error}</p>
+                <p className="text-gray-900 mb-4">{error}</p>
                 <button
                   onClick={handleDownload}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -196,7 +196,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Preview Not Available</h3>
-                <p className="text-gray-500 mb-4">This file type cannot be previewed in the browser</p>
+                <p className="text-gray-900 mb-4">This file type cannot be previewed in the browser</p>
                 <button
                   onClick={handleDownload}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -210,7 +210,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
 
         {/* Footer with file info */}
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-          <div className="flex items-center justify-between text-sm text-gray-600">
+          <div className="flex items-center justify-between text-sm text-gray-900">
             <div className="flex items-center space-x-4">
               <span>Type: {document.mimeType || 'Unknown'}</span>
               {document.fileSize && (

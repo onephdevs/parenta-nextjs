@@ -98,7 +98,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
               <div className="flex items-center space-x-4">
                 <Link 
                   href="/admin/financial/invoices" 
-                  className="flex items-center text-gray-500 hover:text-gray-700"
+                  className="flex items-center text-gray-900 hover:text-gray-900"
                 >
                   <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -129,11 +129,11 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                 <div className="px-6 py-5">
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Invoice Number</dt>
+                      <dt className="text-sm font-medium text-gray-900">Invoice Number</dt>
                       <dd className="mt-1 text-lg font-semibold text-gray-900">{invoice.invoice_number}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Tenant</dt>
+                      <dt className="text-sm font-medium text-gray-900">Tenant</dt>
                       <dd className="mt-1 text-sm text-gray-900">
                         <Link 
                           href={`/admin/tenants/${invoice.tenant_id}`}
@@ -144,21 +144,21 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Room</dt>
+                      <dt className="text-sm font-medium text-gray-900">Room</dt>
                       <dd className="mt-1 text-sm text-gray-900">
                         {invoice.building_name} - Room {invoice.room_number}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Issue Date</dt>
+                      <dt className="text-sm font-medium text-gray-900">Issue Date</dt>
                       <dd className="mt-1 text-sm text-gray-900">{formatDate(invoice.issue_date)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Due Date</dt>
+                      <dt className="text-sm font-medium text-gray-900">Due Date</dt>
                       <dd className="mt-1 text-sm text-gray-900">{formatDate(invoice.due_date)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Period</dt>
+                      <dt className="text-sm font-medium text-gray-900">Period</dt>
                       <dd className="mt-1 text-sm text-gray-900">
                         {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}
                       </dd>
@@ -167,7 +167,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
 
                   {invoice.description && (
                     <div className="mt-6">
-                      <dt className="text-sm font-medium text-gray-500">Description</dt>
+                      <dt className="text-sm font-medium text-gray-900">Description</dt>
                       <dd className="mt-1 text-sm text-gray-900">{invoice.description}</dd>
                     </div>
                   )}
@@ -178,7 +178,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
               <div className="bg-white shadow rounded-lg">
                 <div className="px-6 py-5 border-b border-gray-200">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">Payment History</h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-gray-900">
                     All payments that have been allocated to this invoice
                   </p>
                 </div>
@@ -209,7 +209,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                                       View Payment →
                                     </Link>
                                   </div>
-                                  <div className="mt-1 flex items-center space-x-4 text-xs text-gray-500">
+                                  <div className="mt-1 flex items-center space-x-4 text-xs text-gray-900">
                                     <span>Date: {formatDate(allocation.payment_date)}</span>
                                     <span>•</span>
                                     <span className="capitalize">Method: {allocation.payment_method.replace('_', ' ')}</span>
@@ -217,7 +217,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                                     <span>Total Payment: {formatCurrency(allocation.payment_amount)}</span>
                                   </div>
                                   {allocation.payment_description && (
-                                    <p className="mt-1 text-xs text-gray-600">{allocation.payment_description}</p>
+                                    <p className="mt-1 text-xs text-gray-900">{allocation.payment_description}</p>
                                   )}
                                 </div>
                               </div>
@@ -231,7 +231,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                       <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <p className="mt-2 text-sm text-gray-500">No payments allocated yet</p>
+                      <p className="mt-2 text-sm text-gray-900">No payments allocated yet</p>
                       <p className="text-xs text-gray-400">Payments will be automatically allocated when recorded</p>
                     </div>
                   )}
@@ -248,11 +248,11 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                 </div>
                 <div className="px-6 py-5 space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-500">Total Amount</span>
+                    <span className="text-sm font-medium text-gray-900">Total Amount</span>
                     <span className="text-lg font-bold text-gray-900">{formatCurrency(invoice.amount)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-500">Amount Paid</span>
+                    <span className="text-sm font-medium text-gray-900">Amount Paid</span>
                     <span className="text-lg font-semibold text-green-600">{formatCurrency(paidAmount)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-gray-200">
@@ -263,8 +263,8 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                   {/* Progress Bar */}
                   <div className="pt-4">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-medium text-gray-500">Payment Progress</span>
-                      <span className="text-xs font-semibold text-gray-700">{progressPercentage.toFixed(0)}%</span>
+                      <span className="text-xs font-medium text-gray-900">Payment Progress</span>
+                      <span className="text-xs font-semibold text-gray-900">{progressPercentage.toFixed(0)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
                       <div 
@@ -293,13 +293,13 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                   </Link>
                   <Link
                     href={`/admin/tenants/${invoice.tenant_id}`}
-                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                   >
                     View Tenant Profile
                   </Link>
                   <button
                     onClick={() => window.print()}
-                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                   >
                     <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -312,20 +312,20 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
               {/* Invoice Stats */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 shadow rounded-lg border border-gray-200">
                 <div className="px-6 py-5">
-                  <h3 className="text-sm font-medium text-gray-700 mb-4">Invoice Statistics</h3>
+                  <h3 className="text-sm font-medium text-gray-900 mb-4">Invoice Statistics</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Payments Received</span>
+                      <span className="text-xs text-gray-900">Payments Received</span>
                       <span className="text-sm font-semibold text-gray-900">{allocations.length}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Days Since Issue</span>
+                      <span className="text-xs text-gray-900">Days Since Issue</span>
                       <span className="text-sm font-semibold text-gray-900">
                         {Math.floor((new Date().getTime() - new Date(invoice.issue_date).getTime()) / (1000 * 60 * 60 * 24))} days
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Days Until Due</span>
+                      <span className="text-xs text-gray-900">Days Until Due</span>
                       <span className={`text-sm font-semibold ${
                         new Date(invoice.due_date) < new Date() ? 'text-red-600' : 'text-gray-900'
                       }`}>

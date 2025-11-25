@@ -32,7 +32,7 @@ async function SignInContent({ searchParams }: SignInPageProps) {
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
             {isAdmin ? 'Admin Portal' : 'Tenant Portal'}
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-900">
             Sign in to your {isAdmin ? 'admin' : 'tenant'} account
           </p>
         </div>
@@ -44,7 +44,7 @@ async function SignInContent({ searchParams }: SignInPageProps) {
 
         {/* Footer */}
         <div className="text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-900">
             Secure login powered by NextAuth.js
           </p>
         </div>

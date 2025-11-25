@@ -114,10 +114,10 @@ export default function DeleteRoomModal({
                   </div>
 
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-gray-700 mb-2">
+                    <p className="text-sm text-gray-900 mb-2">
                       <strong>Room Details:</strong>
                     </p>
-                    <div className="text-sm text-gray-600 space-y-1">
+                    <div className="text-sm text-gray-900 space-y-1">
                       <p><strong>Room Number:</strong> {room.roomNumber}</p>
                       <p><strong>Type:</strong> {room.roomType}</p>
                       <p><strong>Status:</strong> {room.roomStatus}</p>
@@ -128,7 +128,7 @@ export default function DeleteRoomModal({
                   <div className="mb-6">
                     <label
                       htmlFor="confirmText"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-sm font-medium text-gray-900 mb-2"
                     >
                       Type <span className="font-mono font-bold text-red-600">DELETE</span> or Room Number <span className="font-mono font-bold text-red-600">{room.roomNumber}</span> to confirm:
                     </label>
@@ -149,7 +149,7 @@ export default function DeleteRoomModal({
                       type="button"
                       onClick={handleClose}
                       disabled={isDeleting}
-                      className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Cancel
                     </button>

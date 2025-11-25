@@ -60,7 +60,7 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Tenants
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Manage your tenant relationships
               </p>
             </div>
@@ -93,7 +93,7 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Tenants</dt>
+                      <dt className="text-sm font-medium text-gray-900 truncate">Total Tenants</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.total || 0}</dd>
                     </dl>
                   </div>
@@ -111,7 +111,7 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Active Tenants</dt>
+                      <dt className="text-sm font-medium text-gray-900 truncate">Active Tenants</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.active || 0}</dd>
                     </dl>
                   </div>
@@ -129,7 +129,7 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Pending Tenants</dt>
+                      <dt className="text-sm font-medium text-gray-900 truncate">Pending Tenants</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.pending || 0}</dd>
                     </dl>
                   </div>
@@ -147,7 +147,7 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Avg. Income</dt>
+                      <dt className="text-sm font-medium text-gray-900 truncate">Avg. Income</dt>
                       <dd className="text-lg font-medium text-gray-900">
                         ₱{stats.averageIncome ? Math.round(stats.averageIncome).toLocaleString() : '0'}
                       </dd>

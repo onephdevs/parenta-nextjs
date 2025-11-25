@@ -69,7 +69,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
               <div className="flex items-center">
                 <Link 
                   href="/admin/tenants" 
-                  className="flex items-center text-gray-500 hover:text-gray-700"
+                  className="flex items-center text-gray-900 hover:text-gray-900"
                 >
                   <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -97,7 +97,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                 </Link>
                 <Link
                   href={`/admin/tenants/${tenant.id}/edit`}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                 >
                   Edit Tenant
                 </Link>
@@ -117,11 +117,11 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                   
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Full Name</dt>
+                      <dt className="text-sm font-medium text-gray-900">Full Name</dt>
                       <dd className="mt-1 text-sm text-gray-900">{tenant.firstName} {tenant.lastName}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Email</dt>
+                      <dt className="text-sm font-medium text-gray-900">Email</dt>
                       <dd className="mt-1 text-sm text-gray-900">
                         <a href={`mailto:${tenant.email}`} className="text-purple-600 hover:text-purple-500">
                           {tenant.email}
@@ -129,13 +129,13 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                      <dt className="text-sm font-medium text-gray-900">Phone</dt>
                       <dd className="mt-1 text-sm text-gray-900">
                         {tenant.phone || 'Not provided'}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
+                      <dt className="text-sm font-medium text-gray-900">Date of Birth</dt>
                       <dd className="mt-1 text-sm text-gray-900">{formatDate(tenant.dateOfBirth)}</dd>
                     </div>
                   </div>
@@ -154,13 +154,13 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                           <h4 className="text-lg font-medium text-gray-900">
                             Room {tenant.currentAssignment.roomNumber}
                           </h4>
-                          <p className="text-sm text-gray-600">{tenant.currentAssignment.buildingName}</p>
+                          <p className="text-sm text-gray-900">{tenant.currentAssignment.buildingName}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-semibold text-gray-900">
                             {formatCurrency(tenant.currentAssignment.monthlyRate)}/month
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-900">
                             Since {formatDate(tenant.currentAssignment.startDate)}
                           </p>
                         </div>
@@ -184,13 +184,13 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                               <h4 className="font-medium text-gray-900">
                                 Room {assignment.roomNumber}
                               </h4>
-                              <p className="text-sm text-gray-600">{assignment.buildingName}</p>
+                              <p className="text-sm text-gray-900">{assignment.buildingName}</p>
                             </div>
                             <div className="text-right">
                               <p className="font-semibold text-gray-900">
                                 {formatCurrency(assignment.monthlyRate)}/month
                               </p>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-gray-900">
                                 {formatDate(assignment.startDate)} 
                                 {assignment.endDate && ` - ${formatDate(assignment.endDate)}`}
                               </p>
@@ -208,7 +208,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                     </div>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-gray-500">No room assignments found</p>
+                      <p className="text-gray-900">No room assignments found</p>
                     </div>
                   )}
                 </div>
@@ -247,18 +247,18 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                     
                     <div className="space-y-3">
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Name</dt>
+                        <dt className="text-sm font-medium text-gray-900">Name</dt>
                         <dd className="mt-1 text-sm text-gray-900">{tenant.emergencyContactName}</dd>
                       </div>
                       {tenant.emergencyContactPhone && (
                         <div>
-                          <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                          <dt className="text-sm font-medium text-gray-900">Phone</dt>
                           <dd className="mt-1 text-sm text-gray-900">{tenant.emergencyContactPhone}</dd>
                         </div>
                       )}
                       {tenant.emergencyContactRelationship && (
                         <div>
-                          <dt className="text-sm font-medium text-gray-500">Relationship</dt>
+                          <dt className="text-sm font-medium text-gray-900">Relationship</dt>
                           <dd className="mt-1 text-sm text-gray-900">{tenant.emergencyContactRelationship}</dd>
                         </div>
                       )}
@@ -274,20 +274,20 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                   
                   <div className="space-y-3">
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Monthly Income</dt>
+                      <dt className="text-sm font-medium text-gray-900">Monthly Income</dt>
                       <dd className="mt-1 text-sm text-gray-900">{formatCurrency(tenant.monthlyIncome)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Security Deposit</dt>
+                      <dt className="text-sm font-medium text-gray-900">Security Deposit</dt>
                       <dd className="mt-1 text-sm text-gray-900">{formatCurrency(tenant.securityDeposit)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Employment Status</dt>
+                      <dt className="text-sm font-medium text-gray-900">Employment Status</dt>
                       <dd className="mt-1 text-sm text-gray-900">{tenant.employmentStatus || 'Not specified'}</dd>
                     </div>
                     {tenant.employerName && (
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Employer</dt>
+                        <dt className="text-sm font-medium text-gray-900">Employer</dt>
                         <dd className="mt-1 text-sm text-gray-900">{tenant.employerName}</dd>
                       </div>
                     )}

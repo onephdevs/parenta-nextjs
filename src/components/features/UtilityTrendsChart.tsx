@@ -74,7 +74,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
     <div className="bg-white rounded-lg shadow border p-6">
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Utility Spending Trends</h3>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-900">
           Monthly utility costs and consumption patterns over the past 12 months
         </p>
       </div>
@@ -83,7 +83,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
       <div className="mb-6">
         <div className="relative h-64 bg-gray-50 rounded-lg p-4">
           {/* Y-axis labels */}
-          <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 py-4">
+          <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-900 py-4">
             <span>{formatCurrency(maxAmount)}</span>
             <span>{formatCurrency(maxAmount * 0.75)}</span>
             <span>{formatCurrency(maxAmount * 0.5)}</span>
@@ -121,7 +121,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
                     </div>
                     
                     {/* Month label */}
-                    <div className="text-xs text-gray-600 mt-2 transform -rotate-45 origin-left">
+                    <div className="text-xs text-gray-900 mt-2 transform -rotate-45 origin-left">
                       {formatMonth(monthData.month)}
                     </div>
                   </div>
@@ -171,7 +171,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
                         {utilityType}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-900">
                       {formatCurrency(totalAmount)} • {totalBills} bills
                     </div>
                   </div>
@@ -186,25 +186,25 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
           <h4 className="text-sm font-medium text-gray-900 mb-3">Period Summary</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Total Spending:</span>
+              <span className="text-sm text-gray-900">Total Spending:</span>
               <span className="text-sm font-medium text-gray-900">
                 {formatCurrency(trends.reduce((sum, t) => sum + t.total_amount, 0))}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Total Bills:</span>
+              <span className="text-sm text-gray-900">Total Bills:</span>
               <span className="text-sm font-medium text-gray-900">
                 {trends.reduce((sum, t) => sum + t.bill_count, 0)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Average per Month:</span>
+              <span className="text-sm text-gray-900">Average per Month:</span>
               <span className="text-sm font-medium text-gray-900">
                 {formatCurrency(totalsByMonth.reduce((sum, t) => sum + t.total_amount, 0) / totalsByMonth.length)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Peak Month:</span>
+              <span className="text-sm text-gray-900">Peak Month:</span>
               <span className="text-sm font-medium text-gray-900">
                 {(() => {
                   const peakMonth = totalsByMonth.reduce((max, month) => 

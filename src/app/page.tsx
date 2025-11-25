@@ -92,15 +92,15 @@ export default function LandingPage() {
               <span className="text-2xl font-bold text-gray-900">Parenta</span>
         </div>
             <nav className="hidden md:flex items-center space-x-8">
-              <a href="#properties" className="text-gray-600 hover:text-blue-600 transition">Properties</a>
-              <a href="#features" className="text-gray-600 hover:text-blue-600 transition">Features</a>
-              <a href="#about" className="text-gray-600 hover:text-blue-600 transition">About</a>
-              <a href="#contact" className="text-gray-600 hover:text-blue-600 transition">Contact</a>
+              <a href="#properties" className="text-gray-900 hover:text-blue-600 transition">Properties</a>
+              <a href="#features" className="text-gray-900 hover:text-blue-600 transition">Features</a>
+              <a href="#about" className="text-gray-900 hover:text-blue-600 transition">About</a>
+              <a href="#contact" className="text-gray-900 hover:text-blue-600 transition">Contact</a>
             </nav>
             <div className="flex items-center space-x-4">
               <Link 
                 href="/auth/tenant/signin"
-                className="text-gray-600 hover:text-blue-600 transition font-medium"
+                className="text-gray-900 hover:text-blue-600 transition font-medium"
               >
                 Tenant Login
               </Link>
@@ -124,7 +124,7 @@ export default function LandingPage() {
                 Find Your Perfect
                 <span className="text-blue-600"> Home</span> Today
               </h1>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <p className="text-xl text-gray-900 mb-8 leading-relaxed">
                 Discover premium properties with modern amenities, professional management, 
                 and a community you'll love to call home.
               </p>
@@ -152,7 +152,7 @@ export default function LandingPage() {
                     {stats.map((stat, index) => (
                       <div key={index} className="text-center">
                         <div className="text-3xl font-bold text-blue-600 mb-1">{stat.value}</div>
-                        <div className="text-sm text-gray-600">{stat.label}</div>
+                        <div className="text-sm text-gray-900">{stat.label}</div>
                       </div>
                     ))}
                   </div>
@@ -168,7 +168,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Parenta?</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
               Experience the difference with our comprehensive property management services
             </p>
           </div>
@@ -182,7 +182,7 @@ export default function LandingPage() {
                   <feature.icon className="h-7 w-7 text-blue-600 group-hover:text-white transition" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <p className="text-gray-900">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -194,7 +194,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Featured Properties</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
               Explore our carefully selected properties in prime locations
             </p>
           </div>
@@ -229,12 +229,12 @@ export default function LandingPage() {
                     <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition">
                       {building.name}
                     </h3>
-                    <div className="flex items-center text-gray-600 mb-3">
+                    <div className="flex items-center text-gray-900 mb-3">
                       <MapPin className="h-4 w-4 mr-2" />
                       <span className="text-sm">{building.address}</span>
                     </div>
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <div className="flex items-center text-gray-600">
+                      <div className="flex items-center text-gray-900">
                         <Home className="h-4 w-4 mr-2" />
                         <span className="text-sm">{building.totalUnits} Units</span>
                       </div>
@@ -253,7 +253,7 @@ export default function LandingPage() {
           ) : (
             <div className="text-center py-12">
               <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">Properties coming soon!</p>
+              <p className="text-gray-900 text-lg">Properties coming soon!</p>
             </div>
           )}
         </div>
@@ -264,7 +264,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">What Our Tenants Say</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
               Don't just take our word for it
             </p>
           </div>
@@ -292,10 +292,10 @@ export default function LandingPage() {
                     <Star key={star} className="h-5 w-5 text-yellow-400 fill-current" />
                   ))}
                 </div>
-                <p className="text-gray-700 mb-4 italic">&ldquo;{testimonial.text}&rdquo;</p>
+                <p className="text-gray-900 mb-4 italic">&ldquo;{testimonial.text}&rdquo;</p>
                 <div>
                   <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                  <div className="text-sm text-gray-600">{testimonial.role}</div>
+                  <div className="text-sm text-gray-900">{testimonial.role}</div>
                 </div>
               </div>
             ))}
@@ -333,7 +333,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Get In Touch</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
               Have questions? We're here to help
             </p>
           </div>
@@ -343,21 +343,21 @@ export default function LandingPage() {
                 <Phone className="h-6 w-6 text-blue-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Phone</h3>
-              <p className="text-gray-600">+63 (2) 1234-5678</p>
+              <p className="text-gray-900">+63 (2) 1234-5678</p>
             </div>
             <div className="text-center">
               <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Mail className="h-6 w-6 text-blue-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Email</h3>
-              <p className="text-gray-600">info@parenta.com</p>
+              <p className="text-gray-900">info@parenta.com</p>
             </div>
             <div className="text-center">
               <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
                 <MapPin className="h-6 w-6 text-blue-600" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Location</h3>
-              <p className="text-gray-600">Manila, Philippines</p>
+              <p className="text-gray-900">Manila, Philippines</p>
             </div>
           </div>
         </div>

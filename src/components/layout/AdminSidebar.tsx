@@ -261,7 +261,7 @@ export default function AdminSidebar() {
             className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
               active
                 ? 'bg-purple-100 text-purple-900'
-                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                : 'text-gray-900 hover:bg-gray-100 hover:text-gray-900'
             }`}
           >
             <span className="flex items-center space-x-3">
@@ -295,7 +295,7 @@ export default function AdminSidebar() {
         } ${
           active
             ? 'bg-purple-100 text-purple-900'
-            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+            : 'text-gray-900 hover:bg-gray-100 hover:text-gray-900'
         }`}
       >
         {item.icon}
@@ -316,7 +316,7 @@ export default function AdminSidebar() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900">Parenta</h1>
-            <p className="text-xs text-gray-500">Property Manager</p>
+            <p className="text-xs text-gray-900">Property Manager</p>
           </div>
         </Link>
       </div>
@@ -340,11 +340,11 @@ export default function AdminSidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">Admin User</p>
-            <p className="text-xs text-gray-500 truncate">admin@parenta.com</p>
+            <p className="text-xs text-gray-900 truncate">admin@parenta.com</p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/auth/signin?role=admin' })}
-            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 text-gray-400 hover:text-gray-900 transition-colors"
             title="Sign out"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

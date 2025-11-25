@@ -150,11 +150,11 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
       case 'invoice':
         return 'text-orange-600 bg-orange-50';
       case 'document':
-        return 'text-gray-600 bg-gray-50';
+        return 'text-gray-900 bg-gray-50';
       case 'maintenance':
         return 'text-red-600 bg-red-50';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-gray-900 bg-gray-50';
     }
   };
 
@@ -186,7 +186,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
                 />
                 <button
                   onClick={onClose}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-900"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -198,7 +198,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
               {isSearching && (
                 <div className="p-8 text-center">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  <p className="mt-2 text-sm text-gray-600">Searching...</p>
+                  <p className="mt-2 text-sm text-gray-900">Searching...</p>
                 </div>
               )}
 
@@ -206,7 +206,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
                 <div className="p-8 text-center">
                   <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-900 font-medium">No results found</p>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-900 mt-1">
                     Try searching with different keywords
                   </p>
                 </div>
@@ -227,7 +227,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
                         <p className="text-sm font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
                           {result.title}
                         </p>
-                        <p className="text-sm text-gray-600 truncate">
+                        <p className="text-sm text-gray-900 truncate">
                           {result.subtitle}
                         </p>
                       </div>
@@ -278,7 +278,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
 
             {/* Footer */}
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
-              <p className="text-xs text-gray-600 text-center">
+              <p className="text-xs text-gray-900 text-center">
                 Press <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">ESC</kbd> to close
               </p>
             </div>

@@ -19,7 +19,7 @@ export default async function AdvancedExportPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Advanced Export Manager</h1>
-            <p className="text-gray-600">Create custom reports and manage data exports</p>
+            <p className="text-gray-900">Create custom reports and manage data exports</p>
           </div>
         </div>
 
@@ -37,7 +37,7 @@ export default async function AdvancedExportPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Exports</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Total Exports</dt>
                     <dd className="text-lg font-medium text-gray-900">24</dd>
                   </dl>
                 </div>
@@ -46,7 +46,7 @@ export default async function AdvancedExportPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-blue-600 font-medium">+3</span>
-                <span className="text-gray-600"> this week</span>
+                <span className="text-gray-900"> this week</span>
               </div>
             </div>
           </div>
@@ -63,7 +63,7 @@ export default async function AdvancedExportPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Completed</dt>
                     <dd className="text-lg font-medium text-gray-900">18</dd>
                   </dl>
                 </div>
@@ -72,7 +72,7 @@ export default async function AdvancedExportPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-green-600 font-medium">95%</span>
-                <span className="text-gray-600"> success rate</span>
+                <span className="text-gray-900"> success rate</span>
               </div>
             </div>
           </div>
@@ -89,7 +89,7 @@ export default async function AdvancedExportPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Processing</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Processing</dt>
                     <dd className="text-lg font-medium text-gray-900">2</dd>
                   </dl>
                 </div>
@@ -98,7 +98,7 @@ export default async function AdvancedExportPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-yellow-600 font-medium">Est.</span>
-                <span className="text-gray-600"> 3 min remaining</span>
+                <span className="text-gray-900"> 3 min remaining</span>
               </div>
             </div>
           </div>
@@ -115,7 +115,7 @@ export default async function AdvancedExportPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Custom Reports</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Custom Reports</dt>
                     <dd className="text-lg font-medium text-gray-900">8</dd>
                   </dl>
                 </div>
@@ -124,7 +124,7 @@ export default async function AdvancedExportPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-purple-600 font-medium">6</span>
-                <span className="text-gray-600"> public reports</span>
+                <span className="text-gray-900"> public reports</span>
               </div>
             </div>
           </div>

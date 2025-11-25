@@ -6,7 +6,7 @@ export default function UtilitiesPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Utilities Management</h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-gray-900 mt-2">
           Manage utility bills, track consumption, and monitor provider relationships across all your properties.
         </p>
       </div>

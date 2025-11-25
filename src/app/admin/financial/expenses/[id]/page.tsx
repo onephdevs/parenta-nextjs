@@ -94,7 +94,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
         );
       default:
         return (
-          <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         );
@@ -110,7 +110,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
             <div className="flex items-center space-x-4">
               <Link
                 href="/admin/financial/expenses"
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-900 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -121,7 +121,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
             <div className="flex items-center space-x-3">
               <Link
                 href={`/admin/financial/expenses/${expense.id}/edit`}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -169,45 +169,45 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Expense Information</h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">Basic details about this expense.</p>
+              <p className="mt-1 max-w-2xl text-sm text-gray-900">Basic details about this expense.</p>
             </div>
             <div className="border-t border-gray-200">
               <dl>
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Date</dt>
+                  <dt className="text-sm font-medium text-gray-900">Date</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     {formatDate(expense.expenseDate)}
                   </dd>
                 </div>
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Category</dt>
+                  <dt className="text-sm font-medium text-gray-900">Category</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 capitalize">
                     {expense.category}
                   </dd>
                 </div>
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Amount</dt>
+                  <dt className="text-sm font-medium text-gray-900">Amount</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-semibold">
                     {formatCurrency(expense.amount)}
                   </dd>
                 </div>
                 {expense.vendor && (
                   <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Vendor</dt>
+                    <dt className="text-sm font-medium text-gray-900">Vendor</dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                       {expense.vendor}
                     </dd>
                   </div>
                 )}
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Description</dt>
+                  <dt className="text-sm font-medium text-gray-900">Description</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     {expense.description}
                   </dd>
                 </div>
                 {expense.notes && (
                   <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Notes</dt>
+                    <dt className="text-sm font-medium text-gray-900">Notes</dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                       {expense.notes}
                     </dd>
@@ -221,21 +221,21 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Location Details</h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">Building and room associated with this expense.</p>
+              <p className="mt-1 max-w-2xl text-sm text-gray-900">Building and room associated with this expense.</p>
             </div>
             <div className="border-t border-gray-200">
               <dl>
                 {expense.buildingName ? (
                   <>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Building</dt>
+                      <dt className="text-sm font-medium text-gray-900">Building</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         {expense.buildingName}
                       </dd>
                     </div>
                     {expense.roomNumber && (
                       <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Room</dt>
+                        <dt className="text-sm font-medium text-gray-900">Room</dt>
                         <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                           Room {expense.roomNumber}
                         </dd>
@@ -244,7 +244,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
                   </>
                 ) : (
                   <div className="bg-gray-50 px-4 py-5 sm:px-6">
-                    <p className="text-sm text-gray-500 text-center py-8">
+                    <p className="text-sm text-gray-900 text-center py-8">
                       No specific building or room associated with this expense.
                     </p>
                   </div>
@@ -258,24 +258,24 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
         <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
           <div className="px-4 py-5 sm:px-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900">Record Details</h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">When this expense was recorded and last updated.</p>
+            <p className="mt-1 max-w-2xl text-sm text-gray-900">When this expense was recorded and last updated.</p>
           </div>
           <div className="border-t border-gray-200">
             <dl>
               <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt className="text-sm font-medium text-gray-500">Created</dt>
+                <dt className="text-sm font-medium text-gray-900">Created</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                   {formatDate(expense.createdAt)}
                 </dd>
               </div>
               <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
+                <dt className="text-sm font-medium text-gray-900">Last Updated</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                   {formatDate(expense.updatedAt)}
                 </dd>
               </div>
               <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt className="text-sm font-medium text-gray-500">Expense ID</dt>
+                <dt className="text-sm font-medium text-gray-900">Expense ID</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
                   #{expense.id}
                 </dd>

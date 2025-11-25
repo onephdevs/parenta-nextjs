@@ -127,14 +127,14 @@ export default function LeaseManagement() {
           {activeTab === 'alerts' && (
             <div className="space-y-4">
               {alerts.length === 0 ? (
-                <p className="text-gray-500">No pending alerts</p>
+                <p className="text-gray-900">No pending alerts</p>
               ) : (
                 alerts.map((alert) => (
                   <div key={alert.id} className="p-4 border rounded bg-yellow-50">
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-semibold">{alert.tenant_name}</h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           {alert.building_name} - Room {alert.room_number}
                         </p>
                         <p className="text-sm mt-2">
@@ -158,14 +158,14 @@ export default function LeaseManagement() {
           {activeTab === 'renewals' && (
             <div className="space-y-4">
               {renewals.length === 0 ? (
-                <p className="text-gray-500">No renewal requests</p>
+                <p className="text-gray-900">No renewal requests</p>
               ) : (
                 renewals.map((renewal) => (
                   <div key={renewal.id} className="p-4 border rounded bg-white">
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-semibold">{renewal.tenant_name}</h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           {renewal.building_name} - Room {renewal.room_number}
                         </p>
                         <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
@@ -206,14 +206,14 @@ export default function LeaseManagement() {
           {activeTab === 'moveouts' && (
             <div className="space-y-4">
               {moveouts.length === 0 ? (
-                <p className="text-gray-500">No move-out processing records</p>
+                <p className="text-gray-900">No move-out processing records</p>
               ) : (
                 moveouts.map((moveout) => (
                   <div key={moveout.id} className="p-4 border rounded bg-white">
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-semibold">{moveout.tenant_name}</h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           {moveout.building_name} - Room {moveout.room_number}
                         </p>
                         <p className="text-sm mt-2">

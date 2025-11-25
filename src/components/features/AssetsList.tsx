@@ -183,25 +183,25 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Asset
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Type & Location
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Condition
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Assignment
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Financial
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -214,7 +214,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     <div className="text-sm font-medium text-gray-900">
                       {asset.assetName}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-900">
                       {asset.brand && asset.model ? `${asset.brand} ${asset.model}` : 
                        asset.brand || asset.model || 'No model info'}
                     </div>
@@ -231,7 +231,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                       {asset.assetType}
                     </div>
                     {asset.buildingName && (
-                      <div className="text-sm text-gray-500 flex items-center gap-1">
+                      <div className="text-sm text-gray-900 flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         {asset.buildingName}
                       </div>
@@ -254,7 +254,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                           </div>
                         )}
                         {asset.assignedTenant && (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-900">
                             Tenant: {asset.assignedTenant}
                           </div>
                         )}
@@ -284,7 +284,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                       </div>
                     )}
                     {asset.rentalRate && (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-900">
                         Rent: {formatCurrency(asset.rentalRate)}/mo
                       </div>
                     )}
@@ -331,7 +331,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
       {totalPages > 1 && (
         <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-900">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total} assets
             </div>
             <div className="flex gap-2">
@@ -342,7 +342,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
               >
                 Previous
               </button>
-              <span className="px-3 py-2 text-sm text-gray-700">
+              <span className="px-3 py-2 text-sm text-gray-900">
                 Page {currentPage} of {totalPages}
               </span>
               <button
@@ -391,16 +391,16 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                   </h4>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-500 block mb-1">Asset Name</label>
+                      <label className="text-sm font-medium text-gray-900 block mb-1">Asset Name</label>
                       <p className="text-gray-900 font-medium">{selectedAsset.assetName}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Type</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Type</label>
                         <p className="text-gray-900 capitalize">{selectedAsset.assetType}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Location</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Location</label>
                         <p className="text-gray-900 flex items-center gap-1">
                           {selectedAsset.buildingName ? (
                             <>
@@ -416,15 +416,15 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     {(selectedAsset.brand || selectedAsset.model || selectedAsset.serialNumber) && (
                       <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <label className="text-sm font-medium text-gray-500 block mb-1">Brand</label>
+                          <label className="text-sm font-medium text-gray-900 block mb-1">Brand</label>
                           <p className="text-gray-900">{selectedAsset.brand || '-'}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500 block mb-1">Model</label>
+                          <label className="text-sm font-medium text-gray-900 block mb-1">Model</label>
                           <p className="text-gray-900">{selectedAsset.model || '-'}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-500 block mb-1">Serial Number</label>
+                          <label className="text-sm font-medium text-gray-900 block mb-1">Serial Number</label>
                           <p className="text-gray-900 font-mono text-sm">{selectedAsset.serialNumber || '-'}</p>
                         </div>
                       </div>
@@ -441,13 +441,13 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-2">Current Status</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-2">Current Status</label>
                         <div className="flex items-center">
                           {getStatusBadge(selectedAsset.assetStatus)}
                         </div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-2">Condition</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-2">Condition</label>
                         <div className="flex items-center">
                           {getConditionBadge(selectedAsset.assetCondition)}
                         </div>
@@ -456,7 +456,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     
                     {/* Assignment Details */}
                     <div>
-                      <label className="text-sm font-medium text-gray-500 block mb-2">Assignment Details</label>
+                      <label className="text-sm font-medium text-gray-900 block mb-2">Assignment Details</label>
                       <div className="bg-white rounded-lg p-4 border border-gray-200">
                         {selectedAsset.assetStatus === 'assigned' ? (
                           <div className="space-y-2">
@@ -475,7 +475,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                             {selectedAsset.assignmentDate && (
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-3 w-3 text-gray-400" />
-                                <span className="text-sm text-gray-500">Since: {formatDate(selectedAsset.assignmentDate)}</span>
+                                <span className="text-sm text-gray-900">Since: {formatDate(selectedAsset.assignmentDate)}</span>
                               </div>
                             )}
                             {!selectedAsset.assignedRoom && !selectedAsset.assignedTenant && (
@@ -505,13 +505,13 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Current Value</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Current Value</label>
                         <p className="text-2xl font-bold text-green-600">
                           {selectedAsset.currentValue ? formatCurrency(selectedAsset.currentValue) : '-'}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Monthly Rental</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Monthly Rental</label>
                         <p className="text-2xl font-bold text-blue-600">
                           {selectedAsset.rentalRate ? `${formatCurrency(selectedAsset.rentalRate)}/mo` : '-'}
                         </p>
@@ -520,7 +520,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     
                     {selectedAsset.purchasePrice && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Purchase Price</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Purchase Price</label>
                         <p className="text-lg font-semibold text-gray-900">
                           {formatCurrency(selectedAsset.purchasePrice)}
                         </p>
@@ -529,8 +529,8 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     
                     {selectedAsset.purchaseDate && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Purchase Information</label>
-                        <div className="flex items-center gap-2 text-gray-700">
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Purchase Information</label>
+                        <div className="flex items-center gap-2 text-gray-900">
                           <Calendar className="h-4 w-4 text-gray-400" />
                           <span>Purchased on {formatDate(selectedAsset.purchaseDate)}</span>
                         </div>
@@ -548,16 +548,16 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                   <div className="space-y-4">
                     {selectedAsset.description && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-1">Description</label>
-                        <p className="text-gray-700 bg-white px-3 py-2 rounded border leading-relaxed">
+                        <label className="text-sm font-medium text-gray-900 block mb-1">Description</label>
+                        <p className="text-gray-900 bg-white px-3 py-2 rounded border leading-relaxed">
                           {selectedAsset.description}
                         </p>
                       </div>
                     )}
                     
                     <div>
-                      <label className="text-sm font-medium text-gray-500 block mb-1">Asset ID</label>
-                      <p className="text-gray-700 font-mono text-sm bg-white px-3 py-2 rounded border">
+                      <label className="text-sm font-medium text-gray-900 block mb-1">Asset ID</label>
+                      <p className="text-gray-900 font-mono text-sm bg-white px-3 py-2 rounded border">
                         {selectedAsset.id}
                       </p>
                     </div>
@@ -565,17 +565,17 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     {/* Performance Metrics */}
                     {(selectedAsset.currentValue && selectedAsset.rentalRate) && (
                       <div>
-                        <label className="text-sm font-medium text-gray-500 block mb-2">Performance Metrics</label>
+                        <label className="text-sm font-medium text-gray-900 block mb-2">Performance Metrics</label>
                         <div className="bg-white rounded-lg p-4 border border-gray-200">
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                              <span className="text-gray-500">Annual Rental Yield:</span>
+                              <span className="text-gray-900">Annual Rental Yield:</span>
                               <p className="font-semibold text-green-600">
                                 {((selectedAsset.rentalRate * 12 / selectedAsset.currentValue) * 100).toFixed(1)}%
                               </p>
                             </div>
                             <div>
-                              <span className="text-gray-500">Monthly ROI:</span>
+                              <span className="text-gray-900">Monthly ROI:</span>
                               <p className="font-semibold text-blue-600">
                                 {((selectedAsset.rentalRate / selectedAsset.currentValue) * 100).toFixed(2)}%
                               </p>
@@ -592,7 +592,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
               <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-gray-200">
                 <button
                   onClick={() => setSelectedAsset(null)}
-                  className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-6 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Close
                 </button>

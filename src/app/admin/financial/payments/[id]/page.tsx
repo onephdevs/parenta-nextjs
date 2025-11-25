@@ -111,7 +111,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
             <div className="flex items-center space-x-4">
               <Link
                 href="/admin/financial/payments"
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-900 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -119,12 +119,12 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Payment Details</h1>
-                <p className="text-sm text-gray-500">Payment #{payment.id}</p>
+                <p className="text-sm text-gray-900">Payment #{payment.id}</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <button
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -151,7 +151,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">{formatCurrency(payment.amount)}</h2>
-                      <p className="text-sm text-gray-500">Payment made on {formatDateOnly(payment.paymentDate)}</p>
+                      <p className="text-sm text-gray-900">Payment made on {formatDateOnly(payment.paymentDate)}</p>
                     </div>
                   </div>
                 </div>
@@ -174,15 +174,15 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Tenant Information</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Name</span>
+                    <span className="text-sm font-medium text-gray-900">Name</span>
                     <span className="text-sm text-gray-900">{payment.tenantName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Email</span>
+                    <span className="text-sm font-medium text-gray-900">Email</span>
                     <span className="text-sm text-gray-900">{payment.tenantEmail}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Phone</span>
+                    <span className="text-sm font-medium text-gray-900">Phone</span>
                     <span className="text-sm text-gray-900">{payment.tenantPhone || 'N/A'}</span>
                   </div>
                   <div className="pt-3 border-t">
@@ -203,15 +203,15 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Room Information</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Building</span>
+                    <span className="text-sm font-medium text-gray-900">Building</span>
                     <span className="text-sm text-gray-900">{payment.buildingName || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Room Number</span>
+                    <span className="text-sm font-medium text-gray-900">Room Number</span>
                     <span className="text-sm text-gray-900">{payment.roomNumber || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Monthly Rent</span>
+                    <span className="text-sm font-medium text-gray-900">Monthly Rent</span>
                     <span className="text-sm text-gray-900">
                       {payment.monthlyRate ? formatCurrency(payment.monthlyRate) : 'N/A'}
                     </span>
@@ -228,7 +228,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                   )}
                   {!payment.roomId && payment.roomNumber && (
                     <div className="pt-3 border-t">
-                      <p className="text-sm text-gray-500 italic">No room assignment linked to this payment</p>
+                      <p className="text-sm text-gray-900 italic">No room assignment linked to this payment</p>
                     </div>
                   )}
                 </div>
@@ -243,29 +243,29 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Payment Method</span>
+                    <span className="text-sm font-medium text-gray-900">Payment Method</span>
                     <span className="text-sm text-gray-900">{getPaymentMethodDisplay(payment.paymentMethod)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Payment Date</span>
+                    <span className="text-sm font-medium text-gray-900">Payment Date</span>
                     <span className="text-sm text-gray-900">{formatDateOnly(payment.paymentDate)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Due Date</span>
+                    <span className="text-sm font-medium text-gray-900">Due Date</span>
                     <span className="text-sm text-gray-900">{payment.dueDate ? formatDateOnly(payment.dueDate) : 'N/A'}</span>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Transaction ID</span>
+                    <span className="text-sm font-medium text-gray-900">Transaction ID</span>
                     <span className="text-sm text-gray-900">{payment.referenceNumber || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Created</span>
+                    <span className="text-sm font-medium text-gray-900">Created</span>
                     <span className="text-sm text-gray-900">{formatDate(payment.createdAt)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">Last Updated</span>
+                    <span className="text-sm font-medium text-gray-900">Last Updated</span>
                     <span className="text-sm text-gray-900">{formatDate(payment.updatedAt)}</span>
                   </div>
                 </div>
@@ -273,7 +273,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
               
               {payment.notes && (
                 <div className="mt-6 pt-4 border-t">
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
                   <p className="text-sm text-gray-900">{payment.notes}</p>
                 </div>
               )}

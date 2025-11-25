@@ -139,7 +139,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
       case 'applied_to_invoice':
         return 'text-purple-600 bg-purple-50 border-purple-200';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-gray-900 bg-gray-50 border-gray-200';
     }
   };
 
@@ -190,10 +190,10 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg leading-6 font-medium text-gray-900">Security Deposit</h3>
-            <p className="mt-1 text-sm text-gray-600">Manage security deposit for {tenantName}</p>
+            <p className="mt-1 text-sm text-gray-900">Manage security deposit for {tenantName}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-600">Available Balance</p>
+            <p className="text-sm text-gray-900">Available Balance</p>
             <p className="text-3xl font-bold text-green-600">{formatCurrency(balance)}</p>
           </div>
         </div>
@@ -222,7 +222,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                 setShowActionForm(true);
               }}
               disabled={balance <= 0}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -243,12 +243,12 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
                   Amount * (Max: {formatCurrency(balance)})
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">₱</span>
+                    <span className="text-gray-900 sm:text-sm">₱</span>
                   </div>
                   <input
                     type="number"
@@ -267,7 +267,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
 
               {actionType === 'apply' ? (
                 <div>
-                  <label htmlFor="invoiceId" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="invoiceId" className="block text-sm font-medium text-gray-900">
                     Invoice ID *
                   </label>
                   <input
@@ -282,7 +282,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900">
                     Refund Method *
                   </label>
                   <select
@@ -301,7 +301,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
               )}
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
                   Description (Optional)
                 </label>
                 <input
@@ -315,7 +315,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
               </div>
 
               <div>
-                <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-900">
                   Reference Number (Optional)
                 </label>
                 <input
@@ -338,7 +338,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                   setFormData({ amount: '', description: '', invoiceId: '', paymentMethod: 'bank_transfer', referenceNumber: '' });
                 }}
                 disabled={submitting}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -373,16 +373,16 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                       <p className="text-sm font-medium text-gray-900 capitalize">
                         {transaction.transactionType.replace('_', ' ')}
                       </p>
-                      <p className="text-xs text-gray-600 mt-1">{transaction.description}</p>
+                      <p className="text-xs text-gray-900 mt-1">{transaction.description}</p>
                       {transaction.paymentMethod && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-900 mt-1">
                           Method: {transaction.paymentMethod.replace('_', ' ')}
                         </p>
                       )}
                       {transaction.referenceNumber && (
-                        <p className="text-xs text-gray-500">Ref: {transaction.referenceNumber}</p>
+                        <p className="text-xs text-gray-900">Ref: {transaction.referenceNumber}</p>
                       )}
-                      <p className="text-xs text-gray-500 mt-1">{formatDate(transaction.createdAt)}</p>
+                      <p className="text-xs text-gray-900 mt-1">{formatDate(transaction.createdAt)}</p>
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold ${
@@ -410,7 +410,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p className="mt-2 text-sm text-gray-500">No deposit transactions yet</p>
+            <p className="mt-2 text-sm text-gray-900">No deposit transactions yet</p>
             <p className="text-xs text-gray-400">Deposits will be recorded when tenants pay security deposits</p>
           </div>
         )}

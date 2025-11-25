@@ -281,7 +281,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Building Selection */}
             <div>
-              <label htmlFor="buildingId" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900 mb-1">
                 Building *
               </label>
               <select
@@ -302,7 +302,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
 
             {/* Room Number */}
             <div>
-              <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-900 mb-1">
                 Room Number *
               </label>
               <input
@@ -319,7 +319,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
             {/* Room Type & Floor */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="roomType" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="roomType" className="block text-sm font-medium text-gray-900 mb-1">
                   Room Type *
                 </label>
                 <select
@@ -341,7 +341,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
               </div>
 
               <div>
-                <label htmlFor="floorNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="floorNumber" className="block text-sm font-medium text-gray-900 mb-1">
                   Floor
                 </label>
                 <input
@@ -359,7 +359,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
             {/* Financial Fields */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-900 mb-1">
                   Monthly Rent (₱) *
                 </label>
                 <input
@@ -377,7 +377,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
               </div>
 
               <div>
-                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-900 mb-1">
                   Deposit (₱)
                 </label>
                 <input
@@ -485,7 +485,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                         placeholder="e.g., 50, 100"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="mt-1 text-sm text-gray-900">
                         {formData.monthlyRate && formData.depositPercentage
                           ? `Deposit: ₱${((formData.monthlyRate * formData.depositPercentage) / 100).toLocaleString()}`
                           : 'Enter percentage to see calculated amount'}
@@ -526,7 +526,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
 
             {/* Square Footage */}
             <div>
-              <label htmlFor="squareFootage" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="squareFootage" className="block text-sm font-medium text-gray-900 mb-1">
                 Size (sq ft)
               </label>
               <input
@@ -542,7 +542,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
 
             {/* Description */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
                 Description
               </label>
               <textarea
@@ -557,7 +557,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
 
             {/* Amenities */}
             <div>
-              <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="amenities" className="block text-sm font-medium text-gray-900 mb-1">
                 Amenities (comma-separated)
               </label>
               <input
@@ -594,7 +594,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                 type="button"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+                className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
               >
                 Cancel
               </button>

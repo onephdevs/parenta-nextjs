@@ -123,7 +123,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
       type="button"
       onClick={onClose}
       disabled={isSubmitting}
-      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+      className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
     >
       Cancel
     </button>
@@ -161,7 +161,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="buildingId" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900 mb-1">
                   Building *
                 </label>
                 <select
@@ -181,7 +181,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
               </div>
               
               <div>
-                <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-900 mb-1">
                   Room Number *
                 </label>
                 <input
@@ -203,7 +203,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label htmlFor="roomType" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="roomType" className="block text-sm font-medium text-gray-900 mb-1">
                   Room Type
                 </label>
                 <select
@@ -225,7 +225,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
               </div>
 
               <div>
-                <label htmlFor="floorNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="floorNumber" className="block text-sm font-medium text-gray-900 mb-1">
                   Floor Number
                 </label>
                 <input
@@ -241,7 +241,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
               </div>
 
               <div>
-                <label htmlFor="squareFootage" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="squareFootage" className="block text-sm font-medium text-gray-900 mb-1">
                   Square Footage
                 </label>
                 <input
@@ -264,7 +264,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Information</h3>
             
             <div>
-              <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-900 mb-1">
                 Monthly Rate (₱) *
               </label>
               <input
@@ -279,7 +279,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
                 placeholder="e.g., 5000, 8000, 12000"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
-              <p className="mt-1 text-sm text-gray-500">Enter amount in Philippine Pesos</p>
+              <p className="mt-1 text-sm text-gray-900">Enter amount in Philippine Pesos</p>
             </div>
           </div>
 
@@ -288,7 +288,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
             
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
                 Description
               </label>
               <textarea
@@ -302,7 +302,7 @@ export default function AddRoomModal({ isOpen, onClose, buildings, building, bui
             </div>
 
             <div>
-              <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="amenities" className="block text-sm font-medium text-gray-900 mb-1">
                 Amenities (comma-separated)
               </label>
               <input

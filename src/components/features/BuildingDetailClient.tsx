@@ -32,7 +32,7 @@ export default function BuildingDetailClient({ building }: BuildingDetailClientP
           Edit Building
         </button>
         
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-900">
           Update building information, address, amenities, and other details using the full-screen editor.
         </div>
       </div>

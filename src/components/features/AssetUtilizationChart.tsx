@@ -64,7 +64,7 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
   if (!data) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-900">
           No utilization data available
         </div>
       </div>
@@ -89,11 +89,11 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Utilization Rate</p>
+              <p className="text-sm font-medium text-gray-900">Utilization Rate</p>
               <p className="text-2xl font-bold text-blue-600">
                 {data.utilizationRate.toFixed(1)}%
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-900">
                 Assets currently assigned
               </p>
             </div>
@@ -106,11 +106,11 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Avg Assignment Duration</p>
+              <p className="text-sm font-medium text-gray-900">Avg Assignment Duration</p>
               <p className="text-2xl font-bold text-green-600">
                 {Math.round(data.averageAssignmentDuration)} days
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-900">
                 Average time per assignment
               </p>
             </div>
@@ -123,11 +123,11 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Most Utilized Assets</p>
+              <p className="text-sm font-medium text-gray-900">Most Utilized Assets</p>
               <p className="text-2xl font-bold text-purple-600">
                 {data.mostUtilizedAssets.length}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-900">
                 High-demand assets
               </p>
             </div>
@@ -166,11 +166,11 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
           <div className="flex justify-center space-x-4 mt-4">
             <div className="flex items-center">
               <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-              <span className="text-sm text-gray-600">Utilized ({data.utilizationRate.toFixed(1)}%)</span>
+              <span className="text-sm text-gray-900">Utilized ({data.utilizationRate.toFixed(1)}%)</span>
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-gray-300 rounded-full mr-2"></div>
-              <span className="text-sm text-gray-600">Available ({(100 - data.utilizationRate).toFixed(1)}%)</span>
+              <span className="text-sm text-gray-900">Available ({(100 - data.utilizationRate).toFixed(1)}%)</span>
             </div>
           </div>
         </div>
@@ -208,22 +208,22 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Underutilized Assets</h3>
-            <p className="text-sm text-gray-500">Assets that haven&apos;t been assigned recently</p>
+            <p className="text-sm text-gray-900">Assets that haven&apos;t been assigned recently</p>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Asset Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Days Unassigned
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Status
                   </th>
                 </tr>
@@ -234,7 +234,7 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {item.asset.assetName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
                       {item.asset.assetType}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

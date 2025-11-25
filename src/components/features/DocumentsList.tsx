@@ -69,7 +69,7 @@ export default function DocumentsList({
         );
       default:
         return (
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         );
@@ -232,7 +232,7 @@ export default function DocumentsList({
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           >
             <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z" />
@@ -245,7 +245,7 @@ export default function DocumentsList({
         {showFilters && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Category</label>
               <select
                 value={searchParams.categoryId || ''}
                 onChange={(e) => handleFilterChange('categoryId', e.target.value)}
@@ -261,7 +261,7 @@ export default function DocumentsList({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Document Type</label>
               <select
                 value={searchParams.documentType || ''}
                 onChange={(e) => handleFilterChange('documentType', e.target.value)}
@@ -277,7 +277,7 @@ export default function DocumentsList({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Access Level</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Access Level</label>
               <select
                 value={searchParams.accessLevel || ''}
                 onChange={(e) => handleFilterChange('accessLevel', e.target.value)}
@@ -291,7 +291,7 @@ export default function DocumentsList({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Status</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Expiry Status</label>
               <select
                 value={searchParams.isExpired || ''}
                 onChange={(e) => handleFilterChange('isExpired', e.target.value)}
@@ -311,7 +311,7 @@ export default function DocumentsList({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 <input
                   type="checkbox"
                   checked={selectedDocuments.length === documents.length && documents.length > 0}
@@ -319,25 +319,25 @@ export default function DocumentsList({
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Document
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Category
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Associated With
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Size
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Uploaded
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Expiry
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -345,7 +345,7 @@ export default function DocumentsList({
           <tbody className="bg-white divide-y divide-gray-200">
             {documents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-900">
                   <div className="flex flex-col items-center">
                     <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -375,7 +375,7 @@ export default function DocumentsList({
                         <div className="text-sm font-medium text-gray-900">
                           {document.documentName}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-900">
                           {document.fileName}
                         </div>
                         {document.tags && document.tags.length > 0 && (
@@ -389,7 +389,7 @@ export default function DocumentsList({
                               </span>
                             ))}
                             {document.tags.length > 3 && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-900">
                                 +{document.tags.length - 3} more
                               </span>
                             )}
@@ -404,7 +404,7 @@ export default function DocumentsList({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div className="space-y-1">
                       {document.buildingName && (
-                        <div className="flex items-center text-xs text-gray-600">
+                        <div className="flex items-center text-xs text-gray-900">
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                           </svg>
@@ -412,7 +412,7 @@ export default function DocumentsList({
                         </div>
                       )}
                       {document.roomNumber && (
-                        <div className="flex items-center text-xs text-gray-600">
+                        <div className="flex items-center text-xs text-gray-900">
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
                           </svg>
@@ -420,7 +420,7 @@ export default function DocumentsList({
                         </div>
                       )}
                       {document.tenantName && (
-                        <div className="flex items-center text-xs text-gray-600">
+                        <div className="flex items-center text-xs text-gray-900">
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
@@ -437,7 +437,7 @@ export default function DocumentsList({
                       {formatDate(document.createdAt)}
                     </div>
                     {document.uploaderName && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-900">
                         by {document.uploaderName}
                       </div>
                     )}
@@ -459,7 +459,7 @@ export default function DocumentsList({
                         }
                       </div>
                     ) : (
-                      <span className="text-gray-500">No expiry</span>
+                      <span className="text-gray-900">No expiry</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -528,21 +528,21 @@ export default function DocumentsList({
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage <= 1}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-900">
                 Showing{' '}
                 <span className="font-medium">{(currentPage - 1) * 20 + 1}</span>
                 {' '}to{' '}
@@ -559,7 +559,7 @@ export default function DocumentsList({
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="sr-only">Previous</span>
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -584,7 +584,7 @@ export default function DocumentsList({
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           isCurrentPage
                             ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
                         }`}
                       >
                         {page}
@@ -597,7 +597,7 @@ export default function DocumentsList({
                     return (
                       <span
                         key={page}
-                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-900"
                       >
                         ...
                       </span>
@@ -609,7 +609,7 @@ export default function DocumentsList({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="sr-only">Next</span>
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">

@@ -135,7 +135,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
         );
       default:
         return (
-          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         );
@@ -153,7 +153,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             <div className="flex items-center space-x-4">
               <Link
                 href="/admin/financial"
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-900 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -191,7 +191,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Expenses</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Total Expenses</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.totalAmount)}</dd>
                   </dl>
                 </div>
@@ -199,7 +199,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.totalExpenses} expenses</span>
+                <span className="text-gray-900">{summary.totalExpenses} expenses</span>
               </div>
             </div>
           </div>
@@ -217,7 +217,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">This Month</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">This Month</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.monthlyAmount)}</dd>
                   </dl>
                 </div>
@@ -225,7 +225,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.monthlyExpenses} expenses</span>
+                <span className="text-gray-900">{summary.monthlyExpenses} expenses</span>
               </div>
             </div>
           </div>
@@ -242,7 +242,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Top Category</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Top Category</dt>
                     <dd className="text-lg font-medium text-gray-900">
                       {Object.keys(summary.categoryBreakdown).length > 0 
                         ? Object.entries(summary.categoryBreakdown).sort(([,a], [,b]) => b.amount - a.amount)[0][0] 
@@ -254,7 +254,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">
+                <span className="text-gray-900">
                   {Object.keys(summary.categoryBreakdown).length} categories
                 </span>
               </div>
@@ -273,7 +273,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Average Expense</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Average Expense</dt>
                     <dd className="text-lg font-medium text-gray-900">
                       {summary.totalExpenses > 0 
                         ? formatCurrency(summary.totalAmount / summary.totalExpenses)
@@ -285,7 +285,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">per expense</span>
+                <span className="text-gray-900">per expense</span>
               </div>
             </div>
           </div>
@@ -296,7 +296,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           <div className="px-6 py-4">
             <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-1">
                   Search
                 </label>
                 <input
@@ -310,7 +310,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               </div>
 
               <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="category" className="block text-sm font-medium text-gray-900 mb-1">
                   Category
                 </label>
                 <select
@@ -331,7 +331,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               </div>
 
               <div>
-                <label htmlFor="building" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="building" className="block text-sm font-medium text-gray-900 mb-1">
                   Building
                 </label>
                 <select
@@ -350,7 +350,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               </div>
 
               <div>
-                <label htmlFor="vendor" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="vendor" className="block text-sm font-medium text-gray-900 mb-1">
                   Vendor
                 </label>
                 <input
@@ -381,7 +381,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             <h3 className="text-lg leading-6 font-medium text-gray-900">
               Expenses ({expensesData.total})
             </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            <p className="mt-1 max-w-2xl text-sm text-gray-900">
               Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, expensesData.total)} of {expensesData.total} expenses
             </p>
           </div>
@@ -392,7 +392,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No expenses found</h3>
-              <p className="mt-1 text-sm text-gray-500">Get started by recording a new expense.</p>
+              <p className="mt-1 text-sm text-gray-900">Get started by recording a new expense.</p>
               <div className="mt-6">
                 <Link
                   href="/admin/financial/expenses/new"
@@ -429,7 +429,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                               {formatCurrency(expense.amount)}
                             </span>
                           </div>
-                          <div className="mt-1 flex items-center text-sm text-gray-500">
+                          <div className="mt-1 flex items-center text-sm text-gray-900">
                             {expense.vendor && (
                               <>
                                 <p>{expense.vendor}</p>
@@ -446,7 +446,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                             <p>{formatDate(expense.expenseDate)}</p>
                           </div>
                           {expense.notes && (
-                            <p className="mt-1 text-sm text-gray-600">{expense.notes}</p>
+                            <p className="mt-1 text-sm text-gray-900">{expense.notes}</p>
                           )}
                         </div>
                       </div>
@@ -473,7 +473,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               {page > 1 && (
                 <Link
                   href={`?page=${page - 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
                 >
                   Previous
                 </Link>
@@ -481,7 +481,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
               {page < totalPages && (
                 <Link
                   href={`?page=${page + 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
                 >
                   Next
                 </Link>
@@ -489,7 +489,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-gray-900">
                   Showing <span className="font-medium">{((page - 1) * 20) + 1}</span> to{' '}
                   <span className="font-medium">{Math.min(page * 20, expensesData.total)}</span> of{' '}
                   <span className="font-medium">{expensesData.total}</span> results
@@ -500,7 +500,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                   {page > 1 && (
                     <Link
                       href={`?page=${page - 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
                     >
                       <span className="sr-only">Previous</span>
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -520,7 +520,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           pageNum === page
                             ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
                         }`}
                       >
                         {pageNum}
@@ -531,7 +531,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                   {page < totalPages && (
                     <Link
                       href={`?page=${page + 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
                     >
                       <span className="sr-only">Next</span>
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">

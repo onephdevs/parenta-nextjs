@@ -19,7 +19,7 @@ export default function OccupancyWidget({ data }: OccupancyWidgetProps) {
         {/* Overall Occupancy */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Overall Occupancy</span>
+            <span className="text-sm font-medium text-gray-900">Overall Occupancy</span>
             <span className="text-sm font-bold text-gray-900">{occupancyRate?.toFixed(1)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
@@ -28,7 +28,7 @@ export default function OccupancyWidget({ data }: OccupancyWidgetProps) {
               style={{ width: `${occupancyRate}%` }}
             ></div>
           </div>
-          <div className="flex justify-between mt-2 text-sm text-gray-600">
+          <div className="flex justify-between mt-2 text-sm text-gray-900">
             <span>{occupiedRooms} occupied</span>
             <span>{vacantRooms} vacant</span>
             <span>{totalRooms} total</span>
@@ -38,7 +38,7 @@ export default function OccupancyWidget({ data }: OccupancyWidgetProps) {
         {/* By Building */}
         {byBuilding && byBuilding.length > 0 && (
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">By Building</h4>
+            <h4 className="text-sm font-medium text-gray-900 mb-3">By Building</h4>
             <div className="space-y-4">
               {byBuilding.map((building: any) => (
                 <div key={building.buildingId}>
@@ -60,7 +60,7 @@ export default function OccupancyWidget({ data }: OccupancyWidgetProps) {
                       style={{ width: `${building.rate}%` }}
                     ></div>
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-gray-900">
                     {building.occupied} / {building.total} rooms
                   </div>
                 </div>

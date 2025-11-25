@@ -131,7 +131,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
     <div id="edit-building-form" className="bg-white shadow rounded-lg">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Edit Building</h3>
-        <p className="text-sm text-gray-500 mt-1">Update building information and settings</p>
+        <p className="text-sm text-gray-900 mt-1">Update building information and settings</p>
       </div>
 
       <div className="p-6">
@@ -146,7 +146,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
             <h4 className="text-md font-medium text-gray-900 mb-4">Basic Information</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-900 mb-1">
                   Building Name *
                 </label>
                 <input
@@ -161,7 +161,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
               </div>
               
               <div>
-                <label htmlFor="buildingType" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="buildingType" className="block text-sm font-medium text-gray-900 mb-1">
                   Building Type
                 </label>
                 <select
@@ -183,7 +183,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
             <h4 className="text-md font-medium text-gray-900 mb-4">Address</h4>
             <div className="space-y-4">
               <div>
-                <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-900 mb-1">
                   Address Line 1 *
                 </label>
                 <input
@@ -198,7 +198,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
               </div>
 
               <div>
-                <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-900 mb-1">
                   Address Line 2
                 </label>
                 <input
@@ -213,7 +213,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-900 mb-1">
                     City *
                   </label>
                   <input
@@ -228,7 +228,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
                 </div>
 
                 <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-900 mb-1">
                     State *
                   </label>
                   <input
@@ -243,7 +243,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
                 </div>
 
                 <div>
-                  <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="postalCode" className="block text-sm font-medium text-gray-900 mb-1">
                     Postal Code *
                   </label>
                   <input
@@ -259,7 +259,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
               </div>
 
               <div>
-                <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="country" className="block text-sm font-medium text-gray-900 mb-1">
                   Country *
                 </label>
                 <input
@@ -279,7 +279,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
             <h4 className="text-md font-medium text-gray-900 mb-4">Building Details</h4>
             <div className="space-y-4">
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
                   Description
                 </label>
                 <textarea
@@ -295,7 +295,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="yearBuilt" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="yearBuilt" className="block text-sm font-medium text-gray-900 mb-1">
                     Year Built
                   </label>
                   <input
@@ -311,7 +311,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
                 </div>
 
                 <div>
-                  <label htmlFor="totalFloors" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="totalFloors" className="block text-sm font-medium text-gray-900 mb-1">
                     Total Floors
                   </label>
                   <input
@@ -328,7 +328,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
               </div>
 
               <div>
-                <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="amenities" className="block text-sm font-medium text-gray-900 mb-1">
                   Amenities
                 </label>
                 <input
@@ -385,7 +385,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
                 </div>
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-gray-900">Delete Building</h3>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-900 mt-1">
                     Are you sure you want to delete &quot;{building.name}&quot;? This action cannot be undone.
                   </p>
                 </div>
@@ -396,7 +396,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
                   type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={isDeleting}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
                 >
                   Cancel
                 </button>

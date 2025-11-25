@@ -89,14 +89,14 @@ export function AssetStatsCards({ stats }: AssetStatsCardsProps) {
           <div key={index} className={`${card.bgColor} rounded-lg p-6 border border-gray-200`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">
+                <p className="text-sm font-medium text-gray-900 mb-1">
                   {card.title}
                 </p>
                 <p className={`text-2xl font-bold ${card.textColor}`}>
                   {card.value}
                 </p>
                 {card.subtitle && (
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-900 mt-1">
                     {card.subtitle}
                   </p>
                 )}

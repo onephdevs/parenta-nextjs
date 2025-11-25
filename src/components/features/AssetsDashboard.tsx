@@ -246,7 +246,7 @@ export function AssetsDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'overview' 
                 ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
             <Package className="inline-block w-4 h-4 mr-2" />
@@ -257,7 +257,7 @@ export function AssetsDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'maintenance' 
                 ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
             <AlertTriangle className="inline-block w-4 h-4 mr-2" />
@@ -268,7 +268,7 @@ export function AssetsDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'analytics' 
                 ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
             <TrendingUp className="inline-block w-4 h-4 mr-2" />
@@ -279,7 +279,7 @@ export function AssetsDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'qrcodes' 
                 ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
             }`}
           >
             <QrCode className="inline-block w-4 h-4 mr-2" />
@@ -353,7 +353,7 @@ export function AssetsDashboard() {
             <div className="flex gap-2">
               <button
                 onClick={handleExportAssets}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                className="px-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
                 Export

@@ -121,13 +121,13 @@ export default function TenantDashboard() {
                 </div>
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">Tenant Portal</h1>
-                  <p className="text-xs text-gray-500">Your Home Dashboard</p>
+                  <p className="text-xs text-gray-900">Your Home Dashboard</p>
                 </div>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
+              <button className="relative p-2 text-gray-900 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
               </button>
@@ -137,7 +137,7 @@ export default function TenantDashboard() {
                   <p className="text-sm font-medium text-gray-900">
                     {session.user.name || session.user.email}
                   </p>
-                  <p className="text-xs text-gray-500">Tenant</p>
+                  <p className="text-xs text-gray-900">Tenant</p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold">
                   {session.user.name?.charAt(0) || session.user.email?.charAt(0)}
@@ -156,7 +156,7 @@ export default function TenantDashboard() {
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome Home! 🏡
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-900">
             Manage your rental and stay updated with your property information.
           </p>
         </div>
@@ -234,9 +234,9 @@ export default function TenantDashboard() {
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
               ₱{tenantInfo.monthlyRent.toLocaleString()}
             </h3>
-            <p className="text-sm text-gray-600 mb-3">Next Payment</p>
+            <p className="text-sm text-gray-900 mb-3">Next Payment</p>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Due: {new Date(tenantInfo.nextDueDate).toLocaleDateString()}</span>
+              <span className="text-gray-900">Due: {new Date(tenantInfo.nextDueDate).toLocaleDateString()}</span>
               <Link href="/tenant/payments" className="text-green-600 hover:text-green-700 font-medium flex items-center">
                 Pay <ArrowRight className="h-3 w-3 ml-1" />
               </Link>
@@ -256,9 +256,9 @@ export default function TenantDashboard() {
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
               {recentPayments.length}
             </h3>
-            <p className="text-sm text-gray-600 mb-3">Payments Made</p>
+            <p className="text-sm text-gray-900 mb-3">Payments Made</p>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Last 3 months</span>
+              <span className="text-gray-900">Last 3 months</span>
               <Link href="/tenant/payments" className="text-green-600 hover:text-green-700 font-medium flex items-center">
                 View <ArrowRight className="h-3 w-3 ml-1" />
               </Link>
@@ -278,9 +278,9 @@ export default function TenantDashboard() {
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
               {maintenanceRequests.filter(r => r.status === 'In Progress').length}
             </h3>
-            <p className="text-sm text-gray-600 mb-3">Active Requests</p>
+            <p className="text-sm text-gray-900 mb-3">Active Requests</p>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">{maintenanceRequests.length} total</span>
+              <span className="text-gray-900">{maintenanceRequests.length} total</span>
               <Link href="/tenant/maintenance" className="text-green-600 hover:text-green-700 font-medium flex items-center">
                 View <ArrowRight className="h-3 w-3 ml-1" />
               </Link>
@@ -293,16 +293,16 @@ export default function TenantDashboard() {
               <div className="bg-yellow-100 p-3 rounded-lg">
                 <FileText className="h-6 w-6 text-yellow-600" />
               </div>
-              <span className="text-xs font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded-full">
+              <span className="text-xs font-medium text-gray-900 bg-gray-50 px-2 py-1 rounded-full">
                 Available
               </span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
               3
             </h3>
-            <p className="text-sm text-gray-600 mb-3">Documents</p>
+            <p className="text-sm text-gray-900 mb-3">Documents</p>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Lease & receipts</span>
+              <span className="text-gray-900">Lease & receipts</span>
               <Link href="/tenant/documents" className="text-green-600 hover:text-green-700 font-medium flex items-center">
                 View <ArrowRight className="h-3 w-3 ml-1" />
               </Link>
@@ -332,7 +332,7 @@ export default function TenantDashboard() {
                       <action.icon className={`h-5 w-5 text-${action.color}-600`} />
                     </div>
                     <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
-                    <p className="text-sm text-gray-600">{action.description}</p>
+                    <p className="text-sm text-gray-900">{action.description}</p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-green-600 group-hover:translate-x-1 transition" />
                 </div>
@@ -354,7 +354,7 @@ export default function TenantDashboard() {
                 <div key={payment.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div>
                     <p className="font-medium text-gray-900">{payment.type}</p>
-                    <p className="text-xs text-gray-500">{new Date(payment.date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-900">{new Date(payment.date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-gray-900">₱{payment.amount.toLocaleString()}</p>
@@ -382,7 +382,7 @@ export default function TenantDashboard() {
                 <div key={request.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{request.title}</p>
-                    <p className="text-xs text-gray-500">{new Date(request.date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-900">{new Date(request.date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
@@ -415,7 +415,7 @@ export default function TenantDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Call Us</p>
-                <p className="text-xs text-gray-600">+63 (2) 1234-5678</p>
+                <p className="text-xs text-gray-900">+63 (2) 1234-5678</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -424,7 +424,7 @@ export default function TenantDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Email Us</p>
-                <p className="text-xs text-gray-600">support@parenta.com</p>
+                <p className="text-xs text-gray-900">support@parenta.com</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -433,7 +433,7 @@ export default function TenantDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Emergency</p>
-                <p className="text-xs text-gray-600">24/7 Hotline Available</p>
+                <p className="text-xs text-gray-900">24/7 Hotline Available</p>
               </div>
             </div>
           </div>

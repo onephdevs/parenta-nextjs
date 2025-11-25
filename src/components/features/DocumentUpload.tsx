@@ -172,7 +172,7 @@ export default function DocumentUpload({
               <FileText className="h-8 w-8 text-gray-400" />
               <div>
                 <p className="text-sm font-medium text-gray-900">{currentDocumentName}</p>
-                <p className="text-xs text-gray-500">Tenant Agreement Document</p>
+                <p className="text-xs text-gray-900">Tenant Agreement Document</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -188,7 +188,7 @@ export default function DocumentUpload({
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="px-3 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
               >
                 <X className="h-4 w-4" />
                 <span>Delete</span>
@@ -199,7 +199,7 @@ export default function DocumentUpload({
       ) : (
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
           <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-sm text-gray-600 mb-4">No agreement document uploaded</p>
+          <p className="text-sm text-gray-900 mb-4">No agreement document uploaded</p>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -220,7 +220,7 @@ export default function DocumentUpload({
                     className="hidden"
                   />
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-900">
         PDF, DOC, or DOCX. Max 10MB.
       </p>
     </div>

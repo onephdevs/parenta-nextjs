@@ -304,7 +304,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     <div className="bg-white shadow rounded-lg">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Create New Invoice</h3>
-        <p className="text-sm text-gray-500 mt-1">Generate an invoice for tenant payments</p>
+        <p className="text-sm text-gray-900 mt-1">Generate an invoice for tenant payments</p>
       </div>
 
       <div className="p-6">
@@ -320,7 +320,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
             <h4 className="text-md font-medium text-gray-900 mb-4">Invoice Details</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="tenantId" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="tenantId" className="block text-sm font-medium text-gray-900 mb-1">
                   Tenant *
                 </label>
                 <select
@@ -341,7 +341,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </div>
 
               <div>
-                <label htmlFor="roomId" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="roomId" className="block text-sm font-medium text-gray-900 mb-1">
                   Room *
                 </label>
                 <select
@@ -370,7 +370,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </div>
 
               <div>
-                <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="dueDate" className="block text-sm font-medium text-gray-900 mb-1">
                   Due Date *
                 </label>
                 <input
@@ -385,7 +385,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </div>
 
               <div>
-                <label htmlFor="billingPeriodStart" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="billingPeriodStart" className="block text-sm font-medium text-gray-900 mb-1">
                   Billing Period Start
                 </label>
                 <input
@@ -399,7 +399,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </div>
 
               <div>
-                <label htmlFor="billingPeriodEnd" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="billingPeriodEnd" className="block text-sm font-medium text-gray-900 mb-1">
                   Billing Period End
                 </label>
                 <input
@@ -434,7 +434,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border border-gray-200 rounded-md">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-900 mb-1">
                       Description *
                     </label>
                     <input
@@ -448,7 +448,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-900 mb-1">
                       Type
                     </label>
                     <select
@@ -465,7 +465,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-900 mb-1">
                       Quantity
                     </label>
                     <input
@@ -479,7 +479,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-900 mb-1">
                       Unit Price *
                     </label>
                     <input
@@ -514,7 +514,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
             <h4 className="text-md font-medium text-gray-900 mb-4">Calculations</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="taxRate" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="taxRate" className="block text-sm font-medium text-gray-900 mb-1">
                   Tax Rate (%)
                 </label>
                 <input
@@ -531,7 +531,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </div>
 
               <div>
-                <label htmlFor="discountAmount" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="discountAmount" className="block text-sm font-medium text-gray-900 mb-1">
                   Discount Amount
                 </label>
                 <input
@@ -551,16 +551,16 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
             <div className="mt-6 bg-gray-50 p-4 rounded-md">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Subtotal:</span>
+                  <span className="text-sm text-gray-900">Subtotal:</span>
                   <span className="text-sm font-medium">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Tax ({(formData.taxRate * 100).toFixed(1)}%):</span>
+                  <span className="text-sm text-gray-900">Tax ({(formData.taxRate * 100).toFixed(1)}%):</span>
                   <span className="text-sm font-medium">{formatCurrency(taxAmount)}</span>
                 </div>
                 {formData.discountAmount > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Discount:</span>
+                    <span className="text-sm text-gray-900">Discount:</span>
                     <span className="text-sm font-medium text-red-600">-{formatCurrency(formData.discountAmount)}</span>
                   </div>
                 )}
@@ -576,7 +576,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
 
           {/* Notes */}
           <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-1">
               Notes
             </label>
             <textarea
@@ -595,7 +595,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
             >
               Cancel
             </button>

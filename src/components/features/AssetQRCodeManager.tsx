@@ -222,7 +222,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
               </button>
               <button
                 onClick={() => setShowPrintView(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50"
               >
                 Back to Manager
               </button>
@@ -245,10 +245,10 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                   className="qr-code-image"
                 />
                 <div className="mt-2 text-sm font-medium">{asset.assetName}</div>
-                <div className="text-xs text-gray-600">{asset.assetType}</div>
-                <div className="text-xs text-gray-500">ID: {asset.id}</div>
+                <div className="text-xs text-gray-900">{asset.assetType}</div>
+                <div className="text-xs text-gray-900">ID: {asset.id}</div>
                 {asset.serialNumber && (
-                  <div className="text-xs text-gray-500">SN: {asset.serialNumber}</div>
+                  <div className="text-xs text-gray-900">SN: {asset.serialNumber}</div>
                 )}
               </div>
             );
@@ -264,10 +264,10 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium text-gray-900">QR Code Management</h3>
-          <p className="text-sm text-gray-600">Generate and manage QR codes for asset tracking</p>
+          <p className="text-sm text-gray-900">Generate and manage QR codes for asset tracking</p>
         </div>
         <div className="flex items-center space-x-3">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-900">
             {selectedAssets.length} of {assets.length} selected
           </span>
           <button
@@ -280,14 +280,14 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
           <button
             onClick={handlePrintSelected}
             disabled={selectedAssets.length === 0 || loading}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Print Selected
           </button>
           <button
             onClick={handleExportSelected}
             disabled={selectedAssets.length === 0}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Export Data
           </button>
@@ -304,9 +304,9 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
               onChange={(e) => handleSelectAll(e.target.checked)}
               className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
             />
-            <span className="ml-2 text-sm text-gray-700">Select All Assets</span>
+            <span className="ml-2 text-sm text-gray-900">Select All Assets</span>
           </label>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-900">
             {assets.filter(a => a.qrCodeGenerated).length} of {assets.length} assets have QR codes
           </div>
         </div>
@@ -322,7 +322,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   <input
                     type="checkbox"
                     checked={selectedAssets.length === assets.length && assets.length > 0}
@@ -330,19 +330,19 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                     className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Asset
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Building
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   QR Code Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -362,7 +362,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                     <div>
                       <div className="text-sm font-medium text-gray-900">{asset.assetName}</div>
                       {asset.serialNumber && (
-                        <div className="text-sm text-gray-500">SN: {asset.serialNumber}</div>
+                        <div className="text-sm text-gray-900">SN: {asset.serialNumber}</div>
                       )}
                     </div>
                   </td>

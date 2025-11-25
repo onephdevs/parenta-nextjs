@@ -174,7 +174,7 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="ml-2 text-gray-500">Loading images...</span>
+              <span className="ml-2 text-gray-900">Loading images...</span>
             </div>
           ) : (
             <ImageGallery
@@ -202,31 +202,31 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
             </div>
             <dl className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Room Number</dt>
+                <dt className="text-sm font-medium text-gray-900">Room Number</dt>
                 <dd className="col-span-2 text-sm font-semibold text-gray-900">{roomDetails.room.roomNumber}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Building</dt>
+                <dt className="text-sm font-medium text-gray-900">Building</dt>
                 <dd className="col-span-2 text-sm text-gray-900">{roomDetails.room.buildingName}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Floor</dt>
+                <dt className="text-sm font-medium text-gray-900">Floor</dt>
                 <dd className="col-span-2 text-sm text-gray-900">{roomDetails.room.floorNumber || 'Not specified'}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Type</dt>
+                <dt className="text-sm font-medium text-gray-900">Type</dt>
                 <dd className="col-span-2 text-sm text-gray-900 capitalize">{roomDetails.room.roomType}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Square Footage</dt>
+                <dt className="text-sm font-medium text-gray-900">Square Footage</dt>
                 <dd className="col-span-2 text-sm text-gray-900">{roomDetails.room.squareFootage ? `${roomDetails.room.squareFootage} sq ft` : 'Not specified'}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Monthly Rate</dt>
+                <dt className="text-sm font-medium text-gray-900">Monthly Rate</dt>
                 <dd className="col-span-2 text-sm font-semibold text-purple-600">{formatCurrency(roomDetails.room.monthlyRate)}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Deposit</dt>
+                <dt className="text-sm font-medium text-gray-900">Deposit</dt>
                 <dd className="col-span-2 text-sm text-gray-900">{roomDetails.room.depositAmount ? formatCurrency(roomDetails.room.depositAmount) : 'Not specified'}</dd>
               </div>
             </dl>
@@ -239,27 +239,27 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Room Statistics</h3>
             <dl className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Total Assignments</dt>
+                <dt className="text-sm font-medium text-gray-900">Total Assignments</dt>
                 <dd className="col-span-2 text-lg font-semibold text-purple-600">{roomDetails.occupancyMetrics.total_assignments}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Occupancy Rate</dt>
+                <dt className="text-sm font-medium text-gray-900">Occupancy Rate</dt>
                 <dd className="col-span-2 text-lg font-semibold text-blue-600">{Math.round(roomDetails.occupancyMetrics.occupancy_rate_percent)}%</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Avg Stay Duration</dt>
+                <dt className="text-sm font-medium text-gray-900">Avg Stay Duration</dt>
                 <dd className="col-span-2 text-sm text-gray-900">{Math.round(roomDetails.occupancyMetrics.average_stay_duration_days)} days</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Total Revenue</dt>
+                <dt className="text-sm font-medium text-gray-900">Total Revenue</dt>
                 <dd className="col-span-2 text-lg font-semibold text-green-600">{formatCurrency(roomDetails.occupancyMetrics.total_revenue)}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Created</dt>
+                <dt className="text-sm font-medium text-gray-900">Created</dt>
                 <dd className="col-span-2 text-sm text-gray-900">{new Date(roomDetails.room.createdAt).toLocaleDateString()}</dd>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Active</dt>
+                <dt className="text-sm font-medium text-gray-900">Active</dt>
                 <dd className={`col-span-2 text-sm font-medium ${roomDetails.room.isActive ? 'text-green-600' : 'text-red-600'}`}>
                   {roomDetails.room.isActive ? 'Yes' : 'No'}
                 </dd>
@@ -280,16 +280,16 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
                   <h4 className="text-lg font-medium text-gray-900">
                     {roomDetails.currentTenant.firstName} {roomDetails.currentTenant.lastName}
                   </h4>
-                  <p className="text-sm text-gray-600">{roomDetails.currentTenant.email}</p>
+                  <p className="text-sm text-gray-900">{roomDetails.currentTenant.email}</p>
                   {roomDetails.currentTenant.phone && (
-                    <p className="text-sm text-gray-600">{roomDetails.currentTenant.phone}</p>
+                    <p className="text-sm text-gray-900">{roomDetails.currentTenant.phone}</p>
                   )}
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-semibold text-gray-900">
                     {formatCurrency(roomDetails.currentTenant.monthlyRate)}/month
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-900">
                     Since {new Date(roomDetails.currentTenant.startDate).toLocaleDateString()}
                   </p>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -307,7 +307,7 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">Description</h3>
-            <p className="text-sm text-gray-700">{roomDetails.room.description}</p>
+            <p className="text-sm text-gray-900">{roomDetails.room.description}</p>
           </div>
         </div>
       )}

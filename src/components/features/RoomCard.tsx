@@ -97,7 +97,7 @@ export default function RoomCard({
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{currentRoom.roomNumber}</h3>
-            <p className="text-sm text-gray-500">{buildingName}</p>
+            <p className="text-sm text-gray-900">{buildingName}</p>
           </div>
           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(currentRoom.roomStatus)}`}>
             {getStatusIcon(currentRoom.roomStatus)}
@@ -108,34 +108,34 @@ export default function RoomCard({
         {/* Room Details */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Type</span>
+            <span className="text-sm text-gray-900">Type</span>
             <span className="text-sm font-medium text-gray-900 capitalize">{currentRoom.roomType}</span>
           </div>
 
           {currentRoom.squareFootage && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Size</span>
+              <span className="text-sm text-gray-900">Size</span>
               <span className="text-sm font-medium text-gray-900">{currentRoom.squareFootage} sq ft</span>
             </div>
           )}
 
           {currentRoom.floorNumber && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Floor</span>
+              <span className="text-sm text-gray-900">Floor</span>
               <span className="text-sm font-medium text-gray-900">{currentRoom.floorNumber}</span>
             </div>
           )}
 
           {currentRoom.monthlyRate && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Rent</span>
+              <span className="text-sm text-gray-900">Rent</span>
               <span className="text-sm font-semibold text-gray-900">${parseFloat(currentRoom.monthlyRate).toLocaleString()}/mo</span>
             </div>
           )}
 
           {currentRoom.depositAmount && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Deposit</span>
+              <span className="text-sm text-gray-900">Deposit</span>
               <span className="text-sm font-medium text-gray-900">${parseFloat(currentRoom.depositAmount).toLocaleString()}</span>
             </div>
           )}
@@ -144,7 +144,7 @@ export default function RoomCard({
         {/* Amenities */}
         {currentRoom.amenities && (
           <div className="mt-4">
-            <div className="text-sm text-gray-500 mb-2">Amenities</div>
+            <div className="text-sm text-gray-900 mb-2">Amenities</div>
             <div className="text-sm text-gray-900">
               {currentRoom.amenities}
             </div>
@@ -161,7 +161,7 @@ export default function RoomCard({
           </Link>
           <button 
             onClick={() => setIsQuickEditOpen(true)}
-            className="flex-1 bg-gray-100 text-gray-700 text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="flex-1 bg-gray-100 text-gray-900 text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             Quick Edit
           </button>

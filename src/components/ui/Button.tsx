@@ -19,8 +19,8 @@ const Button = forwardRef<HTMLButtonElement, ExtendedButtonProps>(
     const variants = {
       primary: "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800",
       secondary: "bg-gray-200 text-gray-900 hover:bg-gray-300 active:bg-gray-400",
-      outline: "border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 active:bg-gray-100",
-      ghost: "bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200"
+      outline: "border border-gray-300 bg-transparent text-gray-900 hover:bg-gray-50 active:bg-gray-100",
+      ghost: "bg-transparent text-gray-900 hover:bg-gray-100 active:bg-gray-200"
     };
 
     const sizes = {

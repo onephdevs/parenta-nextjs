@@ -89,7 +89,7 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                           e.stopPropagation();
                           setIsMenuOpen(!isMenuOpen);
                         }}
-                        className="text-gray-400 hover:text-gray-600 p-1"
+                        className="text-gray-400 hover:text-gray-900 p-1"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -101,7 +101,7 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                           <div className="py-1">
                             <Link
                               href={`/admin/buildings/${building.id}`}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                             >
                               View Details
                             </Link>
@@ -110,13 +110,13 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                                 router.push(`/admin/buildings/${building.id}`);
                                 setIsMenuOpen(false);
                               }}
-                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                             >
                               Edit Building
                             </button>
                             <Link
                               href={`/admin/buildings/${building.id}/rooms`}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                             >
                               Manage Rooms
                             </Link>
@@ -139,19 +139,19 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                 
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Address</p>
+                    <p className="text-sm text-gray-900">Address</p>
                     <p className="text-sm font-medium text-gray-900">{formatAddress(building)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Total Units</p>
+                    <p className="text-sm text-gray-900">Total Units</p>
                     <p className="text-sm font-medium text-gray-900">{building.totalUnits} units</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Type</p>
+                    <p className="text-sm text-gray-900">Type</p>
                     <p className="text-sm font-medium text-gray-900 capitalize">{building.buildingType}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Occupancy</p>
+                    <p className="text-sm text-gray-900">Occupancy</p>
                     <p className="text-sm font-medium text-gray-900">
                       {building.occupiedUnits || 0}/{building.totalUnits || 0}
                     </p>
@@ -197,7 +197,7 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                 e.stopPropagation();
                 setIsMenuOpen(!isMenuOpen);
               }}
-              className="text-gray-400 hover:text-gray-600 p-1"
+              className="text-gray-400 hover:text-gray-900 p-1"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -209,7 +209,7 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                 <div className="py-1">
                   <Link
                     href={`/admin/buildings/${building.id}`}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     View Details
@@ -219,13 +219,13 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
                       router.push(`/admin/buildings/${building.id}`);
                       setIsMenuOpen(false);
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                   >
                     Edit Building
                   </button>
                   <Link
                     href={`/admin/buildings/${building.id}/rooms`}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="block px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Manage Rooms
@@ -247,16 +247,16 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
         </div>
 
         <div className="mt-2">
-          <p className="text-sm text-gray-600">{formatAddress(building)}</p>
+          <p className="text-sm text-gray-900">{formatAddress(building)}</p>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-500">Units</p>
+            <p className="text-sm text-gray-900">Units</p>
             <p className="text-lg font-semibold text-gray-900">{building.totalUnits || 0}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Occupancy</p>
+            <p className="text-sm text-gray-900">Occupancy</p>
             <p className="text-lg font-semibold text-gray-900">
               {building.occupiedUnits || 0}/{building.totalUnits || 0}
             </p>
@@ -264,13 +264,13 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
         </div>
 
         <div className="mt-4">
-          <p className="text-sm text-gray-500">Type</p>
+          <p className="text-sm text-gray-900">Type</p>
           <p className="text-sm font-medium text-gray-900 capitalize">{building.buildingType}</p>
         </div>
 
         {building.amenities && (
           <div className="mt-4">
-            <p className="text-sm text-gray-500 mb-2">Amenities</p>
+            <p className="text-sm text-gray-900 mb-2">Amenities</p>
             <div className="text-sm text-gray-900">
               {building.amenities}
             </div>

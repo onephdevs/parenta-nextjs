@@ -348,7 +348,7 @@ export default function TenantForm() {
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="firstName" className="block text-sm font-medium text-gray-900">
               First Name *
             </label>
             <input
@@ -368,7 +368,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="lastName" className="block text-sm font-medium text-gray-900">
               Last Name *
             </label>
             <input
@@ -388,7 +388,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-900">
               Email *
             </label>
             <input
@@ -408,7 +408,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-900">
               Phone
             </label>
             <input
@@ -422,7 +422,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-900">
               Date of Birth
             </label>
             <input
@@ -436,7 +436,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-900">
               Previous Address
             </label>
             <input
@@ -450,7 +450,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900">
               Monthly Income (₱)
             </label>
             <input
@@ -474,7 +474,7 @@ export default function TenantForm() {
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           <div>
-            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-900">
               Contact Name
             </label>
             <input
@@ -488,7 +488,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-900">
               Contact Phone
             </label>
             <input
@@ -507,7 +507,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-900">
               Relationship
             </label>
             <input
@@ -530,7 +530,7 @@ export default function TenantForm() {
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-900">
               Employment Status
             </label>
             <select
@@ -549,7 +549,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="employerName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="employerName" className="block text-sm font-medium text-gray-900">
               Employer Name
             </label>
             <input
@@ -568,13 +568,13 @@ export default function TenantForm() {
         <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">
           Property & Room Assignment
         </h3>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-900 mb-4">
           Assign a property and room now to automatically generate invoices based on lease details.
         </p>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="buildingId" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900">
               Property (Optional)
             </label>
             <select
@@ -592,13 +592,13 @@ export default function TenantForm() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-900">
               Select a property to filter available rooms
             </p>
           </div>
 
           <div>
-            <label htmlFor="roomId" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="roomId" className="block text-sm font-medium text-gray-900">
               Room (Optional)
             </label>
             <select
@@ -622,7 +622,7 @@ export default function TenantForm() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-900">
               {formData.roomId 
                 ? 'Invoices will be auto-generated after tenant creation' 
                 : 'You can assign a room later from the tenant detail page'}
@@ -663,7 +663,7 @@ export default function TenantForm() {
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="monthlyRent" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="monthlyRent" className="block text-sm font-medium text-gray-900">
               Monthly Rent (₱) *
             </label>
             <div className="flex items-center mb-2">
@@ -682,7 +682,7 @@ export default function TenantForm() {
                 }}
                 className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
               />
-              <label htmlFor="overrideMonthlyRent" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="overrideMonthlyRent" className="ml-2 block text-sm text-gray-900">
                 Override monthly rent
               </label>
             </div>
@@ -704,7 +704,7 @@ export default function TenantForm() {
             {errors.monthlyRent && (
               <p className="mt-1 text-sm text-red-600">{errors.monthlyRent}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-900">
               {formData.roomId && !overrideMonthlyRent 
                 ? 'Monthly rent is automatically set from the selected room' 
                 : 'Enter amount in Philippine Pesos'}
@@ -712,7 +712,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="depositMonths" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="depositMonths" className="block text-sm font-medium text-gray-900">
               Deposit Months *
             </label>
             <select
@@ -727,13 +727,13 @@ export default function TenantForm() {
               <option value="2">2 months</option>
               <option value="3">3 months</option>
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-900">
               Deposit: ₱{((formData.monthlyRent || 0) * formData.depositMonths).toLocaleString()}
             </p>
           </div>
 
           <div>
-            <label htmlFor="advanceMonths" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="advanceMonths" className="block text-sm font-medium text-gray-900">
               Advance Months *
             </label>
             <select
@@ -748,7 +748,7 @@ export default function TenantForm() {
               <option value="2">2 months</option>
               <option value="3">3 months</option>
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-900">
               Advance: ₱{((formData.monthlyRent || 0) * formData.advanceMonths).toLocaleString()}
             </p>
           </div>
@@ -756,12 +756,12 @@ export default function TenantForm() {
           {/* Total Amount Display */}
           <div className="sm:col-span-2 bg-purple-50 p-4 rounded-md border border-purple-200">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Total Initial Payment:</span>
+              <span className="text-sm font-medium text-gray-900">Total Initial Payment:</span>
               <span className="text-lg font-bold text-purple-600">
                 ₱{((formData.monthlyRent || 0) * (formData.depositMonths + formData.advanceMonths)).toLocaleString()}
               </span>
             </div>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-900">
               (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths} month{formData.depositMonths !== 1 ? 's' : ''} deposit) + (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''} advance)
             </p>
           </div>
@@ -775,7 +775,7 @@ export default function TenantForm() {
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="leaseStartDate" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="leaseStartDate" className="block text-sm font-medium text-gray-900">
               Lease Start Date
             </label>
             <input
@@ -789,7 +789,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="leaseEndDate" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="leaseEndDate" className="block text-sm font-medium text-gray-900">
               Lease End Date
             </label>
             <input
@@ -803,7 +803,7 @@ export default function TenantForm() {
           </div>
 
           <div>
-            <label htmlFor="moveInDate" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="moveInDate" className="block text-sm font-medium text-gray-900">
               Move In Date
             </label>
             <input
@@ -825,7 +825,7 @@ export default function TenantForm() {
         
         <div className="grid grid-cols-1 gap-6">
           <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-900">
               Notes
             </label>
             <textarea
@@ -846,7 +846,7 @@ export default function TenantForm() {
           type="button"
           onClick={() => router.back()}
           disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
         >
           Cancel
         </button>

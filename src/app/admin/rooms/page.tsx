@@ -60,14 +60,14 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Rooms
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Manage rooms across all properties
               </p>
             </div>
             <div className="mt-4 flex md:mt-0 md:ml-4">
               <Link
                 href="/admin/buildings"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -93,7 +93,7 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Total Rooms</dt>
+                <dt className="text-sm font-medium text-gray-900">Total Rooms</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{stats?.total_rooms || 0}</dd>
               </div>
             </div>
@@ -109,9 +109,9 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Occupied</dt>
+                <dt className="text-sm font-medium text-gray-900">Occupied</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{stats?.occupied_rooms || 0}</dd>
-                <dd className="text-xs text-gray-500">{stats?.occupancy_rate || 0}% occupancy</dd>
+                <dd className="text-xs text-gray-900">{stats?.occupancy_rate || 0}% occupancy</dd>
               </div>
             </div>
           </div>
@@ -126,9 +126,9 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Vacant</dt>
+                <dt className="text-sm font-medium text-gray-900">Vacant</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{stats?.vacant_rooms || 0}</dd>
-                <dd className="text-xs text-gray-500">Available now</dd>
+                <dd className="text-xs text-gray-900">Available now</dd>
               </div>
             </div>
           </div>
@@ -143,11 +143,11 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Avg Rent</dt>
+                <dt className="text-sm font-medium text-gray-900">Avg Rent</dt>
                 <dd className="text-2xl font-semibold text-gray-900">
                   ₱{stats?.average_rent ? Math.round(stats.average_rent).toLocaleString() : 0}
                 </dd>
-                <dd className="text-xs text-gray-500">per month</dd>
+                <dd className="text-xs text-gray-900">per month</dd>
               </div>
             </div>
           </div>

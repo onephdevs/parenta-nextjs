@@ -189,7 +189,7 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
           <Settings className="h-5 w-5" />
           Cost Allocation Rules - {buildingName}
         </h3>
-        <p className="text-sm text-gray-600 mb-6">
+        <p className="text-sm text-gray-900 mb-6">
           Configure how utility costs are split among tenants for each utility type.
         </p>
         
@@ -214,7 +214,7 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
                     )}
                   </div>
                   {rule && (
-                    <div className="mt-1 text-sm text-gray-500">
+                    <div className="mt-1 text-sm text-gray-900">
                       Common areas: {rule.includeCommonAreas ? `${rule.commonAreaPercentage}%` : 'Not included'}
                     </div>
                   )}
@@ -243,7 +243,7 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
 
             <div className="p-6 space-y-6">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Utility Type</label>
+                <label className="block text-sm font-medium text-gray-900">Utility Type</label>
                 <select
                   value={currentRule.utilityType}
                   onChange={(e) => setCurrentRule({ ...currentRule, utilityType: e.target.value as any })}
@@ -258,7 +258,7 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Allocation Method</label>
+                <label className="block text-sm font-medium text-gray-900">Allocation Method</label>
                 <select
                   value={currentRule.allocationMethod}
                   onChange={(e) => setCurrentRule({ ...currentRule, allocationMethod: e.target.value as any })}
@@ -275,8 +275,8 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-4">
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Include Common Area Costs</label>
-                    <p className="text-sm text-gray-500">
+                    <label className="text-sm font-medium text-gray-900">Include Common Area Costs</label>
+                    <p className="text-sm text-gray-900">
                       Include shared space utilities (hallways, lobby, etc.)
                     </p>
                   </div>
@@ -293,7 +293,7 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
 
                 {currentRule.includeCommonAreas && (
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Common Area Percentage</label>
+                    <label className="block text-sm font-medium text-gray-900">Common Area Percentage</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -306,9 +306,9 @@ export default function AllocationRulesConfig({ buildingId, buildingName }: Allo
                         })}
                         className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       />
-                      <span className="text-sm text-gray-500">% of total cost</span>
+                      <span className="text-sm text-gray-900">% of total cost</span>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-900">
                       This percentage will be split equally among all tenants
                     </p>
                   </div>

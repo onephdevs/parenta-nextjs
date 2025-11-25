@@ -14,7 +14,7 @@ export default function TopTenantsList({ tenants }: TopTenantsListProps) {
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Top Tenants by Payment History
           </h3>
-          <p className="text-sm text-gray-500">No tenant data available</p>
+          <p className="text-sm text-gray-900">No tenant data available</p>
         </div>
       </div>
     );
@@ -38,22 +38,22 @@ export default function TopTenantsList({ tenants }: TopTenantsListProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead>
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Rank
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Tenant
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Total Paid
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Payments
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Avg Payment
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">
                   On-Time Rate
                 </th>
               </tr>
@@ -75,7 +75,7 @@ export default function TopTenantsList({ tenants }: TopTenantsListProps) {
                     <div className="text-sm font-medium text-gray-900">
                       {tenant.tenantName}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-900">
                       Last payment: {new Date(tenant.lastPaymentDate).toLocaleDateString()}
                     </div>
                   </td>

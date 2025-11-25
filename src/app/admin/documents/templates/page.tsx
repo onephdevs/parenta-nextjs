@@ -19,7 +19,7 @@ export default async function DocumentTemplatesPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Document Templates</h1>
-            <p className="text-gray-600">Create and manage templates for automated document generation</p>
+            <p className="text-gray-900">Create and manage templates for automated document generation</p>
           </div>
         </div>
 
@@ -37,7 +37,7 @@ export default async function DocumentTemplatesPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Templates</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Total Templates</dt>
                     <dd className="text-lg font-medium text-gray-900">12</dd>
                   </dl>
                 </div>
@@ -46,7 +46,7 @@ export default async function DocumentTemplatesPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-blue-600 font-medium">3</span>
-                <span className="text-gray-600"> system templates</span>
+                <span className="text-gray-900"> system templates</span>
               </div>
             </div>
           </div>
@@ -63,7 +63,7 @@ export default async function DocumentTemplatesPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Generated This Month</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Generated This Month</dt>
                     <dd className="text-lg font-medium text-gray-900">47</dd>
                   </dl>
                 </div>
@@ -72,7 +72,7 @@ export default async function DocumentTemplatesPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-green-600 font-medium">+12%</span>
-                <span className="text-gray-600"> from last month</span>
+                <span className="text-gray-900"> from last month</span>
               </div>
             </div>
           </div>
@@ -89,7 +89,7 @@ export default async function DocumentTemplatesPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Most Used</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Most Used</dt>
                     <dd className="text-lg font-medium text-gray-900">Rent Invoice</dd>
                   </dl>
                 </div>
@@ -98,7 +98,7 @@ export default async function DocumentTemplatesPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-yellow-600 font-medium">180</span>
-                <span className="text-gray-600"> uses this month</span>
+                <span className="text-gray-900"> uses this month</span>
               </div>
             </div>
           </div>
@@ -115,7 +115,7 @@ export default async function DocumentTemplatesPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Categories</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Categories</dt>
                     <dd className="text-lg font-medium text-gray-900">6</dd>
                   </dl>
                 </div>
@@ -124,7 +124,7 @@ export default async function DocumentTemplatesPage() {
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-purple-600 font-medium">100%</span>
-                <span className="text-gray-600"> coverage</span>
+                <span className="text-gray-900"> coverage</span>
               </div>
             </div>
           </div>

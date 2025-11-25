@@ -32,7 +32,7 @@ async function SignUpContent({ searchParams }: SignUpPageProps) {
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
             Create {isAdmin ? 'Admin' : 'Tenant'} Account
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-900">
             Join our platform as a {isAdmin ? 'system administrator' : 'tenant user'}
           </p>
         </div>
@@ -44,7 +44,7 @@ async function SignUpContent({ searchParams }: SignUpPageProps) {
 
         {/* Footer */}
         <div className="text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-900">
             By creating an account, you agree to our terms of service
           </p>
         </div>

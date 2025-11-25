@@ -139,7 +139,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
           type="button"
           onClick={onClose}
           disabled={isSubmitting || isDeleting}
-          className="px-6 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Cancel
         </button>
@@ -215,7 +215,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-900 mb-2">
                   Building Name *
                 </label>
                 <input
@@ -231,7 +231,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
               </div>
               
               <div>
-                <label htmlFor="buildingType" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="buildingType" className="block text-sm font-medium text-gray-900 mb-2">
                   Building Type *
                 </label>
                 <select
@@ -261,7 +261,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
             
             <div className="space-y-6">
               <div>
-                <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-900 mb-2">
                   Address Line 1 *
                 </label>
                 <input
@@ -277,7 +277,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
               </div>
 
               <div>
-                <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-900 mb-2">
                   Address Line 2
                 </label>
                 <input
@@ -293,7 +293,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-900 mb-2">
                     City *
                   </label>
                   <input
@@ -309,7 +309,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                 </div>
 
                 <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-900 mb-2">
                     State *
                   </label>
                   <input
@@ -325,7 +325,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                 </div>
 
                 <div>
-                  <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="postalCode" className="block text-sm font-medium text-gray-900 mb-2">
                     Postal Code *
                   </label>
                   <input
@@ -342,7 +342,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
               </div>
 
               <div>
-                <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="country" className="block text-sm font-medium text-gray-900 mb-2">
                   Country *
                 </label>
                 <input
@@ -370,7 +370,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
             
             <div className="space-y-6">
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-2">
                   Description
                 </label>
                 <textarea
@@ -386,7 +386,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label htmlFor="yearBuilt" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="yearBuilt" className="block text-sm font-medium text-gray-900 mb-2">
                     Year Built
                   </label>
                   <input
@@ -403,7 +403,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                 </div>
 
                 <div>
-                  <label htmlFor="totalFloors" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="totalFloors" className="block text-sm font-medium text-gray-900 mb-2">
                     Total Floors
                   </label>
                   <input
@@ -421,7 +421,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
               </div>
 
               <div>
-                <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="amenities" className="block text-sm font-medium text-gray-900 mb-2">
                   Amenities
                 </label>
                 <input

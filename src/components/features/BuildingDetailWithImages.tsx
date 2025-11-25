@@ -105,7 +105,7 @@ export default function BuildingDetailWithImages({ building }: BuildingDetailWit
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="ml-2 text-gray-500">Loading images...</span>
+              <span className="ml-2 text-gray-900">Loading images...</span>
             </div>
           ) : (
             <ImageGallery
@@ -125,35 +125,35 @@ export default function BuildingDetailWithImages({ building }: BuildingDetailWit
           <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Building Information</h3>
           <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Address</dt>
+              <dt className="text-sm font-medium text-gray-900">Address</dt>
               <dd className="mt-1 text-sm text-gray-900">{formatAddress(building)}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Building Type</dt>
+              <dt className="text-sm font-medium text-gray-900">Building Type</dt>
               <dd className="mt-1 text-sm text-gray-900 capitalize">{building.buildingType}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Year Built</dt>
+              <dt className="text-sm font-medium text-gray-900">Year Built</dt>
               <dd className="mt-1 text-sm text-gray-900">{building.yearBuilt || 'Not specified'}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Total Floors</dt>
+              <dt className="text-sm font-medium text-gray-900">Total Floors</dt>
               <dd className="mt-1 text-sm text-gray-900">{building.totalFloors || 'Not specified'}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Total Units</dt>
+              <dt className="text-sm font-medium text-gray-900">Total Units</dt>
               <dd className="mt-1 text-sm text-gray-900">{building.totalUnits}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Active Units</dt>
+              <dt className="text-sm font-medium text-gray-900">Active Units</dt>
               <dd className="mt-1 text-sm text-gray-900">{building.activeUnits}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Country</dt>
+              <dt className="text-sm font-medium text-gray-900">Country</dt>
               <dd className="mt-1 text-sm text-gray-900">{building.country}</dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-sm font-medium text-gray-500">Description</dt>
+              <dt className="text-sm font-medium text-gray-900">Description</dt>
               <dd className="mt-1 text-sm text-gray-900">{building.description || 'No description provided'}</dd>
             </div>
           </dl>

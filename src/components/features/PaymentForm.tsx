@@ -276,7 +276,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         <div className="md:grid md:grid-cols-3 md:gap-6">
           <div className="md:col-span-1">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Payment Information</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-900">
               Record a new payment or update payment details.
             </p>
           </div>
@@ -284,7 +284,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
             <div className="grid grid-cols-6 gap-6">
               {/* Tenant Selection */}
               <div className="col-span-6">
-                <label htmlFor="tenantId" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="tenantId" className="block text-sm font-medium text-gray-900">
                   Tenant *
                 </label>
                 <select
@@ -316,12 +316,12 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
               {/* Total Amount Paid */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
                   Total Amount Paid *
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-base font-medium">₱</span>
+                    <span className="text-gray-900 text-base font-medium">₱</span>
                   </div>
                   <input
                     type="number"
@@ -340,19 +340,19 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                 {errors.amount && (
                   <p className="mt-2 text-sm text-red-600">{errors.amount}</p>
                 )}
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   Total amount received from tenant
                 </p>
               </div>
 
               {/* Deposit Amount */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-900">
                   Deposit Amount
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-base font-medium">₱</span>
+                    <span className="text-gray-900 text-base font-medium">₱</span>
                   </div>
                   <input
                     type="number"
@@ -371,7 +371,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                 {errors.depositAmount && (
                   <p className="mt-2 text-sm text-red-600">{errors.depositAmount}</p>
                 )}
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   Amount to add to deposit ledger (remainder goes to invoices)
                 </p>
               </div>
@@ -399,7 +399,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
               {/* Payment Type */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="type" className="block text-sm font-medium text-gray-900">
                   Payment Type *
                 </label>
                 <select
@@ -424,7 +424,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
               {/* Payment Date */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="paymentDate" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="paymentDate" className="block text-sm font-medium text-gray-900">
                   Payment Date *
                 </label>
                 <input
@@ -444,7 +444,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
               {/* Payment Method */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900">
                   Payment Method *
                 </label>
                 <select
@@ -469,7 +469,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
               {/* Transaction ID */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="transactionId" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="transactionId" className="block text-sm font-medium text-gray-900">
                   Transaction ID
                 </label>
                 <input
@@ -485,7 +485,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
               {/* Description */}
               <div className="col-span-6">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
                   Description
                 </label>
                 <textarea
@@ -508,7 +508,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         <button
           type="button"
           onClick={handleCancel}
-          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
+          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
         >
           Cancel
         </button>

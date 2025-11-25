@@ -197,7 +197,7 @@ export default async function AdminDashboard() {
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back, {session.user.firstName}! 👋
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-900">
             Here's what's happening with your properties today.
                 </p>
               </div>
@@ -218,9 +218,9 @@ export default async function AdminDashboard() {
               <h3 className="text-2xl font-bold text-gray-900 mb-1">
                 {stats.buildings.total}
               </h3>
-              <p className="text-sm text-gray-600 mb-3">Total Buildings</p>
+              <p className="text-sm text-gray-900 mb-3">Total Buildings</p>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">{stats.buildings.totalUnits} units</span>
+                <span className="text-gray-900">{stats.buildings.totalUnits} units</span>
                 <Link href="/admin/buildings" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
                   View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
@@ -240,9 +240,9 @@ export default async function AdminDashboard() {
               <h3 className="text-2xl font-bold text-gray-900 mb-1">
                 {stats.rooms.occupied}
               </h3>
-              <p className="text-sm text-gray-600 mb-3">Occupied Units</p>
+              <p className="text-sm text-gray-900 mb-3">Occupied Units</p>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">{stats.rooms.vacant} vacant</span>
+                <span className="text-gray-900">{stats.rooms.vacant} vacant</span>
                 <Link href="/admin/rooms" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
                   View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
@@ -262,9 +262,9 @@ export default async function AdminDashboard() {
               <h3 className="text-2xl font-bold text-gray-900 mb-1">
                 {stats.tenants.active}
               </h3>
-              <p className="text-sm text-gray-600 mb-3">Active Tenants</p>
+              <p className="text-sm text-gray-900 mb-3">Active Tenants</p>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">{stats.tenants.pending} pending</span>
+                <span className="text-gray-900">{stats.tenants.pending} pending</span>
                 <Link href="/admin/tenants" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
                   View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
@@ -282,9 +282,9 @@ export default async function AdminDashboard() {
               <h3 className="text-2xl font-bold text-gray-900 mb-1">
                 ₱{stats.summary.monthlyRevenue.toLocaleString()}
               </h3>
-              <p className="text-sm text-gray-600 mb-3">Monthly Revenue</p>
+              <p className="text-sm text-gray-900 mb-3">Monthly Revenue</p>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">{stats.financial.paidPayments} payments</span>
+                <span className="text-gray-900">{stats.financial.paidPayments} payments</span>
                 <Link href="/admin/payments" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
                   View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
@@ -322,7 +322,7 @@ export default async function AdminDashboard() {
                       <action.icon className={`h-5 w-5 text-${action.color}-600`} />
                     </div>
                     <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
-                    <p className="text-sm text-gray-600">{action.description}</p>
+                    <p className="text-sm text-gray-900">{action.description}</p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition" />
                 </div>
@@ -342,19 +342,19 @@ export default async function AdminDashboard() {
               </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Total Payments</span>
+                  <span className="text-sm text-gray-900">Total Payments</span>
                   <span className="font-semibold text-gray-900">{stats.financial.totalPayments}</span>
                 </div>
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Paid Payments</span>
+                  <span className="text-sm text-gray-900">Paid Payments</span>
                   <span className="font-semibold text-green-600">{stats.financial.paidPayments}</span>
                 </div>
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Pending Payments</span>
+                  <span className="text-sm text-gray-900">Pending Payments</span>
                   <span className="font-semibold text-yellow-600">{stats.financial.pendingPayments}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Overdue Payments</span>
+                  <span className="text-sm text-gray-900">Overdue Payments</span>
                   <span className="font-semibold text-red-600">{stats.financial.overduePayments}</span>
                 </div>
               </div>
@@ -374,19 +374,19 @@ export default async function AdminDashboard() {
               </h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Total Units</span>
+                  <span className="text-sm text-gray-900">Total Units</span>
                   <span className="font-semibold text-gray-900">{stats.rooms.total}</span>
                 </div>
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Occupied</span>
+                  <span className="text-sm text-gray-900">Occupied</span>
                   <span className="font-semibold text-green-600">{stats.rooms.occupied}</span>
                 </div>
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Vacant</span>
+                  <span className="text-sm text-gray-900">Vacant</span>
                   <span className="font-semibold text-blue-600">{stats.rooms.vacant}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Under Maintenance</span>
+                  <span className="text-sm text-gray-900">Under Maintenance</span>
                   <span className="font-semibold text-orange-600">{stats.rooms.maintenance}</span>
                 </div>
               </div>

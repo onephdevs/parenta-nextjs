@@ -130,7 +130,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Document Templates</h2>
-          <p className="text-gray-600">Create and manage document templates for automated generation</p>
+          <p className="text-gray-900">Create and manage document templates for automated generation</p>
         </div>
         <div className="flex items-center space-x-3">
           <button
@@ -158,7 +158,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <span className="mr-2">{tab.icon}</span>
@@ -200,21 +200,21 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
                   </div>
 
                   {template.description && (
-                    <p className="text-sm text-gray-600 mb-4">{template.description}</p>
+                    <p className="text-sm text-gray-900 mb-4">{template.description}</p>
                   )}
 
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Variables:</span>
+                      <span className="text-gray-900">Variables:</span>
                       <span className="font-medium">{template.variables.length}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Usage Count:</span>
+                      <span className="text-gray-900">Usage Count:</span>
                       <span className="font-medium">{template.usageCount}</span>
                     </div>
                     {template.lastUsed && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Last Used:</span>
+                        <span className="text-gray-900">Last Used:</span>
                         <span className="font-medium">
                           {new Date(template.lastUsed).toLocaleDateString()}
                         </span>
@@ -260,7 +260,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
               <div className="text-center py-12">
                 <div className="text-gray-400 text-6xl mb-4">📄</div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Templates Found</h3>
-                <p className="text-gray-500 mb-6">Create your first document template to get started.</p>
+                <p className="text-gray-900 mb-6">Create your first document template to get started.</p>
                 <button
                   onClick={() => setShowForm(true)}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
@@ -300,7 +300,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
                     .slice(0, 3)
                     .map((template) => (
                       <div key={template.id} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">{template.name}</span>
+                        <span className="text-gray-900">{template.name}</span>
                         <button
                           onClick={() => {
                             setGenerationData({ templateId: template.id, variables: {} });
@@ -314,7 +314,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
                     ))}
                   
                   {templates.filter(t => t.category === category.id).length > 3 && (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-900">
                       +{templates.filter(t => t.category === category.id).length - 3} more
                     </div>
                   )}
@@ -406,7 +406,7 @@ function DocumentGenerator({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {selectedTemplate.variables.map((variable) => (
               <div key={variable.name}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   {variable.label}
                   {variable.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
@@ -530,12 +530,12 @@ function DocumentGeneratorModal({
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <h5 className="font-medium text-gray-900">{template.name}</h5>
-                        <span className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded-full capitalize">
+                        <span className="text-xs px-2 py-1 bg-gray-200 text-gray-900 rounded-full capitalize">
                           {template.category}
                         </span>
                       </div>
                       {template.description && (
-                        <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                        <p className="text-sm text-gray-900 mt-1">{template.description}</p>
                       )}
                     </div>
                     {generationData.templateId === template.id && (
@@ -561,7 +561,7 @@ function DocumentGeneratorModal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {selectedTemplate.variables.map((variable) => (
                     <div key={variable.name} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-gray-900">
                         {variable.label}
                         {variable.required && <span className="text-red-500 ml-1">*</span>}
                       </label>
@@ -599,7 +599,7 @@ function DocumentGeneratorModal({
                       )}
                       
                       {variable.description && (
-                        <p className="text-xs text-gray-500">{variable.description}</p>
+                        <p className="text-xs text-gray-900">{variable.description}</p>
                       )}
                     </div>
                   ))}
@@ -618,12 +618,12 @@ function DocumentGeneratorModal({
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h5 className="font-medium text-gray-900">{selectedTemplate.name}</h5>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-900">
                       Format: {selectedTemplate.format?.toUpperCase() || 'PDF'}
                     </span>
                   </div>
                   
-                  <div className="text-sm text-gray-600 space-y-2">
+                  <div className="text-sm text-gray-900 space-y-2">
                     <p><strong>Category:</strong> {selectedTemplate.category}</p>
                     <p><strong>Variables:</strong> {selectedTemplate.variables.length}</p>
                     <p><strong>Completed:</strong> {Object.keys(generationData.variables).length}/{selectedTemplate.variables.length}</p>
@@ -648,7 +648,7 @@ function DocumentGeneratorModal({
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-6 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
@@ -696,7 +696,7 @@ function TemplateFormModal({
             </h2>
             <button
               onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-900"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -706,7 +706,7 @@ function TemplateFormModal({
         </div>
         
         <div className="p-6">
-          <p className="text-gray-500 text-center py-8">
+          <p className="text-gray-900 text-center py-8">
             Template creation form would be implemented here.
             This would include fields for template name, category, content editor,
             and variable definitions.
@@ -715,7 +715,7 @@ function TemplateFormModal({
           <div className="flex justify-end space-x-3 mt-6">
             <button
               onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
             >
               Cancel
             </button>

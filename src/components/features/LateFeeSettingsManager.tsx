@@ -292,7 +292,7 @@ export default function LateFeeSettingsManager() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">No tiers added yet. Click "Add Tier" to create one.</p>
+                  <p className="text-sm text-gray-900">No tiers added yet. Click "Add Tier" to create one.</p>
                 )}
               </div>
             )}
@@ -390,7 +390,7 @@ export default function LateFeeSettingsManager() {
       <div className="space-y-4">
         <h3 className="text-xl font-semibold">Current Settings</h3>
         {settings.length === 0 ? (
-          <p className="text-gray-500">No late fee settings configured yet.</p>
+          <p className="text-gray-900">No late fee settings configured yet.</p>
         ) : (
           <div className="grid gap-4">
             {settings.map((setting) => (
@@ -408,7 +408,7 @@ export default function LateFeeSettingsManager() {
                   </span>
                 </div>
                 {setting.description && (
-                  <p className="text-sm text-gray-600 mb-3">{setting.description}</p>
+                  <p className="text-sm text-gray-900 mb-3">{setting.description}</p>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                   <div>

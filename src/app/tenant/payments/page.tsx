@@ -57,7 +57,7 @@ export default function PaymentsPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-900">Loading...</p>
         </div>
       </div>
     );
@@ -206,7 +206,7 @@ export default function PaymentsPage() {
             <div className="flex items-center">
               <Link
                 href="/tenant"
-                className="flex items-center text-gray-500 hover:text-gray-700 mr-4"
+                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
               >
                 <ArrowLeft className="h-5 w-5 mr-1" />
                 Back to Dashboard
@@ -218,7 +218,7 @@ export default function PaymentsPage() {
               </div>
               <div className="ml-4">
                 <h1 className="text-xl font-semibold text-gray-900">Payments</h1>
-                <p className="text-sm text-gray-500">Manage your rent payments and history</p>
+                <p className="text-sm text-gray-900">Manage your rent payments and history</p>
               </div>
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function PaymentsPage() {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">Total Paid</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">Total Paid</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {formatCurrency(paymentData?.totalPaid)}
                           </dd>
@@ -258,11 +258,11 @@ export default function PaymentsPage() {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">Next Due</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">Next Due</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {formatCurrency(paymentData?.nextAmount)}
                           </dd>
-                          <dd className="text-xs text-gray-500">
+                          <dd className="text-xs text-gray-900">
                             Due: {formatDate(paymentData?.nextDueDate)}
                           </dd>
                         </dl>
@@ -279,7 +279,7 @@ export default function PaymentsPage() {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">Outstanding</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">Outstanding</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {formatCurrency(paymentData?.outstandingBalance)}
                           </dd>
@@ -321,10 +321,10 @@ export default function PaymentsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-900">
                       Pay your rent securely online with multiple payment options
                     </p>
-                    <div className="mt-2 text-sm text-gray-600">
+                    <div className="mt-2 text-sm text-gray-900">
                       <p>• Credit/Debit Cards (Visa, MasterCard, American Express)</p>
                       <p>• Bank Transfer (ACH)</p>
                       <p>• Online Banking</p>
@@ -334,7 +334,7 @@ export default function PaymentsPage() {
                     <div className="text-2xl font-bold text-gray-900 mb-2">
                       {formatCurrency(paymentData?.nextAmount)}
                     </div>
-                    <div className="text-sm text-gray-500 mb-4">
+                    <div className="text-sm text-gray-900 mb-4">
                       Due: {formatDate(paymentData?.nextDueDate)}
                     </div>
                     <button
@@ -385,22 +385,22 @@ export default function PaymentsPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Date
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Amount
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Type
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Status
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Reference
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
@@ -423,10 +423,10 @@ export default function PaymentsPage() {
                                   <span className="ml-1">{payment.status}</span>
                                 </span>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
                                 {payment.reference || 'N/A'}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <button
                                   onClick={() => handleDownloadReceipt(payment.id)}
                                   className="text-blue-600 hover:text-blue-900 flex items-center"
@@ -443,7 +443,7 @@ export default function PaymentsPage() {
                   ) : (
                     <div className="text-center py-8">
                       <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">
+                      <p className="text-gray-900">
                         {searchTerm || filterStatus !== 'all' 
                           ? 'No payments found matching your criteria.' 
                           : 'No payment history available.'}

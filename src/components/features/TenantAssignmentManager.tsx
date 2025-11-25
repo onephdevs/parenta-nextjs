@@ -294,7 +294,7 @@ export default function TenantAssignmentManager({
                 <h4 className="text-lg font-medium text-gray-900">
                   {currentTenant.first_name} {currentTenant.last_name}
                 </h4>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-900">
                   <div>
                     <span className="font-medium">Email:</span> {currentTenant.email}
                   </div>
@@ -321,15 +321,15 @@ export default function TenantAssignmentManager({
                 </div>
                 {currentTenant.notes && (
                   <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                    <span className="font-medium text-gray-700">Notes:</span>
-                    <p className="mt-1 text-sm text-gray-600">{currentTenant.notes}</p>
+                    <span className="font-medium text-gray-900">Notes:</span>
+                    <p className="mt-1 text-sm text-gray-900">{currentTenant.notes}</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-900">
             <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
@@ -362,18 +362,18 @@ export default function TenantAssignmentManager({
                       {occupant.first_name} {occupant.last_name}
                     </h4>
                     {occupant.relationship_to_tenant && (
-                      <p className="text-sm text-gray-600 capitalize">
+                      <p className="text-sm text-gray-900 capitalize">
                         {occupant.relationship_to_tenant}
                       </p>
                     )}
                     {occupant.phone && (
-                      <p className="text-sm text-gray-600">Phone: {occupant.phone}</p>
+                      <p className="text-sm text-gray-900">Phone: {occupant.phone}</p>
                     )}
                     {occupant.email && (
-                      <p className="text-sm text-gray-600">Email: {occupant.email}</p>
+                      <p className="text-sm text-gray-900">Email: {occupant.email}</p>
                     )}
                   </div>
-                  <div className="text-right text-sm text-gray-600">
+                  <div className="text-right text-sm text-gray-900">
                     <div>
                       Moved in: {new Date(occupant.move_in_date).toLocaleDateString()}
                     </div>
@@ -402,9 +402,9 @@ export default function TenantAssignmentManager({
                     <h4 className="font-medium text-gray-900">
                       {assignment.first_name} {assignment.last_name}
                     </h4>
-                    <p className="text-sm text-gray-600">{assignment.email}</p>
+                    <p className="text-sm text-gray-900">{assignment.email}</p>
                   </div>
-                  <div className="text-right text-sm text-gray-600">
+                  <div className="text-right text-sm text-gray-900">
                     <div>
                       {new Date(assignment.start_date).toLocaleDateString()} - 
                       {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'Current'}
@@ -433,7 +433,7 @@ export default function TenantAssignmentManager({
               <h3 className="text-lg font-medium text-gray-900 mb-4">Assign Tenant to Room</h3>
               <form onSubmit={handleAssignTenant} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Select Tenant</label>
+                  <label className="block text-sm font-medium text-gray-900">Select Tenant</label>
                   <select
                     value={assignFormData.tenantId}
                     onChange={(e) => setAssignFormData({ ...assignFormData, tenantId: e.target.value })}
@@ -450,7 +450,7 @@ export default function TenantAssignmentManager({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                  <label className="block text-sm font-medium text-gray-900">Start Date</label>
                   <input
                     type="date"
                     value={assignFormData.startDate}
@@ -461,7 +461,7 @@ export default function TenantAssignmentManager({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Monthly Rate (₱)</label>
+                  <label className="block text-sm font-medium text-gray-900">Monthly Rate (₱)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -473,7 +473,7 @@ export default function TenantAssignmentManager({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-900">
                     Deposit Paid (₱)
                     {room?.depositRequired && (
                       <span className="ml-2 text-red-600">*</span>
@@ -501,7 +501,7 @@ export default function TenantAssignmentManager({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Notes</label>
+                  <label className="block text-sm font-medium text-gray-900">Notes</label>
                   <textarea
                     value={assignFormData.notes}
                     onChange={(e) => setAssignFormData({ ...assignFormData, notes: e.target.value })}
@@ -522,7 +522,7 @@ export default function TenantAssignmentManager({
                   <button
                     type="button"
                     onClick={() => setShowAssignForm(false)}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
                   >
                     Cancel
                   </button>
@@ -546,7 +546,7 @@ export default function TenantAssignmentManager({
               </div>
               <form onSubmit={handleUnassignTenant} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">End Date</label>
+                  <label className="block text-sm font-medium text-gray-900">End Date</label>
                   <input
                     type="date"
                     value={unassignFormData.endDate}
@@ -557,7 +557,7 @@ export default function TenantAssignmentManager({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Notes</label>
+                  <label className="block text-sm font-medium text-gray-900">Notes</label>
                   <textarea
                     value={unassignFormData.notes}
                     onChange={(e) => setUnassignFormData({ ...unassignFormData, notes: e.target.value })}
@@ -578,7 +578,7 @@ export default function TenantAssignmentManager({
                   <button
                     type="button"
                     onClick={() => setShowUnassignForm(false)}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
                   >
                     Cancel
                   </button>

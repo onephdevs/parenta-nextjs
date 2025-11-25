@@ -111,7 +111,7 @@ export default function AddOccupantModal({
             <h3 className="text-lg font-medium text-gray-900">Add Occupant</h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
+              className="text-gray-400 hover:text-gray-900"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -119,14 +119,14 @@ export default function AddOccupantModal({
             </button>
           </div>
 
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-gray-900 mb-4">
             Add a non-tenant occupant (e.g., relative, spouse, child) to this room.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">First Name *</label>
+                <label className="block text-sm font-medium text-gray-900">First Name *</label>
                 <input
                   type="text"
                   value={formData.firstName}
@@ -137,7 +137,7 @@ export default function AddOccupantModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Last Name *</label>
+                <label className="block text-sm font-medium text-gray-900">Last Name *</label>
                 <input
                   type="text"
                   value={formData.lastName}
@@ -150,7 +150,7 @@ export default function AddOccupantModal({
 
             {tenantId && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Relationship to Tenant</label>
+                <label className="block text-sm font-medium text-gray-900">Relationship to Tenant</label>
                 <select
                   value={formData.relationshipToTenant}
                   onChange={(e) => setFormData({ ...formData, relationshipToTenant: e.target.value })}
@@ -167,7 +167,7 @@ export default function AddOccupantModal({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                <label className="block text-sm font-medium text-gray-900">Date of Birth</label>
                 <input
                   type="date"
                   value={formData.dateOfBirth}
@@ -177,7 +177,7 @@ export default function AddOccupantModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Move-in Date *</label>
+                <label className="block text-sm font-medium text-gray-900">Move-in Date *</label>
                 <input
                   type="date"
                   value={formData.moveInDate}
@@ -190,7 +190,7 @@ export default function AddOccupantModal({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                <label className="block text-sm font-medium text-gray-900">Phone</label>
                 <input
                   type="tel"
                   value={formData.phone}
@@ -200,7 +200,7 @@ export default function AddOccupantModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <label className="block text-sm font-medium text-gray-900">Email</label>
                 <input
                   type="email"
                   value={formData.email}
@@ -214,7 +214,7 @@ export default function AddOccupantModal({
               <h4 className="text-sm font-medium text-gray-900 mb-3">Emergency Contact (Optional)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Contact Name</label>
+                  <label className="block text-sm font-medium text-gray-900">Contact Name</label>
                   <input
                     type="text"
                     value={formData.emergencyContactName}
@@ -224,7 +224,7 @@ export default function AddOccupantModal({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Contact Phone</label>
+                  <label className="block text-sm font-medium text-gray-900">Contact Phone</label>
                   <input
                     type="tel"
                     value={formData.emergencyContactPhone}
@@ -235,7 +235,7 @@ export default function AddOccupantModal({
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700">Relationship</label>
+                <label className="block text-sm font-medium text-gray-900">Relationship</label>
                 <input
                   type="text"
                   value={formData.emergencyContactRelationship}
@@ -247,7 +247,7 @@ export default function AddOccupantModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Notes</label>
+              <label className="block text-sm font-medium text-gray-900">Notes</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -268,7 +268,7 @@ export default function AddOccupantModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
               >
                 Cancel
               </button>

@@ -150,7 +150,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
         <div className="text-center">
           <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">All Caught Up!</h3>
-          <p className="text-gray-500">No maintenance items scheduled or overdue.</p>
+          <p className="text-gray-900">No maintenance items scheduled or overdue.</p>
         </div>
       </div>
     );
@@ -163,7 +163,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Items</p>
+              <p className="text-sm font-medium text-gray-900">Total Items</p>
               <p className="text-2xl font-bold text-blue-600">
                 {maintenanceItems.length}
               </p>
@@ -177,7 +177,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Overdue</p>
+              <p className="text-sm font-medium text-gray-900">Overdue</p>
               <p className="text-2xl font-bold text-red-600">
                 {groupedItems.overdue.length}
               </p>
@@ -191,7 +191,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Upcoming</p>
+              <p className="text-sm font-medium text-gray-900">Upcoming</p>
               <p className="text-2xl font-bold text-green-600">
                 {groupedItems.upcoming.length}
               </p>
@@ -216,19 +216,19 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Asset
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Due Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Priority
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Condition
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -241,7 +241,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
                         <div className="text-sm font-medium text-gray-900">
                           {item.asset.assetName}
                         </div>
-                        <div className="text-sm text-gray-500 capitalize">
+                        <div className="text-sm text-gray-900 capitalize">
                           {item.asset.assetType}
                         </div>
                       </div>
@@ -285,19 +285,19 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Asset
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Due Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Priority
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Condition
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -310,7 +310,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
                         <div className="text-sm font-medium text-gray-900">
                           {item.asset.assetName}
                         </div>
-                        <div className="text-sm text-gray-500 capitalize">
+                        <div className="text-sm text-gray-900 capitalize">
                           {item.asset.assetType}
                         </div>
                       </div>

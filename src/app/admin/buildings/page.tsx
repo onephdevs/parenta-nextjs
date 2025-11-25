@@ -47,7 +47,7 @@ export default async function BuildingsPage({ searchParams }: BuildingsPageProps
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Buildings
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Manage your property portfolio
               </p>
             </div>
@@ -72,7 +72,7 @@ export default async function BuildingsPage({ searchParams }: BuildingsPageProps
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Total Buildings</dt>
+                <dt className="text-sm font-medium text-gray-900">Total Buildings</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{buildings.length}</dd>
               </div>
             </div>
@@ -88,7 +88,7 @@ export default async function BuildingsPage({ searchParams }: BuildingsPageProps
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Total Units</dt>
+                <dt className="text-sm font-medium text-gray-900">Total Units</dt>
                 <dd className="text-2xl font-semibold text-gray-900">
                   {buildings.reduce((total, building) => total + building.totalUnits, 0)}
                 </dd>
@@ -107,7 +107,7 @@ export default async function BuildingsPage({ searchParams }: BuildingsPageProps
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Locations</dt>
+                <dt className="text-sm font-medium text-gray-900">Locations</dt>
                 <dd className="text-2xl font-semibold text-gray-900">
                   {new Set(buildings.map(b => `${b.city}, ${b.state}`)).size}
                 </dd>

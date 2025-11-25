@@ -67,7 +67,7 @@ export default function CostAllocationDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">Cost Allocation System</h1>
-            <p className="text-gray-600">
+            <p className="text-gray-900">
               Configure allocation rules, calculate costs, and manage tenant utility bills
             </p>
           </div>
@@ -76,7 +76,7 @@ export default function CostAllocationDashboard() {
         {/* Building Selection */}
         <div className="bg-white rounded-lg shadow border p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900">
-            <Building className="h-5 w-5 text-gray-700" />
+            <Building className="h-5 w-5 text-gray-900" />
             Select Building
           </h3>
           <div className="flex items-center gap-4">
@@ -95,7 +95,7 @@ export default function CostAllocationDashboard() {
               </select>
             </div>
             {selectedBuilding && (
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-900">
                 {selectedBuilding.totalUnits} units • {selectedBuilding.totalFloors} floors
               </div>
             )}
@@ -128,7 +128,7 @@ export default function CostAllocationDashboard() {
                       className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                         activeTab === tab.id
                           ? 'border-blue-500 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
                       }`}
                     >
                       <Icon className="h-4 w-4" />
@@ -151,7 +151,7 @@ export default function CostAllocationDashboard() {
                           <Settings className="h-6 w-6 text-blue-600" />
                         </div>
                         <h4 className="font-semibold mb-2 text-gray-900">1. Configure Rules</h4>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Set up allocation methods for each utility type (equal split, usage-based, room size, or custom)
                         </p>
                       </div>
@@ -160,7 +160,7 @@ export default function CostAllocationDashboard() {
                           <Calculator className="h-6 w-6 text-green-600" />
                         </div>
                         <h4 className="font-semibold mb-2 text-gray-900">2. Calculate Costs</h4>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Select a utility bill and automatically calculate how costs should be split among tenants
                         </p>
                       </div>
@@ -169,7 +169,7 @@ export default function CostAllocationDashboard() {
                           <FileText className="h-6 w-6 text-purple-600" />
                         </div>
                         <h4 className="font-semibold mb-2 text-gray-900">3. Generate Bills</h4>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Create individual tenant utility bills with detailed cost breakdowns and track payment status
                         </p>
                       </div>
@@ -255,7 +255,7 @@ export default function CostAllocationDashboard() {
             <div className="bg-white rounded-lg shadow border p-8 text-center">
               <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Building</h3>
-              <p className="text-gray-600">
+              <p className="text-gray-900">
                 Choose a building to configure cost allocation rules and manage tenant utility bills.
               </p>
             </div>

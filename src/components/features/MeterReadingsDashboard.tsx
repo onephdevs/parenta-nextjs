@@ -43,7 +43,7 @@ export default function MeterReadingsDashboard() {
             Add Reading
           </button>
         </div>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-gray-900">
           Track and manage utility meter readings across all properties.
         </p>
       </div>
@@ -60,7 +60,7 @@ export default function MeterReadingsDashboard() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Meters</dt>
+                  <dt className="text-sm font-medium text-gray-900 truncate">Total Meters</dt>
                   <dd className="text-lg font-medium text-gray-900">{readings.length}</dd>
                 </dl>
               </div>
@@ -78,7 +78,7 @@ export default function MeterReadingsDashboard() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Recent Readings</dt>
+                  <dt className="text-sm font-medium text-gray-900 truncate">Recent Readings</dt>
                   <dd className="text-lg font-medium text-gray-900">0</dd>
                 </dl>
               </div>
@@ -96,7 +96,7 @@ export default function MeterReadingsDashboard() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Pending Readings</dt>
+                  <dt className="text-sm font-medium text-gray-900 truncate">Pending Readings</dt>
                   <dd className="text-lg font-medium text-gray-900">0</dd>
                 </dl>
               </div>
@@ -114,7 +114,7 @@ export default function MeterReadingsDashboard() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">This Month</dt>
+                  <dt className="text-sm font-medium text-gray-900 truncate">This Month</dt>
                   <dd className="text-lg font-medium text-gray-900">0</dd>
                 </dl>
               </div>
@@ -135,7 +135,7 @@ export default function MeterReadingsDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No meter readings</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by adding your first meter reading.</p>
+            <p className="mt-1 text-sm text-gray-900">Get started by adding your first meter reading.</p>
             <div className="mt-6">
               <button
                 type="button"

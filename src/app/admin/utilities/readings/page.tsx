@@ -18,7 +18,7 @@ export default async function MeterReadingsPage() {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Meter Readings</h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-gray-900 mt-1">
                 Track utility consumption and manage meter readings across all properties
               </p>
             </div>

@@ -122,11 +122,11 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Quick Edit Room</h3>
-            <p className="text-sm text-gray-500">Update essential room details</p>
+            <p className="text-sm text-gray-900">Update essential room details</p>
           </div>
           <button
             onClick={handleCancel}
-            className="text-gray-400 hover:text-gray-600 focus:outline-none"
+            className="text-gray-400 hover:text-gray-900 focus:outline-none"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -145,7 +145,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
           <div className="space-y-4">
             {/* Room Number */}
             <div>
-              <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-900 mb-1">
                 Room Number *
               </label>
               <input
@@ -161,7 +161,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
 
             {/* Room Type */}
             <div>
-              <label htmlFor="roomType" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="roomType" className="block text-sm font-medium text-gray-900 mb-1">
                 Room Type *
               </label>
               <select
@@ -184,7 +184,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
 
             {/* Room Status */}
             <div>
-              <label htmlFor="roomStatus" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="roomStatus" className="block text-sm font-medium text-gray-900 mb-1">
                 Status *
               </label>
               <select
@@ -205,7 +205,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
             {/* Financial Fields */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-900 mb-1">
                   Monthly Rent ($) *
                 </label>
                 <input
@@ -222,7 +222,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
               </div>
 
               <div>
-                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-900 mb-1">
                   Deposit ($)
                 </label>
                 <input
@@ -263,7 +263,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
               type="button"
               onClick={handleCancel}
               disabled={isSubmitting}
-              className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+              className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
             >
               Cancel
             </button>

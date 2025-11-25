@@ -242,7 +242,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
           <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Search</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
@@ -256,7 +256,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Utility Type</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Utility Type</label>
                 <select
                   value={filters.utilityType || 'all'}
                   onChange={(e) => setFilters({ 
@@ -277,7 +277,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Status</label>
                 <select
                   value={filters.billStatus || 'all'}
                   onChange={(e) => setFilters({ 
@@ -295,7 +295,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Period Start</label>
                 <input
                   type="date"
                   value={filters.startDate || ''}
@@ -349,28 +349,28 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Tenant
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Room
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Utility
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Period
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Due Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -381,13 +381,13 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {bill.tenantName}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {bill.roomNumber}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
                     {bill.utilityType}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {format(new Date(bill.billingPeriodStart), 'MMM d')} - {format(new Date(bill.billingPeriodEnd), 'MMM d, yyyy')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
@@ -396,14 +396,14 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(bill.billStatus)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {bill.dueDate && (
                       <span className={`${new Date(bill.dueDate) < new Date() && bill.billStatus !== 'paid' ? 'text-red-600 font-medium' : ''}`}>
                         {format(new Date(bill.dueDate), 'MMM d, yyyy')}
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <button
                       onClick={() => {
                         setSelectedBill(bill);
@@ -422,7 +422,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
         </div>
 
         {filteredBills.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-900">
             No tenant utility bills found matching your criteria.
           </div>
         )}
@@ -430,7 +430,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-6">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-900">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} bills
             </div>
             <div className="flex gap-2">
@@ -465,29 +465,29 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
               {/* Bill Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Tenant</label>
+                  <label className="block text-sm font-medium text-gray-900">Tenant</label>
                   <div className="font-medium">{selectedBill.tenantName}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Room</label>
+                  <label className="block text-sm font-medium text-gray-900">Room</label>
                   <div className="font-medium">{selectedBill.roomNumber}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Utility Type</label>
+                  <label className="block text-sm font-medium text-gray-900">Utility Type</label>
                   <div className="capitalize">{selectedBill.utilityType}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <label className="block text-sm font-medium text-gray-900">Status</label>
                   <div>{getStatusBadge(selectedBill.billStatus)}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Billing Period</label>
+                  <label className="block text-sm font-medium text-gray-900">Billing Period</label>
                   <div>
                     {format(new Date(selectedBill.billingPeriodStart), 'MMM d')} - {format(new Date(selectedBill.billingPeriodEnd), 'MMM d, yyyy')}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Due Date</label>
+                  <label className="block text-sm font-medium text-gray-900">Due Date</label>
                   <div>
                     {selectedBill.dueDate && format(new Date(selectedBill.dueDate), 'MMM d, yyyy')}
                   </div>
@@ -496,7 +496,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
               {/* Cost Breakdown */}
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">Cost Breakdown</label>
+                <label className="block text-sm font-medium text-gray-900">Cost Breakdown</label>
                 <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
                   {selectedBill.baseCharge > 0 && (
                     <div className="flex justify-between">
@@ -520,7 +520,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                     <span>Total Amount:</span>
                     <span>${selectedBill.allocatedAmount.toFixed(2)}</span>
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-900">
                     Share: {selectedBill.tenantSharePercentage.toFixed(1)}% of total building cost
                   </div>
                 </div>
@@ -528,7 +528,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
               {/* Status Actions */}
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">Update Status</label>
+                <label className="block text-sm font-medium text-gray-900">Update Status</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => updateBillStatus(selectedBill.id, 'sent')}
@@ -556,7 +556,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
               {selectedBill.paidDate && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Paid Date</label>
+                  <label className="block text-sm font-medium text-gray-900">Paid Date</label>
                   <div className="text-green-600 font-medium">
                     {format(new Date(selectedBill.paidDate), 'MMM d, yyyy')}
                   </div>
@@ -565,7 +565,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
               {selectedBill.notes && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Notes</label>
+                  <label className="block text-sm font-medium text-gray-900">Notes</label>
                   <div className="text-sm">{selectedBill.notes}</div>
                 </div>
               )}

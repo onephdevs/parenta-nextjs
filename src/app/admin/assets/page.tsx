@@ -14,7 +14,7 @@ export default function AssetsPage() {
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Assets
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Manage property assets, track assignments, and monitor financial performance
               </p>
             </div>

@@ -71,7 +71,7 @@ export default function PaymentGatewayManager() {
               className={`${
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2`}
             >
               <span>{tab.icon}</span>
@@ -99,7 +99,7 @@ export default function PaymentGatewayManager() {
                       </div>
                       <div>
                         <h4 className="font-medium text-gray-900">{gateway.name}</h4>
-                        <p className="text-sm text-gray-500 capitalize">{gateway.type}</p>
+                        <p className="text-sm text-gray-900 capitalize">{gateway.type}</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -115,7 +115,7 @@ export default function PaymentGatewayManager() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Status:</span>
+                      <span className="text-gray-900">Status:</span>
                       <span className={`${
                         gateway.isActive ? 'text-green-600' : 'text-gray-400'
                       } font-medium`}>
@@ -123,13 +123,13 @@ export default function PaymentGatewayManager() {
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Processing Fee:</span>
+                      <span className="text-gray-900">Processing Fee:</span>
                       <span className="text-gray-900 font-medium">
                         {gateway.fees.percentageFee}% + ${gateway.fees.fixedFee}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Supported Methods:</span>
+                      <span className="text-gray-900">Supported Methods:</span>
                       <span className="text-gray-900 font-medium">
                         {gateway.supportedMethods.length} methods
                       </span>
@@ -161,7 +161,7 @@ export default function PaymentGatewayManager() {
               <div className="text-center py-8">
                 <div className="text-gray-400 text-6xl mb-4">⚙️</div>
                 <h4 className="text-lg font-medium text-gray-900 mb-2">Select a Gateway to Configure</h4>
-                <p className="text-gray-500 mb-6">Choose a payment gateway from the overview tab to manage its settings.</p>
+                <p className="text-gray-900 mb-6">Choose a payment gateway from the overview tab to manage its settings.</p>
                 <button
                   onClick={() => setActiveTab('overview')}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
@@ -194,17 +194,17 @@ export default function PaymentGatewayManager() {
                       <span className="text-2xl">{method.icon}</span>
                       <div>
                         <h4 className="font-medium text-gray-900">{method.displayName}</h4>
-                        <p className="text-sm text-gray-500">via {gateway.name}</p>
+                        <p className="text-sm text-gray-900">via {gateway.name}</p>
                       </div>
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Processing Time:</span>
+                        <span className="text-gray-900">Processing Time:</span>
                         <span className="text-gray-900">{method.processingTime}</span>
                       </div>
                       {method.fees && (
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Fees:</span>
+                          <span className="text-gray-900">Fees:</span>
                           <span className="text-gray-900">{method.fees}</span>
                         </div>
                       )}
@@ -242,15 +242,15 @@ export default function PaymentGatewayManager() {
                 <h4 className="font-medium text-gray-900 mb-4">Test Credit Cards</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">4242 4242 4242 4242</span>
+                    <span className="text-sm text-gray-900">4242 4242 4242 4242</span>
                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Success</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">4000 0000 0000 0002</span>
+                    <span className="text-sm text-gray-900">4000 0000 0000 0002</span>
                     <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Declined</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">4000 0000 0000 9995</span>
+                    <span className="text-sm text-gray-900">4000 0000 0000 9995</span>
                     <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Insufficient Funds</span>
                   </div>
                 </div>
@@ -259,7 +259,7 @@ export default function PaymentGatewayManager() {
               {/* Test Actions */}
               <div className="border border-gray-200 rounded-lg p-6">
                 <h4 className="font-medium text-gray-900 mb-4">Test Payment</h4>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-gray-900 mb-4">
                   Create a test payment to verify your gateway configuration.
                 </p>
                 <button className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 text-sm font-medium">
@@ -321,7 +321,7 @@ function GatewayConfigForm({
         </div>
         <div>
           <h4 className="text-xl font-semibold text-gray-900">{gateway.name} Configuration</h4>
-          <p className="text-gray-500 capitalize">{gateway.type} gateway settings</p>
+          <p className="text-gray-900 capitalize">{gateway.type} gateway settings</p>
         </div>
       </div>
 
@@ -331,7 +331,7 @@ function GatewayConfigForm({
           <h5 className="font-medium text-gray-900 mb-3">Basic Settings</h5>
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-900 mb-1">
                 Currency
               </label>
               <select
@@ -359,7 +359,7 @@ function GatewayConfigForm({
                 onChange={(e) => setSettings({ ...settings, testMode: e.target.checked })}
                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <span className="ml-2 text-sm text-gray-700">Test Mode</span>
+              <span className="ml-2 text-sm text-gray-900">Test Mode</span>
             </label>
             <label className="flex items-center">
               <input
@@ -368,7 +368,7 @@ function GatewayConfigForm({
                 onChange={(e) => setSettings({ ...settings, requireCvv: e.target.checked })}
                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <span className="ml-2 text-sm text-gray-700">Require CVV</span>
+              <span className="ml-2 text-sm text-gray-900">Require CVV</span>
             </label>
             <label className="flex items-center">
               <input
@@ -377,7 +377,7 @@ function GatewayConfigForm({
                 onChange={(e) => setSettings({ ...settings, allowSaveCard: e.target.checked })}
                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <span className="ml-2 text-sm text-gray-700">Allow Save Card</span>
+              <span className="ml-2 text-sm text-gray-900">Allow Save Card</span>
             </label>
           </div>
         </div>
@@ -393,7 +393,7 @@ function GatewayConfigForm({
                 onChange={(e) => setSettings({ ...settings, autoCapture: e.target.checked })}
                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <span className="ml-2 text-sm text-gray-700">Auto-capture Payments</span>
+              <span className="ml-2 text-sm text-gray-900">Auto-capture Payments</span>
             </label>
             <label className="flex items-center">
               <input
@@ -402,7 +402,7 @@ function GatewayConfigForm({
                 onChange={(e) => setSettings({ ...settings, enableRecurring: e.target.checked })}
                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
               />
-              <span className="ml-2 text-sm text-gray-700">Enable Recurring Payments</span>
+              <span className="ml-2 text-sm text-gray-900">Enable Recurring Payments</span>
             </label>
           </div>
         </div>
@@ -411,7 +411,7 @@ function GatewayConfigForm({
         <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
           <button
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-900 hover:bg-gray-50"
           >
             Cancel
           </button>

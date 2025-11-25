@@ -106,7 +106,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     <div className="bg-white shadow rounded-lg">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Add New Room</h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-900 mt-1">
           Create a new room in <span className="font-medium">{building.name}</span>
         </p>
       </div>
@@ -131,7 +131,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="roomNumber" className="block text-sm font-medium text-gray-900 mb-1">
               Room Number *
             </label>
             <input
@@ -147,7 +147,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
           </div>
           
           <div>
-            <label htmlFor="roomType" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="roomType" className="block text-sm font-medium text-gray-900 mb-1">
               Room Type *
             </label>
             <select
@@ -173,7 +173,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
         {/* Room Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label htmlFor="floorNumber" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="floorNumber" className="block text-sm font-medium text-gray-900 mb-1">
               Floor Number
             </label>
             <input
@@ -190,7 +190,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
           </div>
 
           <div>
-            <label htmlFor="squareFootage" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="squareFootage" className="block text-sm font-medium text-gray-900 mb-1">
               Size (sq ft)
             </label>
             <input
@@ -209,7 +209,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
 
         {/* Financial Information */}
         <div>
-          <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-900 mb-1">
             Monthly Rate (₱) *
           </label>
           <input
@@ -313,7 +313,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
                     placeholder="e.g., 50, 100"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-900">
                     {formData.monthlyRate && formData.depositPercentage
                       ? `Deposit: ₱${((formData.monthlyRate * formData.depositPercentage) / 100).toLocaleString()}`
                       : 'Enter percentage to see calculated amount'}
@@ -353,7 +353,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
             Description
           </label>
           <textarea
@@ -369,7 +369,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
 
         {/* Amenities */}
         <div>
-          <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="amenities" className="block text-sm font-medium text-gray-900 mb-1">
             Amenities (comma-separated)
           </label>
           <input
@@ -389,7 +389,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
             type="button"
             onClick={handleCancel}
             disabled={isSubmitting}
-            className="px-6 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2 text-sm font-medium text-gray-900 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>

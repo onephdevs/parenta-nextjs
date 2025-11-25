@@ -211,7 +211,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
       <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6">
         {/* Building Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             Building <span className="text-red-500">*</span>
           </label>
           <select
@@ -235,7 +235,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
 
         {/* Room Selection (Optional) */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             Room (Optional)
           </label>
           <select
@@ -252,14 +252,14 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
             ))}
           </select>
           {loadingRooms && (
-            <p className="mt-1 text-sm text-gray-500">Loading rooms...</p>
+            <p className="mt-1 text-sm text-gray-900">Loading rooms...</p>
           )}
         </div>
 
         {/* Utility Type and Meter Number */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Utility Type <span className="text-red-500">*</span>
             </label>
             <select
@@ -281,7 +281,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Meter Number (Optional)
             </label>
             <input
@@ -297,7 +297,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
         {/* Reading Date and Value */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Reading Date <span className="text-red-500">*</span>
             </label>
             <input
@@ -315,7 +315,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Reading Value <span className="text-red-500">*</span>
             </label>
             <input
@@ -337,7 +337,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             Notes (Optional)
           </label>
           <textarea
@@ -355,7 +355,7 @@ export default function MeterReadingForm({ reading, onSubmit, onCancel }: MeterR
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Cancel
             </button>

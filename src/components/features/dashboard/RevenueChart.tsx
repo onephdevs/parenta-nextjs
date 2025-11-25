@@ -19,7 +19,7 @@ export default function RevenueChart({ data }: RevenueChartProps) {
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Monthly Revenue Trend
           </h3>
-          <div className="flex items-center justify-center h-[300px] text-gray-500">
+          <div className="flex items-center justify-center h-[300px] text-gray-900">
             No revenue data available for the last 12 months
           </div>
         </div>
@@ -33,7 +33,7 @@ export default function RevenueChart({ data }: RevenueChartProps) {
         <h3 className="text-lg font-medium text-gray-900 mb-4">
           Monthly Revenue Trend
         </h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-900 mb-4">
           Last 12 months of payment data
         </p>
         <ResponsiveContainer width="100%" height={300}>

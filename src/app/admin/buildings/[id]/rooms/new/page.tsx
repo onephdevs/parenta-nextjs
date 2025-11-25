@@ -38,7 +38,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
           <div className="flex items-center space-x-2 py-3 border-b border-gray-200">
             <Link 
               href="/admin" 
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+              className="text-sm text-gray-900 hover:text-gray-900 flex items-center"
             >
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -50,7 +50,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
             </svg>
             <Link 
               href="/admin/buildings" 
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-900 hover:text-gray-900"
             >
               Buildings
             </Link>
@@ -59,7 +59,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
             </svg>
             <Link 
               href={`/admin/buildings/${building.id}`}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-900 hover:text-gray-900"
             >
               {building.name}
             </Link>
@@ -68,7 +68,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
             </svg>
             <Link 
               href={`/admin/buildings/${building.id}/rooms`}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-900 hover:text-gray-900"
             >
               Rooms
             </Link>
@@ -82,7 +82,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
             <div className="flex items-center">
               <Link
                 href={`/admin/buildings/${building.id}`}
-                className="mr-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                className="mr-4 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title="Back to Building Details"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,7 +91,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Add Room</h1>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-900 mt-1">
                   Add a new room to {building.name}
                 </p>
               </div>

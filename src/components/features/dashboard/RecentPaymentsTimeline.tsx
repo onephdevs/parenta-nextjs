@@ -14,7 +14,7 @@ export default function RecentPaymentsTimeline({ payments }: RecentPaymentsTimel
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Recent Payments
           </h3>
-          <p className="text-sm text-gray-500">No recent payments</p>
+          <p className="text-sm text-gray-900">No recent payments</p>
         </div>
       </div>
     );
@@ -71,11 +71,11 @@ export default function RecentPaymentsTimeline({ payments }: RecentPaymentsTimel
                             ₱{payment.amount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </span>
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-900">
                           {payment.paymentMethod} • {payment.paymentType}
                         </p>
                       </div>
-                      <div className="text-right text-sm whitespace-nowrap text-gray-500">
+                      <div className="text-right text-sm whitespace-nowrap text-gray-900">
                         {new Date(payment.paymentDate).toLocaleDateString()}
                       </div>
                     </div>

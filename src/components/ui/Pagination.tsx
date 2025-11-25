@@ -80,7 +80,7 @@ export default function Pagination({
         {currentPage > 1 ? (
           <Link
             href={createPageURL(currentPage - 1)}
-            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
           >
             Previous
           </Link>
@@ -92,7 +92,7 @@ export default function Pagination({
         {currentPage < totalPages ? (
           <Link
             href={createPageURL(currentPage + 1)}
-            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
           >
             Next
           </Link>
@@ -106,7 +106,7 @@ export default function Pagination({
       {/* Desktop view */}
       <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-gray-900">
             Showing <span className="font-medium">{startItem}</span> to{' '}
             <span className="font-medium">{endItem}</span> of{' '}
             <span className="font-medium">{totalItems}</span> results
@@ -121,7 +121,7 @@ export default function Pagination({
             {currentPage > 1 ? (
               <Link
                 href={createPageURL(currentPage - 1)}
-                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
               >
                 <span className="sr-only">Previous</span>
                 <svg
@@ -163,7 +163,7 @@ export default function Pagination({
                 return (
                   <span
                     key={`ellipsis-${index}`}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-900"
                   >
                     ...
                   </span>
@@ -180,7 +180,7 @@ export default function Pagination({
                   className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                     isCurrentPage
                       ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
-                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                      : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
                   }`}
                   aria-current={isCurrentPage ? 'page' : undefined}
                 >
@@ -193,7 +193,7 @@ export default function Pagination({
             {currentPage < totalPages ? (
               <Link
                 href={createPageURL(currentPage + 1)}
-                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
               >
                 <span className="sr-only">Next</span>
                 <svg

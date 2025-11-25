@@ -48,7 +48,7 @@ export default function TenantSignIn() {
           {/* Back to Home */}
           <Link 
             href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-green-600 mb-8 transition"
+            className="inline-flex items-center text-sm text-gray-900 hover:text-green-600 mb-8 transition"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
@@ -62,7 +62,7 @@ export default function TenantSignIn() {
               </div>
             </div>
             <h2 className="text-3xl font-bold text-gray-900">Tenant Portal</h2>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-gray-900">
               Access your account and manage your rental
             </p>
           </div>
@@ -78,7 +78,7 @@ export default function TenantSignIn() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
                 Email Address
               </label>
               <div className="relative">
@@ -100,7 +100,7 @@ export default function TenantSignIn() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
                 Password
               </label>
               <div className="relative">
@@ -129,7 +129,7 @@ export default function TenantSignIn() {
                   type="checkbox"
                   className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                   Remember me
                 </label>
               </div>
@@ -172,7 +172,7 @@ export default function TenantSignIn() {
           {/* Help Section */}
           <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
             <p className="text-sm font-medium text-gray-900 mb-2">Need Help?</p>
-            <div className="text-xs text-gray-600 space-y-1">
+            <div className="text-xs text-gray-900 space-y-1">
               <p>• Contact your property manager for account access</p>
               <p>• Call our support: +63 (2) 1234-5678</p>
               <p>• Email: support@parenta.com</p>
@@ -181,7 +181,7 @@ export default function TenantSignIn() {
 
           {/* Back to Properties */}
           <div className="mt-6 text-center">
-            <Link href="/#properties" className="text-sm text-gray-600 hover:text-green-600">
+            <Link href="/#properties" className="text-sm text-gray-900 hover:text-green-600">
               ← Browse Available Properties
             </Link>
           </div>

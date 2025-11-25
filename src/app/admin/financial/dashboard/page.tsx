@@ -35,7 +35,7 @@ export default async function DashboardPage() {
         <h1 className="text-3xl font-bold text-gray-900">
           Financial Dashboard
         </h1>
-        <p className="mt-2 text-sm text-gray-700">
+        <p className="mt-2 text-sm text-gray-900">
           Real-time overview of your property management performance
         </p>
       </div>

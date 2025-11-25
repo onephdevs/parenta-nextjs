@@ -181,7 +181,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
         );
       default:
         return (
-          <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-8 h-8 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         );
@@ -200,7 +200,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
         <div className="flex items-center space-x-4">
           <Link
             href="/admin/documents"
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-900 hover:text-gray-900"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -220,7 +220,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
               {getDocumentTypeIcon(document.documentType || 'other')}
               <div>
                 <h3 className="text-sm font-medium text-gray-900">{document.fileName}</h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-900">
                   {document.fileSize ? formatFileSize(document.fileSize) : 'Unknown size'}
                 </p>
               </div>
@@ -228,30 +228,30 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
             <dl className="space-y-3">
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">MIME Type</dt>
+                <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">MIME Type</dt>
                 <dd className="text-sm text-gray-900">{document.mimeType || 'Unknown'}</dd>
               </div>
               
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Version</dt>
+                <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">Version</dt>
                 <dd className="text-sm text-gray-900">v{document.versionNumber}</dd>
               </div>
               
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</dt>
+                <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">Uploaded</dt>
                 <dd className="text-sm text-gray-900">{formatDate(document.createdAt)}</dd>
               </div>
               
               {document.uploaderName && (
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded By</dt>
+                  <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">Uploaded By</dt>
                   <dd className="text-sm text-gray-900">{document.uploaderName}</dd>
                 </div>
               )}
               
               {document.expiryDate && (
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Expiry Status</dt>
+                  <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">Expiry Status</dt>
                   <dd className={`text-sm ${
                     isExpired ? 'text-red-600' : isExpiringSoon ? 'text-yellow-600' : 'text-green-600'
                   }`}>
@@ -264,7 +264,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
             <div className="mt-6 pt-6 border-t border-gray-200">
               <button
                 onClick={() => window.open(`/uploads/documents/${document.fileName}`, '_blank')}
-                className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -282,7 +282,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
             
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <label htmlFor="documentName" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="documentName" className="block text-sm font-medium text-gray-900 mb-1">
                   Document Name *
                 </label>
                 <input
@@ -298,7 +298,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="categoryId" className="block text-sm font-medium text-gray-900 mb-1">
                     Category
                   </label>
                   <select
@@ -318,7 +318,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
                 </div>
 
                 <div>
-                  <label htmlFor="documentType" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="documentType" className="block text-sm font-medium text-gray-900 mb-1">
                     Document Type
                   </label>
                   <select
@@ -339,7 +339,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
                   Description
                 </label>
                 <textarea
@@ -354,7 +354,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
               </div>
 
               <div>
-                <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="tags" className="block text-sm font-medium text-gray-900 mb-1">
                   Tags (comma-separated)
                 </label>
                 <input
@@ -370,7 +370,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="accessLevel" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="accessLevel" className="block text-sm font-medium text-gray-900 mb-1">
                     Access Level
                   </label>
                   <select
@@ -387,7 +387,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
                 </div>
 
                 <div>
-                  <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-900 mb-1">
                     Expiry Date
                   </label>
                   <input
@@ -431,7 +431,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
               <div className="flex space-x-3">
               <Link
                 href="/admin/documents"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Cancel
               </Link>

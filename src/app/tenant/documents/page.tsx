@@ -141,7 +141,7 @@ export default function DocumentsPage() {
     } else if (type.includes('word') || type.includes('document')) {
       return <FileCode className="h-8 w-8 text-blue-500" />;
     } else {
-      return <File className="h-8 w-8 text-gray-500" />;
+      return <File className="h-8 w-8 text-gray-900" />;
     }
   };
 
@@ -199,7 +199,7 @@ export default function DocumentsPage() {
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your documents...</p>
+            <p className="text-gray-900">Loading your documents...</p>
           </div>
         </div>
       </div>
@@ -215,7 +215,7 @@ export default function DocumentsPage() {
             <div className="flex items-center">
               <Link
                 href="/tenant"
-                className="flex items-center text-gray-500 hover:text-gray-700 mr-4"
+                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
               >
                 <ArrowLeft className="h-5 w-5 mr-1" />
                 Back to Dashboard
@@ -227,7 +227,7 @@ export default function DocumentsPage() {
               </div>
               <div className="ml-4">
                 <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
-                <p className="text-sm text-gray-500">Access and download your property documents</p>
+                <p className="text-sm text-gray-900">Access and download your property documents</p>
               </div>
             </div>
           </div>
@@ -245,7 +245,7 @@ export default function DocumentsPage() {
                   <div key={category} className="bg-white overflow-hidden shadow rounded-lg">
                     <div className="p-4">
                       <div className="text-center">
-                        <dt className="text-sm font-medium text-gray-500 truncate capitalize">
+                        <dt className="text-sm font-medium text-gray-900 truncate capitalize">
                           {category}
                         </dt>
                         <dd className="text-2xl font-semibold text-gray-900">{count}</dd>
@@ -307,7 +307,7 @@ export default function DocumentsPage() {
                                 <h4 className="text-sm font-medium text-gray-900 truncate">
                                   {document.name}
                                 </h4>
-                                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
+                                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-900">
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(document.category)}`}>
                                     {document.category}
                                   </span>
@@ -319,7 +319,7 @@ export default function DocumentsPage() {
                                   <span className="text-gray-400">{document.fileType}</span>
                                 </div>
                                 {document.description && (
-                                  <p className="mt-1 text-sm text-gray-600">
+                                  <p className="mt-1 text-sm text-gray-900">
                                     {document.description}
                                   </p>
                                 )}
@@ -328,7 +328,7 @@ export default function DocumentsPage() {
                             <div className="flex items-center space-x-2 ml-4">
                               <button
                                 onClick={() => handlePreview(document)}
-                                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                               >
                                 <Eye className="h-4 w-4 mr-1" />
                                 Preview
@@ -348,7 +348,7 @@ export default function DocumentsPage() {
                   ) : (
                     <div className="text-center py-12">
                       <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500 text-lg">
+                      <p className="text-gray-900 text-lg">
                         {searchTerm || filterCategory !== 'all'
                           ? 'No documents found matching your criteria.'
                           : 'No documents available yet.'}

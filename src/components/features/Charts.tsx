@@ -468,7 +468,7 @@ export function MetricCard({ title, value, change, icon, format = 'number' }: Me
     switch (direction) {
       case 'up': return 'text-green-600';
       case 'down': return 'text-red-600';
-      default: return 'text-gray-600';
+      default: return 'text-gray-900';
     }
   };
 
@@ -484,7 +484,7 @@ export function MetricCard({ title, value, change, icon, format = 'number' }: Me
     <div className="bg-white rounded-lg shadow border p-6">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+          <h3 className="text-sm font-medium text-gray-900">{title}</h3>
           <p className="text-2xl font-bold text-gray-900 mt-1">
             {formatValue(value)}
           </p>
@@ -493,7 +493,7 @@ export function MetricCard({ title, value, change, icon, format = 'number' }: Me
               <span className={`text-sm font-medium ${getChangeColor(change.direction)}`}>
                 {getChangeIcon(change.direction)} {Math.abs(change.percentage).toFixed(1)}%
               </span>
-              <span className="text-sm text-gray-500 ml-2">
+              <span className="text-sm text-gray-900 ml-2">
                 from previous period
               </span>
             </div>

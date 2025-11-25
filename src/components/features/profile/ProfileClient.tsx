@@ -94,7 +94,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-900">
             Manage your personal information and account settings
           </p>
         </div>
@@ -122,7 +122,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
                       {getInitials()}
                     </div>
                     <button className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 transition-colors">
-                      <Camera className="w-5 h-5 text-gray-600" />
+                      <Camera className="w-5 h-5 text-gray-900" />
                     </button>
                   </div>
 
@@ -130,21 +130,21 @@ export default function ProfileClient({ session }: ProfileClientProps) {
                   <h2 className="mt-4 text-2xl font-bold text-gray-900">
                     {session.user.firstName} {session.user.lastName}
                   </h2>
-                  <p className="text-sm text-gray-600 capitalize">{session.user.role}</p>
-                  <p className="mt-2 text-sm text-gray-500">{session.user.email}</p>
+                  <p className="text-sm text-gray-900 capitalize">{session.user.role}</p>
+                  <p className="mt-2 text-sm text-gray-900">{session.user.email}</p>
 
                   {/* Actions */}
                   <div className="mt-6 w-full space-y-3">
                     <button
                       onClick={() => setIsEditing(!isEditing)}
-                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                     >
                       <User className="w-4 h-4 mr-2" />
                       {isEditing ? 'Cancel Edit' : 'Edit Profile'}
                     </button>
                     <button
                       onClick={() => setShowPasswordModal(true)}
-                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                     >
                       <Lock className="w-4 h-4 mr-2" />
                       Change Password
@@ -156,7 +156,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
               {/* Stats */}
               <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Member since</span>
+                  <span className="text-gray-900">Member since</span>
                   <span className="font-medium text-gray-900">Nov 2025</span>
                 </div>
               </div>
@@ -330,7 +330,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
                   <div className="mt-6 flex justify-end gap-3">
                     <button
                       onClick={() => setIsEditing(false)}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                     >
                       Cancel
                     </button>
@@ -419,7 +419,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
                 <div className="mt-6 flex justify-end gap-3">
                   <button
                     onClick={() => setShowPasswordModal(false)}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                   >
                     Cancel
                   </button>

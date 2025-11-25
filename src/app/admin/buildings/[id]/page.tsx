@@ -76,7 +76,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
           <div className="flex items-center space-x-2 py-3 border-b border-gray-200">
             <Link 
               href="/admin" 
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+              className="text-sm text-gray-900 hover:text-gray-900 flex items-center"
             >
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -88,7 +88,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
             </svg>
             <Link 
               href="/admin/buildings" 
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-900 hover:text-gray-900"
             >
               Buildings
             </Link>
@@ -102,7 +102,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
             <div className="flex items-center">
               <Link
                 href="/admin/buildings"
-                className="mr-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                className="mr-4 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title="Back to Buildings"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,7 +111,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{building.name}</h1>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-900 mt-1">
                   {formatAddress(building)}
                 </p>
               </div>
@@ -144,11 +144,11 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
                       <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
                           <div className="text-2xl font-bold text-gray-900">{roomStats.totalRooms}</div>
-                          <div className="text-sm text-gray-500">Total Rooms</div>
+                          <div className="text-sm text-gray-900">Total Rooms</div>
                         </div>
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
                           <div className="text-2xl font-bold text-gray-900">{roomStats.occupiedRooms}</div>
-                          <div className="text-sm text-gray-500">Occupied Rooms</div>
+                          <div className="text-sm text-gray-900">Occupied Rooms</div>
                         </div>
                       </div>
                       
@@ -190,25 +190,25 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Stats</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Occupancy Rate</span>
+                    <span className="text-sm text-gray-900">Occupancy Rate</span>
                     <span className="text-sm font-medium text-gray-900">
                       {roomStats.occupancyRate}%
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Available Units</span>
+                    <span className="text-sm text-gray-900">Available Units</span>
                     <span className="text-sm font-medium text-gray-900">
                       {roomStats.vacantRooms}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Created</span>
+                    <span className="text-sm text-gray-900">Created</span>
                     <span className="text-sm font-medium text-gray-900">
                       {new Date(building.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Last Updated</span>
+                    <span className="text-sm text-gray-900">Last Updated</span>
                     <span className="text-sm font-medium text-gray-900">
                       {new Date(building.updatedAt).toLocaleDateString()}
                     </span>
@@ -217,13 +217,13 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
                     <>
                       <div className="border-t pt-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-500">Average Rent</span>
+                          <span className="text-sm text-gray-900">Average Rent</span>
                           <span className="text-sm font-medium text-gray-900">
                             ${roomStats.averageRent.toLocaleString()}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-500">Rent Range</span>
+                          <span className="text-sm text-gray-900">Rent Range</span>
                           <span className="text-sm font-medium text-gray-900">
                             ${roomStats.minRent} - ${roomStats.maxRent}
                           </span>
@@ -239,7 +239,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Building</h3>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-gray-900 mb-4">
                   Update building information and settings
                 </p>
                 <BuildingDetailClient building={building} />

@@ -39,7 +39,7 @@ export default function UtilityStatsCards({ stats }: UtilityStatsCardsProps) {
       case 'paid':
         return 'text-green-600';
       default:
-        return 'text-gray-600';
+        return 'text-gray-900';
     }
   };
 
@@ -108,11 +108,11 @@ export default function UtilityStatsCards({ stats }: UtilityStatsCardsProps) {
         <div key={index} className="bg-white rounded-lg shadow border p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-600 mb-1">{card.title}</p>
+              <p className="text-sm font-medium text-gray-900 mb-1">{card.title}</p>
               <p className={`text-2xl font-bold ${card.color} mb-1`}>
                 {card.value}
               </p>
-              <p className="text-xs text-gray-500">{card.subtext}</p>
+              <p className="text-xs text-gray-900">{card.subtext}</p>
             </div>
             <div className="text-2xl ml-4">
               {card.icon}

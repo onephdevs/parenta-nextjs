@@ -194,7 +194,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
         <div className="md:grid md:grid-cols-3 md:gap-6">
           <div className="md:col-span-1">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Expense Information</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-900">
               Record a new expense or update expense details.
             </p>
           </div>
@@ -202,12 +202,12 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
             <div className="grid grid-cols-6 gap-6">
               {/* Amount */}
               <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
                   Amount *
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 text-base"></span>
+                    <span className="text-gray-900 text-base"></span>
                   </div>
                   <input
                     type="number"
@@ -230,7 +230,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
               {/* Category */}
               <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="category" className="block text-sm font-medium text-gray-900">
                   Category *
                 </label>
                 <select
@@ -257,7 +257,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
               {/* Expense Date */}
               <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="expenseDate" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="expenseDate" className="block text-sm font-medium text-gray-900">
                   Expense Date *
                 </label>
                 <input
@@ -277,7 +277,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
               {/* Building Selection */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="buildingId" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900">
                   Building (Optional)
                 </label>
                 <select
@@ -298,7 +298,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
               {/* Room Selection */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="roomId" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="roomId" className="block text-sm font-medium text-gray-900">
                   Room (Optional)
                 </label>
                 <select
@@ -317,13 +317,13 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   ))}
                 </select>
                 {!formData.buildingId && (
-                  <p className="mt-1 text-sm text-gray-500">Select a building first to choose a room</p>
+                  <p className="mt-1 text-sm text-gray-900">Select a building first to choose a room</p>
                 )}
               </div>
 
               {/* Vendor */}
               <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="vendor" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="vendor" className="block text-sm font-medium text-gray-900">
                   Vendor
                 </label>
                 <input
@@ -339,7 +339,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
               {/* Description */}
               <div className="col-span-6">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
                   Description *
                 </label>
                 <input
@@ -360,7 +360,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
               {/* Notes */}
               <div className="col-span-6">
-                <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="notes" className="block text-sm font-medium text-gray-900">
                   Notes
                 </label>
                 <textarea
@@ -383,7 +383,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
         <button
           type="button"
           onClick={handleCancel}
-          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
         >
           Cancel
         </button>

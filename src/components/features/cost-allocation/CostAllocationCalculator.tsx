@@ -210,13 +210,13 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
           <Calculator className="h-5 w-5" />
           Cost Allocation Calculator - {buildingName}
         </h3>
-        <p className="text-sm text-gray-600 mb-6">
+        <p className="text-sm text-gray-900 mb-6">
           Select a utility bill and calculate how costs should be split among tenants.
         </p>
         
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Select Utility Bill</label>
+            <label className="block text-sm font-medium text-gray-900">Select Utility Bill</label>
             <select
               value={selectedBillId}
               onChange={(e) => setSelectedBillId(e.target.value)}
@@ -230,7 +230,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
               ))}
             </select>
             {utilityBills.length === 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-900">
                 No utility bills available for allocation. Make sure there are unallocated bills for this building.
               </p>
             )}
@@ -267,7 +267,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
           <h3 className="text-lg font-semibold mb-4">Allocation Settings</h3>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Allocation Method</label>
+              <label className="block text-sm font-medium text-gray-900">Allocation Method</label>
               <select
                 value={allocationSettings.allocationMethod}
                 onChange={(e) => setAllocationSettings({
@@ -285,8 +285,8 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Include Common Area Costs</label>
-                <p className="text-sm text-gray-500">
+                <label className="text-sm font-medium text-gray-900">Include Common Area Costs</label>
+                <p className="text-sm text-gray-900">
                   Include shared space utilities in allocation
                 </p>
               </div>
@@ -306,7 +306,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
             {allocationSettings.includeCommonAreas && (
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Common Area Percentage</label>
+                <label className="block text-sm font-medium text-gray-900">Common Area Percentage</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -319,13 +319,13 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                     })}
                     className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
-                  <span className="text-sm text-gray-500">% of total cost</span>
+                  <span className="text-sm text-gray-900">% of total cost</span>
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Tenant Bill Due Date</label>
+              <label className="block text-sm font-medium text-gray-900">Tenant Bill Due Date</label>
               <input
                 type="date"
                 value={allocationSettings.dueDate ? allocationSettings.dueDate.toISOString().split('T')[0] : ''}
@@ -373,19 +373,19 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                 <div className="text-2xl font-bold text-green-600">
                   ${allocations.reduce((sum, a) => sum + a.allocatedAmount, 0).toFixed(2)}
                 </div>
-                <div className="text-sm text-gray-600">Total Allocated</div>
+                <div className="text-sm text-gray-900">Total Allocated</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {allocations.length}
                 </div>
-                <div className="text-sm text-gray-600">Tenants</div>
+                <div className="text-sm text-gray-900">Tenants</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
                   ${(allocations.reduce((sum, a) => sum + a.allocatedAmount, 0) / allocations.length).toFixed(2)}
                 </div>
-                <div className="text-sm text-gray-600">Average per Tenant</div>
+                <div className="text-sm text-gray-900">Average per Tenant</div>
               </div>
             </div>
 
@@ -399,7 +399,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                   <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex-1">
                       <div className="font-medium">{allocation.tenantName}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-900">
                         Room {allocation.roomNumber} • {allocation.sharePercentage.toFixed(1)}% of total
                       </div>
                       {allocation.usage && (
@@ -415,7 +415,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-lg">${allocation.allocatedAmount.toFixed(2)}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-900">
                         {allocation.commonAreaCharge > 0 && (
                           <span>Common: ${allocation.commonAreaCharge.toFixed(2)}</span>
                         )}

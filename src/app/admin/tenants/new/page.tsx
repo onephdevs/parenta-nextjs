@@ -20,7 +20,7 @@ export default async function NewTenantPage() {
             <div className="flex items-center">
               <Link 
                 href="/admin/tenants" 
-                className="flex items-center text-gray-500 hover:text-gray-700"
+                className="flex items-center text-gray-900 hover:text-gray-900"
               >
                 <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -39,7 +39,7 @@ export default async function NewTenantPage() {
           <div className="px-4 py-5 sm:p-6">
             <div className="mb-6">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Tenant Information</h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Enter the tenant&apos;s personal information and contact details.
               </p>
             </div>

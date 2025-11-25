@@ -48,7 +48,7 @@ export default function StaffSignIn() {
           {/* Back to Home */}
           <Link 
             href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 mb-8 transition"
+            className="inline-flex items-center text-sm text-gray-900 hover:text-purple-600 mb-8 transition"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
@@ -62,7 +62,7 @@ export default function StaffSignIn() {
               </div>
             </div>
             <h2 className="text-3xl font-bold text-gray-900">Staff Portal</h2>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-gray-900">
               Sign in to manage daily operations
             </p>
           </div>
@@ -78,7 +78,7 @@ export default function StaffSignIn() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
                 Email Address
               </label>
               <div className="relative">
@@ -100,7 +100,7 @@ export default function StaffSignIn() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
                 Password
               </label>
               <div className="relative">
@@ -129,7 +129,7 @@ export default function StaffSignIn() {
                   type="checkbox"
                   className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                   Remember me
                 </label>
               </div>
@@ -171,7 +171,7 @@ export default function StaffSignIn() {
 
           {/* Admin Login Link */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-900">
               Need admin access?{' '}
               <Link href="/auth/admin/signin" className="font-medium text-purple-600 hover:text-purple-500">
                 Admin Login

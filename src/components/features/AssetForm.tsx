@@ -124,7 +124,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
         <h2 className="text-xl font-semibold">
           {isEditing ? 'Edit Asset' : 'Add New Asset'}
         </h2>
-        <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+        <button onClick={onCancel} className="text-gray-400 hover:text-gray-900">
           <X className="h-6 w-6" />
         </button>
       </div>
@@ -132,7 +132,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Asset Name *
             </label>
             <input
@@ -145,7 +145,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Asset Type *
             </label>
             <select
@@ -166,7 +166,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Building
             </label>
             <select
@@ -184,7 +184,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Status
             </label>
             <select
@@ -200,7 +200,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Condition
             </label>
             <select
@@ -217,7 +217,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Brand
             </label>
             <input
@@ -229,7 +229,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Model
             </label>
             <input
@@ -241,7 +241,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Serial Number
             </label>
             <input
@@ -253,7 +253,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Purchase Price
             </label>
             <input
@@ -266,7 +266,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Current Value
             </label>
             <input
@@ -279,7 +279,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-900 mb-1">
               Rental Rate (per month)
             </label>
             <input
@@ -293,7 +293,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-900 mb-1">
             Description
           </label>
           <textarea
@@ -308,7 +308,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             Cancel
           </button>

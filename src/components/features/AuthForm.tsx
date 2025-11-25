@@ -109,7 +109,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Role Selection */}
         <div>
-          <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="role" className="block text-sm font-medium text-gray-900 mb-2">
             Role
           </label>
           <select
@@ -128,7 +128,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
         {/* First Name (signup only) */}
         {mode === 'signup' && (
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="firstName" className="block text-sm font-medium text-gray-900 mb-2">
               First Name
             </label>
             <input
@@ -148,7 +148,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
         {/* Last Name (signup only) */}
         {mode === 'signup' && (
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="lastName" className="block text-sm font-medium text-gray-900 mb-2">
               Last Name
             </label>
             <input
@@ -167,7 +167,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
 
         {/* Email */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
             Email
           </label>
           <input
@@ -185,7 +185,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
 
         {/* Password */}
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
             Password
           </label>
           <input
@@ -201,7 +201,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
             minLength={6}
           />
           {mode === 'signup' && (
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-900 mt-1">
               Password must be at least 6 characters long
             </p>
           )}
@@ -233,7 +233,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
 
         {/* Toggle Mode Link */}
         <div className="text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-900">
             {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
             {' '}
             <button

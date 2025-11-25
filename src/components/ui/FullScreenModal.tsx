@@ -35,14 +35,14 @@ export default function FullScreenModal({
             <div className="flex items-center gap-4">
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
                 {subtitle && (
-                  <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+                  <p className="text-sm text-gray-900 mt-1">{subtitle}</p>
                 )}
               </div>
             </div>
@@ -52,7 +52,7 @@ export default function FullScreenModal({
                 {/* Close X button */}
                 <button
                   onClick={onClose}
-                  className="ml-4 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  className="ml-4 text-gray-400 hover:text-gray-900 transition-colors flex-shrink-0"
                   aria-label="Close modal"
                 >
                   <X className="h-5 w-5" />
@@ -65,7 +65,7 @@ export default function FullScreenModal({
                 {/* Close X button */}
                 <button
                   onClick={onClose}
-                  className="ml-4 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  className="ml-4 text-gray-400 hover:text-gray-900 transition-colors flex-shrink-0"
                   aria-label="Close modal"
                 >
                   <X className="h-5 w-5" />

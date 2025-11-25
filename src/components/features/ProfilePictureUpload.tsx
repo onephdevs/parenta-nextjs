@@ -194,7 +194,7 @@ export default function ProfilePictureUpload({
             type="button"
             onClick={handleDelete}
             disabled={isUploading || isDeleting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Delete
           </button>
@@ -209,7 +209,7 @@ export default function ProfilePictureUpload({
         className="hidden"
       />
 
-      <p className="text-xs text-gray-500 text-center">
+      <p className="text-xs text-gray-900 text-center">
         JPEG, PNG, or WebP. Max 5MB.
       </p>
     </div>

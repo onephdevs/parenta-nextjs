@@ -42,7 +42,7 @@ export default function InvoiceStatusChart({ data }: InvoiceStatusChartProps) {
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Invoice Status Distribution
           </h3>
-          <div className="flex items-center justify-center h-[300px] text-gray-500">
+          <div className="flex items-center justify-center h-[300px] text-gray-900">
             No invoice data available
           </div>
         </div>

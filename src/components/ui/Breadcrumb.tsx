@@ -30,7 +30,7 @@ export default function Breadcrumb({ items, showBackButton = true, children, sub
               {item.href ? (
                 <Link 
                   href={item.href} 
-                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+                  className="text-sm text-gray-900 hover:text-gray-900 flex items-center"
                 >
                   {index === 0 && (
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,7 +51,7 @@ export default function Breadcrumb({ items, showBackButton = true, children, sub
             {showBackButton && backHref && (
               <Link 
                 href={backHref} 
-                className="mr-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                className="mr-4 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title={`Back to ${items.length > 1 ? items[items.length - 2].label : 'Dashboard'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +62,7 @@ export default function Breadcrumb({ items, showBackButton = true, children, sub
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{items[items.length - 1].label}</h1>
               {subtitle && (
-                <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+                <p className="text-sm text-gray-900 mt-1">{subtitle}</p>
               )}
             </div>
           </div>

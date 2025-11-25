@@ -58,7 +58,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               <span className="text-lg font-bold text-gray-900">Menu</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                className="p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -78,7 +78,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md lg:hidden"
+                className="p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md lg:hidden"
               >
                 <Menu className="w-6 h-6" />
               </button>
@@ -86,7 +86,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               {/* Desktop Sidebar Toggle */}
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="hidden lg:block p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                className="hidden lg:block p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md"
                 title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +108,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
                       className={`${
                         index === breadcrumbs.length - 1
                           ? 'text-gray-900 font-medium'
-                          : 'text-gray-500 hover:text-gray-700'
+                          : 'text-gray-900 hover:text-gray-900'
                       }`}
                     >
                       {breadcrumb.label}
@@ -123,7 +123,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               {/* Search Button */}
               <button 
                 onClick={() => setSearchModalOpen(true)}
-                className="hidden md:flex p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                className="hidden md:flex p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md"
                 title="Search"
               >
                 <Search className="w-5 h-5" />
@@ -132,7 +132,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               {/* Notifications */}
               <Link
                 href="/admin/notifications"
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md relative"
+                className="p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md relative"
               >
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
@@ -141,7 +141,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               {/* Settings */}
               <Link
                 href="/admin/settings"
-                className="hidden md:flex p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                className="hidden md:flex p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md"
               >
                 <Settings className="w-5 h-5" />
               </Link>
@@ -152,7 +152,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
                   <p className="text-sm font-medium text-gray-900">
                     {session.user.firstName} {session.user.lastName}
                   </p>
-                  <p className="text-xs text-gray-500 capitalize">{session.user.role}</p>
+                  <p className="text-xs text-gray-900 capitalize">{session.user.role}</p>
                 </div>
                 <Link
                   href="/admin/profile"
@@ -167,7 +167,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               {/* Sign Out */}
               <button
                 onClick={() => signOut({ callbackUrl: '/auth/signin?role=admin' })}
-                className="hidden sm:flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                className="hidden sm:flex items-center px-3 py-2 text-sm font-medium text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title="Sign out"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,7 +189,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
                     className={`${
                       index === breadcrumbs.length - 1
                         ? 'text-gray-900 font-medium'
-                        : 'text-gray-500'
+                        : 'text-gray-900'
                     } truncate`}
                   >
                     {breadcrumb.label}

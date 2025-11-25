@@ -200,7 +200,7 @@ export default async function ReportsPage() {
       case 'pink':
         return 'bg-pink-100 text-pink-600';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-900';
     }
   };
 
@@ -213,7 +213,7 @@ export default async function ReportsPage() {
             <div className="flex items-center space-x-4">
               <Link
                 href="/admin"
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-900 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -221,7 +221,7 @@ export default async function ReportsPage() {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-                <p className="text-sm text-gray-500">Access all available reports and insights</p>
+                <p className="text-sm text-gray-900">Access all available reports and insights</p>
               </div>
             </div>
           </div>
@@ -246,7 +246,7 @@ export default async function ReportsPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-900">Financial</p>
-                  <p className="text-xs text-gray-500">View reports</p>
+                  <p className="text-xs text-gray-900">View reports</p>
                 </div>
               </div>
             </Link>
@@ -263,7 +263,7 @@ export default async function ReportsPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-900">Analytics</p>
-                  <p className="text-xs text-gray-500">View charts</p>
+                  <p className="text-xs text-gray-900">View charts</p>
                 </div>
               </div>
             </Link>
@@ -280,7 +280,7 @@ export default async function ReportsPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-900">Export</p>
-                  <p className="text-xs text-gray-500">Download data</p>
+                  <p className="text-xs text-gray-900">Download data</p>
                 </div>
               </div>
             </Link>
@@ -297,7 +297,7 @@ export default async function ReportsPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-900">Insights</p>
-                  <p className="text-xs text-gray-500">Advanced data</p>
+                  <p className="text-xs text-gray-900">Advanced data</p>
                 </div>
               </div>
             </Link>
@@ -315,7 +315,7 @@ export default async function ReportsPage() {
                   </div>
                   <div className="ml-4">
                     <h3 className="text-lg font-semibold text-gray-900">{category.title}</h3>
-                    <p className="text-sm text-gray-500">{category.description}</p>
+                    <p className="text-sm text-gray-900">{category.description}</p>
                   </div>
                 </div>
               </div>
@@ -335,7 +335,7 @@ export default async function ReportsPage() {
                           <h4 className="text-sm font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
                             {report.name}
                           </h4>
-                          <p className="mt-1 text-xs text-gray-500">
+                          <p className="mt-1 text-xs text-gray-900">
                             {report.description}
                           </p>
                         </div>

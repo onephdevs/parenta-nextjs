@@ -116,7 +116,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
       type="button"
       onClick={onClose}
       disabled={isSubmitting}
-      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+      className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
     >
       Cancel
     </button>
@@ -154,7 +154,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-900 mb-1">
                   Building Name *
                 </label>
                 <input
@@ -169,7 +169,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
               </div>
               
               <div>
-                <label htmlFor="buildingType" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="buildingType" className="block text-sm font-medium text-gray-900 mb-1">
                   Building Type
                 </label>
                 <select
@@ -192,7 +192,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Address</h3>
             
             <div>
-              <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-900 mb-1">
                 Address Line 1 *
               </label>
               <input
@@ -207,7 +207,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             </div>
 
             <div>
-              <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-900 mb-1">
                 Address Line 2
               </label>
               <input
@@ -222,7 +222,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="city" className="block text-sm font-medium text-gray-900 mb-1">
                   City *
                 </label>
                 <input
@@ -237,7 +237,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
               </div>
 
               <div>
-                <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="state" className="block text-sm font-medium text-gray-900 mb-1">
                   State *
                 </label>
                 <input
@@ -252,7 +252,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
               </div>
 
               <div>
-                <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="postalCode" className="block text-sm font-medium text-gray-900 mb-1">
                   Postal Code *
                 </label>
                 <input
@@ -274,7 +274,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="yearBuilt" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="yearBuilt" className="block text-sm font-medium text-gray-900 mb-1">
                   Year Built
                 </label>
                 <input
@@ -290,7 +290,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
               </div>
 
               <div>
-                <label htmlFor="totalFloors" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="totalFloors" className="block text-sm font-medium text-gray-900 mb-1">
                   Total Floors
                 </label>
                 <input
@@ -307,7 +307,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             </div>
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
                 Description
               </label>
               <textarea
@@ -321,7 +321,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             </div>
 
             <div>
-              <label htmlFor="amenities" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="amenities" className="block text-sm font-medium text-gray-900 mb-1">
                 Amenities
               </label>
               <input

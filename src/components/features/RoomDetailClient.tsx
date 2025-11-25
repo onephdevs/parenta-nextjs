@@ -178,7 +178,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Room {roomDetails.room.roomNumber}</h1>
-              <p className="text-sm text-gray-500 mt-1">{roomDetails.room.buildingName}</p>
+              <p className="text-sm text-gray-900 mt-1">{roomDetails.room.buildingName}</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium border ${getStatusColor(roomDetails.room.roomStatus)}`}>
@@ -187,7 +187,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
               </div>
               <button
                 onClick={() => setActiveTab('edit')}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -205,7 +205,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
               </button>
               <button
                 onClick={refreshRoomData}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -226,7 +226,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
                     ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
+                    : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-200'
                 }`}
               >
                 <span className="mr-2">{tab.icon}</span>
@@ -246,33 +246,33 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
               <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
               <dl className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Room Type</dt>
+                  <dt className="text-sm font-medium text-gray-900">Room Type</dt>
                   <dd className="col-span-2 text-sm text-gray-900 capitalize">{roomDetails.room.roomType}</dd>
                 </div>
                 {roomDetails.room.floorNumber && (
                   <div className="grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-500">Floor</dt>
+                    <dt className="text-sm font-medium text-gray-900">Floor</dt>
                     <dd className="col-span-2 text-sm text-gray-900">{roomDetails.room.floorNumber}</dd>
                   </div>
                 )}
                 {roomDetails.room.squareFootage && (
                   <div className="grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-500">Size</dt>
+                    <dt className="text-sm font-medium text-gray-900">Size</dt>
                     <dd className="col-span-2 text-sm text-gray-900">{roomDetails.room.squareFootage} sq ft</dd>
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Monthly Rate</dt>
+                  <dt className="text-sm font-medium text-gray-900">Monthly Rate</dt>
                   <dd className="col-span-2 text-lg font-semibold text-gray-900">₱{parseFloat(roomDetails.room.monthlyRate.toString()).toLocaleString()}/mo</dd>
                 </div>
                 {roomDetails.room.depositAmount && (
                   <div className="grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-500">Security Deposit</dt>
+                    <dt className="text-sm font-medium text-gray-900">Security Deposit</dt>
                     <dd className="col-span-2 text-sm text-gray-900">₱{parseFloat(roomDetails.room.depositAmount.toString()).toLocaleString()}</dd>
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
+                  <dt className="text-sm font-medium text-gray-900">Status</dt>
                   <dd className="col-span-2 text-sm text-gray-900 capitalize">{roomDetails.room.roomStatus}</dd>
                 </div>
               </dl>
@@ -283,23 +283,23 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
               <h3 className="text-lg font-medium text-gray-900 mb-4">Vacancy Overview</h3>
               <dl className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Total Assignments</dt>
+                  <dt className="text-sm font-medium text-gray-900">Total Assignments</dt>
                   <dd className="col-span-2 text-lg font-semibold text-purple-600">{roomDetails.occupancyMetrics.total_assignments}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Occupancy Rate</dt>
+                  <dt className="text-sm font-medium text-gray-900">Occupancy Rate</dt>
                   <dd className="col-span-2 text-lg font-semibold text-blue-600">{Math.round(roomDetails.occupancyMetrics.occupancy_rate_percent)}%</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Created</dt>
+                  <dt className="text-sm font-medium text-gray-900">Created</dt>
                   <dd className="col-span-2 text-sm text-gray-900">{new Date(roomDetails.room.createdAt).toLocaleDateString()}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
+                  <dt className="text-sm font-medium text-gray-900">Last Updated</dt>
                   <dd className="col-span-2 text-sm text-gray-900">{new Date(roomDetails.room.updatedAt).toLocaleDateString()}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Active</dt>
+                  <dt className="text-sm font-medium text-gray-900">Active</dt>
                   <dd className={`col-span-2 text-sm font-medium ${roomDetails.room.isActive ? 'text-green-600' : 'text-red-600'}`}>
                     {roomDetails.room.isActive ? 'Yes' : 'No'}
                   </dd>
@@ -311,7 +311,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
             {roomDetails.room.description && (
               <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Description</h3>
-                <p className="text-sm text-gray-700">{roomDetails.room.description}</p>
+                <p className="text-sm text-gray-900">{roomDetails.room.description}</p>
               </div>
             )}
 

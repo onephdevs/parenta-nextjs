@@ -14,7 +14,7 @@ export default function UpcomingDueDates({ dueDates }: UpcomingDueDatesProps) {
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Upcoming Due Dates
           </h3>
-          <p className="text-sm text-gray-500">No upcoming invoices in the next 30 days</p>
+          <p className="text-sm text-gray-900">No upcoming invoices in the next 30 days</p>
         </div>
       </div>
     );
@@ -43,7 +43,7 @@ export default function UpcomingDueDates({ dueDates }: UpcomingDueDatesProps) {
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {invoice.tenantName}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-900">
                       {invoice.invoiceNumber}
                     </p>
                   </div>
@@ -51,7 +51,7 @@ export default function UpcomingDueDates({ dueDates }: UpcomingDueDatesProps) {
                     <p className="text-sm font-medium text-gray-900">
                       ₱{invoice.remainingAmount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-900">
                       Due in {invoice.daysUntilDue} {invoice.daysUntilDue === 1 ? 'day' : 'days'}
                     </p>
                   </div>

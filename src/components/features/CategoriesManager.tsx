@@ -97,7 +97,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-medium text-gray-900">Document Categories</h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-900">
             Organize your documents with categories for easier management and searching.
           </p>
         </div>
@@ -120,7 +120,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.414 1.414 0 01-2.828 0l-7-7A1.414 1.414 0 013 12V7a4 4 0 014-4z" />
             </svg>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h3>
-            <p className="text-gray-600 mb-4">Get started by creating your first document category.</p>
+            <p className="text-gray-900 mb-4">Get started by creating your first document category.</p>
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
@@ -147,7 +147,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                         <div>
                           <h3 className="text-sm font-medium text-gray-900">{category.name}</h3>
                           {category.description && (
-                            <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+                            <p className="text-sm text-gray-900 mt-1">{category.description}</p>
                           )}
                         </div>
                       </div>
@@ -158,14 +158,14 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                             {subCategories.map((subCategory) => (
                               <div key={subCategory.id} className="flex items-center space-x-3">
                                 <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">
-                                  <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3 h-3 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.414 1.414 0 01-2.828 0l-7-7A1.414 1.414 0 013 12V7a4 4 0 014-4z" />
                                   </svg>
                                 </div>
                                 <div>
                                   <span className="text-sm text-gray-900">{subCategory.name}</span>
                                   {subCategory.description && (
-                                    <span className="text-sm text-gray-500 ml-2">- {subCategory.description}</span>
+                                    <span className="text-sm text-gray-900 ml-2">- {subCategory.description}</span>
                                   )}
                                 </div>
                               </div>
@@ -179,7 +179,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                       <div className="text-sm text-gray-900 font-medium">
                         {stats.documentCount} documents
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-900">
                         Created {formatDate(category.createdAt)}
                       </div>
                     </div>
@@ -207,7 +207,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                     <button
                       type="button"
                       onClick={() => setIsCreateModalOpen(false)}
-                      className="text-gray-400 hover:text-gray-500"
+                      className="text-gray-400 hover:text-gray-900"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -217,7 +217,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
 
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-900 mb-1">
                         Category Name *
                       </label>
                       <input
@@ -233,7 +233,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                     </div>
 
                     <div>
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
                         Description
                       </label>
                       <textarea
@@ -248,7 +248,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                     </div>
 
                     <div>
-                      <label htmlFor="parentCategoryId" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="parentCategoryId" className="block text-sm font-medium text-gray-900 mb-1">
                         Parent Category (optional)
                       </label>
                       <select
@@ -291,7 +291,7 @@ export default function CategoriesManager({ categories }: CategoriesManagerProps
                     type="button"
                     onClick={() => setIsCreateModalOpen(false)}
                     disabled={isSubmitting}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>

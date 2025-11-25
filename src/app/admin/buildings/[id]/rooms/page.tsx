@@ -63,7 +63,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
           <div className="flex items-center space-x-2 py-3 border-b border-gray-200">
             <Link 
               href="/admin" 
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+              className="text-sm text-gray-900 hover:text-gray-900 flex items-center"
             >
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -75,7 +75,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
             </svg>
             <Link 
               href="/admin/buildings" 
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-900 hover:text-gray-900"
             >
               Buildings
             </Link>
@@ -84,7 +84,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
             </svg>
             <Link 
               href={`/admin/buildings/${building.id}`} 
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-900 hover:text-gray-900"
             >
               {building.name}
             </Link>
@@ -98,7 +98,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
             <div className="flex items-center">
               <Link 
                 href={`/admin/buildings/${building.id}`}
-                className="mr-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                className="mr-4 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title="Back to Building"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +107,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Rooms in {building.name}</h1>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-900 mt-1">
                   {building.addressLine1}, {building.city}, {building.state} {building.zipCode}
                 </p>
               </div>
@@ -115,7 +115,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
             <div className="flex space-x-3">
               <Link
                 href="/admin/rooms"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v0" />
@@ -124,7 +124,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
               </Link>
               <Link
                 href={`/admin/buildings/${building.id}`}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -150,7 +150,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Total Rooms</dt>
+                <dt className="text-sm font-medium text-gray-900">Total Rooms</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{buildingStats.total_rooms}</dd>
               </div>
             </div>
@@ -166,9 +166,9 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Occupied</dt>
+                <dt className="text-sm font-medium text-gray-900">Occupied</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{buildingStats.occupied_rooms}</dd>
-                <dd className="text-xs text-gray-500">{buildingStats.occupancy_rate}% occupancy</dd>
+                <dd className="text-xs text-gray-900">{buildingStats.occupancy_rate}% occupancy</dd>
               </div>
             </div>
           </div>
@@ -183,9 +183,9 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Vacant</dt>
+                <dt className="text-sm font-medium text-gray-900">Vacant</dt>
                 <dd className="text-2xl font-semibold text-gray-900">{buildingStats.vacant_rooms}</dd>
-                <dd className="text-xs text-gray-500">Available now</dd>
+                <dd className="text-xs text-gray-900">Available now</dd>
               </div>
             </div>
           </div>
@@ -200,11 +200,11 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
                 </div>
               </div>
               <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Avg Rent</dt>
+                <dt className="text-sm font-medium text-gray-900">Avg Rent</dt>
                 <dd className="text-2xl font-semibold text-gray-900">
                   ${buildingStats.average_rent ? Math.round(buildingStats.average_rent).toLocaleString() : 0}
                 </dd>
-                <dd className="text-xs text-gray-500">per month</dd>
+                <dd className="text-xs text-gray-900">per month</dd>
               </div>
             </div>
           </div>

@@ -252,7 +252,7 @@ export default function MaintenancePage() {
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading maintenance requests...</p>
+            <p className="text-gray-900">Loading maintenance requests...</p>
           </div>
         </div>
       </div>
@@ -268,7 +268,7 @@ export default function MaintenancePage() {
             <div className="flex items-center">
               <Link
                 href="/tenant"
-                className="flex items-center text-gray-500 hover:text-gray-700 mr-4"
+                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
               >
                 <ArrowLeft className="h-5 w-5 mr-1" />
                 Back to Dashboard
@@ -280,7 +280,7 @@ export default function MaintenancePage() {
               </div>
               <div className="ml-4">
                 <h1 className="text-xl font-semibold text-gray-900">Maintenance Requests</h1>
-                <p className="text-sm text-gray-500">Manage your maintenance requests and submit new ones</p>
+                <p className="text-sm text-gray-900">Manage your maintenance requests and submit new ones</p>
               </div>
             </div>
             <button
@@ -305,11 +305,11 @@ export default function MaintenancePage() {
                   <div className="p-5">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
-                        <Clock className="h-6 w-6 text-gray-600" />
+                        <Clock className="h-6 w-6 text-gray-900" />
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">Active Requests</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">Active Requests</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {maintenanceData?.active || 0}
                           </dd>
@@ -327,7 +327,7 @@ export default function MaintenancePage() {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">In Progress</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">In Progress</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {filteredRequests.filter(r => r.status === 'in_progress').length}
                           </dd>
@@ -345,7 +345,7 @@ export default function MaintenancePage() {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">Completed</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {filteredRequests.filter(r => r.status === 'completed').length}
                           </dd>
@@ -363,7 +363,7 @@ export default function MaintenancePage() {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">High Priority</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">High Priority</dt>
                           <dd className="text-lg font-medium text-gray-900">
                             {filteredRequests.filter(r => r.priority === 'high').length}
                           </dd>
@@ -434,8 +434,8 @@ export default function MaintenancePage() {
                                   {request.priority} priority
                                 </span>
                               </div>
-                              <p className="text-gray-600 mb-3">{request.description}</p>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-500">
+                              <p className="text-gray-900 mb-3">{request.description}</p>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-900">
                                 <div>
                                   <span className="font-medium">Category:</span> {request.category.replace('_', ' ')}
                                 </div>
@@ -460,7 +460,7 @@ export default function MaintenancePage() {
                               )}
                               {request.notes && (
                                 <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                                  <p className="text-sm text-gray-700">
+                                  <p className="text-sm text-gray-900">
                                     <MessageSquare className="h-4 w-4 inline mr-1" />
                                     <span className="font-medium">Notes:</span> {request.notes}
                                   </p>
@@ -474,7 +474,7 @@ export default function MaintenancePage() {
                   ) : (
                     <div className="text-center py-8">
                       <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">
+                      <p className="text-gray-900">
                         {searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
                           ? 'No maintenance requests found matching your criteria.'
                           : 'No maintenance requests yet. Submit a new request if you need assistance.'}
@@ -510,7 +510,7 @@ export default function MaintenancePage() {
                 <button
                   type="button"
                   onClick={() => setShowNewRequestForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-900"
                 >
                   <span className="sr-only">Close</span>
                   ×
@@ -519,7 +519,7 @@ export default function MaintenancePage() {
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="title" className="block text-sm font-medium text-gray-900">
                     Title *
                   </label>
                   <input
@@ -534,7 +534,7 @@ export default function MaintenancePage() {
                 </div>
 
                 <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="category" className="block text-sm font-medium text-gray-900">
                     Category *
                   </label>
                   <select
@@ -554,7 +554,7 @@ export default function MaintenancePage() {
                 </div>
 
                 <div>
-                  <label htmlFor="priority" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="priority" className="block text-sm font-medium text-gray-900">
                     Priority
                   </label>
                   <select
@@ -570,7 +570,7 @@ export default function MaintenancePage() {
                 </div>
 
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="description" className="block text-sm font-medium text-gray-900">
                     Description *
                   </label>
                   <textarea
@@ -589,7 +589,7 @@ export default function MaintenancePage() {
                 <button
                   type="button"
                   onClick={() => setShowNewRequestForm(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
                 >
                   Cancel
                 </button>

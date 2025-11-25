@@ -98,7 +98,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-900">
             Manage your account settings and preferences
           </p>
         </div>
@@ -127,7 +127,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                     className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                       activeTab === tab.id
                         ? 'border-purple-600 text-purple-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -153,7 +153,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                         <label className="text-sm font-medium text-gray-900">
                           Email Notifications
                         </label>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Receive notifications via email
                         </p>
                       </div>
@@ -181,7 +181,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                         <label className="text-sm font-medium text-gray-900">
                           Payment Reminders
                         </label>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Get notified about upcoming payments
                         </p>
                       </div>
@@ -209,7 +209,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                         <label className="text-sm font-medium text-gray-900">
                           Maintenance Alerts
                         </label>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Receive maintenance request notifications
                         </p>
                       </div>
@@ -237,7 +237,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                         <label className="text-sm font-medium text-gray-900">
                           Monthly Reports
                         </label>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Receive monthly financial reports
                         </p>
                       </div>
@@ -277,7 +277,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                         <label className="text-sm font-medium text-gray-900">
                           Two-Factor Authentication
                         </label>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-900">
                           Add an extra layer of security to your account
                         </p>
                       </div>
@@ -317,13 +317,13 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                         <option value="120">2 hours</option>
                         <option value="480">8 hours</option>
                       </select>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="mt-1 text-sm text-gray-900">
                         Automatically log out after this period of inactivity
                       </p>
                     </div>
 
                     <div className="pt-4 border-t border-gray-200">
-                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                         <Lock className="w-4 h-4 mr-2" />
                         Change Password
                       </button>
@@ -424,7 +424,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                   <div className="space-y-3">
                     <div className="flex justify-between py-3 border-b border-gray-200">
                       <span className="text-sm font-medium text-gray-900">Application Version</span>
-                      <span className="text-sm text-gray-600">v1.0.0</span>
+                      <span className="text-sm text-gray-900">v1.0.0</span>
                     </div>
                     <div className="flex justify-between py-3 border-b border-gray-200">
                       <span className="text-sm font-medium text-gray-900">Database Status</span>
@@ -432,22 +432,22 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                     </div>
                     <div className="flex justify-between py-3 border-b border-gray-200">
                       <span className="text-sm font-medium text-gray-900">Last Backup</span>
-                      <span className="text-sm text-gray-600">Today at 2:00 AM</span>
+                      <span className="text-sm text-gray-900">Today at 2:00 AM</span>
                     </div>
                     <div className="flex justify-between py-3 border-b border-gray-200">
                       <span className="text-sm font-medium text-gray-900">Total Storage Used</span>
-                      <span className="text-sm text-gray-600">2.4 GB</span>
+                      <span className="text-sm text-gray-900">2.4 GB</span>
                     </div>
                   </div>
 
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Actions</h4>
                     <div className="flex flex-wrap gap-3">
-                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                         <Database className="w-4 h-4 mr-2" />
                         Clear Cache
                       </button>
-                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                         <Database className="w-4 h-4 mr-2" />
                         Export Data
                       </button>

@@ -55,7 +55,7 @@ export default function RoomFinancialDashboard({
               </div>
             </div>
             <div className="ml-4">
-              <dt className="text-sm font-medium text-gray-500">Total Payments (12mo)</dt>
+              <dt className="text-sm font-medium text-gray-900">Total Payments (12mo)</dt>
               <dd className="text-2xl font-semibold text-gray-900">
                 {formatCurrency(financialSummary.total_payments)}
               </dd>
@@ -74,7 +74,7 @@ export default function RoomFinancialDashboard({
               </div>
             </div>
             <div className="ml-4">
-              <dt className="text-sm font-medium text-gray-500">Current Monthly Rate</dt>
+              <dt className="text-sm font-medium text-gray-900">Current Monthly Rate</dt>
               <dd className="text-2xl font-semibold text-gray-900">
                 {formatCurrency(financialSummary.current_monthly_rate)}
               </dd>
@@ -97,7 +97,7 @@ export default function RoomFinancialDashboard({
               </div>
             </div>
             <div className="ml-4">
-              <dt className="text-sm font-medium text-gray-500">Overdue Amount</dt>
+              <dt className="text-sm font-medium text-gray-900">Overdue Amount</dt>
               <dd className={`text-2xl font-semibold ${
                 financialSummary.overdue_amount > 0 ? 'text-red-600' : 'text-gray-900'
               }`}>
@@ -118,7 +118,7 @@ export default function RoomFinancialDashboard({
               </div>
             </div>
             <div className="ml-4">
-              <dt className="text-sm font-medium text-gray-500">Pending Payments</dt>
+              <dt className="text-sm font-medium text-gray-900">Pending Payments</dt>
               <dd className="text-2xl font-semibold text-gray-900">
                 {formatCurrency(financialSummary.pending_amount)}
               </dd>
@@ -135,28 +135,28 @@ export default function RoomFinancialDashboard({
             <div className="text-3xl font-bold text-purple-600">
               {occupancyMetrics.total_assignments}
             </div>
-            <div className="text-sm text-gray-500 mt-1">Total Assignments</div>
+            <div className="text-sm text-gray-900 mt-1">Total Assignments</div>
           </div>
           
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-600">
               {Math.round(occupancyMetrics.occupancy_rate_percent)}%
             </div>
-            <div className="text-sm text-gray-500 mt-1">Occupancy Rate</div>
+            <div className="text-sm text-gray-900 mt-1">Occupancy Rate</div>
           </div>
           
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">
               {formatDays(occupancyMetrics.avg_assignment_length)}
             </div>
-            <div className="text-sm text-gray-500 mt-1">Avg Stay Length</div>
+            <div className="text-sm text-gray-900 mt-1">Avg Stay Length</div>
           </div>
           
           <div className="text-center">
             <div className="text-3xl font-bold text-indigo-600">
               {formatDays(occupancyMetrics.total_occupied_days)}
             </div>
-            <div className="text-sm text-gray-500 mt-1">Total Occupied</div>
+            <div className="text-sm text-gray-900 mt-1">Total Occupied</div>
           </div>
         </div>
       </div>
@@ -169,7 +169,7 @@ export default function RoomFinancialDashboard({
             <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
               <div>
                 <div className="font-medium text-gray-900">Security Deposit</div>
-                <div className="text-sm text-gray-600">Amount received from current tenant</div>
+                <div className="text-sm text-gray-900">Amount received from current tenant</div>
               </div>
               <div className="text-lg font-semibold text-green-600">
                 {formatCurrency(financialSummary.deposit_received)}
@@ -181,7 +181,7 @@ export default function RoomFinancialDashboard({
             <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
               <div>
                 <div className="font-medium text-gray-900">Current Assignment Start</div>
-                <div className="text-sm text-gray-600">Move-in date for current tenant</div>
+                <div className="text-sm text-gray-900">Move-in date for current tenant</div>
               </div>
               <div className="text-lg font-semibold text-blue-600">
                 {new Date(financialSummary.current_assignment_start).toLocaleDateString()}
@@ -192,7 +192,7 @@ export default function RoomFinancialDashboard({
           {(financialSummary.overdue_amount > 0 || financialSummary.pending_amount > 0) && (
             <div className="border-t border-gray-200 pt-4">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Payment Status Summary:</span>
+                <span className="text-gray-900">Payment Status Summary:</span>
                 <div className="space-x-4">
                   {financialSummary.pending_amount > 0 && (
                     <span className="text-yellow-600">
@@ -217,7 +217,7 @@ export default function RoomFinancialDashboard({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => window.location.href = `/admin/financial/payments?roomId=${roomId}`}
-            className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           >
             <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -237,7 +237,7 @@ export default function RoomFinancialDashboard({
           
           <button
             onClick={() => window.location.href = `/admin/financial/reports?roomId=${roomId}`}
-            className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           >
             <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

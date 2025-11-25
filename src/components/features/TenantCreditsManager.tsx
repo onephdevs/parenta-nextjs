@@ -125,7 +125,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
       case 'applied_to_invoice':
         return 'text-purple-600 bg-purple-50 border-purple-200';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-gray-900 bg-gray-50 border-gray-200';
     }
   };
 
@@ -176,10 +176,10 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg leading-6 font-medium text-gray-900">Tenant Credits</h3>
-            <p className="mt-1 text-sm text-gray-600">Manage advance payments and credits for {tenantName}</p>
+            <p className="mt-1 text-sm text-gray-900">Manage advance payments and credits for {tenantName}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-600">Current Balance</p>
+            <p className="text-sm text-gray-900">Current Balance</p>
             <p className="text-3xl font-bold text-purple-600">{formatCurrency(balance)}</p>
           </div>
         </div>
@@ -201,12 +201,12 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
                   Amount *
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">₱</span>
+                    <span className="text-gray-900 sm:text-sm">₱</span>
                   </div>
                   <input
                     type="number"
@@ -223,7 +223,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
               </div>
 
               <div>
-                <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="type" className="block text-sm font-medium text-gray-900">
                   Transaction Type *
                 </label>
                 <select
@@ -239,7 +239,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
                   Description (Optional)
                 </label>
                 <input
@@ -261,7 +261,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
                   setFormData({ amount: '', type: 'credit', description: '' });
                 }}
                 disabled={submitting}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -296,8 +296,8 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
                       <p className="text-sm font-medium text-gray-900 capitalize">
                         {transaction.transactionType.replace('_', ' ')}
                       </p>
-                      <p className="text-xs text-gray-600 mt-1">{transaction.description}</p>
-                      <p className="text-xs text-gray-500 mt-1">{formatDate(transaction.createdAt)}</p>
+                      <p className="text-xs text-gray-900 mt-1">{transaction.description}</p>
+                      <p className="text-xs text-gray-900 mt-1">{formatDate(transaction.createdAt)}</p>
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold ${
@@ -325,7 +325,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="mt-2 text-sm text-gray-500">No credit transactions yet</p>
+            <p className="mt-2 text-sm text-gray-900">No credit transactions yet</p>
             <p className="text-xs text-gray-400">Credit transactions will appear here when payments exceed invoice amounts</p>
           </div>
         )}

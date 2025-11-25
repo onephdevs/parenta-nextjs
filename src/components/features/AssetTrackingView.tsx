@@ -89,7 +89,7 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{asset.assetName}</h2>
-            <p className="text-gray-600">{asset.assetType} • {asset.brand} {asset.model}</p>
+            <p className="text-gray-900">{asset.assetType} • {asset.brand} {asset.model}</p>
           </div>
           <div className="flex items-center space-x-3">
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(asset.assetStatus)}`}>
@@ -106,24 +106,24 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-500">Location</div>
+            <div className="text-sm text-gray-900">Location</div>
             <div className="text-lg font-semibold text-gray-900">
               {asset.buildingName}
             </div>
             {asset.location && (
-              <div className="text-sm text-gray-600">{asset.location}</div>
+              <div className="text-sm text-gray-900">{asset.location}</div>
             )}
           </div>
           
           <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-500">Current Value</div>
+            <div className="text-sm text-gray-900">Current Value</div>
             <div className="text-lg font-semibold text-gray-900">
               {asset.currentValue ? formatCurrency(asset.currentValue) : 'N/A'}
             </div>
           </div>
 
           <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="text-sm text-gray-500">Serial Number</div>
+            <div className="text-sm text-gray-900">Serial Number</div>
             <div className="text-lg font-semibold text-gray-900">
               {asset.serialNumber || 'N/A'}
             </div>
@@ -141,7 +141,7 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
               className={`${
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2`}
             >
               <span>{tab.icon}</span>
@@ -160,29 +160,29 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Asset Information</h3>
                 <dl className="space-y-3">
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Asset Type:</dt>
+                    <dt className="text-sm text-gray-900">Asset Type:</dt>
                     <dd className="text-sm font-medium text-gray-900">{asset.assetType}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Brand:</dt>
+                    <dt className="text-sm text-gray-900">Brand:</dt>
                     <dd className="text-sm font-medium text-gray-900">{asset.brand || 'N/A'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Model:</dt>
+                    <dt className="text-sm text-gray-900">Model:</dt>
                     <dd className="text-sm font-medium text-gray-900">{asset.model || 'N/A'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Serial Number:</dt>
+                    <dt className="text-sm text-gray-900">Serial Number:</dt>
                     <dd className="text-sm font-medium text-gray-900">{asset.serialNumber || 'N/A'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Status:</dt>
+                    <dt className="text-sm text-gray-900">Status:</dt>
                     <dd className="text-sm font-medium text-gray-900">
                       {asset.assetStatus.charAt(0).toUpperCase() + asset.assetStatus.slice(1)}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Condition:</dt>
+                    <dt className="text-sm text-gray-900">Condition:</dt>
                     <dd className="text-sm font-medium text-gray-900">
                       {asset.assetCondition.charAt(0).toUpperCase() + asset.assetCondition.slice(1)}
                     </dd>
@@ -194,15 +194,15 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Location & Tracking</h3>
                 <dl className="space-y-3">
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Building:</dt>
+                    <dt className="text-sm text-gray-900">Building:</dt>
                     <dd className="text-sm font-medium text-gray-900">{asset.buildingName || 'N/A'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Specific Location:</dt>
+                    <dt className="text-sm text-gray-900">Specific Location:</dt>
                     <dd className="text-sm font-medium text-gray-900">{asset.location || 'N/A'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">QR Code:</dt>
+                    <dt className="text-sm text-gray-900">QR Code:</dt>
                     <dd className="text-sm font-medium text-gray-900">
                       {asset.qrCodeGenerated ? (
                         <span className="text-green-600">✓ Generated</span>
@@ -212,7 +212,7 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Tracking Enabled:</dt>
+                    <dt className="text-sm text-gray-900">Tracking Enabled:</dt>
                     <dd className="text-sm font-medium text-gray-900">
                       {asset.trackingEnabled ? (
                         <span className="text-green-600">✓ Enabled</span>
@@ -222,7 +222,7 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-500">Current Value:</dt>
+                    <dt className="text-sm text-gray-900">Current Value:</dt>
                     <dd className="text-sm font-medium text-gray-900">
                       {asset.currentValue ? formatCurrency(asset.currentValue) : 'N/A'}
                     </dd>
@@ -297,11 +297,11 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-medium text-gray-900">Regular Inspection</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-900">
                         {asset.lastMaintenanceDate ? formatDate(asset.lastMaintenanceDate) : 'N/A'}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-sm text-gray-900 mt-1">
                       Routine maintenance and performance check completed successfully.
                     </div>
                   </div>
@@ -312,11 +312,11 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-medium text-gray-900">Installation</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-900">
                         {asset.installedDate ? formatDate(asset.installedDate) : 'N/A'}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-sm text-gray-900 mt-1">
                       Asset installed and commissioned for operation.
                     </div>
                   </div>
@@ -335,25 +335,25 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <div className="text-sm font-medium text-gray-900">QR Code Scanned</div>
-                    <div className="text-sm text-gray-600">Scanned for routine inspection</div>
+                    <div className="text-sm text-gray-900">Scanned for routine inspection</div>
                   </div>
-                  <div className="text-sm text-gray-500">Today, 2:30 PM</div>
+                  <div className="text-sm text-gray-900">Today, 2:30 PM</div>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <div className="text-sm font-medium text-gray-900">Location Updated</div>
-                    <div className="text-sm text-gray-600">Moved to current location</div>
+                    <div className="text-sm text-gray-900">Moved to current location</div>
                   </div>
-                  <div className="text-sm text-gray-500">2 days ago</div>
+                  <div className="text-sm text-gray-900">2 days ago</div>
                 </div>
                 
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <div className="text-sm font-medium text-gray-900">QR Code Generated</div>
-                    <div className="text-sm text-gray-600">QR code created for tracking</div>
+                    <div className="text-sm text-gray-900">QR code created for tracking</div>
                   </div>
-                  <div className="text-sm text-gray-500">1 week ago</div>
+                  <div className="text-sm text-gray-900">1 week ago</div>
                 </div>
               </div>
             </div>
@@ -369,9 +369,9 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">Asset Purchased</div>
-                    <div className="text-sm text-gray-600">Asset acquired and added to inventory</div>
+                    <div className="text-sm text-gray-900">Asset acquired and added to inventory</div>
                   </div>
-                  <div className="text-sm text-gray-500">Purchase Date</div>
+                  <div className="text-sm text-gray-900">Purchase Date</div>
                 </div>
                 
                 <div className="flex items-center space-x-4">
@@ -382,9 +382,9 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">Installed & Commissioned</div>
-                    <div className="text-sm text-gray-600">Asset installed and put into service</div>
+                    <div className="text-sm text-gray-900">Asset installed and put into service</div>
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-900">
                     {asset.installedDate ? formatDate(asset.installedDate) : 'N/A'}
                   </div>
                 </div>
@@ -397,9 +397,9 @@ export default function AssetTrackingView({ asset }: AssetTrackingViewProps) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">In Service</div>
-                    <div className="text-sm text-gray-600">Currently operational and being tracked</div>
+                    <div className="text-sm text-gray-900">Currently operational and being tracked</div>
                   </div>
-                  <div className="text-sm text-gray-500">Current Status</div>
+                  <div className="text-sm text-gray-900">Current Status</div>
                 </div>
               </div>
             </div>

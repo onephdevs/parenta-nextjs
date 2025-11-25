@@ -289,7 +289,7 @@ export default function AdminMaintenancePage() {
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Maintenance Requests
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Track and manage property maintenance requests
               </p>
             </div>
@@ -306,7 +306,7 @@ export default function AdminMaintenancePage() {
                 <Wrench className="h-8 w-8 text-blue-600" />
                 Maintenance Requests
               </h1>
-              <p className="mt-2 text-gray-600">
+              <p className="mt-2 text-gray-900">
                 Manage and track all maintenance requests across properties
               </p>
             </div>
@@ -318,7 +318,7 @@ export default function AdminMaintenancePage() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Requests</p>
+                <p className="text-sm font-medium text-gray-900">Total Requests</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
               <Wrench className="h-8 w-8 text-gray-400" />
@@ -328,7 +328,7 @@ export default function AdminMaintenancePage() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Open</p>
+                <p className="text-sm font-medium text-gray-900">Open</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.open}</p>
               </div>
               <AlertCircle className="h-8 w-8 text-yellow-400" />
@@ -338,7 +338,7 @@ export default function AdminMaintenancePage() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
+                <p className="text-sm font-medium text-gray-900">In Progress</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
               </div>
               <Clock className="h-8 w-8 text-blue-400" />
@@ -348,7 +348,7 @@ export default function AdminMaintenancePage() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-sm font-medium text-gray-900">Completed</p>
                 <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
               </div>
               <CheckCircle2 className="h-8 w-8 text-green-400" />
@@ -421,40 +421,40 @@ export default function AdminMaintenancePage() {
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading requests...</p>
+              <p className="text-gray-900">Loading requests...</p>
             </div>
           ) : filteredRequests.length === 0 ? (
             <div className="text-center py-12">
               <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No maintenance requests found</p>
+              <p className="text-gray-900">No maintenance requests found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Request
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Property
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Tenant
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Category
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Priority
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -464,15 +464,15 @@ export default function AdminMaintenancePage() {
                     <tr key={request.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">{request.title}</div>
-                        <div className="text-sm text-gray-500 line-clamp-1">{request.description}</div>
+                        <div className="text-sm text-gray-900 line-clamp-1">{request.description}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{request.building_name || 'N/A'}</div>
-                        <div className="text-sm text-gray-500">{request.room_number || 'No room'}</div>
+                        <div className="text-sm text-gray-900">{request.room_number || 'No room'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{request.tenant_name || 'N/A'}</div>
-                        <div className="text-sm text-gray-500">{request.tenant_email || ''}</div>
+                        <div className="text-sm text-gray-900">{request.tenant_email || ''}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900 capitalize">
@@ -485,7 +485,7 @@ export default function AdminMaintenancePage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(request.status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(request.request_date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -514,7 +514,7 @@ export default function AdminMaintenancePage() {
                 <h3 className="text-lg font-semibold text-gray-900">Update Maintenance Request</h3>
                 <button
                   onClick={() => setShowUpdateModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-900"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -524,12 +524,12 @@ export default function AdminMaintenancePage() {
                 {/* Request Info */}
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-2">{selectedRequest.title}</h4>
-                  <p className="text-sm text-gray-600">{selectedRequest.description}</p>
-                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                  <p className="text-sm text-gray-900">{selectedRequest.description}</p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-900">
                     <Building className="h-4 w-4" />
                     {selectedRequest.building_name} - {selectedRequest.room_number}
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
+                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-900">
                     <User className="h-4 w-4" />
                     {selectedRequest.tenant_name}
                   </div>
@@ -538,7 +538,7 @@ export default function AdminMaintenancePage() {
                 {/* Update Form */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Status
                     </label>
                     <select
@@ -554,7 +554,7 @@ export default function AdminMaintenancePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Priority
                     </label>
                     <select
@@ -570,7 +570,7 @@ export default function AdminMaintenancePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Scheduled Date
                     </label>
                     <input
@@ -582,7 +582,7 @@ export default function AdminMaintenancePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Completed Date
                     </label>
                     <input
@@ -594,7 +594,7 @@ export default function AdminMaintenancePage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Assigned To
                     </label>
                     <input
@@ -607,7 +607,7 @@ export default function AdminMaintenancePage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
                       Notes
                     </label>
                     <textarea
@@ -624,7 +624,7 @@ export default function AdminMaintenancePage() {
                 <div className="flex justify-end gap-3 pt-4">
                   <button
                     onClick={() => setShowUpdateModal(false)}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-4 py-2 text-gray-900 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     Cancel
                   </button>

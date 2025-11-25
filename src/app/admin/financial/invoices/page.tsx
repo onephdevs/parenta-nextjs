@@ -126,7 +126,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         );
       default:
         return (
-          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         );
@@ -144,7 +144,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             <div className="flex items-center space-x-4">
               <Link
                 href="/admin/financial"
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-900 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -182,7 +182,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Paid Invoices</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Paid Invoices</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.paidAmount)}</dd>
                   </dl>
                 </div>
@@ -190,7 +190,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.paidInvoices} invoices</span>
+                <span className="text-gray-900">{summary.paidInvoices} invoices</span>
               </div>
             </div>
           </div>
@@ -207,7 +207,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Unpaid Invoices</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Unpaid Invoices</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.unpaidAmount)}</dd>
                   </dl>
                 </div>
@@ -215,7 +215,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.unpaidInvoices} invoices</span>
+                <span className="text-gray-900">{summary.unpaidInvoices} invoices</span>
               </div>
             </div>
           </div>
@@ -232,7 +232,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Overdue</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Overdue</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.overdueAmount)}</dd>
                   </dl>
                 </div>
@@ -240,7 +240,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.overdueInvoices} invoices</span>
+                <span className="text-gray-900">{summary.overdueInvoices} invoices</span>
               </div>
             </div>
           </div>
@@ -257,7 +257,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Invoices</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Total Invoices</dt>
                     <dd className="text-lg font-medium text-gray-900">{summary.totalInvoices}</dd>
                   </dl>
                 </div>
@@ -265,7 +265,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{formatCurrency(summary.totalAmount)} total value</span>
+                <span className="text-gray-900">{formatCurrency(summary.totalAmount)} total value</span>
               </div>
             </div>
           </div>
@@ -276,7 +276,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
           <div className="px-6 py-4">
             <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-1">
                   Search
                 </label>
                 <input
@@ -290,7 +290,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
               </div>
 
               <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="status" className="block text-sm font-medium text-gray-900 mb-1">
                   Status
                 </label>
                 <select
@@ -309,7 +309,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
               </div>
 
               <div>
-                <label htmlFor="tenant" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="tenant" className="block text-sm font-medium text-gray-900 mb-1">
                   Tenant
                 </label>
                 <select
@@ -345,7 +345,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             <h3 className="text-lg leading-6 font-medium text-gray-900">
               Invoices ({invoicesData.total})
             </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            <p className="mt-1 max-w-2xl text-sm text-gray-900">
               Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, invoicesData.total)} of {invoicesData.total} invoices
             </p>
           </div>
@@ -356,7 +356,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
-              <p className="mt-1 text-sm text-gray-500">Get started by creating a new invoice.</p>
+              <p className="mt-1 text-sm text-gray-900">Get started by creating a new invoice.</p>
               <div className="mt-6">
                 <Link
                   href="/admin/financial/invoices/new"
@@ -393,7 +393,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                               {formatCurrency(invoice.totalAmount)}
                             </span>
                           </div>
-                          <div className="mt-1 flex items-center text-sm text-gray-500">
+                          <div className="mt-1 flex items-center text-sm text-gray-900">
                             <p>
                               {invoice.tenantName} • {invoice.buildingName} {invoice.roomNumber}
                             </p>
@@ -401,7 +401,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                             <p>Due: {formatDate(invoice.dueDate)}</p>
                           </div>
                           {invoice.description && (
-                            <p className="mt-1 text-sm text-gray-600">{invoice.description}</p>
+                            <p className="mt-1 text-sm text-gray-900">{invoice.description}</p>
                           )}
                         </div>
                       </div>
@@ -428,7 +428,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
               {page > 1 && (
                 <Link
                   href={`?page=${page - 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
                 >
                   Previous
                 </Link>
@@ -436,7 +436,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
               {page < totalPages && (
                 <Link
                   href={`?page=${page + 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
                 >
                   Next
                 </Link>
@@ -444,7 +444,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-gray-900">
                   Showing <span className="font-medium">{((page - 1) * 20) + 1}</span> to{' '}
                   <span className="font-medium">{Math.min(page * 20, invoicesData.total)}</span> of{' '}
                   <span className="font-medium">{invoicesData.total}</span> results
@@ -455,7 +455,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                   {page > 1 && (
                     <Link
                       href={`?page=${page - 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
                     >
                       <span className="sr-only">Previous</span>
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -475,7 +475,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           pageNum === page
                             ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
                         }`}
                       >
                         {pageNum}
@@ -486,7 +486,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                   {page < totalPages && (
                     <Link
                       href={`?page=${page + 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
                     >
                       <span className="sr-only">Next</span>
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">

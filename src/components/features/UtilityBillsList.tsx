@@ -137,7 +137,7 @@ export default function UtilityBillsList({
             {hasActiveFilters && (
               <button
                 onClick={onClearFilters}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-gray-900 hover:text-gray-900"
               >
                 Clear all filters
               </button>
@@ -223,25 +223,25 @@ export default function UtilityBillsList({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Utility & Provider
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Building
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Amount
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Billing Period
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Due Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -275,7 +275,7 @@ export default function UtilityBillsList({
               ))
             ) : bills.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-8 text-center text-gray-900">
                   {hasActiveFilters ? 'No bills match your filters' : 'No utility bills found'}
                 </td>
               </tr>
@@ -293,7 +293,7 @@ export default function UtilityBillsList({
                           <div className="text-sm font-medium text-gray-900">
                             {bill.providerName}
                           </div>
-                          <div className="text-sm text-gray-500 capitalize">
+                          <div className="text-sm text-gray-900 capitalize">
                             {bill.utilityType}
                           </div>
                           {bill.providerAccountNumber && (
@@ -309,7 +309,7 @@ export default function UtilityBillsList({
                         {building?.name || 'Unknown Building'}
                       </div>
                       {building && (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-900">
                           {building.city}, {building.state}
                         </div>
                       )}
@@ -319,12 +319,12 @@ export default function UtilityBillsList({
                         {formatCurrency(bill.amount)}
                       </div>
                       {bill.usageAmount && (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-900">
                           {bill.usageAmount} {bill.usageUnit || 'units'}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>{formatDate(bill.billingPeriodStart)}</div>
                       <div>to {formatDate(bill.billingPeriodEnd)}</div>
                     </td>
@@ -337,7 +337,7 @@ export default function UtilityBillsList({
                           ? 'text-red-600' 
                           : daysUntilDue <= 7 
                             ? 'text-yellow-600' 
-                            : 'text-gray-500'
+                            : 'text-gray-900'
                       }`}>
                         {daysUntilDue < 0 
                           ? `${Math.abs(daysUntilDue)} days overdue`
@@ -396,7 +396,7 @@ export default function UtilityBillsList({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
+          <div className="text-sm text-gray-900">
             Page {currentPage} of {totalPages}
           </div>
           <div className="flex space-x-2">

@@ -95,7 +95,7 @@ export default async function FinancialDashboard() {
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Financial Overview
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Monitor payments, expenses, and financial performance
               </p>
             </div>
@@ -111,25 +111,25 @@ export default async function FinancialDashboard() {
               </Link>
               <Link
                 href="/admin/financial/payments"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 View All Payments
               </Link>
               <Link
                 href="/admin/financial/expenses"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Manage Expenses
               </Link>
               <Link
                 href="/admin/financial/invoices"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Manage Invoices
               </Link>
               <Link
                 href="/admin/financial/reports"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 View Reports
               </Link>
@@ -154,7 +154,7 @@ export default async function FinancialDashboard() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Total Revenue</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.completedAmount)}</dd>
                   </dl>
                 </div>
@@ -162,7 +162,7 @@ export default async function FinancialDashboard() {
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.completedPayments} completed payments</span>
+                <span className="text-gray-900">{summary.completedPayments} completed payments</span>
               </div>
             </div>
           </div>
@@ -180,7 +180,7 @@ export default async function FinancialDashboard() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Pending Payments</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Pending Payments</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.pendingAmount)}</dd>
                   </dl>
                 </div>
@@ -188,7 +188,7 @@ export default async function FinancialDashboard() {
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.pendingPayments} pending payments</span>
+                <span className="text-gray-900">{summary.pendingPayments} pending payments</span>
               </div>
             </div>
           </div>
@@ -206,7 +206,7 @@ export default async function FinancialDashboard() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Overdue Payments</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Overdue Payments</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.overdueAmount)}</dd>
                   </dl>
                 </div>
@@ -214,7 +214,7 @@ export default async function FinancialDashboard() {
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.overduePayments} overdue payments</span>
+                <span className="text-gray-900">{summary.overduePayments} overdue payments</span>
               </div>
             </div>
           </div>
@@ -232,7 +232,7 @@ export default async function FinancialDashboard() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Average Payment</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Average Payment</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.averagePaymentAmount)}</dd>
                   </dl>
                 </div>
@@ -240,7 +240,7 @@ export default async function FinancialDashboard() {
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{summary.totalPayments} total payments</span>
+                <span className="text-gray-900">{summary.totalPayments} total payments</span>
               </div>
             </div>
           </div>
@@ -277,7 +277,7 @@ export default async function FinancialDashboard() {
                             <p className="text-sm font-medium text-gray-900 truncate">
                               {payment.tenantName}
                             </p>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-900">
                               {payment.roomNumber && `Room ${payment.roomNumber} • `}
                               {formatDate(payment.paymentDate)}
                             </p>
@@ -304,7 +304,7 @@ export default async function FinancialDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                   <h3 className="mt-2 text-sm font-medium text-gray-900">No payments yet</h3>
-                  <p className="mt-1 text-sm text-gray-500">Get started by recording your first payment.</p>
+                  <p className="mt-1 text-sm text-gray-900">Get started by recording your first payment.</p>
                   <div className="mt-6">
                     <Link
                       href="/admin/financial/payments/new"
@@ -336,7 +336,7 @@ export default async function FinancialDashboard() {
                 
                 <Link
                   href="/admin/financial/payments?status=overdue"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                 >
                   <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -346,7 +346,7 @@ export default async function FinancialDashboard() {
                 
                 <Link
                   href="/admin/financial/reports"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                 >
                   <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -356,7 +356,7 @@ export default async function FinancialDashboard() {
                 
                 <Link
                   href="/admin/financial/invoices"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                 >
                   <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -366,7 +366,7 @@ export default async function FinancialDashboard() {
                 
                 <Link
                   href="/admin/financial/payment-gateways"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                 >
                   <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -376,7 +376,7 @@ export default async function FinancialDashboard() {
                 
                 <Link
                   href="/admin/financial/advanced-analytics"
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
                 >
                   <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

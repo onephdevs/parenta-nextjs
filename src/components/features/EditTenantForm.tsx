@@ -250,7 +250,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-900">
                 First Name *
               </label>
               <input
@@ -270,7 +270,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-900">
                 Last Name *
               </label>
               <input
@@ -290,7 +290,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900">
                 Email *
               </label>
               <input
@@ -310,7 +310,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-900">
                 Phone
               </label>
               <input
@@ -329,7 +329,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-900">
                 Date of Birth
               </label>
               <input
@@ -343,7 +343,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="tenantStatus" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="tenantStatus" className="block text-sm font-medium text-gray-900">
                 Status
               </label>
               <select
@@ -362,7 +362,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           </div>
 
           <div className="mt-6">
-            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-900">
               Previous Address
             </label>
             <textarea
@@ -384,7 +384,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             <div>
-              <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-900">
                 Name
               </label>
               <input
@@ -398,7 +398,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-900">
                 Phone
               </label>
               <input
@@ -417,7 +417,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-900">
                 Relationship
               </label>
               <input
@@ -441,7 +441,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-900">
                 Employment Status
               </label>
               <select
@@ -460,7 +460,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="employerName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="employerName" className="block text-sm font-medium text-gray-900">
                 Employer Name
               </label>
               <input
@@ -474,7 +474,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900">
                 Monthly Income ($)
               </label>
               <input
@@ -495,7 +495,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-900">
                 Security Deposit ($)
               </label>
               <input
@@ -525,7 +525,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label htmlFor="leaseStartDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="leaseStartDate" className="block text-sm font-medium text-gray-900">
                 Lease Start Date
               </label>
               <input
@@ -539,7 +539,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="leaseEndDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="leaseEndDate" className="block text-sm font-medium text-gray-900">
                 Lease End Date
               </label>
               <input
@@ -553,7 +553,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="moveInDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="moveInDate" className="block text-sm font-medium text-gray-900">
                 Move-in Date
               </label>
               <input
@@ -567,7 +567,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="moveOutDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="moveOutDate" className="block text-sm font-medium text-gray-900">
                 Move-out Date
               </label>
               <input
@@ -584,7 +584,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
         {/* Notes */}
         <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="notes" className="block text-sm font-medium text-gray-900">
             Notes
           </label>
           <textarea
@@ -647,7 +647,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           <div className="flex space-x-3">
             <Link
               href={`/admin/tenants/${tenant.id}`}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
             >
               Cancel
             </Link>

@@ -149,7 +149,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
             {/* Sort Order */}
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm leading-4 font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm leading-4 font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
             >
               {sortOrder === 'asc' ? (
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,7 +169,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
                 className={`inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
                   viewMode === 'grid'
                     ? 'bg-purple-50 text-purple-700 border-purple-300'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                    : 'bg-white text-gray-900 hover:bg-gray-50'
                 }`}
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +181,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
                 className={`inline-flex items-center px-3 py-2 rounded-r-md border border-l-0 border-gray-300 text-sm font-medium ${
                   viewMode === 'list'
                     ? 'bg-purple-50 text-purple-700 border-purple-300'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                    : 'bg-white text-gray-900 hover:bg-gray-50'
                 }`}
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -193,7 +193,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
         </div>
 
         {/* Results Count */}
-        <div className="mt-4 text-sm text-gray-500">
+        <div className="mt-4 text-sm text-gray-900">
           Showing {filteredAndSortedTenants.length} of {tenants.length} tenants
         </div>
       </div>
@@ -206,7 +206,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 515.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No tenants found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-900">
               {searchTerm || selectedStatus
                 ? 'Try adjusting your search criteria.'
                 : 'Get started by adding your first tenant.'
@@ -242,12 +242,12 @@ export default function TenantsList({ tenants }: TenantsListProps) {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Income</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Move-in Date</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Tenant</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Income</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">Move-in Date</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-900 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -266,7 +266,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
                               <div className="text-sm font-medium text-gray-900">
                                 {tenant.firstName} {tenant.lastName}
                               </div>
-                              <div className="text-sm text-gray-500">{tenant.email}</div>
+                              <div className="text-sm text-gray-900">{tenant.email}</div>
                             </div>
                           </div>
                         </td>

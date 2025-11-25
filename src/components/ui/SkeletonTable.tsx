@@ -23,7 +23,7 @@ export default function SkeletonTable({
             <thead className="bg-gray-50">
               <tr>
                 {Array.from({ length: columns }).map((_, i) => (
-                  <th key={i} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th key={i} className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                     <Skeleton height={16} width="80%" />
                   </th>
                 ))}

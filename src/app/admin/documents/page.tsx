@@ -146,7 +146,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
               <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                 Documents
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-900">
                 Manage and organize all property-related documents
               </p>
             </div>
@@ -154,7 +154,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
               <DocumentUpload />
               <Link
                 href="/admin/documents/categories"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.414 1.414 0 01-2.828 0l-7-7A1.414 1.414 0 013 12V7a4 4 0 014-4z" />
@@ -182,7 +182,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Documents</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Total Documents</dt>
                     <dd className="text-lg font-medium text-gray-900">{stats.totalDocuments}</dd>
                   </dl>
                 </div>
@@ -190,7 +190,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">{stats.documentsThisMonth} added this month</span>
+                <span className="text-gray-900">{stats.documentsThisMonth} added this month</span>
               </div>
             </div>
           </div>
@@ -208,7 +208,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Storage Used</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Storage Used</dt>
                     <dd className="text-lg font-medium text-gray-900">{formatFileSize(stats.storageUsed)}</dd>
                   </dl>
                 </div>
@@ -216,7 +216,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">Across all documents</span>
+                <span className="text-gray-900">Across all documents</span>
               </div>
             </div>
           </div>
@@ -234,7 +234,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Expiring Soon</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Expiring Soon</dt>
                     <dd className="text-lg font-medium text-gray-900">{stats.expiringDocuments}</dd>
                   </dl>
                 </div>
@@ -242,7 +242,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">Within 30 days</span>
+                <span className="text-gray-900">Within 30 days</span>
               </div>
             </div>
           </div>
@@ -260,7 +260,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Categories</dt>
+                    <dt className="text-sm font-medium text-gray-900 truncate">Categories</dt>
                     <dd className="text-lg font-medium text-gray-900">{categories.length}</dd>
                   </dl>
                 </div>
@@ -268,7 +268,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
             </div>
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
-                <span className="text-gray-600">Document categories</span>
+                <span className="text-gray-900">Document categories</span>
               </div>
             </div>
           </div>
