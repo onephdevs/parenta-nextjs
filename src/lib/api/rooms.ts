@@ -211,22 +211,44 @@ export async function updateRoom(id: string, roomData: Partial<CreateRoomData>):
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
+    let hasDepositAmount = false;
 
+    // Handle deposit_amount: prioritize depositFixedAmount over depositAmount
+    if (roomData.depositFixedAmount !== undefined) {
+      paramCount++;
+      updates.push(`deposit_amount = $${paramCount}`);
+      values.push(roomData.depositFixedAmount);
+      hasDepositAmount = true;
+    } else if (roomData.depositAmount !== undefined) {
+      paramCount++;
+      updates.push(`deposit_amount = $${paramCount}`);
+      values.push(roomData.depositAmount);
+      hasDepositAmount = true;
+    }
+
+    // Handle other fields
     Object.entries(roomData).forEach(([key, value]) => {
-      if (value !== undefined) {
-        paramCount++;
-        const dbKey = key === 'buildingId' ? 'building_id' : 
-                     key === 'roomNumber' ? 'room_number' :
-                     key === 'roomType' ? 'room_type' :
-                     key === 'floorNumber' ? 'floor_number' :
-                     key === 'squareFootage' ? 'square_footage' :
-                     key === 'monthlyRate' ? 'monthly_rate' :
-                     key === 'depositAmount' ? 'deposit_amount' :
-                     key === 'roomStatus' ? 'room_status' :
-                     key;
-        updates.push(`${dbKey} = $${paramCount}`);
-        values.push(value);
+      // Skip depositAmount and depositFixedAmount as they're handled above
+      if (key === 'depositAmount' || key === 'depositFixedAmount' || value === undefined) {
+        return;
       }
+
+      paramCount++;
+      const dbKey = key === 'buildingId' ? 'building_id' : 
+                   key === 'roomNumber' ? 'room_number' :
+                   key === 'roomType' ? 'room_type' :
+                   key === 'floorNumber' ? 'floor_number' :
+                   key === 'squareFootage' ? 'square_footage' :
+                   key === 'monthlyRate' ? 'monthly_rate' :
+                   key === 'depositRequired' ? 'deposit_required' :
+                   key === 'depositType' ? 'deposit_type' :
+                   key === 'depositPercentage' ? 'deposit_percentage' :
+                   key === 'roomStatus' ? 'room_status' :
+                   key === 'amenities' ? 'amenities' :
+                   key === 'description' ? 'description' :
+                   key;
+      updates.push(`${dbKey} = $${paramCount}`);
+      values.push(value);
     });
 
     if (updates.length === 0) {
