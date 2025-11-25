@@ -51,6 +51,7 @@ export interface DatabaseBuilding {
 export interface Room {
   id: string;
   buildingId: string;
+  buildingName?: string;
   roomNumber: string;
   floorNumber?: number;
   roomType: string;
@@ -72,6 +73,7 @@ export interface Room {
 export interface DatabaseRoom {
   id: string;
   building_id: string;
+  building_name?: string;
   room_number: string;
   floor_number?: number;
   room_type: string;

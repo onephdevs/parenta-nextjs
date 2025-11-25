@@ -6,6 +6,7 @@ function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
   return {
     id: dbRoom.id,
     buildingId: dbRoom.building_id,
+    buildingName: dbRoom.building_name || undefined,
     roomNumber: dbRoom.room_number,
     floorNumber: dbRoom.floor_number,
     roomType: dbRoom.room_type,

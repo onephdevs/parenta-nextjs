@@ -81,7 +81,8 @@ export default function CreateReservationModal({
       const result = await response.json();
       
       if (result.success) {
-        const roomsData = result.data?.rooms || result.data?.data?.rooms || result.data || [];
+        // Handle paginated response
+        const roomsData = result.data?.rooms || result.data || [];
         const allRooms = Array.isArray(roomsData) ? roomsData : [];
         setRooms(allRooms.filter((r: Room) => 
           r.roomStatus === 'vacant' || r.roomStatus === 'reserved'

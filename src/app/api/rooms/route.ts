@@ -18,12 +18,13 @@ export async function GET(request: Request) {
       Object.entries(filters).filter(([, value]) => value !== undefined)
     );
 
-    const rooms = await getAllRooms(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
+    const roomsResult = await getAllRooms(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
     
     return NextResponse.json({
       success: true,
-      data: rooms,
-      count: rooms.length
+      data: roomsResult.rooms,
+      pagination: roomsResult.pagination,
+      count: roomsResult.rooms.length
     });
   } catch (error) {
     console.error('Rooms API error:', error);

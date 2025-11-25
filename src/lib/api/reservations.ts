@@ -1,6 +1,5 @@
 import pool from '@/lib/db';
 import { Reservation, ReservationWithDetails, CreateReservationData } from '@/types/database';
-import { createPayment, CreatePaymentData } from './payments';
 
 // Helper function to map database row to Reservation
 function mapDatabaseReservationToReservation(row: any): Reservation {
@@ -95,24 +94,29 @@ export async function createReservation(
     // Create payment record if deposit is provided
     let depositPaymentId: string | undefined;
     if (reservationData.reservationDeposit > 0) {
-      const paymentData: CreatePaymentData = {
-        tenantId: reservationData.tenantId,
-        amount: reservationData.reservationDeposit,
-        paymentType: 'deposit',
-        paymentMethod: 'cash', // Default, can be updated later
-        paymentDate: reservationDate,
-        dueDate: reservationDate,
-        notes: `Reservation deposit for room reservation`,
-      };
-
-      const payment = await createPayment(paymentData);
-      depositPaymentId = payment.id;
-
-      // Update payment status to paid
-      await client.query(
-        'UPDATE payments SET payment_status = $1 WHERE id = $2',
-        ['paid', payment.id]
-      );
+      // Create payment directly in the transaction
+      const paymentQuery = `
+        INSERT INTO payments (
+          tenant_id, assignment_id, amount, payment_type, payment_method,
+          payment_date, due_date, reference_number, notes, payment_status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id
+      `;
+      
+      const paymentResult = await client.query(paymentQuery, [
+        reservationData.tenantId,
+        null, // No assignment_id for reservation deposits
+        reservationData.reservationDeposit,
+        'deposit',
+        'cash', // Default, can be updated later
+        reservationDate.toISOString().split('T')[0],
+        reservationDate.toISOString().split('T')[0],
+        null, // reference_number
+        `Reservation deposit for room reservation`,
+        'paid' // Set directly to paid for reservation deposits
+      ]);
+      
+      depositPaymentId = paymentResult.rows[0].id;
     }
 
     // Create reservation
