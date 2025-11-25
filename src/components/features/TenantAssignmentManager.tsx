@@ -116,11 +116,16 @@ export default function TenantAssignmentManager({
       const response = await fetch(`/api/occupants?roomId=${roomId}&activeOnly=true`);
       const result = await response.json();
       
-      if (result.success) {
+      if (result.success && Array.isArray(result.data)) {
         setOccupants(result.data);
+      } else {
+        // Ensure occupants is always an array, even on error
+        setOccupants([]);
       }
     } catch (error) {
       console.error('Error fetching occupants:', error);
+      // Ensure occupants is always an array, even on error
+      setOccupants([]);
     }
   };
 
@@ -354,16 +359,16 @@ export default function TenantAssignmentManager({
             </button>
           </div>
           <div className="space-y-3">
-            {occupants.map((occupant) => (
+            {Array.isArray(occupants) && occupants.map((occupant) => (
               <div key={occupant.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-gray-900">
-                      {occupant.first_name} {occupant.last_name}
+                      {occupant.first_name || ''} {occupant.last_name || ''}
                     </h4>
                     {occupant.relationship_to_tenant && (
                       <p className="text-sm text-gray-900 capitalize">
-                        {occupant.relationship_to_tenant}
+                        {String(occupant.relationship_to_tenant)}
                       </p>
                     )}
                     {occupant.phone && (

@@ -311,7 +311,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
             {roomDetails.room.description && (
               <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Description</h3>
-                <p className="text-sm text-gray-900">{roomDetails.room.description}</p>
+                <p className="text-sm text-gray-900">{String(roomDetails.room.description || '')}</p>
               </div>
             )}
 
@@ -320,7 +320,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
               <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Amenities</h3>
                 <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
-                  {roomDetails.room.amenities}
+                  {String(roomDetails.room.amenities || '')}
                 </div>
               </div>
             )}
