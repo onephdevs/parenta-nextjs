@@ -31,6 +31,7 @@ export default function CreateReservationModal({
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTenants, setLoadingTenants] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [activeReservationRoomIds, setActiveReservationRoomIds] = useState<Set<string>>(new Set());
   
   const [formData, setFormData] = useState<CreateReservationData>({
     tenantId: initialTenantId || '',
@@ -42,13 +43,22 @@ export default function CreateReservationModal({
     notes: '',
   });
 
-  // Fetch available rooms (vacant or reserved)
+  // Fetch active reservations first, then rooms
   useEffect(() => {
     if (isOpen) {
-      fetchRooms();
+      fetchActiveReservations();
       fetchTenants();
     }
   }, [isOpen]);
+
+  // Fetch rooms after active reservations are loaded
+  useEffect(() => {
+    if (isOpen && activeReservationRoomIds.size >= 0) {
+      // activeReservationRoomIds.size >= 0 is always true, but this ensures
+      // we wait for the initial fetch to complete (even if empty)
+      fetchRooms();
+    }
+  }, [isOpen, activeReservationRoomIds]);
 
   // Update form when initial values change
   useEffect(() => {
@@ -73,6 +83,32 @@ export default function CreateReservationModal({
     }
   }, [formData.roomId, rooms]);
 
+  const fetchActiveReservations = async () => {
+    try {
+      // Fetch active reservations to filter out rooms that already have reservations
+      const response = await fetch('/api/reservations?status=active');
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const reservations = result.data.reservations || result.data || [];
+        // Get set of room IDs that have active reservations
+        const roomIdsWithActiveReservations = new Set(
+          reservations
+            .filter((r: any) => {
+              // Only include reservations that haven't expired
+              const expiryDate = new Date(r.expiryDate || r.expiry_date);
+              return expiryDate >= new Date();
+            })
+            .map((r: any) => r.roomId || r.room_id)
+        );
+        setActiveReservationRoomIds(roomIdsWithActiveReservations);
+      }
+    } catch (error) {
+      console.error('Error fetching active reservations:', error);
+      // Don't show error to user, just log it
+    }
+  };
+
   const fetchRooms = async () => {
     setLoadingRooms(true);
     try {
@@ -84,9 +120,16 @@ export default function CreateReservationModal({
         // Handle paginated response
         const roomsData = result.data?.rooms || result.data || [];
         const allRooms = Array.isArray(roomsData) ? roomsData : [];
-        setRooms(allRooms.filter((r: Room) => 
-          r.roomStatus === 'vacant' || r.roomStatus === 'reserved'
-        ));
+        
+        // Filter rooms:
+        // 1. Must be vacant or reserved (not occupied or maintenance)
+        // 2. Must NOT have an active reservation (expiry_date >= CURRENT_DATE)
+        const filteredRooms = allRooms.filter((r: Room) => {
+          const isAvailableStatus = r.roomStatus === 'vacant' || r.roomStatus === 'reserved';
+          const hasActiveReservation = activeReservationRoomIds.has(r.id);
+          return isAvailableStatus && !hasActiveReservation;
+        });
+        setRooms(filteredRooms);
       }
     } catch (error) {
       console.error('Error fetching rooms:', error);
