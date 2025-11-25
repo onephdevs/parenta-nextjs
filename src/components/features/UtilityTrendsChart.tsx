@@ -1,5 +1,8 @@
 'use client';
 
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
+
 interface UtilityTrend {
   utility_type: string;
   month: string;
@@ -15,6 +18,7 @@ interface UtilityTrendsChartProps {
 }
 
 export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) {
+  const { currencyCode } = useCurrency();
   if (!trends.length) {
     return null;
   }
@@ -40,15 +44,6 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
     cable: '#EF4444', // red
     waste: '#10B981', // emerald
     other: '#6B7280', // gray
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   const formatMonth = (monthStr: string) => {
@@ -84,11 +79,11 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
         <div className="relative h-64 bg-gray-50 rounded-lg p-4">
           {/* Y-axis labels */}
           <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-900 py-4">
-            <span>{formatCurrency(maxAmount)}</span>
-            <span>{formatCurrency(maxAmount * 0.75)}</span>
-            <span>{formatCurrency(maxAmount * 0.5)}</span>
-            <span>{formatCurrency(maxAmount * 0.25)}</span>
-            <span>$0</span>
+            <span>{formatCurrency(maxAmount, currencyCode)}</span>
+            <span>{formatCurrency(maxAmount * 0.75, currencyCode)}</span>
+            <span>{formatCurrency(maxAmount * 0.5, currencyCode)}</span>
+            <span>{formatCurrency(maxAmount * 0.25, currencyCode)}</span>
+            <span>{formatCurrency(0, currencyCode)}</span>
           </div>
 
           {/* Chart area */}
@@ -114,7 +109,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
                     >
                       {/* Tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
-                        {formatCurrency(monthData.total_amount)}
+                        {formatCurrency(monthData.total_amount, currencyCode)}
                         <br />
                         {monthData.total_bills} bills
                       </div>
@@ -172,7 +167,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
                       </span>
                     </div>
                     <div className="text-xs text-gray-900">
-                      {formatCurrency(totalAmount)} • {totalBills} bills
+                      {formatCurrency(totalAmount, currencyCode)} • {totalBills} bills
                     </div>
                   </div>
                 </div>
@@ -188,7 +183,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
             <div className="flex justify-between">
               <span className="text-sm text-gray-900">Total Spending:</span>
               <span className="text-sm font-medium text-gray-900">
-                {formatCurrency(trends.reduce((sum, t) => sum + t.total_amount, 0))}
+                {formatCurrency(trends.reduce((sum, t) => sum + t.total_amount, 0), currencyCode)}
               </span>
             </div>
             <div className="flex justify-between">
@@ -200,7 +195,7 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
             <div className="flex justify-between">
               <span className="text-sm text-gray-900">Average per Month:</span>
               <span className="text-sm font-medium text-gray-900">
-                {formatCurrency(totalsByMonth.reduce((sum, t) => sum + t.total_amount, 0) / totalsByMonth.length)}
+                {formatCurrency(totalsByMonth.reduce((sum, t) => sum + t.total_amount, 0) / totalsByMonth.length, currencyCode)}
               </span>
             </div>
             <div className="flex justify-between">
@@ -233,9 +228,9 @@ export default function UtilityTrendsChart({ trends }: UtilityTrendsChartProps) 
             if (Math.abs(percentChange) < 5) {
               return `Utility costs remained stable this month (${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%).`;
             } else if (percentChange > 0) {
-              return `Utility costs increased by ${percentChange.toFixed(1)}% this month (${formatCurrency(change)}).`;
+              return `Utility costs increased by ${percentChange.toFixed(1)}% this month (${formatCurrency(change, currencyCode)}).`;
             } else {
-              return `Utility costs decreased by ${Math.abs(percentChange).toFixed(1)}% this month (${formatCurrency(Math.abs(change))} savings).`;
+              return `Utility costs decreased by ${Math.abs(percentChange).toFixed(1)}% this month (${formatCurrency(Math.abs(change), currencyCode)} savings).`;
             }
           })()}
         </div>

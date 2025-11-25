@@ -16,6 +16,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
 import { ChartConfiguration } from '../../types/analytics';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 // Register Chart.js components
 ChartJS.register(
@@ -83,6 +84,8 @@ const defaultOptions = {
 };
 
 export function AnalyticsChart({ config, height = 400, className = '' }: ChartProps) {
+  const { currencySymbol } = useCurrency();
+  
   const chartData = {
     labels: config.labels || [],
     datasets: config.datasets.map((dataset, index) => ({
@@ -171,6 +174,8 @@ interface FinancialTrendChartProps {
 }
 
 export function FinancialTrendChart({ data, height = 400 }: FinancialTrendChartProps) {
+  const { currencySymbol } = useCurrency();
+  
   const config: ChartConfiguration = {
     type: 'line',
     title: 'Financial Trends',
@@ -204,7 +209,7 @@ export function FinancialTrendChart({ data, height = 400 }: FinancialTrendChartP
           beginAtZero: true,
           ticks: {
             callback: function(value) {
-              return '$' + Number(value).toLocaleString();
+              return currencySymbol + Number(value).toLocaleString();
             }
           }
         }
@@ -213,7 +218,7 @@ export function FinancialTrendChart({ data, height = 400 }: FinancialTrendChartP
         tooltip: {
           callbacks: {
             label: function(context) {
-              return context.dataset.label + ': $' + Number(context.parsed.y).toLocaleString();
+              return context.dataset.label + ': ' + currencySymbol + Number(context.parsed.y).toLocaleString();
             }
           }
         }
@@ -289,6 +294,8 @@ interface UtilityBreakdownChartProps {
 }
 
 export function UtilityBreakdownChart({ data, height = 300 }: UtilityBreakdownChartProps) {
+  const { currencySymbol } = useCurrency();
+  
   const config: ChartConfiguration = {
     type: 'doughnut',
     title: 'Utility Cost Breakdown',
@@ -307,7 +314,7 @@ export function UtilityBreakdownChart({ data, height = 300 }: UtilityBreakdownCh
             label: function(context) {
               const item = data[context.dataIndex];
               return [
-                `${context.label}: $${Number(context.parsed).toLocaleString()}`,
+                `${context.label}: ${currencySymbol}${Number(context.parsed).toLocaleString()}`,
                 `${item.percentage.toFixed(1)}% of total`
               ];
             }
@@ -331,6 +338,8 @@ interface BuildingPerformanceChartProps {
 }
 
 export function BuildingPerformanceChart({ data, height = 400 }: BuildingPerformanceChartProps) {
+  const { currencySymbol } = useCurrency();
+  
   const config: ChartConfiguration = {
     type: 'bar',
     title: 'Building Performance Comparison',
@@ -365,7 +374,7 @@ export function BuildingPerformanceChart({ data, height = 400 }: BuildingPerform
               const building = data[context.dataIndex];
               return [
                 `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`,
-                `Net Income: $${Number(building.netIncome).toLocaleString()}`
+                `Net Income: ${currencySymbol}${Number(building.netIncome).toLocaleString()}`
               ];
             }
           }
@@ -389,6 +398,8 @@ interface CashFlowChartProps {
 }
 
 export function CashFlowChart({ data, height = 400 }: CashFlowChartProps) {
+  const { currencySymbol } = useCurrency();
+  
   const config: ChartConfiguration = {
     type: 'bar',
     title: 'Cash Flow Analysis',
@@ -410,7 +421,7 @@ export function CashFlowChart({ data, height = 400 }: CashFlowChartProps) {
         y: {
           ticks: {
             callback: function(value) {
-              return '$' + Math.abs(Number(value)).toLocaleString();
+              return currencySymbol + Math.abs(Number(value)).toLocaleString();
             }
           }
         }
@@ -423,9 +434,9 @@ export function CashFlowChart({ data, height = 400 }: CashFlowChartProps) {
               const value = Math.abs(context.parsed.y);
               const isOutflow = context.datasetIndex === 1;
               return [
-                `${context.dataset.label}: $${value.toLocaleString()}`,
-                `Net Flow: $${item.netFlow.toLocaleString()}`,
-                `Cumulative: $${item.cumulativeFlow.toLocaleString()}`
+                `${context.dataset.label}: ${currencySymbol}${value.toLocaleString()}`,
+                `Net Flow: ${currencySymbol}${item.netFlow.toLocaleString()}`,
+                `Cumulative: ${currencySymbol}${item.cumulativeFlow.toLocaleString()}`
               ];
             }
           }
@@ -451,12 +462,14 @@ interface MetricCardProps {
 }
 
 export function MetricCard({ title, value, change, icon, format = 'number' }: MetricCardProps) {
+  const { currencySymbol } = useCurrency();
+  
   const formatValue = (val: string | number) => {
     if (typeof val === 'string') return val;
     
     switch (format) {
       case 'currency':
-        return '$' + val.toLocaleString();
+        return currencySymbol + val.toLocaleString();
       case 'percentage':
         return val.toFixed(1) + '%';
       default:
