@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Room, CreateRoomData } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { X, Save, AlertCircle } from 'lucide-react';
 
 interface QuickEditModalProps {
@@ -14,6 +15,7 @@ interface QuickEditModalProps {
 
 export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: QuickEditModalProps) {
   const { showNotification, updateNotification } = useNotifications();
+  const { currencySymbol } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -206,7 +208,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-900 mb-1">
-                  Monthly Rent ($) *
+                  Monthly Rent ({currencySymbol}) *
                 </label>
                 <input
                   type="number"
@@ -223,7 +225,7 @@ export default function QuickEditModal({ room, isOpen, onClose, onUpdate }: Quic
 
               <div>
                 <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-900 mb-1">
-                  Deposit ($)
+                  Deposit ({currencySymbol})
                 </label>
                 <input
                   type="number"

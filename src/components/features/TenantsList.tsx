@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Tenant, Building } from '@/types/database';
 import TenantCard from './TenantCard';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface TenantsListProps {
   tenants: Tenant[];
@@ -11,6 +12,7 @@ interface TenantsListProps {
 }
 
 export default function TenantsList({ tenants }: TenantsListProps) {
+  const { formatCurrency } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -279,7 +281,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {tenant.monthlyIncome ? `$${tenant.monthlyIncome.toLocaleString()}` : 'Not specified'}
+                          {tenant.monthlyIncome ? formatCurrency(tenant.monthlyIncome) : 'Not specified'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {tenant.moveInDate ? new Date(tenant.moveInDate).toLocaleDateString() : 'Not set'}

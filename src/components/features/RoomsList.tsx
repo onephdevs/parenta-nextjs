@@ -7,6 +7,7 @@ import RoomCard from './RoomCard';
 import AddRoomModal from './AddRoomModal';
 import QuickEditModal from './QuickEditModal';
 import BulkRoomActions from './BulkRoomActions';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface RoomsListProps {
   rooms: Room[];
@@ -14,6 +15,7 @@ interface RoomsListProps {
 }
 
 export default function RoomsList({ rooms, buildings }: RoomsListProps) {
+  const { formatCurrency } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedRoomType, setSelectedRoomType] = useState('');
@@ -354,7 +356,7 @@ export default function RoomsList({ rooms, buildings }: RoomsListProps) {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${room.monthlyRate ? parseFloat(room.monthlyRate).toLocaleString() : 'N/A'}
+                      {room.monthlyRate ? formatCurrency(parseFloat(room.monthlyRate)) : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {room.squareFootage ? `${room.squareFootage} sq ft` : 'N/A'}

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Room } from '@/types/database';
 import QuickEditModal from './QuickEditModal';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface RoomCardProps {
   room: Room;
@@ -24,6 +25,7 @@ export default function RoomCard({
 }: RoomCardProps) {
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
   const [currentRoom, setCurrentRoom] = useState(room);
+  const { formatCurrency } = useCurrency();
 
   const handleRoomUpdate = (updatedRoom: Room) => {
     setCurrentRoom(updatedRoom);
@@ -129,14 +131,14 @@ export default function RoomCard({
           {currentRoom.monthlyRate && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-900">Rent</span>
-              <span className="text-sm font-semibold text-gray-900">${parseFloat(currentRoom.monthlyRate).toLocaleString()}/mo</span>
+              <span className="text-sm font-semibold text-gray-900">{formatCurrency(parseFloat(currentRoom.monthlyRate))}/mo</span>
             </div>
           )}
 
           {currentRoom.depositAmount && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-900">Deposit</span>
-              <span className="text-sm font-medium text-gray-900">${parseFloat(currentRoom.depositAmount).toLocaleString()}</span>
+              <span className="text-sm font-medium text-gray-900">{formatCurrency(parseFloat(currentRoom.depositAmount))}</span>
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/context/NotificationContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Tenant {
   id: string;
@@ -33,6 +34,7 @@ interface CreateInvoiceFormProps {
 export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFormProps = {}) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const { formatCurrency } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantRooms, setTenantRooms] = useState<Room[]>([]);
@@ -293,13 +295,6 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
-  };
-
   return (
     <div className="bg-white shadow rounded-lg">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -363,7 +358,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   </option>
                   {tenantRooms.map(room => (
                     <option key={room.id} value={room.id}>
-                      Room {room.roomNumber} - {room.buildingName} (${room.monthlyRate}/month)
+                      Room {room.roomNumber} - {room.buildingName} ({formatCurrency(room.monthlyRate)}/month)
                     </option>
                   ))}
                 </select>
