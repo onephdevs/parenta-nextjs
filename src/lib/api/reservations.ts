@@ -31,6 +31,11 @@ export async function createReservation(
   try {
     await client.query('BEGIN');
 
+    // Validate deposit is required (must be > 0)
+    if (!reservationData.reservationDeposit || reservationData.reservationDeposit <= 0) {
+      throw new Error('Reservation deposit is required. No reservation can be created without a deposit payment.');
+    }
+
     // Validate room is available (vacant or reserved)
     const roomCheck = await client.query(
       'SELECT room_status, deposit_required, deposit_type, deposit_amount, deposit_percentage, monthly_rate FROM rooms WHERE id = $1 AND is_active = true',
@@ -74,8 +79,9 @@ export async function createReservation(
       throw new Error('Expiry date must be after reservation date');
     }
 
-    // Validate deposit if room requires it
-    if (room.deposit_required && reservationData.reservationDeposit > 0) {
+    // Validate deposit meets room requirements if room has depositRequired
+    // Note: Deposit is always required (> 0), but if room has depositRequired, it must meet minimum
+    if (room.deposit_required) {
       let requiredDeposit = 0;
       
       switch (room.deposit_type) {
@@ -97,9 +103,8 @@ export async function createReservation(
       }
     }
 
-    // Create payment record if deposit is provided
+    // Create payment record (deposit is always required, so this always executes)
     let depositPaymentId: string | undefined;
-    if (reservationData.reservationDeposit > 0) {
       // Create payment directly in the transaction
       const paymentQuery = `
         INSERT INTO payments (
@@ -122,8 +127,7 @@ export async function createReservation(
         'paid' // Set directly to paid for reservation deposits
       ]);
       
-      depositPaymentId = paymentResult.rows[0].id;
-    }
+    depositPaymentId = paymentResult.rows[0].id;
 
     // Create reservation
     const reservationQuery = `
@@ -141,8 +145,8 @@ export async function createReservation(
       reservationDate.toISOString().split('T')[0],
       expiryDate.toISOString().split('T')[0],
       reservationData.monthlyRate,
-      reservationData.reservationDeposit || 0,
-      depositPaymentId || null,
+      reservationData.reservationDeposit, // Deposit is always required, no need for || 0
+      depositPaymentId,
       reservationData.notes || null,
       createdBy || null,
     ]);

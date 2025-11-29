@@ -202,6 +202,17 @@ export default function CreateReservationModal({
     e.preventDefault();
     setIsSubmitting(true);
 
+    // Validate deposit is required (must be > 0)
+    if (!formData.reservationDeposit || formData.reservationDeposit <= 0) {
+      showNotification({
+        type: 'error',
+        title: 'Deposit Required',
+        message: 'Reservation deposit is required. No reservation can be created without a deposit payment.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
     // Validate expiry date
     if (formData.expiryDate <= formData.reservationDate!) {
       showNotification({
@@ -213,7 +224,7 @@ export default function CreateReservationModal({
       return;
     }
 
-    // Validate deposit if required
+    // Validate deposit meets room requirements if room has depositRequired
     if (selectedRoom?.depositRequired) {
       const requiredDeposit = calculateRequiredDeposit();
       if (formData.reservationDeposit < requiredDeposit) {
@@ -436,22 +447,28 @@ export default function CreateReservationModal({
         {/* Reservation Deposit */}
         <div>
           <label htmlFor="reservationDeposit" className="block text-sm font-medium text-gray-900 mb-1">
-            Reservation Deposit ({currencySymbol})
+            Reservation Deposit ({currencySymbol}) <span className="text-red-600">*</span>
             {selectedRoom?.depositRequired && (
-              <span className="text-red-600"> * (Min: {formatCurrency(requiredDeposit, currencyCode)})</span>
+              <span className="text-red-600"> (Min: {formatCurrency(requiredDeposit, currencyCode)})</span>
             )}
           </label>
           <input
             type="number"
             id="reservationDeposit"
             name="reservationDeposit"
-            min={selectedRoom?.depositRequired ? requiredDeposit : 0}
+            required
+            min={selectedRoom?.depositRequired ? requiredDeposit : 0.01}
             step="0.01"
             value={formData.reservationDeposit}
             onChange={handleInputChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          {selectedRoom?.depositRequired && formData.reservationDeposit < requiredDeposit && (
+          {(!formData.reservationDeposit || formData.reservationDeposit <= 0) && (
+            <p className="mt-1 text-sm text-red-600">
+              Reservation deposit is required. No reservation can be created without a deposit payment.
+            </p>
+          )}
+          {selectedRoom?.depositRequired && formData.reservationDeposit > 0 && formData.reservationDeposit < requiredDeposit && (
             <p className="mt-1 text-sm text-red-600">
               Minimum deposit required: {formatCurrency(requiredDeposit, currencyCode)}
             </p>
