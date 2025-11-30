@@ -41,7 +41,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
           sidebarOpen ? 'lg:w-64' : 'lg:w-0'
         }`}
       >
-        <div className={`flex flex-col w-64 ${sidebarOpen ? '' : 'hidden'}`}>
+        <div className={`flex flex-col w-64 ${sidebarOpen ? '' : 'hidden'} relative z-[60]`}>
           <AdminSidebar />
         </div>
       </div>

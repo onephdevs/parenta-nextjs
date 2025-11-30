@@ -6,7 +6,7 @@ import { Room, Tenant, CreateReservationData } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
-import FullScreenModal from '@/components/ui/FullScreenModal';
+import AdminFullScreenModal from '@/components/ui/AdminFullScreenModal';
 import Link from 'next/link';
 
 interface CreateReservationModalProps {
@@ -320,7 +320,7 @@ export default function CreateReservationModal({
   );
 
   return (
-    <FullScreenModal
+    <AdminFullScreenModal
       isOpen={isOpen}
       onClose={onClose}
       title="Create Reservation"
@@ -491,7 +491,7 @@ export default function CreateReservationModal({
           />
         </div>
       </form>
-    </FullScreenModal>
+    </AdminFullScreenModal>
   );
 }
 
