@@ -122,12 +122,14 @@ export default function CreateReservationModal({
         const allRooms = Array.isArray(roomsData) ? roomsData : [];
         
         // Filter rooms:
-        // 1. Must be vacant or reserved (not occupied or maintenance)
+        // 1. Must be vacant (not occupied, reserved, or maintenance)
         // 2. Must NOT have an active reservation (expiry_date >= CURRENT_DATE)
+        // Note: We only show vacant rooms to avoid confusion. Rooms with status "reserved" 
+        // should have an active reservation record, and if they don't, the status should be updated.
         const filteredRooms = allRooms.filter((r: Room) => {
-          const isAvailableStatus = r.roomStatus === 'vacant' || r.roomStatus === 'reserved';
+          const isVacant = r.roomStatus === 'vacant';
           const hasActiveReservation = activeReservationRoomIds.has(r.id);
-          return isAvailableStatus && !hasActiveReservation;
+          return isVacant && !hasActiveReservation;
         });
         setRooms(filteredRooms);
       }
@@ -345,7 +347,7 @@ export default function CreateReservationModal({
             <option value="">Select a room</option>
             {rooms.map(room => (
               <option key={room.id} value={room.id}>
-                {room.roomNumber} - {room.buildingName || 'Unknown Building'} ({room.roomStatus})
+                {room.roomNumber} - {room.buildingName || 'Unknown Building'}
               </option>
             ))}
           </select>

@@ -14,7 +14,6 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrencyState] = useState('PHP');
-  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load currency setting from database on mount
   useEffect(() => {
@@ -32,8 +31,6 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error loading currency setting:', error);
       // Keep default PHP if error
-    } finally {
-      setIsLoaded(true);
     }
   };
 
@@ -51,11 +48,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const currencySymbol = getCurrencySymbol(currency);
 
-  // Show loading state or default to avoid flicker
-  if (!isLoaded) {
-    return <>{children}</>;
-  }
-
+  // Always provide context, even during loading (use default PHP)
   return (
     <CurrencyContext.Provider
       value={{
