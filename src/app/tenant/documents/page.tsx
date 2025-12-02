@@ -36,6 +36,7 @@ interface Document {
 interface DocumentsData {
   totalDocuments: number;
   documents: Document[];
+  categories?: Record<string, number>;
 }
 
 export default function DocumentsPage() {
@@ -85,12 +86,25 @@ export default function DocumentsPage() {
       const data = await response.json();
 
       if (data.success) {
-        setDocumentsData(data.data);
+        // Map API response to component format
+        setDocumentsData({
+          totalDocuments: data.data.totalDocuments,
+          documents: data.data.documents.map((doc: any) => ({
+            id: doc.id,
+            name: doc.name,
+            category: doc.category,
+            uploadedAt: doc.uploadedAt,
+            size: doc.size,
+            fileType: doc.fileType,
+            url: doc.url,
+            description: doc.description,
+          })),
+        });
       } else {
         showNotification({
           type: 'error',
           title: 'Error',
-          message: 'Failed to load documents'
+          message: data.error || 'Failed to load documents'
         });
       }
     } catch (error) {
@@ -106,28 +120,41 @@ export default function DocumentsPage() {
   };
 
   const handleDownload = (document: Document) => {
-    showNotification({
-      type: 'info',
-      title: 'Download Starting',
-      message: `Downloading ${document.name}...`
-    });
-    
-    // In a real implementation, this would trigger the actual download
-    setTimeout(() => {
+    if (document.url) {
+      // Open download URL in new tab
+      window.open(document.url, '_blank');
       showNotification({
         type: 'success',
-        title: 'Download Complete',
-        message: `${document.name} has been downloaded successfully.`
+        title: 'Download Started',
+        message: `Downloading ${document.name}...`
       });
-    }, 1500);
+    } else {
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Download URL not available'
+      });
+    }
   };
 
   const handlePreview = (document: Document) => {
-    showNotification({
-      type: 'info',
-      title: 'Document Preview',
-      message: `Document preview functionality will be available soon for ${document.name}`
-    });
+    if (document.fileType?.includes('pdf')) {
+      // Open PDF in new tab for preview
+      if (document.url) {
+        window.open(document.url, '_blank');
+      }
+    } else if (document.fileType?.startsWith('image/')) {
+      // Open image in new tab for preview
+      if (document.url) {
+        window.open(document.url, '_blank');
+      }
+    } else {
+      showNotification({
+        type: 'info',
+        title: 'Preview',
+        message: `Preview not available for this file type. Please download to view.`
+      });
+    }
   };
 
   const getFileIcon = (fileType: string) => {
@@ -240,20 +267,22 @@ export default function DocumentsPage() {
           {documentsData && (
             <div className="space-y-6">
               {/* Document Categories Overview */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                {Object.entries(documentsByCategory).map(([category, count]) => (
-                  <div key={category} className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-4">
-                      <div className="text-center">
-                        <dt className="text-sm font-medium text-gray-900 truncate capitalize">
-                          {category}
-                        </dt>
-                        <dd className="text-2xl font-semibold text-gray-900">{count}</dd>
+              {documentsData.categories && (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                  {Object.entries(documentsData.categories).map(([category, count]) => (
+                    <div key={category} className="bg-white overflow-hidden shadow rounded-lg">
+                      <div className="p-4">
+                        <div className="text-center">
+                          <dt className="text-sm font-medium text-gray-900 truncate capitalize">
+                            {category}
+                          </dt>
+                          <dd className="text-2xl font-semibold text-gray-900">{count}</dd>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* Search and Filter */}
               <div className="bg-white shadow rounded-lg p-6">

@@ -248,6 +248,7 @@ export async function initiateMoveOut(
 
 /**
  * Complete move-out processing (mark tenant as moved out)
+ * Now handles deposit, advance, and utility deposit for settlement
  */
 export async function completeMoveOut(
   moveoutId: string,
@@ -256,6 +257,15 @@ export async function completeMoveOut(
     deposit_return_amount: number;
     deposit_deduction_amount?: number;
     deduction_reason?: string;
+    advance_return_amount?: number;
+    utility_deposit_return_amount?: number;
+    // Allocation of funds
+    use_deposit_for_last_month?: boolean;
+    use_advance_for_last_month?: boolean;
+    use_deposit_for_utilities?: boolean;
+    use_advance_for_utilities?: boolean;
+    use_deposit_for_damages?: boolean;
+    use_advance_for_damages?: boolean;
   },
   dbPool: Pool = pool
 ): Promise<{ success: boolean; message: string }> {
@@ -264,9 +274,13 @@ export async function completeMoveOut(
   try {
     await client.query('BEGIN');
     
-    // Get move-out details
+    // Get move-out details with assignment info
     const moveoutResult = await client.query(
-      'SELECT * FROM moveout_processing WHERE id = $1',
+      `SELECT m.*, tra.deposit_paid, tra.advance_paid, tra.utility_deposit_paid,
+              tra.deposit_valid_until, tra.deposit_refundable
+       FROM moveout_processing m
+       INNER JOIN tenant_room_assignments tra ON m.room_assignment_id = tra.id
+       WHERE m.id = $1`,
       [moveoutId]
     );
     
@@ -275,6 +289,15 @@ export async function completeMoveOut(
     }
     
     const moveout = moveoutResult.rows[0];
+    const depositPaid = parseFloat(moveout.deposit_paid || 0);
+    const advancePaid = parseFloat(moveout.advance_paid || 0);
+    const utilityDepositPaid = parseFloat(moveout.utility_deposit_paid || 0);
+    
+    // Calculate available funds
+    const availableDeposit = depositPaid;
+    const availableAdvance = advancePaid;
+    const availableUtility = utilityDepositPaid;
+    const totalAvailable = availableDeposit + availableAdvance + availableUtility;
     
     // Update move-out record
     await client.query(
@@ -335,6 +358,74 @@ export async function completeMoveOut(
           -data.deposit_deduction_amount,
           `Deposit deduction: ${data.deduction_reason || 'Damages'}`,
         ]
+      );
+    }
+    
+    // Process advance return (if any)
+    if (data.advance_return_amount && data.advance_return_amount > 0) {
+      // Record advance return in tenant credits (negative amount)
+      await client.query(
+        `INSERT INTO tenant_credits (
+          tenant_id, amount, credit_type, description, transaction_date
+        ) VALUES ($1, $2, 'refund', $3, $4)`,
+        [
+          moveout.tenant_id,
+          -data.advance_return_amount,
+          `Advance payment refund for move-out on ${data.actual_moveout_date}`,
+          new Date(),
+        ]
+      );
+    }
+    
+    // Process utility deposit return (if any)
+    if (data.utility_deposit_return_amount && data.utility_deposit_return_amount > 0) {
+      // Record utility deposit return in deposit ledger
+      await client.query(
+        `INSERT INTO deposit_ledger (
+          tenant_id, amount, transaction_type, description
+        ) VALUES ($1, $2, 'refund', $3)`,
+        [
+          moveout.tenant_id,
+          data.utility_deposit_return_amount,
+          `Utility deposit refund for move-out on ${data.actual_moveout_date}`,
+        ]
+      );
+    }
+    
+    // Handle allocation of funds to outstanding balances
+    // Use deposit/advance for last month rent, utilities, or damages
+    if (data.use_deposit_for_last_month || data.use_advance_for_last_month) {
+      // This would typically link to an invoice or create a payment allocation
+      // For now, we'll record it in the notes/description
+      const allocationNote = [];
+      if (data.use_deposit_for_last_month) allocationNote.push('Deposit used for last month rent');
+      if (data.use_advance_for_last_month) allocationNote.push('Advance used for last month rent');
+      
+      await client.query(
+        `UPDATE moveout_processing SET notes = COALESCE(notes, '') || $1 WHERE id = $2`,
+        [`\n${allocationNote.join(', ')}`, moveoutId]
+      );
+    }
+    
+    if (data.use_deposit_for_utilities || data.use_advance_for_utilities) {
+      const allocationNote = [];
+      if (data.use_deposit_for_utilities) allocationNote.push('Deposit used for unpaid utilities');
+      if (data.use_advance_for_utilities) allocationNote.push('Advance used for unpaid utilities');
+      
+      await client.query(
+        `UPDATE moveout_processing SET notes = COALESCE(notes, '') || $1 WHERE id = $2`,
+        [`\n${allocationNote.join(', ')}`, moveoutId]
+      );
+    }
+    
+    if (data.use_deposit_for_damages || data.use_advance_for_damages) {
+      const allocationNote = [];
+      if (data.use_deposit_for_damages) allocationNote.push('Deposit used for property damages');
+      if (data.use_advance_for_damages) allocationNote.push('Advance used for property damages');
+      
+      await client.query(
+        `UPDATE moveout_processing SET notes = COALESCE(notes, '') || $1 WHERE id = $2`,
+        [`\n${allocationNote.join(', ')}`, moveoutId]
       );
     }
     

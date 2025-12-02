@@ -152,6 +152,120 @@ export async function generateRevenueReportExcel(data: any): Promise<Buffer> {
 }
 
 /**
+ * Generate Tenant List Report Excel
+ */
+export async function generateTenantListReportExcel(data: any): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  workbook.creator = 'Parenta Property Management';
+  workbook.created = new Date();
+  
+  const sheet = workbook.addWorksheet('Tenant List');
+  
+  // Title
+  sheet.mergeCells('A1:J1');
+  sheet.getCell('A1').value = 'Tenant List Report';
+  sheet.getCell('A1').font = { size: 18, bold: true };
+  sheet.getCell('A1').alignment = { horizontal: 'center' };
+  
+  // Summary
+  sheet.mergeCells('A2:J2');
+  sheet.getCell('A2').value = `Total Tenants: ${data.summary.totalTenants} | Total Balance: ₱${data.summary.totalBalance.toFixed(2)} | Past Due: ₱${data.summary.totalPastDue.toFixed(2)}`;
+  sheet.getCell('A2').font = { size: 12 };
+  sheet.getCell('A2').alignment = { horizontal: 'center' };
+  
+  // Generated date
+  sheet.mergeCells('A3:J3');
+  sheet.getCell('A3').value = `Generated: ${new Date().toLocaleString()}`;
+  sheet.getCell('A3').font = { size: 10, italic: true };
+  sheet.getCell('A3').alignment = { horizontal: 'center' };
+  
+  // Headers
+  sheet.addRow([]);
+  const headerRow = sheet.addRow([
+    'Tenant Name',
+    'Email',
+    'Phone',
+    'Room #',
+    'Building',
+    'Balance',
+    'Past Due Amount',
+    'Days Past Due',
+    'Lease Start',
+    'Lease End',
+    'Status'
+  ]);
+  
+  headerRow.font = { bold: true };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE0E0E0' }
+  };
+  
+  // Data rows
+  data.tenants.forEach((tenant: any) => {
+    sheet.addRow([
+      `${tenant.firstName} ${tenant.lastName}`,
+      tenant.email || '',
+      tenant.phone || '',
+      tenant.roomNumber || 'N/A',
+      tenant.buildingName || 'N/A',
+      tenant.balance,
+      tenant.pastDueAmount,
+      tenant.daysPastDue > 0 ? tenant.daysPastDue : 'Current',
+      tenant.leaseStart ? new Date(tenant.leaseStart).toLocaleDateString() : '',
+      tenant.leaseEnd ? new Date(tenant.leaseEnd).toLocaleDateString() : '',
+      tenant.tenantStatus || 'active'
+    ]);
+  });
+  
+  // Format columns
+  sheet.getColumn(1).width = 20; // Name
+  sheet.getColumn(2).width = 25; // Email
+  sheet.getColumn(3).width = 15; // Phone
+  sheet.getColumn(4).width = 10; // Room #
+  sheet.getColumn(5).width = 20; // Building
+  sheet.getColumn(6).width = 15; // Balance
+  sheet.getColumn(7).width = 15; // Past Due
+  sheet.getColumn(8).width = 12; // Days Past Due
+  sheet.getColumn(9).width = 12; // Lease Start
+  sheet.getColumn(10).width = 12; // Lease End
+  sheet.getColumn(11).width = 12; // Status
+  
+  // Format currency columns
+  sheet.getColumn(6).numFmt = '₱#,##0.00';
+  sheet.getColumn(7).numFmt = '₱#,##0.00';
+  
+  // Add totals row
+  const lastRow = sheet.lastRow!.number;
+  sheet.addRow([
+    'TOTAL',
+    '',
+    '',
+    '',
+    '',
+    { formula: `SUM(F6:F${lastRow})` },
+    { formula: `SUM(G6:G${lastRow})` },
+    '',
+    '',
+    '',
+    ''
+  ]);
+  
+  const totalRow = sheet.lastRow!;
+  totalRow.font = { bold: true };
+  totalRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFEB3B' }
+  };
+  
+  // Generate buffer
+  return await workbook.xlsx.writeBuffer() as Buffer;
+}
+
+/**
  * Generate Payment History Report Excel
  */
 export async function generatePaymentHistoryReportExcel(data: any): Promise<Buffer> {
@@ -453,3 +567,293 @@ export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
   return await workbook.xlsx.writeBuffer() as Buffer;
 }
 
+/**
+ * Generate Collected Amount Report Excel
+ */
+export async function generateCollectedAmountReportExcel(data: any): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  workbook.creator = 'Parenta Property Management';
+  workbook.created = new Date();
+  
+  const sheet = workbook.addWorksheet('Collected Amount');
+  
+  // Title
+  sheet.mergeCells('A1:E1');
+  sheet.getCell('A1').value = 'Collected Amount Report';
+  sheet.getCell('A1').font = { size: 18, bold: true };
+  sheet.getCell('A1').alignment = { horizontal: 'center' };
+  
+  // Period
+  sheet.mergeCells('A2:E2');
+  sheet.getCell('A2').value = `Period: ${data.summary.period}`;
+  sheet.getCell('A2').font = { size: 12 };
+  sheet.getCell('A2').alignment = { horizontal: 'center' };
+  
+  // Summary
+  sheet.addRow([]);
+  sheet.addRow(['Metric', 'Value']);
+  sheet.getRow(4).font = { bold: true };
+  sheet.getRow(4).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE0E0E0' }
+  };
+  
+  sheet.addRow(['Total Collected', data.summary.totalCollected]);
+  sheet.addRow(['Total Payments', data.summary.totalPayments]);
+  sheet.addRow(['Average Payment', data.summary.averagePayment]);
+  if (data.summary.growth !== undefined) {
+    sheet.addRow(['Growth vs Previous Period', `${data.summary.growth.toFixed(2)}%`]);
+  }
+  
+  // Format currency
+  sheet.getCell('B5').numFmt = '₱#,##0.00';
+  sheet.getCell('B7').numFmt = '₱#,##0.00';
+  
+  // By Period Sheet
+  if (data.byPeriod && data.byPeriod.length > 0) {
+    const periodSheet = workbook.addWorksheet('By Period');
+    periodSheet.addRow(['Collected Amount by Period']);
+    periodSheet.getRow(1).font = { size: 14, bold: true };
+    periodSheet.addRow([]);
+    periodSheet.addRow(['Period', 'Amount', 'Payments']);
+    periodSheet.getRow(3).font = { bold: true };
+    periodSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.byPeriod.forEach((item: any) => {
+      periodSheet.addRow([item.period, item.amount, item.count]);
+    });
+    
+    periodSheet.getColumn(1).width = 20;
+    periodSheet.getColumn(2).width = 15;
+    periodSheet.getColumn(2).numFmt = '₱#,##0.00';
+    periodSheet.getColumn(3).width = 12;
+  }
+  
+  // By Payment Method Sheet
+  if (data.byPaymentMethod && data.byPaymentMethod.length > 0) {
+    const methodSheet = workbook.addWorksheet('By Payment Method');
+    methodSheet.addRow(['Collected Amount by Payment Method']);
+    methodSheet.getRow(1).font = { size: 14, bold: true };
+    methodSheet.addRow([]);
+    methodSheet.addRow(['Payment Method', 'Amount', 'Count', 'Percentage']);
+    methodSheet.getRow(3).font = { bold: true };
+    methodSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.byPaymentMethod.forEach((item: any) => {
+      methodSheet.addRow([item.method, item.amount, item.count, `${item.percentage.toFixed(2)}%`]);
+    });
+    
+    methodSheet.getColumn(1).width = 20;
+    methodSheet.getColumn(2).width = 15;
+    methodSheet.getColumn(2).numFmt = '₱#,##0.00';
+    methodSheet.getColumn(3).width = 12;
+    methodSheet.getColumn(4).width = 12;
+  }
+  
+  // Timeline Sheet
+  if (data.timeline && data.timeline.length > 0) {
+    const timelineSheet = workbook.addWorksheet('Timeline');
+    timelineSheet.addRow(['Daily Collection Timeline']);
+    timelineSheet.getRow(1).font = { size: 14, bold: true };
+    timelineSheet.addRow([]);
+    timelineSheet.addRow(['Date', 'Amount', 'Payments']);
+    timelineSheet.getRow(3).font = { bold: true };
+    timelineSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.timeline.forEach((item: any) => {
+      timelineSheet.addRow([item.date, item.amount, item.count]);
+    });
+    
+    timelineSheet.getColumn(1).width = 15;
+    timelineSheet.getColumn(2).width = 15;
+    timelineSheet.getColumn(2).numFmt = '₱#,##0.00';
+    timelineSheet.getColumn(3).width = 12;
+  }
+  
+  // Format summary sheet
+  sheet.getColumn(1).width = 25;
+  sheet.getColumn(2).width = 20;
+  
+  // Generate buffer
+  return await workbook.xlsx.writeBuffer() as Buffer;
+}
+
+
+/**
+ * Generate Deposit Report Excel
+ */
+export async function generateDepositReportExcel(data: any): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  workbook.creator = 'Parenta Property Management';
+  workbook.created = new Date();
+  
+  const sheet = workbook.addWorksheet('Deposit Report');
+  
+  sheet.mergeCells('A1:D1');
+  sheet.getCell('A1').value = 'Deposit Received Report';
+  sheet.getCell('A1').font = { size: 18, bold: true };
+  sheet.getCell('A1').alignment = { horizontal: 'center' };
+  
+  sheet.mergeCells('A2:D2');
+  sheet.getCell('A2').value = `Period: ${data.summary.period}`;
+  sheet.getCell('A2').font = { size: 12 };
+  sheet.getCell('A2').alignment = { horizontal: 'center' };
+  
+  sheet.addRow([]);
+  sheet.addRow(['Metric', 'Value']);
+  sheet.getRow(4).font = { bold: true };
+  sheet.getRow(4).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE0E0E0' }
+  };
+  
+  sheet.addRow(['Total Deposits Received', data.summary.totalDepositsReceived]);
+  sheet.addRow(['Total Refunds Issued', data.summary.totalRefundsIssued]);
+  sheet.addRow(['Net Deposit Balance', data.summary.netDepositBalance]);
+  sheet.addRow(['Total Transactions', data.summary.totalTransactions]);
+  sheet.addRow(['Tenant Count', data.summary.tenantCount]);
+  
+  sheet.getCell('B5').numFmt = '₱#,##0.00';
+  sheet.getCell('B6').numFmt = '₱#,##0.00';
+  sheet.getCell('B7').numFmt = '₱#,##0.00';
+  
+  if (data.byPeriod && data.byPeriod.length > 0) {
+    const periodSheet = workbook.addWorksheet('By Period');
+    periodSheet.addRow(['Deposits by Period']);
+    periodSheet.getRow(1).font = { size: 14, bold: true };
+    periodSheet.addRow([]);
+    periodSheet.addRow(['Period', 'Deposits Received', 'Refunds Issued', 'Net Amount', 'Tenants']);
+    periodSheet.getRow(3).font = { bold: true };
+    periodSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.byPeriod.forEach((item: any) => {
+      periodSheet.addRow([item.period, item.depositsReceived, item.refundsIssued, item.netAmount, item.tenantCount]);
+    });
+    
+    periodSheet.getColumn(1).width = 20;
+    periodSheet.getColumn(2).width = 18;
+    periodSheet.getColumn(2).numFmt = '₱#,##0.00';
+    periodSheet.getColumn(3).width = 18;
+    periodSheet.getColumn(3).numFmt = '₱#,##0.00';
+    periodSheet.getColumn(4).width = 18;
+    periodSheet.getColumn(4).numFmt = '₱#,##0.00';
+    periodSheet.getColumn(5).width = 12;
+  }
+  
+  sheet.getColumn(1).width = 25;
+  sheet.getColumn(2).width = 20;
+  
+  return await workbook.xlsx.writeBuffer() as Buffer;
+}
+
+/**
+ * Generate Vacant Rooms Report Excel
+ */
+export async function generateVacantRoomsReportExcel(data: any): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  workbook.creator = 'Parenta Property Management';
+  workbook.created = new Date();
+  
+  const sheet = workbook.addWorksheet('Vacant Rooms');
+  
+  sheet.mergeCells('A1:J1');
+  sheet.getCell('A1').value = 'Vacant Rooms Report';
+  sheet.getCell('A1').font = { size: 18, bold: true };
+  sheet.getCell('A1').alignment = { horizontal: 'center' };
+  
+  sheet.mergeCells('A2:J2');
+  sheet.getCell('A2').value = `Total Vacant: ${data.summary.totalVacant} | Vacancy Rate: ${data.summary.vacancyRate.toFixed(1)}% | Potential Revenue: ₱${data.summary.totalPotentialRevenue.toFixed(2)}`;
+  sheet.getCell('A2').font = { size: 12 };
+  sheet.getCell('A2').alignment = { horizontal: 'center' };
+  
+  sheet.mergeCells('A3:J3');
+  sheet.getCell('A3').value = `Generated: ${new Date().toLocaleString()}`;
+  sheet.getCell('A3').font = { size: 10, italic: true };
+  sheet.getCell('A3').alignment = { horizontal: 'center' };
+  
+  sheet.addRow([]);
+  const headerRow = sheet.addRow([
+    'Room #',
+    'Building',
+    'Floor',
+    'Type',
+    'Monthly Rate',
+    'Days Vacant',
+    'Last Tenant',
+    'Status'
+  ]);
+  
+  headerRow.font = { bold: true };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE0E0E0' }
+  };
+  
+  data.rooms.forEach((room: any) => {
+    sheet.addRow([
+      room.roomNumber,
+      room.buildingName,
+      room.floorNumber || 'N/A',
+      room.roomType || 'N/A',
+      room.monthlyRate,
+      room.daysVacant || 'N/A',
+      room.lastTenantName || 'N/A',
+      room.maintenanceStatus || 'vacant'
+    ]);
+  });
+  
+  sheet.getColumn(1).width = 12;
+  sheet.getColumn(2).width = 20;
+  sheet.getColumn(3).width = 10;
+  sheet.getColumn(4).width = 12;
+  sheet.getColumn(5).width = 15;
+  sheet.getColumn(6).width = 12;
+  sheet.getColumn(7).width = 20;
+  sheet.getColumn(8).width = 12;
+  
+  sheet.getColumn(5).numFmt = '₱#,##0.00';
+  
+  const lastRow = sheet.lastRow!.number;
+  sheet.addRow([
+    'TOTAL',
+    '',
+    '',
+    '',
+    { formula: `SUM(E6:E${lastRow})` },
+    '',
+    '',
+    ''
+  ]);
+  
+  const totalRow = sheet.lastRow!;
+  totalRow.font = { bold: true };
+  totalRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFEB3B' }
+  };
+  
+  return await workbook.xlsx.writeBuffer() as Buffer;
+}

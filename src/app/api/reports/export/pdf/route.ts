@@ -5,7 +5,11 @@ import {
   generateRevenueReportPDF,
   generatePaymentHistoryReportPDF,
   generateOccupancyReportPDF,
-  generateExpenseReportPDF
+  generateExpenseReportPDF,
+  generateTenantListReportPDF,
+  generateCollectedAmountReportPDF,
+  generateDepositReportPDF,
+  generateVacantRoomsReportPDF
 } from '@/lib/services/pdf-export-service';
 
 export async function POST(request: NextRequest) {
@@ -43,6 +47,18 @@ export async function POST(request: NextRequest) {
         break;
       case 'expenses':
         pdfBuffer = await generateExpenseReportPDF(data);
+        break;
+      case 'tenant-list':
+        pdfBuffer = await generateTenantListReportPDF(data);
+        break;
+      case 'collected-amount':
+        pdfBuffer = await generateCollectedAmountReportPDF(data);
+        break;
+      case 'deposits':
+        pdfBuffer = await generateDepositReportPDF(data);
+        break;
+      case 'vacant-rooms':
+        pdfBuffer = await generateVacantRoomsReportPDF(data);
         break;
       default:
         return NextResponse.json(

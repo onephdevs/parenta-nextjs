@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { generateInvoicesForTenant } from '@/lib/services/invoice-generator';
+import {
+  getBuildingDepositConfig,
+  calculateRequiredDeposit,
+  calculateRequiredAdvance,
+  getUtilityDeposit,
+  validateDepositAmount,
+  getDepositValidityDate,
+  isDepositRefundable,
+} from '@/lib/api/building-deposit-config';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -18,6 +27,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       monthlyRate, 
       depositPaid, 
       advanceAmount,
+      utilityDepositAmount,
       notes,
       generateInvoices = true // Option to auto-generate invoices
     } = await request.json();
@@ -34,11 +44,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Check room deposit requirements
+    // Get room and building information
     const roomResult = await client.query(
-      `SELECT deposit_required, deposit_type, deposit_amount, deposit_percentage, monthly_rate
-       FROM rooms
-       WHERE id = $1`,
+      `SELECT r.deposit_required, r.deposit_type, r.deposit_amount, r.deposit_percentage, 
+              r.monthly_rate, r.building_id
+       FROM rooms r
+       WHERE r.id = $1`,
       [roomId]
     );
 
@@ -53,38 +64,90 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     const room = roomResult.rows[0];
+    const buildingId = room.building_id;
+    const monthlyRateValue = parseFloat(monthlyRate);
     
-    // Validate deposit if required
-    if (room.deposit_required) {
-      let requiredDeposit = 0;
-      
+    // Get building deposit config (if exists)
+    const buildingConfig = await getBuildingDepositConfig(buildingId);
+    
+    // Calculate required amounts based on building config or room config
+    let requiredDeposit = 0;
+    let requiredAdvance = 0;
+    let requiredUtility = 0;
+    
+    if (buildingConfig) {
+      // Use building config
+      requiredDeposit = await calculateRequiredDeposit(buildingId, monthlyRateValue);
+      requiredAdvance = await calculateRequiredAdvance(buildingId, monthlyRateValue);
+      requiredUtility = await getUtilityDeposit(buildingId);
+    } else if (room.deposit_required) {
+      // Fall back to room-level deposit config
       switch (room.deposit_type) {
         case 'one_month':
-          requiredDeposit = parseFloat(monthlyRate);
+          requiredDeposit = monthlyRateValue;
           break;
         case 'percentage':
           requiredDeposit = room.deposit_percentage
-            ? (parseFloat(monthlyRate) * parseFloat(room.deposit_percentage)) / 100
+            ? (monthlyRateValue * parseFloat(room.deposit_percentage)) / 100
             : 0;
           break;
         case 'fixed':
           requiredDeposit = room.deposit_amount ? parseFloat(room.deposit_amount) : 0;
           break;
       }
-
-      const depositAmount = depositPaid ? parseFloat(depositPaid) : 0;
-
-      if (depositAmount < requiredDeposit) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: `Deposit required: ₱${requiredDeposit.toLocaleString()}`,
-            details: `This room requires a deposit of ₱${requiredDeposit.toLocaleString()}. Current deposit: ₱${depositAmount.toLocaleString()}`
-          },
-          { status: 400 }
-        );
-      }
+    } else {
+      // Default minimum deposit
+      requiredDeposit = 3000;
     }
+    
+    // Validate deposit amount
+    const depositAmount = depositPaid ? parseFloat(depositPaid) : 0;
+    if (depositAmount < requiredDeposit) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Deposit required: ₱${requiredDeposit.toLocaleString()}`,
+          details: `This ${buildingConfig ? 'building' : 'room'} requires a deposit of ₱${requiredDeposit.toLocaleString()}. Current deposit: ₱${depositAmount.toLocaleString()}`
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate advance amount if provided
+    const advanceAmountValue = advanceAmount ? parseFloat(advanceAmount) : 0;
+    if (advanceAmountValue > 0 && buildingConfig && advanceAmountValue < requiredAdvance) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Advance payment required: ₱${requiredAdvance.toLocaleString()}`,
+          details: `This building requires an advance payment of ₱${requiredAdvance.toLocaleString()}. Current advance: ₱${advanceAmountValue.toLocaleString()}`
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate utility deposit if provided
+    const utilityDepositValue = utilityDepositAmount ? parseFloat(utilityDepositAmount) : 0;
+    if (utilityDepositValue > 0 && buildingConfig && utilityDepositValue < requiredUtility) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Utility deposit required: ₱${requiredUtility.toLocaleString()}`,
+          details: `This building requires a utility deposit of ₱${requiredUtility.toLocaleString()}. Current utility deposit: ₱${utilityDepositValue.toLocaleString()}`
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Calculate deposit validity date
+    const depositValidUntil = buildingConfig
+      ? await getDepositValidityDate(buildingId, new Date(startDate))
+      : undefined;
+    
+    // Determine if deposit is refundable
+    const depositRefundable = depositValidUntil
+      ? await isDepositRefundable(buildingId, depositValidUntil)
+      : true;
 
     await client.query('BEGIN');
 
@@ -96,13 +159,27 @@ export async function POST(request: Request, { params }: RouteParams) {
       [tenantId]
     );
 
-    // Create new assignment
+    // Create new assignment with advance, utility deposit, and validity tracking
     const assignmentResult = await client.query(
       `INSERT INTO tenant_room_assignments 
-       (tenant_id, room_id, start_date, end_date, monthly_rate, deposit_paid, assignment_status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
+       (tenant_id, room_id, start_date, end_date, monthly_rate, deposit_paid, 
+        advance_paid, utility_deposit_paid, deposit_valid_until, deposit_refundable, 
+        assignment_status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11)
        RETURNING *`,
-      [tenantId, roomId, startDate, endDate || null, monthlyRate, depositPaid || null, notes || null]
+      [
+        tenantId, 
+        roomId, 
+        startDate, 
+        endDate || null, 
+        monthlyRate, 
+        depositPaid || null,
+        advanceAmountValue || null,
+        utilityDepositValue || null,
+        depositValidUntil || null,
+        depositRefundable,
+        notes || null
+      ]
     );
 
     // Update tenant status and move-in date

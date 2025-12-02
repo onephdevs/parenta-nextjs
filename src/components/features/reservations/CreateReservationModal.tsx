@@ -32,6 +32,11 @@ export default function CreateReservationModal({
   const [loadingTenants, setLoadingTenants] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [activeReservationRoomIds, setActiveReservationRoomIds] = useState<Set<string>>(new Set());
+  const [buildingConfig, setBuildingConfig] = useState<any>(null);
+  const [requiredDeposit, setRequiredDeposit] = useState(0);
+  const [requiredAdvance, setRequiredAdvance] = useState(0);
+  const [requiredUtility, setRequiredUtility] = useState(0);
+  const [depositValidityDays, setDepositValidityDays] = useState(5);
   
   const [formData, setFormData] = useState<CreateReservationData>({
     tenantId: initialTenantId || '',
@@ -40,6 +45,8 @@ export default function CreateReservationModal({
     expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days from now
     monthlyRate: 0,
     reservationDeposit: 0,
+    advanceAmount: 0,
+    utilityDepositAmount: 0,
     notes: '',
   });
 
@@ -70,18 +77,101 @@ export default function CreateReservationModal({
     }
   }, [initialRoomId, initialTenantId]);
 
-  // Update selected room and monthly rate when room changes
+  // Update selected room and monthly rate when room changes, and fetch building config
   useEffect(() => {
     if (formData.roomId) {
       const room = rooms.find(r => r.id === formData.roomId);
       if (room) {
         setSelectedRoom(room);
         setFormData(prev => ({ ...prev, monthlyRate: room.monthlyRate }));
+        // Fetch building deposit config
+        fetchBuildingDepositConfig(room.buildingId);
       }
     } else {
       setSelectedRoom(null);
+      setBuildingConfig(null);
+      setRequiredDeposit(0);
+      setRequiredAdvance(0);
+      setRequiredUtility(0);
     }
   }, [formData.roomId, rooms]);
+  
+  // Fetch building deposit config
+  const fetchBuildingDepositConfig = async (buildingId: string) => {
+    try {
+      const response = await fetch(`/api/building-deposit-config?buildingId=${buildingId}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setBuildingConfig(result.data);
+        setDepositValidityDays(result.data.depositValidityDays || 5);
+        
+        // Calculate required amounts
+        const monthlyRate = formData.monthlyRate || selectedRoom?.monthlyRate || 0;
+        if (monthlyRate > 0) {
+          calculateRequiredAmounts(buildingId, monthlyRate, result.data);
+        }
+        } else {
+          setBuildingConfig(null);
+          // Fall back to room-level calculation
+          if (selectedRoom) {
+            const monthlyRate = formData.monthlyRate || selectedRoom.monthlyRate;
+            let deposit = 0;
+            if (selectedRoom.depositRequired) {
+              switch (selectedRoom.depositType) {
+                case 'one_month':
+                  deposit = monthlyRate;
+                  break;
+                case 'percentage':
+                  deposit = selectedRoom.depositPercentage
+                    ? (monthlyRate * selectedRoom.depositPercentage) / 100
+                    : 0;
+                  break;
+                case 'fixed':
+                  deposit = selectedRoom.depositAmount || 0;
+                  break;
+              }
+            }
+            setRequiredDeposit(deposit);
+            setRequiredAdvance(0);
+            setRequiredUtility(0);
+          }
+        }
+    } catch (error) {
+      console.error('Error fetching building deposit config:', error);
+      setBuildingConfig(null);
+    }
+  };
+  
+  // Calculate required amounts based on building config
+  const calculateRequiredAmounts = async (buildingId: string, monthlyRate: number, config: any) => {
+    try {
+      const response = await fetch(
+        `/api/building-deposit-config/${buildingId}?action=calculate&monthlyRate=${monthlyRate}`
+      );
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setRequiredDeposit(result.data.requiredDeposit || 0);
+        setRequiredAdvance(result.data.requiredAdvance || 0);
+        setRequiredUtility(result.data.utilityDeposit || 0);
+        
+        // Auto-fill deposit if it's the minimum
+        if (formData.reservationDeposit === 0 && result.data.requiredDeposit > 0) {
+          setFormData(prev => ({ ...prev, reservationDeposit: result.data.requiredDeposit }));
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating required amounts:', error);
+    }
+  };
+  
+  // Recalculate when monthly rate changes
+  useEffect(() => {
+    if (selectedRoom && buildingConfig && formData.monthlyRate > 0) {
+      calculateRequiredAmounts(selectedRoom.buildingId, formData.monthlyRate, buildingConfig);
+    }
+  }, [formData.monthlyRate, selectedRoom, buildingConfig]);
 
   const fetchActiveReservations = async () => {
     try {
@@ -167,32 +257,14 @@ export default function CreateReservationModal({
     }
   };
 
-  const calculateRequiredDeposit = (): number => {
-    if (!selectedRoom?.depositRequired) return 0;
-
-    const monthlyRate = formData.monthlyRate || selectedRoom.monthlyRate;
-
-    switch (selectedRoom.depositType) {
-      case 'one_month':
-        return monthlyRate;
-      case 'percentage':
-        return selectedRoom.depositPercentage
-          ? (monthlyRate * selectedRoom.depositPercentage) / 100
-          : 0;
-      case 'fixed':
-        return selectedRoom.depositAmount || 0;
-      default:
-        return 0;
-    }
-  };
-
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'monthlyRate' || name === 'reservationDeposit'
+      [name]: name === 'monthlyRate' || name === 'reservationDeposit' || 
+              name === 'advanceAmount' || name === 'utilityDepositAmount'
         ? (value ? parseFloat(value) : 0)
         : name === 'reservationDate' || name === 'expiryDate'
         ? new Date(value)
@@ -226,14 +298,38 @@ export default function CreateReservationModal({
       return;
     }
 
-    // Validate deposit meets room requirements if room has depositRequired
-    if (selectedRoom?.depositRequired) {
-      const requiredDeposit = calculateRequiredDeposit();
-      if (formData.reservationDeposit < requiredDeposit) {
+    // Validate deposit meets requirements (building config or room config)
+    const currentRequiredDeposit = buildingConfig ? requiredDeposit : calculateRequiredDepositLocal();
+    if (currentRequiredDeposit > 0 && formData.reservationDeposit < currentRequiredDeposit) {
+      showNotification({
+        type: 'error',
+        title: 'Insufficient Deposit',
+        message: `Minimum deposit required: ${formatCurrency(currentRequiredDeposit, currencyCode)}`,
+      });
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Validate advance if provided
+    if (formData.advanceAmount && formData.advanceAmount > 0 && requiredAdvance > 0) {
+      if (formData.advanceAmount < requiredAdvance) {
         showNotification({
           type: 'error',
-          title: 'Insufficient Deposit',
-          message: `Minimum deposit required: ${formatCurrency(requiredDeposit, currencyCode)}`,
+          title: 'Insufficient Advance',
+          message: `Minimum advance required: ${formatCurrency(requiredAdvance, currencyCode)}`,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    
+    // Validate utility deposit if provided
+    if (formData.utilityDepositAmount && formData.utilityDepositAmount > 0 && requiredUtility > 0) {
+      if (formData.utilityDepositAmount < requiredUtility) {
+        showNotification({
+          type: 'error',
+          title: 'Insufficient Utility Deposit',
+          message: `Minimum utility deposit required: ${formatCurrency(requiredUtility, currencyCode)}`,
         });
         setIsSubmitting(false);
         return;
@@ -281,6 +377,8 @@ export default function CreateReservationModal({
         expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         monthlyRate: 0,
         reservationDeposit: 0,
+        advanceAmount: 0,
+        utilityDepositAmount: 0,
         notes: '',
       });
       setSelectedRoom(null);
@@ -299,7 +397,28 @@ export default function CreateReservationModal({
     }
   };
 
-  const requiredDeposit = calculateRequiredDeposit();
+  // Calculate required deposit (fallback to room-level if no building config)
+  const calculateRequiredDepositLocal = (): number => {
+    if (buildingConfig) {
+      return requiredDeposit;
+    }
+    if (!selectedRoom?.depositRequired) return 0;
+    const monthlyRate = formData.monthlyRate || selectedRoom.monthlyRate;
+    switch (selectedRoom.depositType) {
+      case 'one_month':
+        return monthlyRate;
+      case 'percentage':
+        return selectedRoom.depositPercentage
+          ? (monthlyRate * selectedRoom.depositPercentage) / 100
+          : 0;
+      case 'fixed':
+        return selectedRoom.depositAmount || 0;
+      default:
+        return 0;
+    }
+  };
+  
+  const displayRequiredDeposit = buildingConfig ? requiredDeposit : calculateRequiredDepositLocal();
 
   const actionButtons = (
     <>
@@ -354,9 +473,19 @@ export default function CreateReservationModal({
           {selectedRoom && (
             <p className="mt-1 text-sm text-gray-600">
               Monthly Rate: {formatCurrency(selectedRoom.monthlyRate, currencyCode)}
-              {selectedRoom.depositRequired && (
+              {requiredDeposit > 0 && (
                 <span className="ml-2">
                   | Required Deposit: {formatCurrency(requiredDeposit, currencyCode)}
+                </span>
+              )}
+              {buildingConfig && requiredAdvance > 0 && (
+                <span className="ml-2">
+                  | Required Advance: {formatCurrency(requiredAdvance, currencyCode)}
+                </span>
+              )}
+              {buildingConfig && requiredUtility > 0 && (
+                <span className="ml-2">
+                  | Utility Deposit: {formatCurrency(requiredUtility, currencyCode)}
                 </span>
               )}
             </p>
@@ -450,8 +579,8 @@ export default function CreateReservationModal({
         <div>
           <label htmlFor="reservationDeposit" className="block text-sm font-medium text-gray-900 mb-1">
             Reservation Deposit ({currencySymbol}) <span className="text-red-600">*</span>
-            {selectedRoom?.depositRequired && (
-              <span className="text-red-600"> (Min: {formatCurrency(requiredDeposit, currencyCode)})</span>
+            {displayRequiredDeposit > 0 && (
+              <span className="text-red-600"> (Min: {formatCurrency(displayRequiredDeposit, currencyCode)})</span>
             )}
           </label>
           <input
@@ -459,7 +588,7 @@ export default function CreateReservationModal({
             id="reservationDeposit"
             name="reservationDeposit"
             required
-            min={selectedRoom?.depositRequired ? requiredDeposit : 0.01}
+            min={displayRequiredDeposit > 0 ? displayRequiredDeposit : 0.01}
             step="0.01"
             value={formData.reservationDeposit}
             onChange={handleInputChange}
@@ -470,12 +599,63 @@ export default function CreateReservationModal({
               Reservation deposit is required. No reservation can be created without a deposit payment.
             </p>
           )}
-          {selectedRoom?.depositRequired && formData.reservationDeposit > 0 && formData.reservationDeposit < requiredDeposit && (
+          {displayRequiredDeposit > 0 && formData.reservationDeposit > 0 && formData.reservationDeposit < displayRequiredDeposit && (
             <p className="mt-1 text-sm text-red-600">
-              Minimum deposit required: {formatCurrency(requiredDeposit, currencyCode)}
+              Minimum deposit required: {formatCurrency(displayRequiredDeposit, currencyCode)}
+            </p>
+          )}
+          {buildingConfig && depositValidityDays > 0 && (
+            <p className="mt-1 text-sm text-gray-600">
+              Deposit valid for {depositValidityDays} day{depositValidityDays !== 1 ? 's' : ''} from reservation date
             </p>
           )}
         </div>
+
+        {/* Advance Payment */}
+        {buildingConfig && requiredAdvance > 0 && (
+          <div>
+            <label htmlFor="advanceAmount" className="block text-sm font-medium text-gray-900 mb-1">
+              Advance Payment ({currencySymbol}) (Optional)
+              <span className="text-gray-500"> (Min: {formatCurrency(requiredAdvance, currencyCode)})</span>
+            </label>
+            <input
+              type="number"
+              id="advanceAmount"
+              name="advanceAmount"
+              min={requiredAdvance}
+              step="0.01"
+              value={formData.advanceAmount || 0}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <p className="mt-1 text-sm text-gray-600">
+              Any advance rent payment made at the start of the lease
+            </p>
+          </div>
+        )}
+
+        {/* Utility Deposit */}
+        {buildingConfig && requiredUtility > 0 && (
+          <div>
+            <label htmlFor="utilityDepositAmount" className="block text-sm font-medium text-gray-900 mb-1">
+              Utility Deposit ({currencySymbol}) (Optional)
+              <span className="text-gray-500"> (Min: {formatCurrency(requiredUtility, currencyCode)})</span>
+            </label>
+            <input
+              type="number"
+              id="utilityDepositAmount"
+              name="utilityDepositAmount"
+              min={requiredUtility}
+              step="0.01"
+              value={formData.utilityDepositAmount || 0}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            <p className="mt-1 text-sm text-gray-600">
+              Utility deposit amount for this building
+            </p>
+          </div>
+        )}
 
         {/* Notes */}
         <div>

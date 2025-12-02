@@ -88,8 +88,14 @@ export default function TenantAssignmentManager({
     startDate: new Date().toISOString().split('T')[0],
     monthlyRate: roomMonthlyRate.toString(),
     depositPaid: '',
+    advanceAmount: '',
+    utilityDepositAmount: '',
     notes: ''
   });
+  const [buildingConfig, setBuildingConfig] = useState<any>(null);
+  const [requiredDeposit, setRequiredDeposit] = useState(0);
+  const [requiredAdvance, setRequiredAdvance] = useState(0);
+  const [requiredUtility, setRequiredUtility] = useState(0);
   const [unassignFormData, setUnassignFormData] = useState({
     endDate: new Date().toISOString().split('T')[0],
     notes: ''
@@ -136,8 +142,99 @@ export default function TenantAssignmentManager({
     fetchOccupants();
   }, [showAssignForm, roomId]);
 
-  // Calculate required deposit based on room configuration
+  // Fetch building deposit config when roomId is available
+  useEffect(() => {
+    if (roomId) {
+      fetchRoomBuildingId();
+    } else {
+      setBuildingConfig(null);
+      setRequiredDeposit(0);
+      setRequiredAdvance(0);
+      setRequiredUtility(0);
+    }
+  }, [roomId]);
+
+  // Recalculate when monthly rate changes
+  useEffect(() => {
+    if (buildingConfig && assignFormData.monthlyRate) {
+      const monthlyRate = parseFloat(assignFormData.monthlyRate) || roomMonthlyRate;
+      if (monthlyRate > 0 && buildingConfig.buildingId) {
+        calculateRequiredAmounts(buildingConfig.buildingId, monthlyRate);
+      }
+    }
+  }, [assignFormData.monthlyRate, buildingConfig]);
+
+  // Fetch room's building ID
+  const fetchRoomBuildingId = async () => {
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`);
+      const result = await response.json();
+      
+      if (result.success && result.data?.buildingId) {
+        fetchBuildingDepositConfig(result.data.buildingId);
+      } else {
+        setBuildingConfig(null);
+        setRequiredDeposit(0);
+        setRequiredAdvance(0);
+        setRequiredUtility(0);
+      }
+    } catch (error) {
+      console.error('Error fetching room building ID:', error);
+      setBuildingConfig(null);
+    }
+  };
+
+  // Fetch building deposit config
+  const fetchBuildingDepositConfig = async (buildingId: string) => {
+    try {
+      const response = await fetch(`/api/building-deposit-config?buildingId=${buildingId}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setBuildingConfig({ ...result.data, buildingId });
+        const monthlyRate = parseFloat(assignFormData.monthlyRate) || roomMonthlyRate;
+        if (monthlyRate > 0) {
+          calculateRequiredAmounts(buildingId, monthlyRate);
+        }
+      } else {
+        setBuildingConfig(null);
+        // Fall back to room-level calculation
+        if (room) {
+          const deposit = calculateRequiredDeposit();
+          setRequiredDeposit(deposit);
+          setRequiredAdvance(0);
+          setRequiredUtility(0);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching building deposit config:', error);
+      setBuildingConfig(null);
+    }
+  };
+  
+  // Calculate required amounts based on building config
+  const calculateRequiredAmounts = async (buildingId: string, monthlyRate: number) => {
+    try {
+      const response = await fetch(
+        `/api/building-deposit-config/${buildingId}?action=calculate&monthlyRate=${monthlyRate}`
+      );
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setRequiredDeposit(result.data.requiredDeposit || 0);
+        setRequiredAdvance(result.data.requiredAdvance || 0);
+        setRequiredUtility(result.data.utilityDeposit || 0);
+      }
+    } catch (error) {
+      console.error('Error calculating required amounts:', error);
+    }
+  };
+
+  // Calculate required deposit based on room configuration (fallback)
   const calculateRequiredDeposit = (): number => {
+    if (buildingConfig) {
+      return requiredDeposit; // Use building config value
+    }
     if (!room?.depositRequired) return 0;
 
     const monthlyRate = parseFloat(assignFormData.monthlyRate) || roomMonthlyRate;
@@ -162,12 +259,32 @@ export default function TenantAssignmentManager({
     setLoading(true);
 
     // Validate deposit if required
-    if (room?.depositRequired) {
-      const requiredDeposit = calculateRequiredDeposit();
+    const currentRequiredDeposit = calculateRequiredDeposit();
+    if (currentRequiredDeposit > 0) {
       const depositPaid = assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : 0;
 
-      if (depositPaid < requiredDeposit) {
-        showError(`Deposit required: ₱${requiredDeposit.toLocaleString()}. Current: ₱${depositPaid.toLocaleString()}`);
+      if (depositPaid < currentRequiredDeposit) {
+        showError(`Deposit required: ₱${currentRequiredDeposit.toLocaleString()}. Current: ₱${depositPaid.toLocaleString()}`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Validate advance if provided
+    if (assignFormData.advanceAmount && parseFloat(assignFormData.advanceAmount) > 0 && requiredAdvance > 0) {
+      const advancePaid = parseFloat(assignFormData.advanceAmount);
+      if (advancePaid < requiredAdvance) {
+        showError(`Advance required: ₱${requiredAdvance.toLocaleString()}. Current: ₱${advancePaid.toLocaleString()}`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Validate utility deposit if provided
+    if (assignFormData.utilityDepositAmount && parseFloat(assignFormData.utilityDepositAmount) > 0 && requiredUtility > 0) {
+      const utilityPaid = parseFloat(assignFormData.utilityDepositAmount);
+      if (utilityPaid < requiredUtility) {
+        showError(`Utility deposit required: ₱${requiredUtility.toLocaleString()}. Current: ₱${utilityPaid.toLocaleString()}`);
         setLoading(false);
         return;
       }
@@ -182,6 +299,8 @@ export default function TenantAssignmentManager({
           startDate: assignFormData.startDate,
           monthlyRate: parseFloat(assignFormData.monthlyRate),
           depositPaid: assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : undefined,
+          advanceAmount: assignFormData.advanceAmount ? parseFloat(assignFormData.advanceAmount) : undefined,
+          utilityDepositAmount: assignFormData.utilityDepositAmount ? parseFloat(assignFormData.utilityDepositAmount) : undefined,
           notes: assignFormData.notes
         })
       });
@@ -196,6 +315,8 @@ export default function TenantAssignmentManager({
           startDate: new Date().toISOString().split('T')[0],
           monthlyRate: roomMonthlyRate.toString(),
           depositPaid: '',
+          advanceAmount: '',
+          utilityDepositAmount: '',
           notes: ''
         });
         onAssignmentChange();
@@ -493,17 +614,69 @@ export default function TenantAssignmentManager({
                     placeholder={room?.depositRequired ? "Required" : "Optional"}
                     required={room?.depositRequired}
                   />
-                  {room?.depositRequired && (
+                  {(room?.depositRequired || buildingConfig) && (
                     <p className="mt-1 text-sm text-gray-900">
                       <strong>Required deposit:</strong> ₱{calculateRequiredDeposit().toLocaleString()}
                     </p>
                   )}
-                  {!room?.depositRequired && assignFormData.depositPaid && parseFloat(assignFormData.depositPaid) < calculateRequiredDeposit() && (
+                  {assignFormData.depositPaid && parseFloat(assignFormData.depositPaid) < calculateRequiredDeposit() && (
                     <p className="mt-1 text-sm text-red-600">
                       Insufficient deposit. Required: ₱{calculateRequiredDeposit().toLocaleString()}
                     </p>
                   )}
+                  {buildingConfig && requiredAdvance > 0 && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      <strong>Required advance:</strong> ₱{requiredAdvance.toLocaleString()}
+                    </p>
+                  )}
+                  {buildingConfig && requiredUtility > 0 && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      <strong>Required utility deposit:</strong> ₱{requiredUtility.toLocaleString()}
+                    </p>
+                  )}
                 </div>
+
+                {/* Advance Payment */}
+                {buildingConfig && requiredAdvance > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900">
+                      Advance Payment (₱) (Optional)
+                      <span className="ml-2 text-gray-500">(Min: ₱{requiredAdvance.toLocaleString()})</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={assignFormData.advanceAmount}
+                      onChange={(e) => setAssignFormData({ ...assignFormData, advanceAmount: e.target.value })}
+                      className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      placeholder="Optional"
+                    />
+                    <p className="mt-1 text-sm text-gray-600">
+                      Any advance rent payment made at the start of the lease
+                    </p>
+                  </div>
+                )}
+
+                {/* Utility Deposit */}
+                {buildingConfig && requiredUtility > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900">
+                      Utility Deposit (₱) (Optional)
+                      <span className="ml-2 text-gray-500">(Min: ₱{requiredUtility.toLocaleString()})</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={assignFormData.utilityDepositAmount}
+                      onChange={(e) => setAssignFormData({ ...assignFormData, utilityDepositAmount: e.target.value })}
+                      className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      placeholder="Optional"
+                    />
+                    <p className="mt-1 text-sm text-gray-600">
+                      Utility deposit amount for this building
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-900">Notes</label>

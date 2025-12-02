@@ -410,3 +410,352 @@ export async function generateExpenseReportPDF(data: any): Promise<Buffer> {
   return Buffer.from(await blob.arrayBuffer());
 }
 
+/**
+ * Tenant List Report PDF Component
+ */
+const TenantListReportPDF = ({ data }: { data: any }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Tenant List Report</Text>
+        <Text style={styles.subtitle}>
+          Total Tenants: {data.summary.totalTenants}
+        </Text>
+        <Text style={styles.subtitle}>
+          Total Balance: ₱{data.summary.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        </Text>
+        <Text style={styles.subtitle}>
+          Past Due: ₱{data.summary.totalPastDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        </Text>
+        <Text style={styles.subtitle}>
+          Generated: {new Date().toLocaleString()}
+        </Text>
+      </View>
+
+      {/* Summary Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Summary</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Total Tenants</Text>
+          <Text style={styles.summaryValue}>{data.summary.totalTenants}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Tenants with Balance</Text>
+          <Text style={styles.summaryValue}>{data.summary.tenantsWithBalance}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Tenants Past Due</Text>
+          <Text style={styles.summaryValue}>{data.summary.tenantsPastDue}</Text>
+        </View>
+      </View>
+
+      {/* Tenants Table */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Tenant Details</Text>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 1.5 }]}>Tenant</Text>
+            <Text style={[styles.tableCell, { flex: 1 }]}>Room</Text>
+            <Text style={styles.tableCellRight}>Balance</Text>
+            <Text style={styles.tableCellRight}>Past Due</Text>
+            <Text style={[styles.tableCell, { flex: 0.8 }]}>Status</Text>
+          </View>
+          {data.tenants.map((tenant: any, index: number) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.tableCell, { flex: 1.5 }]}>
+                {tenant.firstName} {tenant.lastName}
+              </Text>
+              <Text style={[styles.tableCell, { flex: 1 }]}>
+                {tenant.roomNumber || 'N/A'}
+              </Text>
+              <Text style={styles.tableCellRight}>
+                ₱{tenant.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+              <Text style={styles.tableCellRight}>
+                ₱{tenant.pastDueAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+              <Text style={[styles.tableCell, { flex: 0.8 }]}>
+                {tenant.daysPastDue > 0 ? `${tenant.daysPastDue}d` : 'Current'}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Footer */}
+      <Text style={styles.footer}>Parenta Property Management System</Text>
+    </Page>
+  </Document>
+);
+
+export async function generateTenantListReportPDF(data: any): Promise<Buffer> {
+  const doc = <TenantListReportPDF data={data} />;
+  const asPdf = pdf(doc);
+  const blob = await asPdf.toBlob();
+  return Buffer.from(await blob.arrayBuffer());
+}
+
+/**
+ * Collected Amount Report PDF Component
+ */
+const CollectedAmountReportPDF = ({ data }: { data: any }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Collected Amount Report</Text>
+        <Text style={styles.subtitle}>
+          Period: {data.summary.period}
+        </Text>
+        {data.summary.growth !== undefined && (
+          <Text style={styles.subtitle}>
+            Growth: {data.summary.growth >= 0 ? '+' : ''}{data.summary.growth.toFixed(2)}%
+          </Text>
+        )}
+        <Text style={styles.subtitle}>
+          Generated: {new Date().toLocaleString()}
+        </Text>
+      </View>
+
+      {/* Summary Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Summary</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Total Collected</Text>
+          <Text style={styles.summaryValue}>
+            ₱{data.summary.totalCollected.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Total Payments</Text>
+          <Text style={styles.summaryValue}>{data.summary.totalPayments}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Average Payment</Text>
+          <Text style={styles.summaryValue}>
+            ₱{data.summary.averagePayment.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+      </View>
+
+      {/* By Period Section */}
+      {data.byPeriod && data.byPeriod.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Collected by Period</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.tableCell}>Period</Text>
+              <Text style={styles.tableCellRight}>Amount</Text>
+              <Text style={styles.tableCellRight}>Payments</Text>
+            </View>
+            {data.byPeriod.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={styles.tableCell}>{item.period}</Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>{item.count}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* By Payment Method Section */}
+      {data.byPaymentMethod && data.byPaymentMethod.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>By Payment Method</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.tableCell}>Method</Text>
+              <Text style={styles.tableCellRight}>Amount</Text>
+              <Text style={styles.tableCellRight}>%</Text>
+            </View>
+            {data.byPaymentMethod.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={styles.tableCell}>{item.method}</Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>{item.percentage.toFixed(1)}%</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Footer */}
+      <Text style={styles.footer}>Parenta Property Management System</Text>
+    </Page>
+  </Document>
+);
+
+export async function generateCollectedAmountReportPDF(data: any): Promise<Buffer> {
+  const doc = <CollectedAmountReportPDF data={data} />;
+  const asPdf = pdf(doc);
+  const blob = await asPdf.toBlob();
+  return Buffer.from(await blob.arrayBuffer());
+}
+
+/**
+ * Deposit Report PDF Component
+ */
+const DepositReportPDF = ({ data }: { data: any }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Deposit Received Report</Text>
+        <Text style={styles.subtitle}>
+          Period: {data.summary.period}
+        </Text>
+        <Text style={styles.subtitle}>
+          Generated: {new Date().toLocaleString()}
+        </Text>
+      </View>
+
+      {/* Summary Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Summary</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Total Deposits Received</Text>
+          <Text style={styles.summaryValue}>
+            ₱{data.summary.totalDepositsReceived.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Total Refunds Issued</Text>
+          <Text style={styles.summaryValue}>
+            ₱{data.summary.totalRefundsIssued.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Net Deposit Balance</Text>
+          <Text style={styles.summaryValue}>
+            ₱{data.summary.netDepositBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+      </View>
+
+      {/* By Period Section */}
+      {data.byPeriod && data.byPeriod.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Deposits by Period</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.tableCell}>Period</Text>
+              <Text style={styles.tableCellRight}>Deposits</Text>
+              <Text style={styles.tableCellRight}>Refunds</Text>
+              <Text style={styles.tableCellRight}>Net</Text>
+            </View>
+            {data.byPeriod.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={styles.tableCell}>{item.period}</Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.depositsReceived.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.refundsIssued.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.netAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Footer */}
+      <Text style={styles.footer}>Parenta Property Management System</Text>
+    </Page>
+  </Document>
+);
+
+export async function generateDepositReportPDF(data: any): Promise<Buffer> {
+  const doc = <DepositReportPDF data={data} />;
+  const asPdf = pdf(doc);
+  const blob = await asPdf.toBlob();
+  return Buffer.from(await blob.arrayBuffer());
+}
+
+/**
+ * Vacant Rooms Report PDF Component
+ */
+const VacantRoomsReportPDF = ({ data }: { data: any }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Vacant Rooms Report</Text>
+        <Text style={styles.subtitle}>
+          Total Vacant: {data.summary.totalVacant} | Vacancy Rate: {data.summary.vacancyRate.toFixed(1)}%
+        </Text>
+        <Text style={styles.subtitle}>
+          Potential Revenue: ₱{data.summary.totalPotentialRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        </Text>
+        <Text style={styles.subtitle}>
+          Generated: {new Date().toLocaleString()}
+        </Text>
+      </View>
+
+      {/* Summary Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Summary</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Total Vacant Rooms</Text>
+          <Text style={styles.summaryValue}>{data.summary.totalVacant}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Vacancy Rate</Text>
+          <Text style={styles.summaryValue}>{data.summary.vacancyRate.toFixed(1)}%</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Average Monthly Rate</Text>
+          <Text style={styles.summaryValue}>
+            ₱{data.summary.averageMonthlyRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </Text>
+        </View>
+      </View>
+
+      {/* Rooms Table */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Vacant Rooms</Text>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 0.8 }]}>Room #</Text>
+            <Text style={[styles.tableCell, { flex: 1.2 }]}>Building</Text>
+            <Text style={[styles.tableCell, { flex: 0.8 }]}>Floor</Text>
+            <Text style={styles.tableCellRight}>Monthly Rate</Text>
+            <Text style={[styles.tableCell, { flex: 0.8 }]}>Days Vacant</Text>
+          </View>
+          {data.rooms.map((room: any, index: number) => (
+            <View key={index} style={styles.tableRow}>
+              <Text style={[styles.tableCell, { flex: 0.8 }]}>{room.roomNumber}</Text>
+              <Text style={[styles.tableCell, { flex: 1.2 }]}>{room.buildingName}</Text>
+              <Text style={[styles.tableCell, { flex: 0.8 }]}>{room.floorNumber || 'N/A'}</Text>
+              <Text style={styles.tableCellRight}>
+                ₱{room.monthlyRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </Text>
+              <Text style={[styles.tableCell, { flex: 0.8 }]}>
+                {room.daysVacant ? `${room.daysVacant}d` : 'N/A'}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Footer */}
+      <Text style={styles.footer}>Parenta Property Management System</Text>
+    </Page>
+  </Document>
+);
+
+export async function generateVacantRoomsReportPDF(data: any): Promise<Buffer> {
+  const doc = <VacantRoomsReportPDF data={data} />;
+  const asPdf = pdf(doc);
+  const blob = await asPdf.toBlob();
+  return Buffer.from(await blob.arrayBuffer());
+}
+

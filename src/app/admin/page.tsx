@@ -12,6 +12,9 @@ import {
   BarChart3,
   Package
 } from 'lucide-react';
+import ActiveTenantsList from '@/components/features/dashboard/ActiveTenantsList';
+import NotificationsWidget from '@/components/features/dashboard/NotificationsWidget';
+import ActivityLogsWidget from '@/components/features/dashboard/ActivityLogsWidget';
 
 // Force fresh data on every page load (no caching)
 export const revalidate = 0;
@@ -150,42 +153,48 @@ export default async function AdminDashboard() {
       description: 'Create a new property',
       href: '/admin/buildings',
       icon: Building2,
-      color: 'blue'
+      bgColor: 'bg-blue-100',
+      iconColor: 'text-blue-600'
     },
     {
       title: 'Add Room',
       description: 'Add a new unit',
       href: '/admin/rooms',
       icon: Home,
-      color: 'green'
+      bgColor: 'bg-green-100',
+      iconColor: 'text-green-600'
     },
     {
       title: 'Add Tenant',
       description: 'Register new tenant',
       href: '/admin/tenants',
       icon: Users,
-      color: 'purple'
+      bgColor: 'bg-purple-100',
+      iconColor: 'text-purple-600'
     },
     {
       title: 'Record Payment',
       description: 'Log a payment',
       href: '/admin/financial/payments/new',
       icon: DollarSign,
-      color: 'yellow'
+      bgColor: 'bg-yellow-100',
+      iconColor: 'text-yellow-600'
     },
     {
       title: 'Add Asset',
       description: 'Track new asset',
       href: '/admin/assets',
       icon: Package,
-      color: 'indigo'
+      bgColor: 'bg-indigo-100',
+      iconColor: 'text-indigo-600'
     },
     {
       title: 'View Reports',
       description: 'Financial reports',
       href: '/admin/reports',
       icon: BarChart3,
-      color: 'pink'
+      bgColor: 'bg-pink-100',
+      iconColor: 'text-pink-600'
     }
   ];
 
@@ -318,8 +327,8 @@ export default async function AdminDashboard() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className={`bg-${action.color}-100 p-2 rounded-lg w-fit mb-3 group-hover:scale-110 transition`}>
-                      <action.icon className={`h-5 w-5 text-${action.color}-600`} />
+                    <div className={`${action.bgColor} p-2 rounded-lg w-fit mb-3 group-hover:scale-110 transition`}>
+                      <action.icon className={`h-5 w-5 ${action.iconColor}`} />
                     </div>
                     <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
                     <p className="text-sm text-gray-900">{action.description}</p>
@@ -329,6 +338,20 @@ export default async function AdminDashboard() {
               </Link>
             ))}
           </div>
+        </div>
+
+        {/* Dashboard Widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Active Tenants List */}
+          <ActiveTenantsList />
+
+          {/* Notifications Widget */}
+          <NotificationsWidget />
+        </div>
+
+        {/* Activity Logs */}
+        <div className="mb-8">
+          <ActivityLogsWidget />
         </div>
 
         {/* Additional Info */}

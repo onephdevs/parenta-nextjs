@@ -1,5 +1,13 @@
 import pool from '@/lib/db';
 import { Reservation, ReservationWithDetails, CreateReservationData } from '@/types/database';
+import {
+  getBuildingDepositConfig,
+  calculateRequiredDeposit,
+  calculateRequiredAdvance,
+  getUtilityDeposit,
+  validateDepositAmount,
+  getDepositValidityDate,
+} from '@/lib/api/building-deposit-config';
 
 // Helper function to map database row to Reservation
 function mapDatabaseReservationToReservation(row: any): Reservation {
@@ -11,6 +19,9 @@ function mapDatabaseReservationToReservation(row: any): Reservation {
     expiryDate: new Date(row.expiry_date),
     monthlyRate: parseFloat(row.monthly_rate),
     reservationDeposit: parseFloat(row.reservation_deposit || 0),
+    advanceAmount: row.advance_amount ? parseFloat(row.advance_amount) : undefined,
+    utilityDepositAmount: row.utility_deposit_amount ? parseFloat(row.utility_deposit_amount) : undefined,
+    depositValidUntil: row.deposit_valid_until ? new Date(row.deposit_valid_until) : undefined,
     depositPaymentId: row.deposit_payment_id || undefined,
     reservationStatus: row.reservation_status,
     convertedToAssignmentId: row.converted_to_assignment_id || undefined,
@@ -36,9 +47,12 @@ export async function createReservation(
       throw new Error('Reservation deposit is required. No reservation can be created without a deposit payment.');
     }
 
-    // Validate room is available (vacant or reserved)
+    // Validate room is available (vacant or reserved) and get building info
     const roomCheck = await client.query(
-      'SELECT room_status, deposit_required, deposit_type, deposit_amount, deposit_percentage, monthly_rate FROM rooms WHERE id = $1 AND is_active = true',
+      `SELECT r.room_status, r.deposit_required, r.deposit_type, r.deposit_amount, 
+              r.deposit_percentage, r.monthly_rate, r.building_id
+       FROM rooms r
+       WHERE r.id = $1 AND r.is_active = true`,
       [reservationData.roomId]
     );
 
@@ -47,6 +61,7 @@ export async function createReservation(
     }
 
     const room = roomCheck.rows[0];
+    const buildingId = room.building_id;
     
     if (room.room_status === 'occupied') {
       throw new Error('Room is already occupied');
@@ -79,11 +94,18 @@ export async function createReservation(
       throw new Error('Expiry date must be after reservation date');
     }
 
-    // Validate deposit meets room requirements if room has depositRequired
-    // Note: Deposit is always required (> 0), but if room has depositRequired, it must meet minimum
-    if (room.deposit_required) {
-      let requiredDeposit = 0;
-      
+    // Get building deposit config (if exists)
+    const buildingConfig = await getBuildingDepositConfig(buildingId);
+    const monthlyRateValue = parseFloat(reservationData.monthlyRate.toString());
+    
+    // Calculate required amounts based on building config or room config
+    let requiredDeposit = 0;
+    
+    if (buildingConfig) {
+      // Use building config
+      requiredDeposit = await calculateRequiredDeposit(buildingId, monthlyRateValue);
+    } else if (room.deposit_required) {
+      // Fall back to room-level deposit config
       switch (room.deposit_type) {
         case 'one_month':
           requiredDeposit = parseFloat(room.monthly_rate);
@@ -97,11 +119,40 @@ export async function createReservation(
           requiredDeposit = room.deposit_amount ? parseFloat(room.deposit_amount) : 0;
           break;
       }
-
-      if (reservationData.reservationDeposit < requiredDeposit) {
-        throw new Error(`Minimum deposit required: ${requiredDeposit.toLocaleString()}`);
-      }
+    } else {
+      // Default minimum deposit
+      requiredDeposit = 3000;
     }
+    
+    // Validate deposit meets requirements
+    if (reservationData.reservationDeposit < requiredDeposit) {
+      throw new Error(`Minimum deposit required: ${requiredDeposit.toLocaleString()}. Provided: ${reservationData.reservationDeposit.toLocaleString()}`);
+    }
+    
+    // Calculate advance and utility deposit if building config exists
+    const requiredAdvance = buildingConfig
+      ? await calculateRequiredAdvance(buildingId, monthlyRateValue)
+      : 0;
+    const requiredUtility = buildingConfig
+      ? await getUtilityDeposit(buildingId)
+      : 0;
+    
+    // Validate advance amount if provided
+    const advanceAmount = reservationData.advanceAmount || 0;
+    if (advanceAmount > 0 && buildingConfig && advanceAmount < requiredAdvance) {
+      throw new Error(`Minimum advance required: ${requiredAdvance.toLocaleString()}. Provided: ${advanceAmount.toLocaleString()}`);
+    }
+    
+    // Validate utility deposit if provided
+    const utilityDepositAmount = reservationData.utilityDepositAmount || 0;
+    if (utilityDepositAmount > 0 && buildingConfig && utilityDepositAmount < requiredUtility) {
+      throw new Error(`Minimum utility deposit required: ${requiredUtility.toLocaleString()}. Provided: ${utilityDepositAmount.toLocaleString()}`);
+    }
+    
+    // Calculate deposit validity date
+    const depositValidUntil = buildingConfig
+      ? await getDepositValidityDate(buildingId, reservationDate)
+      : undefined;
 
     // Create payment record (deposit is always required, so this always executes)
     let depositPaymentId: string | undefined;
@@ -129,13 +180,14 @@ export async function createReservation(
       
     depositPaymentId = paymentResult.rows[0].id;
 
-    // Create reservation
+    // Create reservation with advance, utility deposit, and validity tracking
     const reservationQuery = `
       INSERT INTO reservations (
         tenant_id, room_id, reservation_date, expiry_date, monthly_rate,
-        reservation_deposit, deposit_payment_id, notes, created_by
+        reservation_deposit, advance_amount, utility_deposit_amount, 
+        deposit_valid_until, deposit_payment_id, notes, created_by
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
 
@@ -146,6 +198,9 @@ export async function createReservation(
       expiryDate.toISOString().split('T')[0],
       reservationData.monthlyRate,
       reservationData.reservationDeposit, // Deposit is always required, no need for || 0
+      advanceAmount || null,
+      utilityDepositAmount || null,
+      depositValidUntil ? depositValidUntil.toISOString().split('T')[0] : null,
       depositPaymentId,
       reservationData.notes || null,
       createdBy || null,

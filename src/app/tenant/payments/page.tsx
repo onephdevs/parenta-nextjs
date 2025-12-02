@@ -14,10 +14,14 @@ import {
   Clock,
   ArrowLeft,
   Filter,
-  Search
+  Search,
+  X,
+  Printer
 } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
+import PaymentForm from '@/components/features/tenant/PaymentForm';
 
 interface Payment {
   id: string;
@@ -27,6 +31,26 @@ interface Payment {
   type: string;
   reference?: string;
   description?: string;
+  roomNumber?: string;
+  buildingName?: string;
+  invoiceNumbers?: string;
+}
+
+interface PaymentScheduleItem {
+  id: string;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  status: string;
+  notes?: string;
+  roomNumber?: string;
+  buildingName?: string;
+  address?: string;
 }
 
 interface PaymentSummary {
@@ -34,15 +58,36 @@ interface PaymentSummary {
   nextDueDate: string;
   nextAmount: number;
   outstandingBalance: number;
+  totalPending: number;
+  totalOverdue: number;
+  upcomingInvoices: number;
   recentPayments: Payment[];
+  schedule: PaymentScheduleItem[];
+}
+
+interface BalanceData {
+  outstanding: number;
+  lateFees: number;
+  total: number;
+  outstandingCount: number;
+  nextDueDate: string | null;
+  nextAmount: number;
+  lateFeeDetails?: Array<{
+    invoiceId: string;
+    daysOverdue: number;
+    outstandingAmount: number;
+    lateFee: number;
+  }>;
 }
 
 export default function PaymentsPage() {
   const { data: session, status } = useSession();
   const [paymentData, setPaymentData] = useState<PaymentSummary | null>(null);
+  const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<string | null>(null);
   const { showNotification } = useNotifications();
 
   useEffect(() => {
@@ -71,17 +116,55 @@ export default function PaymentsPage() {
   const fetchPaymentData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/tenant/payments');
-      const data = await response.json();
+      
+      // Fetch payment schedule and history
+      const paymentsResponse = await fetch('/api/tenant/payments');
+      const paymentsData = await paymentsResponse.json();
 
-      if (data.success) {
-        setPaymentData(data.data);
+      // Fetch balance data
+      const balanceResponse = await fetch('/api/tenant/balance');
+      const balanceResult = await balanceResponse.json();
+
+      if (paymentsData.success) {
+        const summary = paymentsData.data.summary;
+        const schedule = paymentsData.data.schedule || [];
+        const history = paymentsData.data.history || [];
+        
+        // Map history to Payment format
+        const recentPayments: Payment[] = history.map((p: any) => ({
+          id: p.id,
+          amount: p.amount,
+          paymentDate: p.paymentDate,
+          status: p.status,
+          type: p.paymentType,
+          reference: p.referenceNumber,
+          description: p.notes,
+          roomNumber: p.roomNumber,
+          buildingName: p.buildingName,
+          invoiceNumbers: p.invoiceNumbers,
+        }));
+
+        setPaymentData({
+          totalPaid: summary.totalPaid || 0,
+          nextDueDate: schedule.length > 0 ? schedule[0].dueDate : '',
+          nextAmount: schedule.length > 0 ? schedule[0].balanceDue : 0,
+          outstandingBalance: summary.outstandingBalance || 0,
+          totalPending: summary.totalPending || 0,
+          totalOverdue: summary.totalOverdue || 0,
+          upcomingInvoices: summary.upcomingInvoices || 0,
+          recentPayments,
+          schedule,
+        });
       } else {
         showNotification({
           type: 'error',
           title: 'Error',
-          message: 'Failed to load payment data'
+          message: paymentsData.error || 'Failed to load payment data'
         });
+      }
+
+      if (balanceResult.success) {
+        setBalanceData(balanceResult.data);
       }
     } catch (error) {
       console.error('Error fetching payment data:', error);
@@ -95,20 +178,30 @@ export default function PaymentsPage() {
     }
   };
 
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  
   const handleMakePayment = () => {
-    showNotification({
-      type: 'info',
-      title: 'Payment Portal',
-      message: 'Payment processing integration will be available soon! You will be able to pay via credit card, bank transfer, and other secure methods.'
-    });
+    setShowPaymentForm(true);
+  };
+
+  const handlePaymentComplete = () => {
+    setShowPaymentForm(false);
+    fetchPaymentData(); // Refresh payment data
   };
 
   const handleDownloadReceipt = (paymentId: string) => {
-    showNotification({
-      type: 'info',
-      title: 'Download Receipt',
-      message: 'Receipt download functionality will be available soon!'
-    });
+    // Open receipt download in new tab
+    window.open(`/api/tenant/payments/${paymentId}/receipt`, '_blank');
+  };
+
+  const handlePrintReceipt = (paymentId: string) => {
+    // Open printable receipt PDF in new tab
+    window.open(`/api/tenant/payments/${paymentId}/print`, '_blank');
+  };
+
+  const handleReceiptUploadComplete = () => {
+    // Refresh payment data after upload
+    fetchPaymentData();
   };
 
   const getStatusColor = (status: string) => {
@@ -275,14 +368,19 @@ export default function PaymentsPage() {
                   <div className="p-5">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
-                        <AlertCircle className={`h-6 w-6 ${(paymentData?.outstandingBalance || 0) > 0 ? 'text-red-600' : 'text-green-600'}`} />
+                        <AlertCircle className={`h-6 w-6 ${(balanceData?.total || 0) > 0 ? 'text-red-600' : 'text-green-600'}`} />
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className="text-sm font-medium text-gray-900 truncate">Outstanding</dt>
+                          <dt className="text-sm font-medium text-gray-900 truncate">Total Balance</dt>
                           <dd className="text-lg font-medium text-gray-900">
-                            {formatCurrency(paymentData?.outstandingBalance)}
+                            {formatCurrency(balanceData?.total || paymentData?.outstandingBalance || 0)}
                           </dd>
+                          {balanceData && balanceData.lateFees > 0 && (
+                            <dd className="text-xs text-red-600 mt-1">
+                              (Includes ₱{formatCurrency(balanceData.lateFees).replace('₱', '')} late fees)
+                            </dd>
+                          )}
                         </dl>
                       </div>
                     </div>
@@ -291,7 +389,7 @@ export default function PaymentsPage() {
               </div>
 
               {/* Outstanding Balance Alert */}
-              {(paymentData?.outstandingBalance || 0) > 0 && (
+              {(balanceData?.total || paymentData?.outstandingBalance || 0) > 0 && (
                 <div className="bg-red-50 border-l-4 border-red-400 p-4">
                   <div className="flex">
                     <div className="flex-shrink-0">
@@ -299,9 +397,15 @@ export default function PaymentsPage() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-red-700">
-                        <strong>Outstanding Balance: {formatCurrency(paymentData?.outstandingBalance)}</strong>
+                        <strong>Total Balance: {formatCurrency(balanceData?.total || paymentData?.outstandingBalance || 0)}</strong>
+                        {balanceData && balanceData.lateFees > 0 && (
+                          <span className="block mt-1">
+                            Outstanding: {formatCurrency(balanceData.outstanding)} | 
+                            Late Fees: {formatCurrency(balanceData.lateFees)}
+                          </span>
+                        )}
                         <br />
-                        Please make a payment to avoid late fees. Late payments may result in additional charges.
+                        Please make a payment to avoid additional late fees. Late payments may result in additional charges.
                       </p>
                       <div className="mt-3">
                         <button
@@ -317,36 +421,140 @@ export default function PaymentsPage() {
               )}
 
               {/* Make Payment Section */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
-                    <p className="text-sm text-gray-900">
-                      Pay your rent securely online with multiple payment options
-                    </p>
-                    <div className="mt-2 text-sm text-gray-900">
-                      <p>• Credit/Debit Cards (Visa, MasterCard, American Express)</p>
-                      <p>• Bank Transfer (ACH)</p>
-                      <p>• Online Banking</p>
+              {!showPaymentForm ? (
+                <div className="bg-white shadow rounded-lg p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
+                      <p className="text-sm text-gray-900">
+                        Pay your rent securely online with multiple payment options
+                      </p>
+                      <div className="mt-2 text-sm text-gray-900">
+                        <p>• Credit/Debit Cards (Visa, MasterCard, American Express)</p>
+                        <p>• Bank Transfer (ACH)</p>
+                        <p>• Online Banking</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900 mb-2">
-                      {formatCurrency(paymentData?.nextAmount)}
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-gray-900 mb-2">
+                        {formatCurrency(balanceData?.nextAmount || paymentData?.nextAmount || 0)}
+                      </div>
+                      <div className="text-sm text-gray-900 mb-4">
+                        Due: {formatDate(balanceData?.nextDueDate || paymentData?.nextDueDate || '')}
+                      </div>
+                      <button
+                        onClick={handleMakePayment}
+                        className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <CreditCard className="mr-2 h-5 w-5" />
+                        Pay Now
+                      </button>
                     </div>
-                    <div className="text-sm text-gray-900 mb-4">
-                      Due: {formatDate(paymentData?.nextDueDate)}
-                    </div>
-                    <button
-                      onClick={handleMakePayment}
-                      className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <CreditCard className="mr-2 h-5 w-5" />
-                      Pay Now
-                    </button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white shadow rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
+                    <button
+                      onClick={() => setShowPaymentForm(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <PaymentForm
+                    invoices={paymentData?.schedule?.map(item => ({
+                      id: item.id,
+                      invoiceNumber: item.invoiceNumber,
+                      dueDate: item.dueDate,
+                      balanceDue: item.balanceDue,
+                      totalAmount: item.totalAmount,
+                      status: item.status,
+                    })) || []}
+                    onPaymentComplete={handlePaymentComplete}
+                    onCancel={() => setShowPaymentForm(false)}
+                  />
+                </div>
+              )}
+
+              {/* Payment Schedule - Upcoming Invoices */}
+              {paymentData && paymentData.schedule && paymentData.schedule.length > 0 && (
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">Upcoming Payments</h3>
+                      <span className="text-sm text-gray-500">
+                        {paymentData.schedule.length} {paymentData.schedule.length === 1 ? 'invoice' : 'invoices'} due
+                      </span>
+                    </div>
+
+                    <div className="overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                              Invoice #
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                              Due Date
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                              Amount Due
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                              Property
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {paymentData.schedule.map((item) => {
+                            const isOverdue = new Date(item.dueDate) < new Date() && item.status === 'overdue';
+                            return (
+                              <tr key={item.id} className={isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {item.invoiceNumber}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <div className="flex items-center">
+                                    <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                                    {formatDate(item.dueDate)}
+                                    {isOverdue && (
+                                      <span className="ml-2 text-xs text-red-600 font-medium">Overdue</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                  {formatCurrency(item.balanceDue)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                    {getStatusIcon(item.status)}
+                                    <span className="ml-1 capitalize">{item.status}</span>
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {item.buildingName && item.roomNumber ? (
+                                    <div>
+                                      <div className="font-medium">{item.buildingName}</div>
+                                      <div className="text-xs text-gray-500">Room {item.roomNumber}</div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">N/A</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Payment History */}
               <div className="bg-white shadow rounded-lg">
@@ -427,13 +635,24 @@ export default function PaymentsPage() {
                                 {payment.reference || 'N/A'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <button
-                                  onClick={() => handleDownloadReceipt(payment.id)}
-                                  className="text-blue-600 hover:text-blue-900 flex items-center"
-                                >
-                                  <Download className="h-4 w-4 mr-1" />
-                                  Receipt
-                                </button>
+                                <div className="flex items-center space-x-3">
+                                  <button
+                                    onClick={() => handlePrintReceipt(payment.id)}
+                                    className="text-green-600 hover:text-green-900 flex items-center"
+                                    title="Print Receipt"
+                                  >
+                                    <Printer className="h-4 w-4 mr-1" />
+                                    Print
+                                  </button>
+                                  <button
+                                    onClick={() => setSelectedPaymentForReceipt(payment.id)}
+                                    className="text-blue-600 hover:text-blue-900 flex items-center"
+                                    title="Upload Receipt"
+                                  >
+                                    <Download className="h-4 w-4 mr-1" />
+                                    Upload
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -463,6 +682,32 @@ export default function PaymentsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Receipt Upload Modal */}
+              {selectedPaymentForReceipt && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                  <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full m-4">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">Upload Receipt</h3>
+                        <button
+                          onClick={() => setSelectedPaymentForReceipt(null)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-6 w-6" />
+                        </button>
+                      </div>
+                      <ReceiptUpload
+                        paymentId={selectedPaymentForReceipt}
+                        onUploadComplete={() => {
+                          handleReceiptUploadComplete();
+                          setSelectedPaymentForReceipt(null);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Payment Information */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

@@ -3,7 +3,7 @@
  * Generates various financial and operational reports
  */
 
-import { pool } from '@/lib/db';
+import pool from '@/lib/db';
 
 export interface RevenueReportData {
   summary: {
@@ -122,6 +122,120 @@ export interface ExpenseReportData {
     amount: number;
     category: string;
     date: string;
+  }>;
+}
+
+export interface TenantListReportData {
+  summary: {
+    totalTenants: number;
+    totalBalance: number;
+    totalPastDue: number;
+    tenantsWithBalance: number;
+    tenantsPastDue: number;
+    period: string;
+  };
+  tenants: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    roomNumber?: string;
+    buildingName?: string;
+    buildingId?: string;
+    balance: number;
+    pastDueAmount: number;
+    daysPastDue: number;
+    leaseStart?: string;
+    leaseEnd?: string;
+    tenantStatus: string;
+  }>;
+}
+
+export interface CollectedAmountReportData {
+  summary: {
+    totalCollected: number;
+    totalPayments: number;
+    averagePayment: number;
+    period: string;
+    previousPeriodCollected?: number;
+    growth?: number;
+  };
+  byPeriod: Array<{
+    period: string;
+    amount: number;
+    count: number;
+  }>;
+  byPaymentMethod: Array<{
+    method: string;
+    amount: number;
+    count: number;
+    percentage: number;
+  }>;
+  byPaymentType: Array<{
+    type: string;
+    amount: number;
+    count: number;
+    percentage: number;
+  }>;
+  timeline: Array<{
+    date: string;
+    amount: number;
+    count: number;
+  }>;
+}
+
+export interface DepositReportData {
+  summary: {
+    totalDepositsReceived: number;
+    totalRefundsIssued: number;
+    netDepositBalance: number;
+    totalTransactions: number;
+    tenantCount: number;
+    period: string;
+  };
+  byPeriod: Array<{
+    period: string;
+    depositsReceived: number;
+    refundsIssued: number;
+    netAmount: number;
+    tenantCount: number;
+  }>;
+  byBuilding: Array<{
+    buildingId: string;
+    buildingName: string;
+    depositsReceived: number;
+    refundsIssued: number;
+    netAmount: number;
+  }>;
+  byTenant: Array<{
+    tenantId: string;
+    tenantName: string;
+    depositsReceived: number;
+    refundsIssued: number;
+    netAmount: number;
+  }>;
+}
+
+export interface VacantRoomsReportData {
+  summary: {
+    totalVacant: number;
+    totalRooms: number;
+    vacancyRate: number;
+    averageMonthlyRate: number;
+    totalPotentialRevenue: number;
+  };
+  rooms: Array<{
+    id: string;
+    roomNumber: string;
+    buildingName: string;
+    buildingId: string;
+    floorNumber?: number;
+    roomType?: string;
+    monthlyRate: number;
+    daysVacant?: number;
+    lastTenantName?: string;
+    maintenanceStatus?: string;
   }>;
 }
 
@@ -734,3 +848,556 @@ export async function getTenantFinancialSummary(tenantId: string): Promise<Tenan
   }
 }
 
+/**
+ * Generate Tenant List Report
+ */
+export async function generateTenantListReport(
+  filters?: { status?: string; buildingId?: string }
+): Promise<TenantListReportData> {
+  const client = await pool.connect();
+  
+  try {
+    let query = `
+      SELECT 
+        t.id,
+        t.first_name,
+        t.last_name,
+        t.email,
+        t.phone,
+        t.tenant_status,
+        r.room_number,
+        b.name as building_name,
+        b.id as building_id,
+        tra.start_date as lease_start,
+        tra.end_date as lease_end,
+        COALESCE(SUM(i.balance_due), 0) as balance,
+        COALESCE(SUM(CASE WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' THEN i.balance_due ELSE 0 END), 0) as past_due_amount,
+        MAX(CASE WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' THEN (CURRENT_DATE - i.due_date) ELSE 0 END) as days_past_due
+      FROM tenants t
+      LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON tra.room_id = r.id
+      LEFT JOIN buildings b ON r.building_id = b.id
+      LEFT JOIN invoices i ON t.id = i.tenant_id AND i.invoice_status IN ('sent', 'partial', 'overdue')
+      WHERE t.is_active = true
+    `;
+    
+    const params: any[] = [];
+    let paramCount = 1;
+    
+    if (filters?.status) {
+      query += ` AND t.tenant_status = $${paramCount}`;
+      params.push(filters.status);
+      paramCount++;
+    }
+    
+    if (filters?.buildingId) {
+      query += ` AND b.id = $${paramCount}`;
+      params.push(filters.buildingId);
+      paramCount++;
+    }
+    
+    query += `
+      GROUP BY t.id, t.first_name, t.last_name, t.email, t.phone, t.tenant_status,
+               r.room_number, b.name, b.id, tra.start_date, tra.end_date
+      ORDER BY past_due_amount DESC, balance DESC, t.last_name ASC
+    `;
+    
+    const result = await client.query(query, params);
+    
+    const tenants = result.rows.map(row => ({
+      id: row.id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      email: row.email,
+      phone: row.phone,
+      roomNumber: row.room_number,
+      buildingName: row.building_name,
+      buildingId: row.building_id,
+      balance: parseFloat(row.balance || 0),
+      pastDueAmount: parseFloat(row.past_due_amount || 0),
+      daysPastDue: parseInt(row.days_past_due || 0),
+      leaseStart: row.lease_start,
+      leaseEnd: row.lease_end,
+      tenantStatus: row.tenant_status,
+    }));
+    
+    const summary = {
+      totalTenants: tenants.length,
+      totalBalance: tenants.reduce((sum, t) => sum + t.balance, 0),
+      totalPastDue: tenants.reduce((sum, t) => sum + t.pastDueAmount, 0),
+      tenantsWithBalance: tenants.filter(t => t.balance > 0).length,
+      tenantsPastDue: tenants.filter(t => t.pastDueAmount > 0).length,
+      period: 'Current',
+    };
+    
+    return {
+      summary,
+      tenants,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Generate Collected Amount Report
+ */
+export async function generateCollectedAmountReport(
+  startDate: string,
+  endDate: string,
+  periodType: 'monthly' | 'quarterly' | 'semi-annual' | 'annual' = 'monthly'
+): Promise<CollectedAmountReportData> {
+  const client = await pool.connect();
+  
+  try {
+    // Determine date truncation based on period type
+    let dateTrunc: string;
+    switch (periodType) {
+      case 'quarterly':
+        dateTrunc = 'quarter';
+        break;
+      case 'semi-annual':
+        dateTrunc = 'month'; // Group 6 months together
+        break;
+      case 'annual':
+        dateTrunc = 'year';
+        break;
+      default:
+        dateTrunc = 'month';
+    }
+    
+    // Get payments in date range
+    const paymentsQuery = `
+      SELECT 
+        p.id,
+        p.amount,
+        p.payment_method,
+        p.payment_type,
+        p.payment_date,
+        p.payment_status
+      FROM payments p
+      WHERE p.payment_date BETWEEN $1 AND $2
+        AND p.payment_status = 'paid'
+      ORDER BY p.payment_date ASC
+    `;
+    
+    const paymentsResult = await client.query(paymentsQuery, [startDate, endDate]);
+    const payments = paymentsResult.rows;
+    
+    // Calculate summary
+    const totalCollected = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+    const totalPayments = payments.length;
+    const averagePayment = totalPayments > 0 ? totalCollected / totalPayments : 0;
+    
+    // Get previous period for comparison
+    const periodDays = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+    const prevStartDate = new Date(new Date(startDate).getTime() - periodDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const prevEndDate = startDate;
+    
+    const prevPaymentsQuery = `
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM payments
+      WHERE payment_date BETWEEN $1 AND $2
+        AND payment_status = 'paid'
+    `;
+    
+    const prevResult = await client.query(prevPaymentsQuery, [prevStartDate, prevEndDate]);
+    const previousPeriodCollected = parseFloat(prevResult.rows[0].total || 0);
+    const growth = previousPeriodCollected > 0 
+      ? ((totalCollected - previousPeriodCollected) / previousPeriodCollected) * 100 
+      : 0;
+    
+    // Group by period
+    const periodMap = new Map<string, { amount: number; count: number }>();
+    
+    payments.forEach((payment: any) => {
+      const date = new Date(payment.payment_date);
+      let periodKey: string;
+      
+      switch (periodType) {
+        case 'quarterly':
+          const quarter = Math.floor(date.getMonth() / 3) + 1;
+          periodKey = `Q${quarter} ${date.getFullYear()}`;
+          break;
+        case 'semi-annual':
+          const half = date.getMonth() < 6 ? 'H1' : 'H2';
+          periodKey = `${half} ${date.getFullYear()}`;
+          break;
+        case 'annual':
+          periodKey = date.getFullYear().toString();
+          break;
+        default:
+          periodKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+      
+      if (!periodMap.has(periodKey)) {
+        periodMap.set(periodKey, { amount: 0, count: 0 });
+      }
+      
+      const period = periodMap.get(periodKey)!;
+      period.amount += parseFloat(payment.amount || 0);
+      period.count += 1;
+    });
+    
+    const byPeriod = Array.from(periodMap.entries())
+      .map(([period, data]) => ({ period, amount: data.amount, count: data.count }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+    
+    // Group by payment method
+    const methodMap = new Map<string, { amount: number; count: number }>();
+    payments.forEach((payment: any) => {
+      const method = payment.payment_method || 'unknown';
+      if (!methodMap.has(method)) {
+        methodMap.set(method, { amount: 0, count: 0 });
+      }
+      const methodData = methodMap.get(method)!;
+      methodData.amount += parseFloat(payment.amount || 0);
+      methodData.count += 1;
+    });
+    
+    const byPaymentMethod = Array.from(methodMap.entries())
+      .map(([method, data]) => ({
+        method,
+        amount: data.amount,
+        count: data.count,
+        percentage: totalCollected > 0 ? (data.amount / totalCollected) * 100 : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+    
+    // Group by payment type
+    const typeMap = new Map<string, { amount: number; count: number }>();
+    payments.forEach((payment: any) => {
+      const type = payment.payment_type || 'unknown';
+      if (!typeMap.has(type)) {
+        typeMap.set(type, { amount: 0, count: 0 });
+      }
+      const typeData = typeMap.get(type)!;
+      typeData.amount += parseFloat(payment.amount || 0);
+      typeData.count += 1;
+    });
+    
+    const byPaymentType = Array.from(typeMap.entries())
+      .map(([type, data]) => ({
+        type,
+        amount: data.amount,
+        count: data.count,
+        percentage: totalCollected > 0 ? (data.amount / totalCollected) * 100 : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+    
+    // Daily timeline
+    const timelineMap = new Map<string, { amount: number; count: number }>();
+    payments.forEach((payment: any) => {
+      const dateKey = payment.payment_date.split('T')[0];
+      if (!timelineMap.has(dateKey)) {
+        timelineMap.set(dateKey, { amount: 0, count: 0 });
+      }
+      const dayData = timelineMap.get(dateKey)!;
+      dayData.amount += parseFloat(payment.amount || 0);
+      dayData.count += 1;
+    });
+    
+    const timeline = Array.from(timelineMap.entries())
+      .map(([date, data]) => ({ date, amount: data.amount, count: data.count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    
+    return {
+      summary: {
+        totalCollected,
+        totalPayments,
+        averagePayment,
+        period: `${startDate} to ${endDate}`,
+        previousPeriodCollected,
+        growth,
+      },
+      byPeriod,
+      byPaymentMethod,
+      byPaymentType,
+      timeline,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Generate Deposit Received Report
+ */
+export async function generateDepositReport(
+  startDate: string,
+  endDate: string,
+  periodType: 'monthly' | 'semi-annual' | 'annual' = 'monthly'
+): Promise<DepositReportData> {
+  const client = await pool.connect();
+  
+  try {
+    const depositsQuery = `
+      SELECT 
+        dl.id,
+        dl.tenant_id,
+        dl.amount,
+        dl.transaction_type,
+        dl.transaction_date,
+        dl.description,
+        t.first_name,
+        t.last_name,
+        tra.room_id,
+        r.building_id,
+        b.name as building_name
+      FROM deposit_ledger dl
+      LEFT JOIN tenants t ON dl.tenant_id = t.id
+      LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON tra.room_id = r.id
+      LEFT JOIN buildings b ON r.building_id = b.id
+      WHERE dl.transaction_date BETWEEN $1 AND $2
+      ORDER BY dl.transaction_date ASC
+    `;
+    
+    const depositsResult = await client.query(depositsQuery, [startDate, endDate]);
+    const transactions = depositsResult.rows;
+    
+    const totalDepositsReceived = transactions
+      .filter((t: any) => t.transaction_type === 'deposit')
+      .reduce((sum: number, t: any) => sum + parseFloat(t.amount || 0), 0);
+    
+    const totalRefundsIssued = transactions
+      .filter((t: any) => t.transaction_type === 'refund')
+      .reduce((sum: number, t: any) => sum + parseFloat(t.amount || 0), 0);
+    
+    const netDepositBalance = totalDepositsReceived - totalRefundsIssued;
+    const totalTransactions = transactions.length;
+    const tenantCount = new Set(transactions.map((t: any) => t.tenant_id).filter(Boolean)).size;
+    
+    const periodMap = new Map<string, {
+      depositsReceived: number;
+      refundsIssued: number;
+      tenantIds: Set<string>;
+    }>();
+    
+    transactions.forEach((transaction: any) => {
+      const date = new Date(transaction.transaction_date);
+      let periodKey: string;
+      
+      switch (periodType) {
+        case 'semi-annual':
+          const half = date.getMonth() < 6 ? 'H1' : 'H2';
+          periodKey = `${half} ${date.getFullYear()}`;
+          break;
+        case 'annual':
+          periodKey = date.getFullYear().toString();
+          break;
+        default:
+          periodKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+      
+      if (!periodMap.has(periodKey)) {
+        periodMap.set(periodKey, {
+          depositsReceived: 0,
+          refundsIssued: 0,
+          tenantIds: new Set(),
+        });
+      }
+      
+      const period = periodMap.get(periodKey)!;
+      if (transaction.transaction_type === 'deposit') {
+        period.depositsReceived += parseFloat(transaction.amount || 0);
+      } else if (transaction.transaction_type === 'refund') {
+        period.refundsIssued += parseFloat(transaction.amount || 0);
+      }
+      
+      if (transaction.tenant_id) {
+        period.tenantIds.add(transaction.tenant_id);
+      }
+    });
+    
+    const byPeriod = Array.from(periodMap.entries())
+      .map(([period, data]) => ({
+        period,
+        depositsReceived: data.depositsReceived,
+        refundsIssued: data.refundsIssued,
+        netAmount: data.depositsReceived - data.refundsIssued,
+        tenantCount: data.tenantIds.size,
+      }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+    
+    const buildingMap = new Map<string, {
+      buildingName: string;
+      depositsReceived: number;
+      refundsIssued: number;
+    }>();
+    
+    transactions.forEach((transaction: any) => {
+      if (!transaction.building_id) return;
+      
+      const buildingKey = transaction.building_id;
+      if (!buildingMap.has(buildingKey)) {
+        buildingMap.set(buildingKey, {
+          buildingName: transaction.building_name || 'Unknown',
+          depositsReceived: 0,
+          refundsIssued: 0,
+        });
+      }
+      
+      const building = buildingMap.get(buildingKey)!;
+      if (transaction.transaction_type === 'deposit') {
+        building.depositsReceived += parseFloat(transaction.amount || 0);
+      } else if (transaction.transaction_type === 'refund') {
+        building.refundsIssued += parseFloat(transaction.amount || 0);
+      }
+    });
+    
+    const byBuilding = Array.from(buildingMap.entries())
+      .map(([buildingId, data]) => ({
+        buildingId,
+        buildingName: data.buildingName,
+        depositsReceived: data.depositsReceived,
+        refundsIssued: data.refundsIssued,
+        netAmount: data.depositsReceived - data.refundsIssued,
+      }))
+      .sort((a, b) => b.depositsReceived - a.depositsReceived);
+    
+    const tenantMap = new Map<string, {
+      tenantName: string;
+      depositsReceived: number;
+      refundsIssued: number;
+    }>();
+    
+    transactions.forEach((transaction: any) => {
+      if (!transaction.tenant_id) return;
+      
+      const tenantKey = transaction.tenant_id;
+      if (!tenantMap.has(tenantKey)) {
+        tenantMap.set(tenantKey, {
+          tenantName: transaction.first_name && transaction.last_name
+            ? `${transaction.first_name} ${transaction.last_name}`
+            : 'Unknown',
+          depositsReceived: 0,
+          refundsIssued: 0,
+        });
+      }
+      
+      const tenant = tenantMap.get(tenantKey)!;
+      if (transaction.transaction_type === 'deposit') {
+        tenant.depositsReceived += parseFloat(transaction.amount || 0);
+      } else if (transaction.transaction_type === 'refund') {
+        tenant.refundsIssued += parseFloat(transaction.amount || 0);
+      }
+    });
+    
+    const byTenant = Array.from(tenantMap.entries())
+      .map(([tenantId, data]) => ({
+        tenantId,
+        tenantName: data.tenantName,
+        depositsReceived: data.depositsReceived,
+        refundsIssued: data.refundsIssued,
+        netAmount: data.depositsReceived - data.refundsIssued,
+      }))
+      .sort((a, b) => b.depositsReceived - a.depositsReceived)
+      .slice(0, 50);
+    
+    return {
+      summary: {
+        totalDepositsReceived,
+        totalRefundsIssued,
+        netDepositBalance,
+        totalTransactions,
+        tenantCount,
+        period: `${startDate} to ${endDate}`,
+      },
+      byPeriod,
+      byBuilding,
+      byTenant,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Generate Vacant Rooms Report
+ */
+export async function generateVacantRoomsReport(
+  filters?: { buildingId?: string }
+): Promise<VacantRoomsReportData> {
+  const client = await pool.connect();
+  
+  try {
+    let query = `
+      SELECT 
+        r.id,
+        r.room_number,
+        r.floor_number,
+        r.room_type,
+        r.monthly_rate,
+        r.room_status,
+        b.id as building_id,
+        b.name as building_name,
+        b.address_line1,
+        b.city,
+        CASE 
+          WHEN tra.end_date IS NOT NULL THEN (CURRENT_DATE - tra.end_date)
+          ELSE NULL
+        END as days_vacant,
+        t.first_name || ' ' || t.last_name as last_tenant_name
+      FROM rooms r
+      INNER JOIN buildings b ON r.building_id = b.id
+      LEFT JOIN tenant_room_assignments tra ON r.id = tra.room_id 
+        AND tra.assignment_status = 'active'
+      LEFT JOIN tenants t ON tra.tenant_id = t.id
+      WHERE r.room_status = 'vacant' AND r.is_active = true
+    `;
+    
+    const params: any[] = [];
+    if (filters?.buildingId) {
+      query += ` AND b.id = $1`;
+      params.push(filters.buildingId);
+    }
+    
+    query += ` ORDER BY b.name, r.room_number`;
+    
+    const result = await client.query(query, params);
+    
+    const rooms = result.rows.map(row => ({
+      id: row.id,
+      roomNumber: row.room_number,
+      buildingName: row.building_name,
+      buildingId: row.building_id,
+      floorNumber: row.floor_number,
+      roomType: row.room_type,
+      monthlyRate: parseFloat(row.monthly_rate || 0),
+      daysVacant: row.days_vacant ? parseInt(row.days_vacant) : undefined,
+      lastTenantName: row.last_tenant_name || undefined,
+      maintenanceStatus: row.room_status,
+    }));
+    
+    const totalRoomsQuery = `
+      SELECT COUNT(*) as total
+      FROM rooms
+      WHERE is_active = true
+      ${filters?.buildingId ? 'AND building_id = $1' : ''}
+    `;
+    
+    const totalRoomsResult = await client.query(totalRoomsQuery, filters?.buildingId ? [filters.buildingId] : []);
+    const totalRooms = parseInt(totalRoomsResult.rows[0].total || 0);
+    
+    const totalVacant = rooms.length;
+    const vacancyRate = totalRooms > 0 ? (totalVacant / totalRooms) * 100 : 0;
+    const averageMonthlyRate = rooms.length > 0
+      ? rooms.reduce((sum, r) => sum + r.monthlyRate, 0) / rooms.length
+      : 0;
+    const totalPotentialRevenue = rooms.reduce((sum, r) => sum + r.monthlyRate, 0);
+    
+    return {
+      summary: {
+        totalVacant,
+        totalRooms,
+        vacancyRate,
+        averageMonthlyRate,
+        totalPotentialRevenue,
+      },
+      rooms,
+    };
+  } finally {
+    client.release();
+  }
+}

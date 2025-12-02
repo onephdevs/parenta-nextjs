@@ -5,7 +5,11 @@ import {
   generateRevenueReportExcel,
   generatePaymentHistoryReportExcel,
   generateOccupancyReportExcel,
-  generateExpenseReportExcel
+  generateExpenseReportExcel,
+  generateTenantListReportExcel,
+  generateCollectedAmountReportExcel,
+  generateDepositReportExcel,
+  generateVacantRoomsReportExcel
 } from '@/lib/services/excel-export-service';
 
 export async function POST(request: NextRequest) {
@@ -43,6 +47,18 @@ export async function POST(request: NextRequest) {
         break;
       case 'expenses':
         excelBuffer = await generateExpenseReportExcel(data);
+        break;
+      case 'tenant-list':
+        excelBuffer = await generateTenantListReportExcel(data);
+        break;
+      case 'collected-amount':
+        excelBuffer = await generateCollectedAmountReportExcel(data);
+        break;
+      case 'deposits':
+        excelBuffer = await generateDepositReportExcel(data);
+        break;
+      case 'vacant-rooms':
+        excelBuffer = await generateVacantRoomsReportExcel(data);
         break;
       default:
         return NextResponse.json(

@@ -153,6 +153,10 @@ export interface TenantRoomAssignment {
   endDate?: Date;
   monthlyRate: number;
   depositPaid?: number;
+  advancePaid?: number;
+  utilityDepositPaid?: number;
+  depositValidUntil?: Date;
+  depositRefundable?: boolean;
   assignmentStatus: 'active' | 'terminated' | 'pending';
   notes?: string;
   createdAt: Date;
@@ -167,6 +171,9 @@ export interface Reservation {
   expiryDate: Date;
   monthlyRate: number;
   reservationDeposit: number;
+  advanceAmount?: number;
+  utilityDepositAmount?: number;
+  depositValidUntil?: Date;
   depositPaymentId?: string;
   reservationStatus: 'active' | 'converted' | 'expired' | 'cancelled';
   convertedToAssignmentId?: string;
@@ -192,7 +199,47 @@ export interface CreateReservationData {
   expiryDate: Date;
   monthlyRate: number;
   reservationDeposit: number;
+  advanceAmount?: number;
+  utilityDepositAmount?: number;
   notes?: string;
+}
+
+// Building Deposit Configuration Types
+export interface BuildingDepositConfig {
+  id: string;
+  buildingId: string;
+  depositMonths: number;
+  depositType: 'fixed' | 'percentage' | 'months';
+  depositAmount?: number;
+  depositPercentage?: number;
+  advanceMonths: number;
+  advanceType: 'fixed' | 'percentage' | 'months';
+  advanceAmount?: number;
+  advancePercentage?: number;
+  utilityDepositAmount: number;
+  depositValidityDays: number;
+  depositRefundableAfterDays: number;
+  minimumDepositAmount: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateBuildingDepositConfigData {
+  buildingId: string;
+  depositMonths?: number;
+  depositType?: 'fixed' | 'percentage' | 'months';
+  depositAmount?: number;
+  depositPercentage?: number;
+  advanceMonths?: number;
+  advanceType?: 'fixed' | 'percentage' | 'months';
+  advanceAmount?: number;
+  advancePercentage?: number;
+  utilityDepositAmount?: number;
+  depositValidityDays?: number;
+  depositRefundableAfterDays?: number;
+  minimumDepositAmount?: number;
+  isActive?: boolean;
 }
 
 export interface DatabaseTenantRoomAssignment {
@@ -203,6 +250,10 @@ export interface DatabaseTenantRoomAssignment {
   end_date?: Date;
   monthly_rate: number;
   deposit_paid?: number;
+  advance_paid?: number;
+  utility_deposit_paid?: number;
+  deposit_valid_until?: Date;
+  deposit_refundable?: boolean;
   assignment_status: 'active' | 'terminated' | 'pending';
   notes?: string;
   created_at: Date;
