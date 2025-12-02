@@ -28,6 +28,18 @@ export default async function ReportsPage() {
       color: 'blue',
       reports: [
         {
+          name: 'Collected Amount Report',
+          description: 'Received/Collected amount per month, quarter, six months, annual',
+          href: '/admin/reports/collected-amount',
+          icon: DollarSign
+        },
+        {
+          name: 'Deposit Report',
+          description: 'Total deposit received per month, six months, annual',
+          href: '/admin/reports/deposits',
+          icon: DollarSign
+        },
+        {
           name: 'Comprehensive Financial Report',
           description: 'Complete financial overview with trends',
           href: '/admin/financial/reports',
@@ -66,6 +78,12 @@ export default async function ReportsPage() {
       color: 'green',
       reports: [
         {
+          name: 'Vacant Rooms Report',
+          description: 'List of vacant rooms/apartments',
+          href: '/admin/reports/vacant-rooms',
+          icon: Home
+        },
+        {
           name: 'Occupancy Report',
           description: 'Room occupancy rates and trends',
           href: '/admin/analytics?view=occupancy',
@@ -91,6 +109,12 @@ export default async function ReportsPage() {
       icon: Users,
       color: 'purple',
       reports: [
+        {
+          name: 'Tenant List Report',
+          description: 'List of tenants with balances and past due status',
+          href: '/admin/reports/tenant-list',
+          icon: Users
+        },
         {
           name: 'Tenant Summary',
           description: 'Overview of all active tenants',
