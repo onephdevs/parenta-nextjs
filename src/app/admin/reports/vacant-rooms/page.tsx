@@ -16,9 +16,12 @@ import {
   Home,
   Building2
 } from 'lucide-react';
+import { useNotifications } from '@/context/NotificationContext';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function VacantRoomsReportPage() {
   const { data: session, status } = useSession();
+  const { showNotification } = useNotifications();
   const [buildingId, setBuildingId] = useState<string>('');
   const [buildings, setBuildings] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -57,12 +60,25 @@ export default function VacantRoomsReportPage() {
 
       if (data.success) {
         setReportData(data.data);
+        showNotification({
+          type: 'success',
+          title: 'Report Generated',
+          message: 'Vacant rooms report generated successfully',
+        });
       } else {
-        alert(data.error || 'Failed to generate report');
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to generate report',
+        });
       }
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Failed to generate report');
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to generate report. Please try again.',
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -70,7 +86,11 @@ export default function VacantRoomsReportPage() {
 
   const handleExport = async (format: 'excel' | 'pdf') => {
     if (!reportData) {
-      alert('Please generate the report first');
+      showNotification({
+        type: 'warning',
+        title: 'No Data',
+        message: 'Please generate the report first',
+      });
       return;
     }
 
@@ -99,12 +119,25 @@ export default function VacantRoomsReportPage() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        showNotification({
+          type: 'success',
+          title: 'Export Successful',
+          message: `Report exported as ${format.toUpperCase()}`,
+        });
       } else {
-        alert('Failed to export report');
+        showNotification({
+          type: 'error',
+          title: 'Export Failed',
+          message: 'Failed to export report',
+        });
       }
     } catch (error) {
       console.error('Error exporting report:', error);
-      alert('Failed to export report');
+      showNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export report',
+      });
     } finally {
       setIsExporting(false);
     }
@@ -323,7 +356,14 @@ export default function VacantRoomsReportPage() {
           </div>
         )}
 
-        {!reportData && (
+        {isGenerating && (
+          <div className="space-y-6">
+            <SkeletonCard showHeader={true} lines={4} />
+            <SkeletonCard showHeader={true} lines={8} />
+          </div>
+        )}
+
+        {!reportData && !isGenerating && (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <Home className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">Generate a report to view vacant rooms data</p>

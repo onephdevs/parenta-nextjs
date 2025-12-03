@@ -16,9 +16,12 @@ import {
   Printer,
   DollarSign
 } from 'lucide-react';
+import { useNotifications } from '@/context/NotificationContext';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function CollectedAmountReportPage() {
   const { data: session, status } = useSession();
+  const { showNotification } = useNotifications();
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [periodType, setPeriodType] = useState<'monthly' | 'quarterly' | 'semi-annual' | 'annual'>('monthly');
@@ -42,7 +45,11 @@ export default function CollectedAmountReportPage() {
 
   const handleGenerateReport = async () => {
     if (!startDate || !endDate) {
-      alert('Please select both start and end dates');
+      showNotification({
+        type: 'warning',
+        title: 'Date Required',
+        message: 'Please select both start and end dates',
+      });
       return;
     }
     
@@ -65,12 +72,25 @@ export default function CollectedAmountReportPage() {
 
       if (data.success) {
         setReportData(data.data);
+        showNotification({
+          type: 'success',
+          title: 'Report Generated',
+          message: 'Collected amount report generated successfully',
+        });
       } else {
-        alert(data.error || 'Failed to generate report');
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to generate report',
+        });
       }
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Failed to generate report. Please try again.');
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to generate report. Please try again.',
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -78,7 +98,11 @@ export default function CollectedAmountReportPage() {
 
   const handleExport = async (format: 'excel' | 'pdf') => {
     if (!reportData) {
-      alert('Please generate the report first');
+      showNotification({
+        type: 'warning',
+        title: 'No Data',
+        message: 'Please generate the report first',
+      });
       return;
     }
 
@@ -107,12 +131,25 @@ export default function CollectedAmountReportPage() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        showNotification({
+          type: 'success',
+          title: 'Export Successful',
+          message: `Report exported as ${format.toUpperCase()}`,
+        });
       } else {
-        alert('Failed to export report');
+        showNotification({
+          type: 'error',
+          title: 'Export Failed',
+          message: 'Failed to export report',
+        });
       }
     } catch (error) {
       console.error('Error exporting report:', error);
-      alert('Failed to export report');
+      showNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export report',
+      });
     } finally {
       setIsExporting(false);
     }
@@ -196,6 +233,96 @@ export default function CollectedAmountReportPage() {
             <Filter className="h-5 w-5 text-gray-600 mr-2" />
             <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
           </div>
+          
+          {/* Date Presets */}
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                const today = new Date();
+                const last7Days = new Date();
+                last7Days.setDate(today.getDate() - 7);
+                setStartDate(last7Days.toISOString().split('T')[0]);
+                setEndDate(today.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              Last 7 Days
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const last30Days = new Date();
+                last30Days.setDate(today.getDate() - 30);
+                setStartDate(last30Days.toISOString().split('T')[0]);
+                setEndDate(today.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const lastMonth = new Date();
+                lastMonth.setMonth(today.getMonth() - 1);
+                lastMonth.setDate(1);
+                const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                setStartDate(lastMonth.toISOString().split('T')[0]);
+                setEndDate(lastDayOfMonth.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              Last Month
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const last3Months = new Date();
+                last3Months.setMonth(today.getMonth() - 3);
+                setStartDate(last3Months.toISOString().split('T')[0]);
+                setEndDate(today.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              Last 3 Months
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const last6Months = new Date();
+                last6Months.setMonth(today.getMonth() - 6);
+                setStartDate(last6Months.toISOString().split('T')[0]);
+                setEndDate(today.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              Last 6 Months
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const thisYear = new Date(today.getFullYear(), 0, 1);
+                setStartDate(thisYear.toISOString().split('T')[0]);
+                setEndDate(today.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              This Year
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const lastYear = new Date(today.getFullYear() - 1, 0, 1);
+                const lastYearEnd = new Date(today.getFullYear() - 1, 11, 31);
+                setStartDate(lastYear.toISOString().split('T')[0]);
+                setEndDate(lastYearEnd.toISOString().split('T')[0]);
+              }}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+            >
+              Last Year
+            </button>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -373,7 +500,14 @@ export default function CollectedAmountReportPage() {
           </div>
         )}
 
-        {!reportData && (
+        {isGenerating && (
+          <div className="space-y-6">
+            <SkeletonCard showHeader={true} lines={4} />
+            <SkeletonCard showHeader={true} lines={6} />
+          </div>
+        )}
+
+        {!reportData && !isGenerating && (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">Generate a report to view collected amount data</p>
