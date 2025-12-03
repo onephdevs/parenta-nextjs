@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building } from '@/types/database';
 import { useNotifications } from '@/context/NotificationContext';
 import FullScreenModal from '@/components/ui/FullScreenModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import BuildingDepositConfigComponent from '@/components/features/BuildingDepositConfig';
 
 interface EditBuildingModalProps {
   building: Building;
@@ -42,11 +41,72 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
     amenities: amenitiesString
   });
 
+  // Deposit config state
+  const [depositConfig, setDepositConfig] = useState<any>(null);
+  const [depositFormData, setDepositFormData] = useState({
+    depositMonths: 1,
+    depositType: 'months' as 'fixed' | 'percentage' | 'months',
+    depositAmount: undefined as number | undefined,
+    depositPercentage: undefined as number | undefined,
+    advanceMonths: 1,
+    advanceType: 'months' as 'fixed' | 'percentage' | 'months',
+    advanceAmount: undefined as number | undefined,
+    advancePercentage: undefined as number | undefined,
+    utilityDepositAmount: 0,
+    depositValidityDays: 5,
+    depositRefundableAfterDays: 5,
+    minimumDepositAmount: 3000,
+  });
+
+  // Load deposit config when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchDepositConfig();
+    }
+  }, [isOpen, building.id]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: name === 'yearBuilt' || name === 'totalFloors' ? (value ? parseInt(value) : undefined) : value
+    }));
+  };
+
+  const fetchDepositConfig = async () => {
+    try {
+      const response = await fetch(`/api/building-deposit-config/${building.id}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setDepositConfig(result.data);
+        setDepositFormData({
+          depositMonths: result.data.depositMonths || 1,
+          depositType: result.data.depositType || 'months',
+          depositAmount: result.data.depositAmount,
+          depositPercentage: result.data.depositPercentage,
+          advanceMonths: result.data.advanceMonths || 1,
+          advanceType: result.data.advanceType || 'months',
+          advanceAmount: result.data.advanceAmount,
+          advancePercentage: result.data.advancePercentage,
+          utilityDepositAmount: result.data.utilityDepositAmount || 0,
+          depositValidityDays: result.data.depositValidityDays || 5,
+          depositRefundableAfterDays: result.data.depositRefundableAfterDays || 5,
+          minimumDepositAmount: result.data.minimumDepositAmount || 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching deposit config:', error);
+    }
+  };
+
+  const handleDepositConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setDepositFormData(prev => ({
+      ...prev,
+      [name]: name.includes('Months') || name.includes('Days') || name.includes('Amount') || name.includes('Percentage')
+        ? (value ? parseFloat(value) : undefined)
+        : value
     }));
   };
 
@@ -67,7 +127,8 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
         ? formData.amenities.split(',').map(a => a.trim()).filter(a => a.length > 0)
         : [];
 
-      const response = await fetch(`/api/buildings/${building.id}`, {
+      // Update building
+      const buildingResponse = await fetch(`/api/buildings/${building.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -78,10 +139,27 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
         }),
       });
 
-      const result = await response.json();
+      const buildingResult = await buildingResponse.json();
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update building');
+      if (!buildingResult.success) {
+        throw new Error(buildingResult.error || 'Failed to update building');
+      }
+
+      // Save deposit config
+      try {
+        await fetch('/api/building-deposit-config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            buildingId: building.id,
+            ...depositFormData,
+          }),
+        });
+      } catch (depositError) {
+        console.error('Error saving deposit config:', depositError);
+        // Don't fail the whole update if deposit config fails
       }
 
       updateNotification(loadingNotificationId, {
@@ -468,10 +546,256 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
               Configure deposit, advance payment, and utility deposit requirements for this building. 
               Rooms will inherit these settings unless configured individually.
             </p>
-            <BuildingDepositConfigComponent 
-              buildingId={building.id} 
-              showAsSection={false}
-            />
+            
+            <div className="space-y-6">
+              {/* Deposit Requirements */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-4">Deposit Requirements</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="depositType" className="block text-sm font-medium text-gray-900 mb-2">
+                      Deposit Type
+                    </label>
+                    <select
+                      id="depositType"
+                      name="depositType"
+                      value={depositFormData.depositType}
+                      onChange={handleDepositConfigChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="months">Months of Rent</option>
+                      <option value="fixed">Fixed Amount</option>
+                      <option value="percentage">Percentage</option>
+                    </select>
+                  </div>
+
+                  {depositFormData.depositType === 'months' && (
+                    <div>
+                      <label htmlFor="depositMonths" className="block text-sm font-medium text-gray-900 mb-2">
+                        Deposit Months
+                      </label>
+                      <input
+                        type="number"
+                        id="depositMonths"
+                        name="depositMonths"
+                        min="0"
+                        step="0.5"
+                        value={depositFormData.depositMonths}
+                        onChange={handleDepositConfigChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 2"
+                      />
+                      <p className="mt-1 text-xs text-gray-900">Number of months (e.g., 2 = 2 months rent)</p>
+                    </div>
+                  )}
+
+                  {depositFormData.depositType === 'fixed' && (
+                    <div>
+                      <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-900 mb-2">
+                        Deposit Amount
+                      </label>
+                      <input
+                        type="number"
+                        id="depositAmount"
+                        name="depositAmount"
+                        min="0"
+                        step="0.01"
+                        value={depositFormData.depositAmount || ''}
+                        onChange={handleDepositConfigChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 9600"
+                      />
+                    </div>
+                  )}
+
+                  {depositFormData.depositType === 'percentage' && (
+                    <div>
+                      <label htmlFor="depositPercentage" className="block text-sm font-medium text-gray-900 mb-2">
+                        Deposit Percentage
+                      </label>
+                      <input
+                        type="number"
+                        id="depositPercentage"
+                        name="depositPercentage"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={depositFormData.depositPercentage || ''}
+                        onChange={handleDepositConfigChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 50"
+                      />
+                      <p className="mt-1 text-xs text-gray-900">Percentage of monthly rent</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label htmlFor="minimumDepositAmount" className="block text-sm font-medium text-gray-900 mb-2">
+                      Minimum Deposit Amount
+                    </label>
+                    <input
+                      type="number"
+                      id="minimumDepositAmount"
+                      name="minimumDepositAmount"
+                      min="0"
+                      step="0.01"
+                      value={depositFormData.minimumDepositAmount}
+                      onChange={handleDepositConfigChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="e.g., 3000"
+                    />
+                    <p className="mt-1 text-xs text-gray-900">Minimum required deposit (default: 3,000)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advance Configuration */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-4">Advance Payment Requirements</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="advanceType" className="block text-sm font-medium text-gray-900 mb-2">
+                      Advance Type
+                    </label>
+                    <select
+                      id="advanceType"
+                      name="advanceType"
+                      value={depositFormData.advanceType}
+                      onChange={handleDepositConfigChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="months">Months of Rent</option>
+                      <option value="fixed">Fixed Amount</option>
+                      <option value="percentage">Percentage</option>
+                    </select>
+                  </div>
+
+                  {depositFormData.advanceType === 'months' && (
+                    <div>
+                      <label htmlFor="advanceMonths" className="block text-sm font-medium text-gray-900 mb-2">
+                        Advance Months
+                      </label>
+                      <input
+                        type="number"
+                        id="advanceMonths"
+                        name="advanceMonths"
+                        min="0"
+                        step="0.5"
+                        value={depositFormData.advanceMonths}
+                        onChange={handleDepositConfigChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 1"
+                      />
+                      <p className="mt-1 text-xs text-gray-900">Number of months (e.g., 1 = 1 month rent)</p>
+                    </div>
+                  )}
+
+                  {depositFormData.advanceType === 'fixed' && (
+                    <div>
+                      <label htmlFor="advanceAmount" className="block text-sm font-medium text-gray-900 mb-2">
+                        Advance Amount
+                      </label>
+                      <input
+                        type="number"
+                        id="advanceAmount"
+                        name="advanceAmount"
+                        min="0"
+                        step="0.01"
+                        value={depositFormData.advanceAmount || ''}
+                        onChange={handleDepositConfigChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 4800"
+                      />
+                    </div>
+                  )}
+
+                  {depositFormData.advanceType === 'percentage' && (
+                    <div>
+                      <label htmlFor="advancePercentage" className="block text-sm font-medium text-gray-900 mb-2">
+                        Advance Percentage
+                      </label>
+                      <input
+                        type="number"
+                        id="advancePercentage"
+                        name="advancePercentage"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={depositFormData.advancePercentage || ''}
+                        onChange={handleDepositConfigChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 50"
+                      />
+                      <p className="mt-1 text-xs text-gray-900">Percentage of monthly rent</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Utility Deposit */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-4">Utility Deposit</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="utilityDepositAmount" className="block text-sm font-medium text-gray-900 mb-2">
+                      Utility Deposit Amount
+                    </label>
+                    <input
+                      type="number"
+                      id="utilityDepositAmount"
+                      name="utilityDepositAmount"
+                      min="0"
+                      step="0.01"
+                      value={depositFormData.utilityDepositAmount}
+                      onChange={handleDepositConfigChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="e.g., 1000"
+                    />
+                    <p className="mt-1 text-xs text-gray-900">Fixed utility deposit amount</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deposit Validity */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-4">Deposit Validity Rules</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="depositValidityDays" className="block text-sm font-medium text-gray-900 mb-2">
+                      Deposit Validity (Days)
+                    </label>
+                    <input
+                      type="number"
+                      id="depositValidityDays"
+                      name="depositValidityDays"
+                      min="1"
+                      value={depositFormData.depositValidityDays}
+                      onChange={handleDepositConfigChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="e.g., 5"
+                    />
+                    <p className="mt-1 text-xs text-gray-900">Number of days deposit is valid (default: 5)</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="depositRefundableAfterDays" className="block text-sm font-medium text-gray-900 mb-2">
+                      Non-Refundable After (Days)
+                    </label>
+                    <input
+                      type="number"
+                      id="depositRefundableAfterDays"
+                      name="depositRefundableAfterDays"
+                      min="1"
+                      value={depositFormData.depositRefundableAfterDays}
+                      onChange={handleDepositConfigChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="e.g., 5"
+                    />
+                    <p className="mt-1 text-xs text-gray-900">After this many days, deposit becomes non-refundable (default: 5)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </form>
       </FullScreenModal>
