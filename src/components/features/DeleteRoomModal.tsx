@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 import { Room } from '@/types/database';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface DeleteRoomModalProps {
   room: Room;
@@ -19,10 +20,19 @@ export default function DeleteRoomModal({
   onDelete,
 }: DeleteRoomModalProps) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  
+  // Access code required for room deletion
+  const REQUIRED_ACCESS_CODE = 'DELETE2024';
 
   const handleDelete = async () => {
+    if (accessCode !== REQUIRED_ACCESS_CODE) {
+      return;
+    }
+    
     setIsDeleting(true);
     try {
       await onDelete();
@@ -33,19 +43,21 @@ export default function DeleteRoomModal({
     } finally {
       setIsDeleting(false);
       setConfirmText('');
+      setAccessCode('');
     }
   };
 
   const handleClose = () => {
     if (!isDeleting) {
       setConfirmText('');
+      setAccessCode('');
       onClose();
     }
   };
 
   const isConfirmValid = 
-    confirmText.toLowerCase() === 'delete' || 
-    confirmText === room.roomNumber;
+    (confirmText.toLowerCase() === 'delete' || confirmText === room.roomNumber) &&
+    accessCode === REQUIRED_ACCESS_CODE;
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -121,27 +133,51 @@ export default function DeleteRoomModal({
                       <p><strong>Room Number:</strong> {room.roomNumber}</p>
                       <p><strong>Type:</strong> {room.roomType}</p>
                       <p><strong>Status:</strong> {room.roomStatus}</p>
-                      <p><strong>Monthly Rate:</strong> ₱{parseFloat(room.monthlyRate.toString()).toLocaleString()}</p>
+                      <p><strong>Monthly Rate:</strong> {formatCurrency(parseFloat(room.monthlyRate.toString()))}</p>
                     </div>
                   </div>
 
-                  <div className="mb-6">
-                    <label
-                      htmlFor="confirmText"
-                      className="block text-sm font-medium text-gray-900 mb-2"
-                    >
-                      Type <span className="font-mono font-bold text-red-600">DELETE</span> or Room Number <span className="font-mono font-bold text-red-600">{room.roomNumber}</span> to confirm:
-                    </label>
-                    <input
-                      type="text"
-                      id="confirmText"
-                      value={confirmText}
-                      onChange={(e) => setConfirmText(e.target.value)}
-                      disabled={isDeleting}
-                      placeholder={`Type DELETE or ${room.roomNumber}`}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      autoComplete="off"
-                    />
+                  <div className="mb-6 space-y-4">
+                    <div>
+                      <label
+                        htmlFor="confirmText"
+                        className="block text-sm font-medium text-gray-900 mb-2"
+                      >
+                        Type <span className="font-mono font-bold text-red-600">DELETE</span> or Room Number <span className="font-mono font-bold text-red-600">{room.roomNumber}</span> to confirm:
+                      </label>
+                      <input
+                        type="text"
+                        id="confirmText"
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        disabled={isDeleting}
+                        placeholder={`Type DELETE or ${room.roomNumber}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        autoComplete="off"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label
+                        htmlFor="accessCode"
+                        className="block text-sm font-medium text-gray-900 mb-2"
+                      >
+                        Access Code <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        id="accessCode"
+                        value={accessCode}
+                        onChange={(e) => setAccessCode(e.target.value)}
+                        disabled={isDeleting}
+                        placeholder="Enter access code"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        autoComplete="off"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        An access code is required to delete a room for security purposes.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex space-x-3">

@@ -55,12 +55,20 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
     });
 
     try {
+      // Convert amenities string to array (split by comma, trim whitespace, filter empty)
+      const amenitiesArray = formData.amenities
+        ? String(formData.amenities).split(',').map(a => a.trim()).filter(a => a.length > 0)
+        : [];
+
       const response = await fetch('/api/buildings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          amenities: amenitiesArray
+        }),
       });
 
       const result = await response.json();

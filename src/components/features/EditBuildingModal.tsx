@@ -21,6 +21,11 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Convert amenities array to string for input field
+  const amenitiesString = Array.isArray(building.amenities) 
+    ? building.amenities.join(', ') 
+    : (building.amenities || '');
+
   const [formData, setFormData] = useState({
     name: building.name,
     buildingType: building.buildingType,
@@ -33,7 +38,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
     description: building.description || '',
     yearBuilt: building.yearBuilt,
     totalFloors: building.totalFloors,
-    amenities: building.amenities || []
+    amenities: amenitiesString
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -56,12 +61,20 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
     });
 
     try {
+      // Convert amenities string to array (split by comma, trim whitespace, filter empty)
+      const amenitiesArray = formData.amenities
+        ? formData.amenities.split(',').map(a => a.trim()).filter(a => a.length > 0)
+        : [];
+
       const response = await fetch(`/api/buildings/${building.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          amenities: amenitiesArray
+        }),
       });
 
       const result = await response.json();

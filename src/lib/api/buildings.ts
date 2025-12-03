@@ -173,14 +173,16 @@ export async function createBuilding(buildingData: CreateBuildingData): Promise<
 // Get building statistics
 export async function getBuildingStats() {
   try {
+    // Count rooms directly instead of using stored total_units column
     const query = `
       SELECT 
-        COUNT(*) as total_buildings,
-        COUNT(*) as active_buildings,
-        SUM(total_units) as total_units,
-        SUM(total_units) as active_units
-      FROM buildings
-      WHERE is_active = true
+        COUNT(DISTINCT b.id) as total_buildings,
+        COUNT(DISTINCT b.id) as active_buildings,
+        COUNT(r.id) as total_units,
+        COUNT(r.id) as active_units
+      FROM buildings b
+      LEFT JOIN rooms r ON r.building_id = b.id AND r.is_active = true
+      WHERE b.is_active = true
     `;
     
     const result = await pool.query(query);
