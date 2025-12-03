@@ -581,8 +581,13 @@ export default function TenantAssignmentManager({
                     type="date"
                     value={assignFormData.startDate}
                     onChange={(e) => setAssignFormData({ ...assignFormData, startDate: e.target.value })}
+                    min="2000-01-01"
+                    max="2099-12-31"
                     className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
+                    style={{
+                      colorScheme: 'light',
+                    }}
                   />
                 </div>
 
@@ -729,8 +734,13 @@ export default function TenantAssignmentManager({
                     type="date"
                     value={unassignFormData.endDate}
                     onChange={(e) => setUnassignFormData({ ...unassignFormData, endDate: e.target.value })}
+                    min={unassignFormData.startDate || '2000-01-01'}
+                    max="2099-12-31"
                     className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
+                    style={{
+                      colorScheme: 'light',
+                    }}
                   />
                 </div>
 

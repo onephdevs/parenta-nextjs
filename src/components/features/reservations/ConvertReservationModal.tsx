@@ -171,7 +171,11 @@ export default function ConvertReservationModal({
             value={formData.startDate}
             onChange={handleInputChange}
             min={new Date().toISOString().split('T')[0]}
+            max="2099-12-31"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            style={{
+              colorScheme: 'light',
+            }}
           />
         </div>
 
@@ -186,8 +190,12 @@ export default function ConvertReservationModal({
             name="endDate"
             value={formData.endDate}
             onChange={handleInputChange}
-            min={formData.startDate}
+            min={formData.startDate || '2000-01-01'}
+            max="2099-12-31"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            style={{
+              colorScheme: 'light',
+            }}
           />
           <p className="mt-1 text-sm text-gray-600">
             Leave empty for month-to-month lease

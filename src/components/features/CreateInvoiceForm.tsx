@@ -375,7 +375,12 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   required
                   value={formData.dueDate}
                   onChange={handleInputChange}
+                  min="2000-01-01"
+                  max="2099-12-31"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
               </div>
 
@@ -389,7 +394,12 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   name="billingPeriodStart"
                   value={formData.billingPeriodStart}
                   onChange={handleInputChange}
+                  min="2000-01-01"
+                  max="2099-12-31"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
               </div>
 
@@ -403,7 +413,12 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   name="billingPeriodEnd"
                   value={formData.billingPeriodEnd}
                   onChange={handleInputChange}
+                  min={formData.billingPeriodStart || '2000-01-01'}
+                  max="2099-12-31"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
               </div>
             </div>

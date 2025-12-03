@@ -42,6 +42,11 @@ interface ProfileData {
     assignmentStart: string;
     assignmentEnd?: string;
     monthlyRate: number;
+    depositPaid?: number;
+    advancePaid?: number;
+    utilityDepositPaid?: number;
+    depositValidUntil?: string;
+    depositRefundable?: boolean;
   } | null;
   occupants: Array<{
     id: string;
@@ -201,6 +206,49 @@ export default function ProfilePage() {
                     <p className="text-sm opacity-80">Address</p>
                     <p className="font-semibold">{profileData.roomAssignment.address}</p>
                   </div>
+                  
+                  {/* Deposit and Advance Information */}
+                  {(profileData.roomAssignment.depositPaid || profileData.roomAssignment.advancePaid || profileData.roomAssignment.utilityDepositPaid) && (
+                    <div className="mt-6 pt-6 border-t border-white/20">
+                      <h4 className="text-lg font-semibold mb-3">Deposits & Advance</h4>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {profileData.roomAssignment.depositPaid && (
+                          <div className="bg-white/10 rounded-lg p-3">
+                            <p className="text-sm opacity-80">Deposit</p>
+                            <p className="font-semibold text-lg">
+                              {formatCurrency(profileData.roomAssignment.depositPaid)}
+                            </p>
+                            {profileData.roomAssignment.depositValidUntil && (
+                              <p className="text-xs opacity-70 mt-1">
+                                Valid until: {formatDate(profileData.roomAssignment.depositValidUntil)}
+                              </p>
+                            )}
+                            {profileData.roomAssignment.depositRefundable !== undefined && (
+                              <p className="text-xs opacity-70">
+                                {profileData.roomAssignment.depositRefundable ? '✓ Refundable' : '✗ Non-refundable'}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {profileData.roomAssignment.advancePaid && (
+                          <div className="bg-white/10 rounded-lg p-3">
+                            <p className="text-sm opacity-80">Advance</p>
+                            <p className="font-semibold text-lg">
+                              {formatCurrency(profileData.roomAssignment.advancePaid)}
+                            </p>
+                          </div>
+                        )}
+                        {profileData.roomAssignment.utilityDepositPaid && (
+                          <div className="bg-white/10 rounded-lg p-3">
+                            <p className="text-sm opacity-80">Utility Deposit</p>
+                            <p className="font-semibold text-lg">
+                              {formatCurrency(profileData.roomAssignment.utilityDepositPaid)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -300,7 +300,12 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                   type="date"
                   value={filters.startDate || ''}
                   onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                  min="2000-01-01"
+                  max="2099-12-31"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
               </div>
             </div>

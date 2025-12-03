@@ -349,7 +349,12 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleChange}
+                min="1900-01-01"
+                max={new Date().toISOString().split('T')[0]}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
             <div>
@@ -410,7 +415,12 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
                 required
                 value={formData.moveInDate}
                 onChange={handleChange}
+                min="2000-01-01"
+                max="2099-12-31"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
             <div className="md:col-span-2">

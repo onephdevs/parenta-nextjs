@@ -238,7 +238,12 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                 type="date"
                 value={formatDateForInput(formData.billingPeriodStart)}
                 onChange={(e) => handleInputChange('billingPeriodStart', new Date(e.target.value))}
+                min="2000-01-01"
+                max="2099-12-31"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
 
@@ -250,9 +255,14 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                 type="date"
                 value={formatDateForInput(formData.billingPeriodEnd)}
                 onChange={(e) => handleInputChange('billingPeriodEnd', new Date(e.target.value))}
+                min={formatDateForInput(formData.billingPeriodStart) || '2000-01-01'}
+                max="2099-12-31"
                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                   errors.billingPeriodEnd ? 'border-red-300' : 'border-gray-300'
                 }`}
+                style={{
+                  colorScheme: 'light',
+                }}
               />
               {errors.billingPeriodEnd && (
                 <p className="mt-1 text-sm text-red-600">{errors.billingPeriodEnd}</p>
@@ -293,9 +303,14 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                 type="date"
                 value={formatDateForInput(formData.dueDate)}
                 onChange={(e) => handleInputChange('dueDate', new Date(e.target.value))}
+                min={formatDateForInput(formData.billingPeriodEnd) || '2000-01-01'}
+                max="2099-12-31"
                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                   errors.dueDate ? 'border-red-300' : 'border-gray-300'
                 }`}
+                style={{
+                  colorScheme: 'light',
+                }}
               />
               {errors.dueDate && (
                 <p className="mt-1 text-sm text-red-600">{errors.dueDate}</p>

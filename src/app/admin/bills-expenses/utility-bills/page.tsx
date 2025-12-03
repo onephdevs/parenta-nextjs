@@ -61,12 +61,30 @@ export default function RoomUtilityBillsPage() {
       const response = await fetch('/api/buildings');
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
-          setBuildings(data.data || []);
+        let buildingsList: any[] = [];
+        
+        if (data.success && data.data) {
+          // Handle { success: true, data: { buildings: [...] } } format
+          if (data.data.buildings && Array.isArray(data.data.buildings)) {
+            buildingsList = data.data.buildings;
+          } else if (Array.isArray(data.data)) {
+            buildingsList = data.data;
+          }
+        } else if (Array.isArray(data)) {
+          buildingsList = data;
+        } else if (data.buildings) {
+          buildingsList = data.buildings;
         }
+        
+        setBuildings(buildingsList);
+      } else {
+        // Ensure buildings is always an array even on error
+        setBuildings([]);
       }
     } catch (error) {
       console.error('Error fetching buildings:', error);
+      // Ensure buildings is always an array even on error
+      setBuildings([]);
     }
   };
 
@@ -83,41 +101,56 @@ export default function RoomUtilityBillsPage() {
       const response = await fetch(`/api/utility-bills/room?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        if (data.success) {
-          let filteredBills = data.data.bills || [];
-          
-          // Apply search filter
-          if (searchTerm) {
-            filteredBills = filteredBills.filter((bill: RoomUtilityBill) =>
-              bill.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              bill.buildingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              bill.providerName.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-          }
-
-          // Apply room filter
-          if (roomFilter) {
-            filteredBills = filteredBills.filter((bill: RoomUtilityBill) =>
-              bill.roomId === roomFilter
-            );
-          }
-
-          setBills(filteredBills);
+        let billsToDisplay: RoomUtilityBill[] = [];
+        
+        if (data.success && data.data) {
+          billsToDisplay = data.data.bills || [];
+        } else if (data.bills) {
+          // Handle direct response format
+          billsToDisplay = data.bills;
         }
+        
+        // Apply search filter
+        if (searchTerm) {
+          billsToDisplay = billsToDisplay.filter((bill: RoomUtilityBill) =>
+            (bill.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (bill.buildingName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (bill.providerName || '').toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
+
+        // Apply room filter
+        if (roomFilter) {
+          billsToDisplay = billsToDisplay.filter((bill: RoomUtilityBill) =>
+            bill.roomId === roomFilter
+          );
+        }
+
+        setBills(billsToDisplay);
       } else {
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: 'Failed to fetch room utility bills',
-        });
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch bills:', errorData);
+        try {
+          showNotification({
+            type: 'error',
+            title: 'Error',
+            message: errorData.error || 'Failed to fetch room utility bills',
+          });
+        } catch (e) {
+          console.error('Notification error:', e);
+        }
       }
     } catch (error) {
       console.error('Error fetching bills:', error);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to fetch room utility bills',
-      });
+      try {
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: error instanceof Error ? error.message : 'Failed to fetch room utility bills',
+        });
+      } catch (e) {
+        console.error('Notification error:', e);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -378,9 +411,9 @@ export default function RoomUtilityBillsPage() {
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
                 >
                   <option value="">All Buildings</option>
-                  {buildings.map((building) => (
+                  {buildings && Array.isArray(buildings) && buildings.map((building) => (
                     <option key={building.id} value={building.id}>
-                      {building.name}
+                      {building.name || building.building_name || building.buildingName || 'Unknown'}
                     </option>
                   ))}
                 </select>

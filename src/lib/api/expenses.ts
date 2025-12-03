@@ -29,21 +29,21 @@ export async function getExpenses(
 ): Promise<ExpenseResult> {
   try {
     const offset = (page - 1) * limit;
-    const conditions: string[] = ['e.is_active = true'];
+    const conditions: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
 
     // Search filter (description or vendor)
     if (filters.search) {
       paramCount++;
-      conditions.push(`(e.description ILIKE $${paramCount} OR e.vendor ILIKE $${paramCount})`);
+      conditions.push(`(e.description ILIKE $${paramCount} OR e.vendor_name ILIKE $${paramCount})`);
       values.push(`%${filters.search}%`);
     }
 
     // Category filter
     if (filters.category) {
       paramCount++;
-      conditions.push(`e.expense_category = $${paramCount}`);
+      conditions.push(`e.category = $${paramCount}`);
       values.push(filters.category);
     }
 
@@ -54,17 +54,10 @@ export async function getExpenses(
       values.push(filters.buildingId);
     }
 
-    // Room filter
-    if (filters.roomId) {
-      paramCount++;
-      conditions.push(`e.room_id = $${paramCount}`);
-      values.push(filters.roomId);
-    }
-
     // Vendor filter
     if (filters.vendor) {
       paramCount++;
-      conditions.push(`e.vendor ILIKE $${paramCount}`);
+      conditions.push(`e.vendor_name ILIKE $${paramCount}`);
       values.push(`%${filters.vendor}%`);
     }
 
@@ -101,12 +94,10 @@ export async function getExpenses(
     const query = `
       SELECT 
         e.*,
-        b.building_name,
-        b.address as building_address,
-        r.room_number
+        b.name as building_name,
+        b.address_line1 as building_address
       FROM expenses e
       LEFT JOIN buildings b ON e.building_id = b.id
-      LEFT JOIN rooms r ON e.room_id = r.id
       ${whereClause}
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
@@ -136,13 +127,11 @@ export async function getExpenseById(id: string): Promise<Expense | null> {
     const query = `
       SELECT 
         e.*,
-        b.building_name,
-        b.address as building_address,
-        r.room_number
+        b.name as building_name,
+        b.address_line1 as building_address
       FROM expenses e
       LEFT JOIN buildings b ON e.building_id = b.id
-      LEFT JOIN rooms r ON e.room_id = r.id
-      WHERE e.id = $1 AND e.is_active = true
+      WHERE e.id = $1
     `;
     
     const result = await pool.query(query, [id]);
@@ -165,20 +154,19 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
   try {
     const query = `
       INSERT INTO expenses (
-        building_id, room_id, expense_category, amount, description,
-        vendor, expense_date, receipt_url, notes
+        building_id, category, amount, description,
+        vendor_name, expense_date, receipt_url, notes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
     
     const values = [
       expenseData.buildingId || null,
-      expenseData.roomId || null,
-      expenseData.expenseCategory || 'other',
+      expenseData.expenseCategory || expenseData.category || 'other',
       expenseData.amount,
       expenseData.description,
-      expenseData.vendor || null,
+      expenseData.vendor || expenseData.vendorName || null,
       expenseData.expenseDate || new Date(),
       expenseData.receiptUrl || null,
       expenseData.notes || null,
@@ -202,11 +190,10 @@ export async function updateExpense(
   try {
     const allowedFields = [
       'building_id',
-      'room_id',
-      'expense_category',
+      'category',
       'amount',
       'description',
-      'vendor',
+      'vendor_name',
       'expense_date',
       'receipt_url',
       'notes',
@@ -242,7 +229,7 @@ export async function updateExpense(
     const query = `
       UPDATE expenses
       SET ${setClauses.join(', ')}
-      WHERE id = $${paramCount} AND is_active = true
+      WHERE id = $${paramCount}
       RETURNING *
     `;
 
@@ -266,8 +253,8 @@ export async function deleteExpense(id: string): Promise<void> {
   try {
     const query = `
       UPDATE expenses
-      SET is_active = false, updated_at = NOW()
-      WHERE id = $1 AND is_active = true
+      SET updated_at = NOW()
+      WHERE id = $1
     `;
     
     const result = await pool.query(query, [id]);
@@ -291,7 +278,7 @@ export async function getExpenseSummary(filters: ExpenseFilters = {}): Promise<{
   monthlyTrend: Array<{ month: string; total: number }>;
 }> {
   try {
-    const conditions: string[] = ['is_active = true'];
+    const conditions: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
 
@@ -329,12 +316,12 @@ export async function getExpenseSummary(filters: ExpenseFilters = {}): Promise<{
     // Get category breakdown
     const categoryQuery = `
       SELECT 
-        expense_category as category,
+        category,
         COUNT(*) as count,
         COALESCE(SUM(amount), 0) as total
       FROM expenses
       ${whereClause}
-      GROUP BY expense_category
+      GROUP BY category
       ORDER BY total DESC
     `;
     const categoryResult = await pool.query(categoryQuery, values);
@@ -352,9 +339,29 @@ export async function getExpenseSummary(filters: ExpenseFilters = {}): Promise<{
     `;
     const trendResult = await pool.query(trendQuery, values);
 
+    // Calculate current month's data
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const currentMonthData = trendResult.rows.find(row => row.month === currentMonth);
+    const monthlyAmount = currentMonthData ? parseFloat(currentMonthData.total) : 0;
+    
+    // Get current month expense count
+    const monthlyCountCondition = whereClause 
+      ? `${whereClause} AND TO_CHAR(expense_date, 'YYYY-MM') = $${values.length + 1}`
+      : `WHERE TO_CHAR(expense_date, 'YYYY-MM') = $1`;
+    const monthlyCountQuery = `
+      SELECT COUNT(*) as count
+      FROM expenses
+      ${monthlyCountCondition}
+    `;
+    const monthlyCountValues = whereClause ? [...values, currentMonth] : [currentMonth];
+    const monthlyCountResult = await pool.query(monthlyCountQuery, monthlyCountValues);
+    const monthlyExpenses = parseInt(monthlyCountResult.rows[0]?.count || '0');
+
     return {
       totalExpenses: parseInt(summaryResult.rows[0].total_expenses),
       totalAmount: parseFloat(summaryResult.rows[0].total_amount),
+      monthlyAmount,
+      monthlyExpenses,
       categoryBreakdown: categoryResult.rows.map(row => ({
         category: row.category,
         total: parseFloat(row.total),
@@ -378,21 +385,18 @@ function mapRowToExpense(row: Record<string, unknown>): Expense {
   return {
     id: String(row.id),
     buildingId: row.building_id ? String(row.building_id) : undefined,
-    roomId: row.room_id ? String(row.room_id) : undefined,
-    expenseCategory: String(row.expense_category),
+    expenseCategory: String(row.category || row.expense_category || 'other'),
     amount: Number(row.amount),
     description: String(row.description),
-    vendor: row.vendor ? String(row.vendor) : undefined,
+    vendor: row.vendor_name ? String(row.vendor_name) : (row.vendor ? String(row.vendor) : undefined),
     expenseDate: row.expense_date ? new Date(String(row.expense_date)) : new Date(),
     receiptUrl: row.receipt_url ? String(row.receipt_url) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
-    isActive: Boolean(row.is_active),
     createdAt: new Date(String(row.created_at)),
     updatedAt: new Date(String(row.updated_at)),
     // Additional fields from joins
     buildingName: row.building_name ? String(row.building_name) : undefined,
     buildingAddress: row.building_address ? String(row.building_address) : undefined,
-    roomNumber: row.room_number ? String(row.room_number) : undefined,
   };
 }
 

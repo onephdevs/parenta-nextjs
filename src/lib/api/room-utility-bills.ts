@@ -20,7 +20,7 @@ export async function getRoomUtilityBills(
 ) {
   try {
     const offset = (page - 1) * limit;
-    const conditions: string[] = ['ub.is_active = true', 'ub.room_id IS NOT NULL'];
+    const conditions: string[] = ['ub.room_id IS NOT NULL'];
     const values: unknown[] = [];
     let paramCount = 0;
 
@@ -314,7 +314,7 @@ export async function updateRoomUtilityBill(
     const query = `
       UPDATE utility_bills
       SET ${setClauses.join(', ')}
-      WHERE id = $${paramCount} AND is_active = true AND room_id IS NOT NULL
+      WHERE id = $${paramCount} AND room_id IS NOT NULL
       RETURNING *
     `;
 
@@ -357,8 +357,8 @@ export async function deleteRoomUtilityBill(id: string) {
   try {
     const query = `
       UPDATE utility_bills
-      SET is_active = false, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 AND is_active = true AND room_id IS NOT NULL
+      SET updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1 AND room_id IS NOT NULL
     `;
     
     const result = await pool.query(query, [id]);

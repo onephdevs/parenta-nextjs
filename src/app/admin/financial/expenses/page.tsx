@@ -65,8 +65,10 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
     summary = {
       totalExpenses: 0,
       totalAmount: 0,
-      byCategory: [],
-      topVendors: []
+      monthlyAmount: 0,
+      monthlyExpenses: 0,
+      categoryBreakdown: [],
+      monthlyTrend: []
     };
   }
 
@@ -244,8 +246,8 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                   <dl>
                     <dt className="text-sm font-medium text-gray-900 truncate">Top Category</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {Object.keys(summary.categoryBreakdown).length > 0 
-                        ? Object.entries(summary.categoryBreakdown).sort(([,a], [,b]) => b.amount - a.amount)[0][0] 
+                      {summary.categoryBreakdown && summary.categoryBreakdown.length > 0 
+                        ? summary.categoryBreakdown[0].category 
                         : 'N/A'}
                     </dd>
                   </dl>
@@ -255,7 +257,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             <div className="bg-gray-50 px-5 py-3">
               <div className="text-sm">
                 <span className="text-gray-900">
-                  {Object.keys(summary.categoryBreakdown).length} categories
+                  {summary.categoryBreakdown && summary.categoryBreakdown.length} categories
                 </span>
               </div>
             </div>

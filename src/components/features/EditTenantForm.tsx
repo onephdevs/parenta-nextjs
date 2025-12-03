@@ -427,7 +427,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleInputChange}
+                min="1900-01-01"
+                max={new Date().toISOString().split('T')[0]}
                 className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
 
@@ -623,7 +628,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="leaseStartDate"
                 value={formData.leaseStartDate}
                 onChange={handleInputChange}
+                min="2000-01-01"
+                max="2099-12-31"
                 className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
 
@@ -637,7 +647,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="leaseEndDate"
                 value={formData.leaseEndDate}
                 onChange={handleInputChange}
+                min={formData.leaseStartDate || '2000-01-01'}
+                max="2099-12-31"
                 className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
 
@@ -651,7 +666,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="moveInDate"
                 value={formData.moveInDate}
                 onChange={handleInputChange}
+                min="2000-01-01"
+                max="2099-12-31"
                 className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
 
@@ -665,7 +685,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="moveOutDate"
                 value={formData.moveOutDate}
                 onChange={handleInputChange}
+                min={formData.moveInDate || '2000-01-01'}
+                max="2099-12-31"
                 className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
           </div>

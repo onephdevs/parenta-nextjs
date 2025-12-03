@@ -191,6 +191,11 @@ export async function getTenantCompleteData(userId: string) {
       tra.start_date as assignment_start,
       tra.end_date as assignment_end,
       tra.monthly_rate,
+      tra.deposit_paid,
+      tra.advance_paid,
+      tra.utility_deposit_paid,
+      tra.deposit_valid_until,
+      tra.deposit_refundable,
       
       -- Room details
       r.id as room_id,

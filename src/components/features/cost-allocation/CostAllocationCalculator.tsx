@@ -334,7 +334,11 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                   dueDate: e.target.value ? new Date(e.target.value) : undefined 
                 })}
                 min={new Date().toISOString().split('T')[0]}
+                max="2099-12-31"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
 

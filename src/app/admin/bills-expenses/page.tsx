@@ -45,6 +45,15 @@ interface RecentExpense {
 
 export default function BillsExpensesPage() {
   const { showNotification } = useNotifications();
+  
+  // Safe notification wrapper
+  const safeShowNotification = (notification: Parameters<typeof showNotification>[0]) => {
+    try {
+      showNotification(notification);
+    } catch (error) {
+      console.error('Notification error:', error);
+    }
+  };
   const [summary, setSummary] = useState<Summary>({
     totalBills: 0,
     totalBillsAmount: 0,
@@ -59,29 +68,52 @@ export default function BillsExpensesPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
       // Fetch room utility bills
-      const billsResponse = await fetch('/api/utility-bills/room?limit=5');
       let billsData = { bills: [], total: 0 };
-      if (billsResponse.ok) {
-        const billsResult = await billsResponse.json();
-        if (billsResult.success) {
-          billsData = billsResult.data;
+      try {
+        const billsResponse = await fetch('/api/utility-bills/room?limit=5');
+        if (billsResponse.ok) {
+          const billsResult = await billsResponse.json();
+          if (billsResult.success && billsResult.data) {
+            billsData = billsResult.data;
+          } else if (billsResult.bills) {
+            // Handle direct response format
+            billsData = billsResult;
+          }
+        } else {
+          // Handle error response (e.g., 401, 500)
+          console.warn('Bills API returned non-OK status:', billsResponse.status);
         }
+      } catch (billsError) {
+        console.error('Error fetching bills:', billsError);
+        // Continue with empty bills data
       }
 
       // Fetch expenses
-      const expensesResponse = await fetch('/api/expenses?limit=5');
       let expensesData = { expenses: [], total: 0 };
-      if (expensesResponse.ok) {
-        const expensesResult = await expensesResponse.json();
-        if (expensesResult.success) {
-          expensesData = expensesResult.data;
+      try {
+        const expensesResponse = await fetch('/api/expenses?limit=5');
+        if (expensesResponse.ok) {
+          const expensesResult = await expensesResponse.json();
+          if (expensesResult.success && expensesResult.data) {
+            expensesData = expensesResult.data;
+          } else if (expensesResult.expenses !== undefined) {
+            // Handle direct response format
+            expensesData = expensesResult;
+          }
+        } else {
+          // Handle error response (e.g., 401, 500)
+          console.warn('Expenses API returned non-OK status:', expensesResponse.status);
         }
+      } catch (expensesError) {
+        console.error('Error fetching expenses:', expensesError);
+        // Continue with empty expenses data
       }
 
       // Calculate summary
@@ -96,7 +128,7 @@ export default function BillsExpensesPage() {
       const currentMonth = new Date();
       currentMonth.setDate(1);
       const monthlyExpenses = (expensesData.expenses || []).filter((exp: any) => {
-        const expDate = new Date(exp.expenseDate);
+        const expDate = new Date(exp.expenseDate || exp.expense_date);
         return expDate >= currentMonth;
       }).reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
 
@@ -110,27 +142,28 @@ export default function BillsExpensesPage() {
       });
 
       setRecentBills((billsData.bills || []).slice(0, 5).map((bill: any) => ({
-        id: bill.id,
-        roomNumber: bill.roomNumber,
-        buildingName: bill.buildingName,
-        utilityType: bill.utilityType,
-        amount: bill.amount,
-        dueDate: bill.dueDate,
-        billStatus: bill.billStatus,
+        id: bill.id || '',
+        roomNumber: bill.roomNumber || bill.room_number || '',
+        buildingName: bill.buildingName || bill.building_name || '',
+        utilityType: bill.utilityType || bill.utility_type || 'electricity',
+        amount: bill.amount || 0,
+        dueDate: bill.dueDate ? (typeof bill.dueDate === 'string' ? bill.dueDate : bill.dueDate.toISOString().split('T')[0]) : (bill.due_date ? new Date(bill.due_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+        billStatus: bill.billStatus || bill.bill_status || 'pending',
       })));
 
       setRecentExpenses((expensesData.expenses || []).slice(0, 5).map((exp: any) => ({
         id: exp.id,
         description: exp.description,
         amount: exp.amount,
-        category: exp.category,
-        expenseDate: exp.expenseDate,
-        buildingName: exp.buildingName,
+        category: exp.expenseCategory || exp.category || 'other',
+        expenseDate: exp.expenseDate ? (typeof exp.expenseDate === 'string' ? exp.expenseDate : exp.expenseDate.toISOString().split('T')[0]) : (exp.expense_date ? new Date(exp.expense_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+        buildingName: exp.buildingName || exp.building_name,
       })));
 
     } catch (error) {
       console.error('Error fetching data:', error);
-      showNotification({
+      // Only show notification if context is available
+      safeShowNotification({
         type: 'error',
         title: 'Error',
         message: 'Failed to load bills and expenses data',
@@ -156,6 +189,7 @@ export default function BillsExpensesPage() {
   };
 
   const getCategoryBadge = (category: string) => {
+    const normalizedCategory = category.toLowerCase().replace(/\s+/g, '_');
     const colors: Record<string, string> = {
       cleaning: 'bg-blue-100 text-blue-800',
       maintenance: 'bg-red-100 text-red-800',
@@ -169,7 +203,7 @@ export default function BillsExpensesPage() {
       taxes: 'bg-gray-100 text-gray-800',
       other: 'bg-gray-100 text-gray-800',
     };
-    return colors[category] || 'bg-gray-100 text-gray-800';
+    return colors[normalizedCategory] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusBadge = (status: string) => {
@@ -437,7 +471,7 @@ export default function BillsExpensesPage() {
                         <div className="text-sm font-medium text-gray-900">{expense.description}</div>
                         <div className="flex items-center space-x-2 mt-1">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getCategoryBadge(expense.category)}`}>
-                            {expense.category.replace('_', ' ')}
+                            {expense.category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                           </span>
                           {expense.buildingName && (
                             <span className="text-xs text-gray-900">{expense.buildingName}</span>

@@ -270,9 +270,14 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   name="expenseDate"
                   value={formData.expenseDate}
                   onChange={(e) => handleInputChange('expenseDate', e.target.value)}
+                  min="2000-01-01"
+                  max="2099-12-31"
                   className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.expenseDate ? 'border-red-300' : ''
                   }`}
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
                 {errors.expenseDate && (
                   <p className="mt-2 text-sm text-red-600">{errors.expenseDate}</p>

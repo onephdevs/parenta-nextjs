@@ -64,24 +64,39 @@ export default function RoomUtilityBillForm({ initialData, onSubmit, onCancel }:
         const response = await fetch('/api/rooms');
         if (response.ok) {
           const data = await response.json();
-          if (data.success) {
-            // Map rooms to include building name
-            const roomsWithBuilding = (data.data?.rooms || []).map((room: any) => ({
-              id: room.id,
-              roomNumber: room.roomNumber,
-              buildingId: room.buildingId,
-              buildingName: room.buildingName || 'Unknown Building',
-            }));
-            setRooms(roomsWithBuilding);
+          let roomsList: any[] = [];
+          
+          if (data.success && data.data) {
+            // Handle { success: true, data: [...] } format
+            roomsList = Array.isArray(data.data) ? data.data : [];
+          } else if (Array.isArray(data)) {
+            // Handle direct array format
+            roomsList = data;
+          } else if (data.rooms) {
+            // Handle { rooms: [...] } format
+            roomsList = data.rooms;
           }
+          
+          // Map rooms to include building name
+          const roomsWithBuilding = roomsList.map((room: any) => ({
+            id: room.id,
+            roomNumber: room.roomNumber || room.room_number,
+            buildingId: room.buildingId || room.building_id,
+            buildingName: room.buildingName || room.building_name || 'Unknown Building',
+          }));
+          setRooms(roomsWithBuilding);
         }
       } catch (error) {
         console.error('Error loading rooms:', error);
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: 'Failed to load rooms',
-        });
+        try {
+          showNotification({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to load rooms',
+          });
+        } catch (e) {
+          console.error('Notification error:', e);
+        }
       }
     };
 
@@ -355,9 +370,14 @@ export default function RoomUtilityBillForm({ initialData, onSubmit, onCancel }:
                   name="billingPeriodStart"
                   value={formData.billingPeriodStart}
                   onChange={(e) => handleInputChange('billingPeriodStart', e.target.value)}
+                  min="2000-01-01"
+                  max="2099-12-31"
                   className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.billingPeriodStart ? 'border-red-300' : ''
                   }`}
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
                 {errors.billingPeriodStart && (
                   <p className="mt-2 text-sm text-red-600">{errors.billingPeriodStart}</p>
@@ -375,9 +395,14 @@ export default function RoomUtilityBillForm({ initialData, onSubmit, onCancel }:
                   name="billingPeriodEnd"
                   value={formData.billingPeriodEnd}
                   onChange={(e) => handleInputChange('billingPeriodEnd', e.target.value)}
+                  min={formData.billingPeriodStart || '2000-01-01'}
+                  max="2099-12-31"
                   className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.billingPeriodEnd ? 'border-red-300' : ''
                   }`}
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
                 {errors.billingPeriodEnd && (
                   <p className="mt-2 text-sm text-red-600">{errors.billingPeriodEnd}</p>
@@ -395,9 +420,14 @@ export default function RoomUtilityBillForm({ initialData, onSubmit, onCancel }:
                   name="dueDate"
                   value={formData.dueDate}
                   onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                  min={formData.billingPeriodEnd || '2000-01-01'}
+                  max="2099-12-31"
                   className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                     errors.dueDate ? 'border-red-300' : ''
                   }`}
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
                 {errors.dueDate && (
                   <p className="mt-2 text-sm text-red-600">{errors.dueDate}</p>

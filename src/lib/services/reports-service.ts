@@ -781,7 +781,7 @@ export async function generateExpenseReportByPeriod(
   
   try {
     // Build WHERE clause with filters
-    const conditions: string[] = ['e.expense_date BETWEEN $1 AND $2', 'e.is_active = true'];
+    const conditions: string[] = ['e.expense_date BETWEEN $1 AND $2'];
     const values: unknown[] = [startDate, endDate];
     let paramCount = 2;
 
@@ -797,11 +797,7 @@ export async function generateExpenseReportByPeriod(
       values.push(filters.buildingId);
     }
 
-    if (filters?.roomId) {
-      paramCount++;
-      conditions.push(`e.room_id = $${paramCount}`);
-      values.push(filters.roomId);
-    }
+    // Note: expenses table doesn't have room_id, so roomId filter is ignored
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
@@ -835,11 +831,9 @@ export async function generateExpenseReportByPeriod(
         e.expense_date,
         e.vendor_name,
         e.expense_status,
-        b.name as building_name,
-        r.room_number
+        b.name as building_name
       FROM expenses e
       LEFT JOIN buildings b ON e.building_id = b.id
-      LEFT JOIN rooms r ON e.room_id = r.id
       ${whereClause}
       ORDER BY e.expense_date ASC
     `;
@@ -912,7 +906,6 @@ export async function generateExpenseReportByPeriod(
       FROM buildings b
       LEFT JOIN expenses e ON e.building_id = b.id
         AND e.expense_date BETWEEN $1 AND $2
-        AND e.is_active = true
       WHERE b.is_active = true
       GROUP BY b.id, b.name
       HAVING SUM(e.amount) > 0
@@ -934,7 +927,6 @@ export async function generateExpenseReportByPeriod(
       amount: parseFloat(row.amount),
       category: row.category,
       buildingName: row.building_name,
-      roomNumber: row.room_number,
       expenseDate: row.expense_date,
       vendorName: row.vendor_name,
       expenseStatus: row.expense_status,
@@ -947,6 +939,9 @@ export async function generateExpenseReportByPeriod(
       byBuilding,
       details,
     };
+  } catch (error) {
+    console.error('Error in generateExpenseReportByPeriod:', error);
+    throw error;
   } finally {
     client.release();
   }

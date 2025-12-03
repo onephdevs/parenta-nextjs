@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -21,7 +19,6 @@ import { useNotifications } from '@/context/NotificationContext';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function ExpenseReportsPage() {
-  const { data: session, status } = useSession();
   const { showNotification } = useNotifications();
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -34,10 +31,6 @@ export default function ExpenseReportsPage() {
   const [reportData, setReportData] = useState<any>(null);
 
   useEffect(() => {
-    if (status === 'unauthenticated' || (session && session.user.role !== 'admin')) {
-      redirect('/auth/signin?role=admin');
-    }
-    
     // Set default date range (last month)
     const today = new Date();
     const lastMonth = new Date();
@@ -47,17 +40,35 @@ export default function ExpenseReportsPage() {
     setEndDate(today.toISOString().split('T')[0]);
     
     fetchBuildings();
-  }, [session, status]);
+  }, []);
 
   const fetchBuildings = async () => {
     try {
       const response = await fetch('/api/buildings');
-      const data = await response.json();
-      if (data.success) {
-        setBuildings(data.data || []);
+      if (response.ok) {
+        const data = await response.json();
+        let buildingsList: any[] = [];
+        
+        if (data.success && data.data) {
+          // Handle { success: true, data: { buildings: [...] } } format
+          if (data.data.buildings && Array.isArray(data.data.buildings)) {
+            buildingsList = data.data.buildings;
+          } else if (Array.isArray(data.data)) {
+            buildingsList = data.data;
+          }
+        } else if (Array.isArray(data)) {
+          buildingsList = data;
+        } else if (data.buildings) {
+          buildingsList = data.buildings;
+        }
+        
+        setBuildings(buildingsList);
+      } else {
+        setBuildings([]);
       }
     } catch (error) {
       console.error('Error fetching buildings:', error);
+      setBuildings([]);
     }
   };
 
@@ -339,7 +350,12 @@ export default function ExpenseReportsPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                min="2000-01-01"
+                max="2099-12-31"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
             <div>
@@ -350,7 +366,12 @@ export default function ExpenseReportsPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                min={startDate || '2000-01-01'}
+                max="2099-12-31"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                style={{
+                  colorScheme: 'light',
+                }}
               />
             </div>
             <div>
@@ -395,9 +416,9 @@ export default function ExpenseReportsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               >
                 <option value="">All Buildings</option>
-                {buildings.map((building) => (
+                {buildings && Array.isArray(buildings) && buildings.map((building) => (
                   <option key={building.id} value={building.id}>
-                    {building.name}
+                    {building.name || building.building_name || building.buildingName || 'Unknown'}
                   </option>
                 ))}
               </select>

@@ -433,9 +433,14 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   name="paymentDate"
                   value={formData.paymentDate}
                   onChange={(e) => handleInputChange('paymentDate', e.target.value)}
+                  min="2000-01-01"
+                  max={new Date().toISOString().split('T')[0]}
                   className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
                     errors.paymentDate ? 'border-red-300' : ''
                   }`}
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
                 {errors.paymentDate && (
                   <p className="mt-2 text-sm text-red-600">{errors.paymentDate}</p>

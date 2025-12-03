@@ -105,6 +105,11 @@ export async function GET() {
           assignmentStart: tenantData.assignment_start,
           assignmentEnd: tenantData.assignment_end,
           monthlyRate: tenantData.monthly_rate,
+          depositPaid: tenantData.deposit_paid ? parseFloat(tenantData.deposit_paid) : undefined,
+          advancePaid: tenantData.advance_paid ? parseFloat(tenantData.advance_paid) : undefined,
+          utilityDepositPaid: tenantData.utility_deposit_paid ? parseFloat(tenantData.utility_deposit_paid) : undefined,
+          depositValidUntil: tenantData.deposit_valid_until ? new Date(tenantData.deposit_valid_until) : undefined,
+          depositRefundable: tenantData.deposit_refundable !== undefined ? tenantData.deposit_refundable : undefined,
         } : null,
         occupants: occupantsResult.rows.map(row => ({
           id: row.id,

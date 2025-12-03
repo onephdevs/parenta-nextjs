@@ -172,7 +172,12 @@ export default function AddOccupantModal({
                   type="date"
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                  min="1900-01-01"
+                  max={new Date().toISOString().split('T')[0]}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
               </div>
 
@@ -182,8 +187,13 @@ export default function AddOccupantModal({
                   type="date"
                   value={formData.moveInDate}
                   onChange={(e) => setFormData({ ...formData, moveInDate: e.target.value })}
+                  min="2000-01-01"
+                  max="2099-12-31"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
                   required
+                  style={{
+                    colorScheme: 'light',
+                  }}
                 />
               </div>
             </div>
