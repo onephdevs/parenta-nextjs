@@ -318,7 +318,11 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">Amenities</h3>
             <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
-              {roomDetails.room.amenities}
+              {Array.isArray(roomDetails.room.amenities) 
+                ? roomDetails.room.amenities.join(', ') 
+                : (typeof roomDetails.room.amenities === 'string' 
+                    ? roomDetails.room.amenities 
+                    : String(roomDetails.room.amenities || ''))}
             </div>
           </div>
         </div>

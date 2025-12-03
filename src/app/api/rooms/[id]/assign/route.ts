@@ -96,8 +96,14 @@ export async function POST(request: Request, { params }: RouteParams) {
           break;
       }
     } else {
-      // Default minimum deposit
+      // Default minimum deposit (3k minimum)
       requiredDeposit = 3000;
+    }
+    
+    // Ensure deposit meets minimum requirement (3k minimum)
+    const minimumDeposit = buildingConfig?.minimumDepositAmount || 3000;
+    if (requiredDeposit < minimumDeposit) {
+      requiredDeposit = minimumDeposit;
     }
     
     // Validate deposit amount
@@ -139,12 +145,18 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
     
-    // Calculate deposit validity date
+    // Calculate deposit validity date (5 days from start date)
+    // Rule: Deposit valid for 5 days, non-refundable after 5 days
     const depositValidUntil = buildingConfig
       ? await getDepositValidityDate(buildingId, new Date(startDate))
-      : undefined;
+      : (() => {
+          // Default: 5 days validity if no building config
+          const validityDate = new Date(startDate);
+          validityDate.setDate(validityDate.getDate() + 5);
+          return validityDate;
+        })();
     
-    // Determine if deposit is refundable
+    // Determine if deposit is refundable (true if within validity period, false after 5 days)
     const depositRefundable = depositValidUntil
       ? await isDepositRefundable(buildingId, depositValidUntil)
       : true;

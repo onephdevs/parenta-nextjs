@@ -161,12 +161,14 @@ export default function BuildingDetailWithImages({ building }: BuildingDetailWit
       </div>
 
       {/* Amenities */}
-      {building.amenities && (
+      {building.amenities && building.amenities.length > 0 && (
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Amenities</h3>
             <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
-              {building.amenities}
+              {Array.isArray(building.amenities) 
+                ? building.amenities.join(', ') 
+                : building.amenities}
             </div>
           </div>
         </div>

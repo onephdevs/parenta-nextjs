@@ -388,24 +388,20 @@ export async function getDepositValidityDate(buildingId: string, startDate?: Dat
 
 /**
  * Check if deposit is refundable based on validity period
+ * Rule: Deposit is valid for 5 days, non-refundable after 5 days
  */
 export async function isDepositRefundable(
   buildingId: string,
   depositValidUntil: Date
 ): Promise<boolean> {
-  const config = await getBuildingDepositConfig(buildingId);
-  const refundableAfterDays = config?.depositRefundableAfterDays || 5;
-  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
   const validUntil = new Date(depositValidUntil);
   validUntil.setHours(0, 0, 0, 0);
   
-  // If today is after the validity date + refundable period, deposit is non-refundable
-  const cutoffDate = new Date(validUntil);
-  cutoffDate.setDate(cutoffDate.getDate() + refundableAfterDays);
-  
-  return today <= cutoffDate;
+  // Deposit is refundable if today is on or before the validity date
+  // After the validity date (5 days), deposit becomes non-refundable
+  return today <= validUntil;
 }
 
