@@ -149,7 +149,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                     <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Current Room Assignment</h3>
                     
                     <div className="border rounded-lg p-4 bg-green-50 border-green-200">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-4">
                         <div>
                           <h4 className="text-lg font-medium text-gray-900">
                             Room {tenant.currentAssignment.roomNumber}
@@ -165,6 +165,49 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                           </p>
                         </div>
                       </div>
+                      
+                      {/* Deposit and Advance Information */}
+                      {(tenant.currentAssignment.depositPaid || tenant.currentAssignment.advancePaid || tenant.currentAssignment.utilityDepositPaid) && (
+                        <div className="mt-4 pt-4 border-t border-green-200">
+                          <h5 className="text-sm font-medium text-gray-900 mb-2">Deposits & Advance</h5>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                            {tenant.currentAssignment.depositPaid && (
+                              <div>
+                                <span className="text-gray-900">Deposit:</span>
+                                <span className="ml-2 font-semibold text-gray-900">
+                                  {formatCurrency(tenant.currentAssignment.depositPaid)}
+                                </span>
+                                {tenant.currentAssignment.depositValidUntil && (
+                                  <p className="text-xs text-gray-900 mt-1">
+                                    Valid until: {formatDate(tenant.currentAssignment.depositValidUntil)}
+                                  </p>
+                                )}
+                                {tenant.currentAssignment.depositRefundable !== undefined && (
+                                  <p className="text-xs text-gray-900">
+                                    {tenant.currentAssignment.depositRefundable ? 'Refundable' : 'Non-refundable'}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {tenant.currentAssignment.advancePaid && (
+                              <div>
+                                <span className="text-gray-900">Advance:</span>
+                                <span className="ml-2 font-semibold text-gray-900">
+                                  {formatCurrency(tenant.currentAssignment.advancePaid)}
+                                </span>
+                              </div>
+                            )}
+                            {tenant.currentAssignment.utilityDepositPaid && (
+                              <div>
+                                <span className="text-gray-900">Utility Deposit:</span>
+                                <span className="ml-2 font-semibold text-gray-900">
+                                  {formatCurrency(tenant.currentAssignment.utilityDepositPaid)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

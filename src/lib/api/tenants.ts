@@ -34,6 +34,11 @@ export interface RoomAssignment {
   startDate: Date;
   endDate?: Date;
   assignmentStatus: 'active' | 'terminated' | 'pending';
+  depositPaid?: number;
+  advancePaid?: number;
+  utilityDepositPaid?: number;
+  depositValidUntil?: Date;
+  depositRefundable?: boolean;
   notes?: string;
 }
 
@@ -327,6 +332,11 @@ function mapRowToAssignment(row: Record<string, unknown>): RoomAssignment {
     startDate: new Date(row.start_date as string),
     endDate: row.end_date ? new Date(row.end_date as string) : undefined,
     assignmentStatus: row.assignment_status as 'active' | 'terminated' | 'pending',
+    depositPaid: row.deposit_paid ? parseFloat(row.deposit_paid as string) : undefined,
+    advancePaid: row.advance_paid ? parseFloat(row.advance_paid as string) : undefined,
+    utilityDepositPaid: row.utility_deposit_paid ? parseFloat(row.utility_deposit_paid as string) : undefined,
+    depositValidUntil: row.deposit_valid_until ? new Date(row.deposit_valid_until as string) : undefined,
+    depositRefundable: row.deposit_refundable !== undefined ? (row.deposit_refundable as boolean) : undefined,
     notes: row.notes as string,
   };
 }

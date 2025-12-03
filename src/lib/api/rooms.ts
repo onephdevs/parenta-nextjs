@@ -19,7 +19,7 @@ function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
     depositPercentage: dbRoom.deposit_percentage,
     roomStatus: dbRoom.room_status,
     description: dbRoom.description,
-    amenities: dbRoom.amenities || '',
+    amenities: Array.isArray(dbRoom.amenities) ? dbRoom.amenities.join(', ') : (dbRoom.amenities || ''),
     isActive: dbRoom.is_active,
     createdAt: dbRoom.created_at,
     updatedAt: dbRoom.updated_at

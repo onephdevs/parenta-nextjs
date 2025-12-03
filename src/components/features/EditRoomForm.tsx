@@ -35,12 +35,15 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
     depositFixedAmount: room.depositFixedAmount,
     depositPercentage: room.depositPercentage,
     description: room.description || '',
-    amenities: room.amenities || ''
+    amenities: Array.isArray(room.amenities) ? room.amenities.join(', ') : (room.amenities || '')
   });
 
-  const [amenitiesInput, setAmenitiesInput] = useState(
-    room.amenities || ''
-  );
+  // Convert amenities to string for input (if it's an array, join it)
+  const amenitiesString = Array.isArray(room.amenities) 
+    ? room.amenities.join(', ') 
+    : (room.amenities || '');
+
+  const [amenitiesInput, setAmenitiesInput] = useState(amenitiesString);
 
   // Fetch buildings when edit mode is activated or when component mounts with startInEditMode
   useEffect(() => {
@@ -98,12 +101,20 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
     const loadingId = showNotification('Updating room...', 'loading');
 
     try {
+      // Convert amenities string to array (split by comma, trim whitespace, filter empty)
+      const amenitiesArray = formData.amenities
+        ? String(formData.amenities).split(',').map(a => a.trim()).filter(a => a.length > 0)
+        : [];
+
       const response = await fetch(`/api/rooms/${room.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          amenities: amenitiesArray
+        }),
       });
 
       const result = await response.json();
