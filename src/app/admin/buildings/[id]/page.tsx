@@ -8,6 +8,7 @@ import BuildingDetailActions from '@/components/features/BuildingDetailActions';
 import BuildingDetailWithImages from '@/components/features/BuildingDetailWithImages';
 import BuildingDetailClient from '@/components/features/BuildingDetailClient';
 import RoomActionsClient from '@/components/features/RoomActionsClient';
+import BuildingDepositConfigComponent from '@/components/features/BuildingDepositConfig';
 
 interface BuildingDetailPageProps {
   params: Promise<{ id: string }>;
@@ -232,6 +233,16 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
                     </>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Deposit Configuration */}
+            <div className="bg-white shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <BuildingDepositConfigComponent 
+                  buildingId={building.id} 
+                  showAsSection={true}
+                />
               </div>
             </div>
 
