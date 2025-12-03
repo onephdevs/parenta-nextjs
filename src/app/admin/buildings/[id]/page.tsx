@@ -8,7 +8,8 @@ import BuildingDetailActions from '@/components/features/BuildingDetailActions';
 import BuildingDetailWithImages from '@/components/features/BuildingDetailWithImages';
 import BuildingDetailClient from '@/components/features/BuildingDetailClient';
 import RoomActionsClient from '@/components/features/RoomActionsClient';
-import BuildingDepositConfigComponent from '@/components/features/BuildingDepositConfig';
+import { getBuildingDepositConfig } from '@/lib/api/building-deposit-config';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 
 interface BuildingDetailPageProps {
   params: Promise<{ id: string }>;
@@ -25,11 +26,19 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
 
   let buildingWithStats: (Building & { roomStats: any }) | null = null;
   let error: string | null = null;
+  let depositConfig = null;
 
   try {
     buildingWithStats = await getBuildingWithRoomStats(id);
     if (!buildingWithStats) {
       notFound();
+    }
+    // Fetch deposit configuration
+    try {
+      depositConfig = await getBuildingDepositConfig(id);
+    } catch (configError) {
+      console.error('Error fetching deposit config:', configError);
+      // Continue without deposit config - it's optional
     }
   } catch (err) {
     console.error('Error fetching building:', err);
@@ -69,7 +78,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -236,15 +245,85 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
               </div>
             </div>
 
-            {/* Deposit Configuration */}
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <BuildingDepositConfigComponent 
-                  buildingId={building.id} 
-                  showAsSection={true}
-                />
+            {/* Deposit & Advance Rules */}
+            {depositConfig ? (
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                    Deposit & Advance Rules
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Deposit:</span>
+                      <span className="text-gray-900 font-medium">
+                        {depositConfig.depositType === 'months' 
+                          ? `${depositConfig.depositMonths} month${depositConfig.depositMonths !== 1 ? 's' : ''}`
+                          : depositConfig.depositType === 'fixed'
+                          ? formatCurrency(depositConfig.depositAmount || 0)
+                          : `${depositConfig.depositPercentage || 0}%`}
+                        {depositConfig.depositType === 'months' && roomStats.averageRent > 0 && (
+                          <span className="text-gray-500 ml-1">
+                            ({formatCurrency(roomStats.averageRent * depositConfig.depositMonths)})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Advance:</span>
+                      <span className="text-gray-900 font-medium">
+                        {depositConfig.advanceType === 'months' 
+                          ? `${depositConfig.advanceMonths} month${depositConfig.advanceMonths !== 1 ? 's' : ''}`
+                          : depositConfig.advanceType === 'fixed'
+                          ? formatCurrency(depositConfig.advanceAmount || 0)
+                          : `${depositConfig.advancePercentage || 0}%`}
+                        {depositConfig.advanceType === 'months' && roomStats.averageRent > 0 && (
+                          <span className="text-gray-500 ml-1">
+                            ({formatCurrency(roomStats.averageRent * depositConfig.advanceMonths)})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Utility Deposit:</span>
+                      <span className="text-gray-900 font-medium">
+                        {formatCurrency(depositConfig.utilityDepositAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Minimum Deposit:</span>
+                      <span className="text-gray-900 font-medium">
+                        {formatCurrency(depositConfig.minimumDepositAmount)}
+                      </span>
+                    </div>
+                    <div className="border-t pt-3 mt-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-gray-500">Validity:</span>
+                        <span className="text-gray-900 font-medium">
+                          {depositConfig.depositValidityDays} day{depositConfig.depositValidityDays !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Non-Refundable After:</span>
+                        <span className="text-gray-900 font-medium">
+                          {depositConfig.depositRefundableAfterDays} day{depositConfig.depositRefundableAfterDays !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">
+                    Deposit & Advance Rules
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    No deposit configuration set. Configure via Edit Building.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Edit Building */}
             <div className="bg-white shadow rounded-lg">

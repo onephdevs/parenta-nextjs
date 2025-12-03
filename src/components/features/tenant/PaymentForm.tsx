@@ -117,10 +117,10 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       {/* Invoice Selection */}
       <div>
-        <label htmlFor="invoiceId" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="invoiceId" className="block text-sm font-medium text-gray-900 mb-2">
           Select Invoice to Pay *
         </label>
         <select
@@ -141,7 +141,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
       {/* Payment Amount */}
       <div>
-        <label htmlFor="paymentAmount" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="paymentAmount" className="block text-sm font-medium text-gray-900 mb-2">
           Payment Amount (₱) *
         </label>
         <input
@@ -156,7 +156,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {selectedInvoice && (
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-900">
             Balance due: {formatCurrency(selectedInvoice.balanceDue)}
           </p>
         )}
@@ -164,7 +164,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
       {/* Payment Method */}
       <div>
-        <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900 mb-2">
           Payment Method *
         </label>
         <select
@@ -182,7 +182,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
       {/* Reference Number */}
       <div>
-        <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-900 mb-2">
           Reference Number (Optional)
         </label>
         <input
@@ -197,7 +197,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
       {/* Notes */}
       <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-2">
           Notes (Optional)
         </label>
         <textarea
@@ -241,7 +241,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
           >
             Cancel
           </button>

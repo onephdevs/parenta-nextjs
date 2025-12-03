@@ -115,7 +115,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       {/* Personal Information */}
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
@@ -124,7 +124,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="firstName" className="block text-sm font-medium text-gray-900 mb-1">
               First Name *
             </label>
             <input
@@ -138,7 +138,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="lastName" className="block text-sm font-medium text-gray-900 mb-1">
               Last Name *
             </label>
             <input
@@ -152,7 +152,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1 flex items-center">
               <Mail className="h-4 w-4 mr-1" />
               Email
             </label>
@@ -162,12 +162,12 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
               name="email"
               value={formData.email}
               disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900"
             />
-            <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+            <p className="text-xs text-gray-900 mt-1">Email cannot be changed</p>
           </div>
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-900 mb-1 flex items-center">
               <Phone className="h-4 w-4 mr-1" />
               Phone
             </label>
@@ -181,7 +181,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-900 mb-1 flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
               Date of Birth
             </label>
@@ -202,7 +202,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
         <h3 className="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-900 mb-1">
               Contact Name
             </label>
             <input
@@ -215,7 +215,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-900 mb-1">
               Contact Phone
             </label>
             <input
@@ -228,7 +228,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-900 mb-1">
               Relationship
             </label>
             <select
@@ -259,7 +259,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-900 mb-1">
               Employment Status
             </label>
             <select
@@ -278,7 +278,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             </select>
           </div>
           <div>
-            <label htmlFor="employerName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="employerName" className="block text-sm font-medium text-gray-900 mb-1">
               Employer Name
             </label>
             <input
@@ -291,7 +291,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900 mb-1">
               Monthly Income (₱)
             </label>
             <input
@@ -315,7 +315,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
           Previous Address
         </h3>
         <div>
-          <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-900 mb-1">
             Address
           </label>
           <textarea

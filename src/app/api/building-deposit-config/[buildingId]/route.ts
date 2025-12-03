@@ -10,9 +10,9 @@ import {
 } from '@/lib/api/building-deposit-config';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     buildingId: string;
-  };
+  }>;
 }
 
 // GET - Get deposit config for a specific building
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { buildingId } = params;
+    const { buildingId } = await params;
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     const monthlyRate = searchParams.get('monthlyRate');

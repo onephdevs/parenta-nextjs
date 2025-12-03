@@ -32,7 +32,7 @@ export default function AdminFullScreenModal({
       <div className="absolute inset-0 bg-gray-900 bg-opacity-50" onClick={onClose} />
       
       {/* Modal content - positioned to respect sidebar (256px on desktop when open) */}
-      <div className="absolute inset-y-0 right-0 left-0 lg:left-64 bg-white flex flex-col shadow-xl z-50">
+      <div className="absolute inset-y-0 right-0 left-0 lg:left-64 bg-white text-gray-900 flex flex-col shadow-xl z-50">
         {/* Header */}
         <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4">
           <div className="flex items-center justify-between">
@@ -81,7 +81,7 @@ export default function AdminFullScreenModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto p-6">
+          <div className="max-w-4xl mx-auto p-6 text-gray-900">
             {children}
           </div>
         </div>

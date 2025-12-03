@@ -277,7 +277,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
         {/* Edit Form */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6">
+          <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 text-gray-900">
             <h2 className="text-lg font-medium text-gray-900 mb-6">Document Details</h2>
             
             <div className="grid grid-cols-1 gap-6">

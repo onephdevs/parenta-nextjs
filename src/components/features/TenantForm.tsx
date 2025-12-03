@@ -340,7 +340,7 @@ export default function TenantForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <div>
         <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
           Personal Information

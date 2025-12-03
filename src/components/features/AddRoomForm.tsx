@@ -111,7 +111,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="p-6 space-y-6 text-gray-900">
         {error && (
           <div className="rounded-md bg-red-50 p-4">
             <div className="flex">

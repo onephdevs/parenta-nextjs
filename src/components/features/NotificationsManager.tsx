@@ -64,7 +64,7 @@ export default function NotificationsManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Generate Reminders Card */}
         <div className="p-6 border border-gray-300 rounded-lg bg-white">
-          <h3 className="text-lg font-semibold mb-3">📅 Generate Payment Reminders</h3>
+          <h3 className="text-lg font-semibold mb-3 text-gray-900">📅 Generate Payment Reminders</h3>
           <p className="text-sm text-gray-900 mb-4">
             Automatically create reminders for upcoming invoice due dates based on your settings.
           </p>
@@ -79,7 +79,7 @@ export default function NotificationsManager() {
 
         {/* Process Queue Card */}
         <div className="p-6 border border-gray-300 rounded-lg bg-white">
-          <h3 className="text-lg font-semibold mb-3">📧 Process Notification Queue</h3>
+          <h3 className="text-lg font-semibold mb-3 text-gray-900">📧 Process Notification Queue</h3>
           <p className="text-sm text-gray-900 mb-4">
             Send all pending notifications in the queue. This happens automatically, but you can trigger it manually.
           </p>

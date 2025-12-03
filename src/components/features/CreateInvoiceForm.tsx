@@ -309,7 +309,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
           {/* Basic Information */}
           <div>
             <h4 className="text-md font-medium text-gray-900 mb-4">Invoice Details</h4>

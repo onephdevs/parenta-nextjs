@@ -289,7 +289,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
           </div>
         ) : (
           // Edit Mode - Form
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 text-gray-900">
             {/* Building Selection */}
             <div>
               <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900 mb-1">

@@ -155,7 +155,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
         </div>
       )}
 
-      <form id="building-form" onSubmit={handleSubmit} className="space-y-8">
+      <form id="building-form" onSubmit={handleSubmit} className="space-y-8 text-gray-900">
         {/* Basic Information */}
         <div className="space-y-6">
           <div>

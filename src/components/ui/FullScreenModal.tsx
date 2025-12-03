@@ -28,7 +28,7 @@ export default function FullScreenModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="h-screen w-screen bg-white flex flex-col">
+      <div className="h-screen w-screen bg-white text-gray-900 flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4">
           <div className="flex items-center justify-between">
@@ -77,7 +77,7 @@ export default function FullScreenModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto p-6">
+          <div className="max-w-4xl mx-auto p-6 text-gray-900">
             {children}
           </div>
         </div>

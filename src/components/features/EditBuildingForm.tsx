@@ -154,7 +154,7 @@ export default function EditBuildingForm({ building }: EditBuildingFormProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
           <div>
             <h4 className="text-md font-medium text-gray-900 mb-4">Basic Information</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
