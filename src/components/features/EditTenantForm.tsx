@@ -224,9 +224,96 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     }
   };
 
+  const formatCurrency = (amount?: number) => {
+    if (!amount) return 'Not specified';
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
+
+  const formatDate = (date?: Date) => {
+    if (!date) return 'Not set';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   return (
     <div className="bg-white shadow rounded-lg">
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Current Room Assignment */}
+        {tenant.currentAssignment && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">
+              Current Room Assignment
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-900">
+                  <span className="font-medium">Room:</span>{' '}
+                  <span className="font-semibold">Room {tenant.currentAssignment.roomNumber}</span>
+                </p>
+                <p className="text-sm text-gray-900">
+                  <span className="font-medium">Building:</span> {tenant.currentAssignment.buildingName}
+                </p>
+                <p className="text-sm text-gray-900">
+                  <span className="font-medium">Monthly Rate:</span> {formatCurrency(tenant.currentAssignment.monthlyRate)}
+                </p>
+                <p className="text-sm text-gray-900">
+                  <span className="font-medium">Since:</span> {formatDate(tenant.currentAssignment.startDate)}
+                </p>
+              </div>
+              {(tenant.currentAssignment.depositPaid || tenant.currentAssignment.advancePaid || tenant.currentAssignment.utilityDepositPaid) && (
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">Deposits & Advance:</p>
+                  {tenant.currentAssignment.depositPaid && (
+                    <p className="text-sm text-gray-900">
+                      <span className="font-medium">Deposit:</span> {formatCurrency(tenant.currentAssignment.depositPaid)}
+                      {tenant.currentAssignment.depositValidUntil && (
+                        <span className="text-xs text-gray-900 ml-2">
+                          (Valid until: {formatDate(tenant.currentAssignment.depositValidUntil)})
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {tenant.currentAssignment.advancePaid && (
+                    <p className="text-sm text-gray-900">
+                      <span className="font-medium">Advance:</span> {formatCurrency(tenant.currentAssignment.advancePaid)}
+                    </p>
+                  )}
+                  {tenant.currentAssignment.utilityDepositPaid && (
+                    <p className="text-sm text-gray-900">
+                      <span className="font-medium">Utility Deposit:</span> {formatCurrency(tenant.currentAssignment.utilityDepositPaid)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="mt-4 pt-4 border-t border-green-200 flex items-center gap-4">
+              {tenant.currentAssignment.roomId && (
+                <>
+                  <Link
+                    href={`/admin/rooms/${tenant.currentAssignment.roomId}`}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    View Room Details →
+                  </Link>
+                  <span className="text-gray-400">|</span>
+                  <Link
+                    href={`/admin/rooms/${tenant.currentAssignment.roomId}#tenant-management`}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    Change Room Assignment →
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Personal Information */}
         <div>
           <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">

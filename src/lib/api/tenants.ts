@@ -28,6 +28,7 @@ export interface Tenant {
 
 export interface RoomAssignment {
   id: string;
+  roomId: string;
   roomNumber: string;
   buildingName: string;
   monthlyRate: number;
@@ -179,6 +180,7 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
     const currentAssignmentQuery = `
       SELECT 
         ra.*,
+        r.id as room_id,
         r.room_number,
         b.name as building_name
       FROM tenant_room_assignments ra
@@ -196,6 +198,7 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
     const historyQuery = `
       SELECT 
         ra.*,
+        r.id as room_id,
         r.room_number,
         b.name as building_name
       FROM tenant_room_assignments ra
@@ -326,6 +329,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & { profilePicture
 function mapRowToAssignment(row: Record<string, unknown>): RoomAssignment {
   return {
     id: row.id as string,
+    roomId: row.room_id as string,
     roomNumber: row.room_number as string,
     buildingName: row.building_name as string,
     monthlyRate: parseFloat(row.monthly_rate as string),
