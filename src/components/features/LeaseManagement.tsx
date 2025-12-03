@@ -94,24 +94,30 @@ export default function LeaseManagement() {
         <div className="flex gap-4">
           <button
             onClick={() => setActiveTab('alerts')}
-            className={`px-4 py-2 font-medium border-b-2 ${
-              activeTab === 'alerts' ? 'border-blue-500 text-blue-600' : 'border-transparent'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              activeTab === 'alerts' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-700 hover:text-gray-900'
             }`}
           >
             ⚠️ Expiration Alerts
           </button>
           <button
             onClick={() => setActiveTab('renewals')}
-            className={`px-4 py-2 font-medium border-b-2 ${
-              activeTab === 'renewals' ? 'border-blue-500 text-blue-600' : 'border-transparent'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              activeTab === 'renewals' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-700 hover:text-gray-900'
             }`}
           >
             🔄 Renewals
           </button>
           <button
             onClick={() => setActiveTab('moveouts')}
-            className={`px-4 py-2 font-medium border-b-2 ${
-              activeTab === 'moveouts' ? 'border-blue-500 text-blue-600' : 'border-transparent'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              activeTab === 'moveouts' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-700 hover:text-gray-900'
             }`}
           >
             📦 Move-Outs

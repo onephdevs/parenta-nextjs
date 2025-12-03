@@ -103,19 +103,19 @@ export default function NotificationsManager() {
 
       {/* Information Section */}
       <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="font-semibold mb-3">ℹ️ How Notifications Work</h3>
+        <h3 className="font-semibold mb-3 text-gray-900">ℹ️ How Notifications Work</h3>
         <div className="space-y-2 text-sm">
-          <p><strong>1. Payment Reminders:</strong> Automatically sent X days before invoice due date</p>
-          <p><strong>2. Overdue Notices:</strong> Sent when invoices become overdue</p>
-          <p><strong>3. Payment Confirmations:</strong> Sent when payments are recorded</p>
-          <p><strong>4. Invoice Notifications:</strong> Sent when new invoices are generated</p>
-          <p><strong>5. Lease Expiry Warnings:</strong> Sent before lease end dates</p>
+          <p className="text-gray-900"><strong className="text-gray-900">1. Payment Reminders:</strong> Automatically sent X days before invoice due date</p>
+          <p className="text-gray-900"><strong className="text-gray-900">2. Overdue Notices:</strong> Sent when invoices become overdue</p>
+          <p className="text-gray-900"><strong className="text-gray-900">3. Payment Confirmations:</strong> Sent when payments are recorded</p>
+          <p className="text-gray-900"><strong className="text-gray-900">4. Invoice Notifications:</strong> Sent when new invoices are generated</p>
+          <p className="text-gray-900"><strong className="text-gray-900">5. Lease Expiry Warnings:</strong> Sent before lease end dates</p>
         </div>
         
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-          <p className="text-sm font-medium">⚙️ Configuration Required:</p>
-          <p className="text-xs mt-1">
-            Make sure to set your <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code> environment variables for email sending to work.
+          <p className="text-sm font-medium text-gray-900">⚙️ Configuration Required:</p>
+          <p className="text-xs mt-1 text-gray-900">
+            Make sure to set your <code className="bg-yellow-100 px-1 py-0.5 rounded text-gray-900">RESEND_API_KEY</code> and <code className="bg-yellow-100 px-1 py-0.5 rounded text-gray-900">EMAIL_FROM</code> environment variables for email sending to work.
           </p>
         </div>
       </div>
