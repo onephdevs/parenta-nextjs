@@ -45,13 +45,13 @@ export async function generateFinancialReport(
     // Revenue analysis
     const revenueQuery = `
       SELECT 
-        SUM(CASE WHEN type = 'rent' THEN amount ELSE 0 END) as rent_revenue,
-        SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END) as deposit_revenue,
-        SUM(CASE WHEN type = 'fee' THEN amount ELSE 0 END) as fee_revenue,
-        SUM(CASE WHEN type = 'utilities' THEN amount ELSE 0 END) as utilities_revenue,
+        SUM(CASE WHEN payment_type = 'rent' THEN amount ELSE 0 END) as rent_revenue,
+        SUM(CASE WHEN payment_type = 'deposit' THEN amount ELSE 0 END) as deposit_revenue,
+        SUM(CASE WHEN payment_type = 'late_fee' THEN amount ELSE 0 END) as fee_revenue,
+        SUM(CASE WHEN payment_type = 'utility' THEN amount ELSE 0 END) as utilities_revenue,
         SUM(amount) as total_revenue
       FROM payments
-      WHERE status = 'completed' 
+      WHERE payment_status = 'paid' 
         AND payment_date >= $1 
         AND payment_date <= $2
     `;
@@ -81,25 +81,25 @@ export async function generateFinancialReport(
     // Outstanding balances
     const outstandingQuery = `
       SELECT 
-        SUM(i.total_amount - COALESCE(i.paid_amount, 0)) as total_outstanding,
+        SUM(i.total_amount - COALESCE(i.amount_paid, 0)) as total_outstanding,
         SUM(CASE 
-          WHEN i.due_date < CURRENT_DATE AND i.status != 'paid' 
-          THEN (i.total_amount - COALESCE(i.paid_amount, 0)) 
+          WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
+          THEN (i.total_amount - COALESCE(i.amount_paid, 0)) 
           ELSE 0 
         END) as overdue_outstanding,
         SUM(CASE 
-          WHEN i.due_date >= CURRENT_DATE AND i.status != 'paid' 
-          THEN (i.total_amount - COALESCE(i.paid_amount, 0)) 
+          WHEN i.due_date >= CURRENT_DATE AND i.invoice_status != 'paid' 
+          THEN (i.total_amount - COALESCE(i.amount_paid, 0)) 
           ELSE 0 
         END) as current_outstanding,
         AVG(CASE 
-          WHEN i.due_date < CURRENT_DATE AND i.status != 'paid' 
-          THEN EXTRACT(DAY FROM CURRENT_DATE - i.due_date) 
+          WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
+          THEN (CURRENT_DATE - i.due_date) 
           ELSE NULL 
         END) as average_days_overdue
       FROM invoices i
-      WHERE i.status != 'paid' 
-        AND i.status != 'cancelled'
+      WHERE i.invoice_status != 'paid' 
+        AND i.invoice_status != 'cancelled'
         AND i.issue_date <= $2
     `;
 
@@ -158,14 +158,14 @@ export async function getRevenueByCategory(
 ): Promise<RevenueByCategory[]> {
   const query = `
     SELECT 
-      type as category,
+      payment_type as category,
       SUM(amount) as amount,
       COUNT(*) as count
     FROM payments
-    WHERE status = 'completed' 
+    WHERE payment_status = 'paid' 
       AND payment_date >= $1 
       AND payment_date <= $2
-    GROUP BY type
+    GROUP BY payment_type
     ORDER BY amount DESC
   `;
 
@@ -212,7 +212,7 @@ export async function getMonthlyTrends(months: number = 12): Promise<MonthlyTren
         TO_CHAR(payment_date, 'YYYY-MM') as month,
         SUM(amount) as revenue
       FROM payments
-      WHERE status = 'completed' 
+      WHERE payment_status = 'paid' 
         AND payment_date >= CURRENT_DATE - INTERVAL '${months} months'
       GROUP BY TO_CHAR(payment_date, 'YYYY-MM')
     ),
@@ -250,24 +250,24 @@ export async function getOutstandingBalances(): Promise<OutstandingBalance[]> {
     SELECT 
       t.id as tenant_id,
       CONCAT(t.first_name, ' ', t.last_name) as tenant_name,
-      SUM(i.total_amount - COALESCE(i.paid_amount, 0)) as total_amount,
+      SUM(i.total_amount - COALESCE(i.amount_paid, 0)) as total_amount,
       SUM(CASE 
-        WHEN i.due_date < CURRENT_DATE AND i.status != 'paid' 
-        THEN (i.total_amount - COALESCE(i.paid_amount, 0)) 
+        WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
+        THEN (i.total_amount - COALESCE(i.amount_paid, 0)) 
         ELSE 0 
       END) as overdue_amount,
       MAX(CASE 
-        WHEN i.due_date < CURRENT_DATE AND i.status != 'paid' 
-        THEN EXTRACT(DAY FROM CURRENT_DATE - i.due_date) 
+        WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
+        THEN (CURRENT_DATE - i.due_date) 
         ELSE 0 
       END) as days_past_due
     FROM invoices i
     JOIN tenants t ON i.tenant_id = t.id
-    WHERE i.status != 'paid' 
-      AND i.status != 'cancelled'
-      AND (i.total_amount - COALESCE(i.paid_amount, 0)) > 0
+    WHERE i.invoice_status != 'paid' 
+      AND i.invoice_status != 'cancelled'
+      AND (i.total_amount - COALESCE(i.amount_paid, 0)) > 0
     GROUP BY t.id, t.first_name, t.last_name
-    HAVING SUM(i.total_amount - COALESCE(i.paid_amount, 0)) > 0
+    HAVING SUM(i.total_amount - COALESCE(i.amount_paid, 0)) > 0
     ORDER BY overdue_amount DESC, total_amount DESC
   `;
 
@@ -308,7 +308,7 @@ export async function getFinancialMetrics(): Promise<{
     const revenueQuery = `
       SELECT COALESCE(SUM(amount), 0) as monthly_revenue
       FROM payments
-      WHERE status = 'completed' 
+      WHERE payment_status = 'paid' 
         AND payment_date >= $1 
         AND payment_date <= $2
     `;
@@ -334,15 +334,15 @@ export async function getFinancialMetrics(): Promise<{
     // Outstanding balances
     const outstandingQuery = `
       SELECT 
-        COALESCE(SUM(total_amount - COALESCE(paid_amount, 0)), 0) as total_outstanding,
+        COALESCE(SUM(total_amount - COALESCE(amount_paid, 0)), 0) as total_outstanding,
         COALESCE(SUM(CASE 
-          WHEN due_date < CURRENT_DATE AND status != 'paid' 
-          THEN (total_amount - COALESCE(paid_amount, 0)) 
+          WHEN due_date < CURRENT_DATE AND invoice_status != 'paid' 
+          THEN (total_amount - COALESCE(amount_paid, 0)) 
           ELSE 0 
         END), 0) as overdue_amount
       FROM invoices
-      WHERE status != 'paid' 
-        AND status != 'cancelled'
+      WHERE invoice_status != 'paid' 
+        AND invoice_status != 'cancelled'
     `;
     
     const outstandingResult = await client.query(outstandingQuery);
@@ -351,7 +351,7 @@ export async function getFinancialMetrics(): Promise<{
     const collectionQuery = `
       SELECT 
         COALESCE(SUM(CASE WHEN i.issue_date >= $1 AND i.issue_date <= $2 THEN i.total_amount ELSE 0 END), 0) as invoiced_amount,
-        COALESCE(SUM(CASE WHEN p.payment_date >= $1 AND p.payment_date <= $2 AND p.status = 'completed' THEN p.amount ELSE 0 END), 0) as collected_amount
+        COALESCE(SUM(CASE WHEN p.payment_date >= $1 AND p.payment_date <= $2 AND p.payment_status = 'paid' THEN p.amount ELSE 0 END), 0) as collected_amount
       FROM invoices i
       FULL OUTER JOIN payments p ON i.tenant_id = p.tenant_id
     `;
@@ -394,16 +394,16 @@ export async function exportFinancialData(
 
   switch (type) {
     case 'payments':
-      headers = 'Date,Tenant,Amount,Type,Status,Payment Method,Description\n';
+      headers = 'Date,Tenant,Amount,Payment Type,Payment Status,Payment Method,Description\n';
       query = `
         SELECT 
           p.payment_date,
           CONCAT(t.first_name, ' ', t.last_name) as tenant_name,
           p.amount,
-          p.type,
-          p.status,
+          p.payment_type,
+          p.payment_status,
           p.payment_method,
-          p.description
+          p.notes as description
         FROM payments p
         LEFT JOIN tenants t ON p.tenant_id = t.id
         WHERE p.payment_date >= $1 AND p.payment_date <= $2
@@ -430,7 +430,7 @@ export async function exportFinancialData(
       break;
 
     case 'invoices':
-      headers = 'Issue Date,Due Date,Tenant,Invoice Number,Amount,Status,Description\n';
+      headers = 'Issue Date,Due Date,Tenant,Invoice Number,Amount,Invoice Status,Description\n';
       query = `
         SELECT 
           i.issue_date,
@@ -438,8 +438,8 @@ export async function exportFinancialData(
           CONCAT(t.first_name, ' ', t.last_name) as tenant_name,
           i.invoice_number,
           i.total_amount,
-          i.status,
-          i.description
+          i.invoice_status,
+          i.notes as description
         FROM invoices i
         LEFT JOIN tenants t ON i.tenant_id = t.id
         WHERE i.issue_date >= $1 AND i.issue_date <= $2
