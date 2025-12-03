@@ -100,7 +100,7 @@ export async function generateFinancialReport(
       FROM invoices i
       WHERE i.invoice_status != 'paid' 
         AND i.invoice_status != 'cancelled'
-        AND i.issue_date <= $2
+        AND i.issue_date <= $1::date
     `;
 
     const outstandingResult = await client.query(outstandingQuery, [endDate]);
