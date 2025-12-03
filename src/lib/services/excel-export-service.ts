@@ -438,7 +438,7 @@ export async function generateOccupancyReportExcel(data: any): Promise<Buffer> {
 }
 
 /**
- * Generate Expense Report Excel
+ * Generate Expense Report Excel (with period support)
  */
 export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
@@ -455,7 +455,7 @@ export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
   summarySheet.getCell('A1').alignment = { horizontal: 'center' };
   
   summarySheet.mergeCells('A2:D2');
-  summarySheet.getCell('A2').value = `Period: ${data.summary.period}`;
+  summarySheet.getCell('A2').value = `Period: ${data.summary.period} (${data.summary.periodType})`;
   summarySheet.getCell('A2').font = { size: 12 };
   summarySheet.getCell('A2').alignment = { horizontal: 'center' };
   
@@ -477,38 +477,142 @@ export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
   summarySheet.getCell('B5').numFmt = '₱#,##0.00';
   summarySheet.getCell('B7').numFmt = '₱#,##0.00';
   
-  // By Category Sheet
-  const categorySheet = workbook.addWorksheet('By Category');
-  
-  categorySheet.addRow(['Expenses by Category']);
-  categorySheet.getRow(1).font = { size: 14, bold: true };
-  categorySheet.addRow([]);
-  categorySheet.addRow(['Category', 'Amount', 'Percentage', 'Count']);
-  categorySheet.getRow(3).font = { bold: true };
-  categorySheet.getRow(3).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFE0E0E0' }
-  };
-  
-  data.byCategory.forEach((item: any) => {
-    categorySheet.addRow([
-      item.category,
-      item.amount,
-      item.percentage / 100,
-      item.count
+  // By Period Sheet (if available)
+  if (data.byPeriod && data.byPeriod.length > 0) {
+    const periodSheet = workbook.addWorksheet('By Period');
+    
+    periodSheet.addRow(['Expenses by Period']);
+    periodSheet.getRow(1).font = { size: 14, bold: true };
+    periodSheet.addRow([]);
+    periodSheet.addRow(['Period', 'Amount', 'Count']);
+    periodSheet.getRow(3).font = { bold: true };
+    periodSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.byPeriod.forEach((item: any) => {
+      periodSheet.addRow([item.period, item.amount, item.count]);
+    });
+    
+    periodSheet.getColumn(1).width = 20;
+    periodSheet.getColumn(2).width = 15;
+    periodSheet.getColumn(2).numFmt = '₱#,##0.00';
+    periodSheet.getColumn(3).width = 10;
+    
+    // Add totals
+    const lastRow = periodSheet.lastRow!.number;
+    periodSheet.addRow([
+      'TOTAL',
+      { formula: `SUM(B4:B${lastRow})` },
+      { formula: `SUM(C4:C${lastRow})` }
     ]);
-  });
+    periodSheet.lastRow!.font = { bold: true };
+    periodSheet.lastRow!.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFEB3B' }
+    };
+  }
   
-  categorySheet.getColumn(1).width = 20;
-  categorySheet.getColumn(2).width = 15;
-  categorySheet.getColumn(2).numFmt = '₱#,##0.00';
-  categorySheet.getColumn(3).width = 12;
-  categorySheet.getColumn(3).numFmt = '0.0%';
-  categorySheet.getColumn(4).width = 10;
+  // By Category Sheet
+  if (data.byCategory && data.byCategory.length > 0) {
+    const categorySheet = workbook.addWorksheet('By Category');
+    
+    categorySheet.addRow(['Expenses by Category']);
+    categorySheet.getRow(1).font = { size: 14, bold: true };
+    categorySheet.addRow([]);
+    categorySheet.addRow(['Category', 'Amount', 'Percentage', 'Count']);
+    categorySheet.getRow(3).font = { bold: true };
+    categorySheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.byCategory.forEach((item: any) => {
+      categorySheet.addRow([
+        item.category.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        item.amount,
+        item.percentage / 100,
+        item.count
+      ]);
+    });
+    
+    categorySheet.getColumn(1).width = 25;
+    categorySheet.getColumn(2).width = 15;
+    categorySheet.getColumn(2).numFmt = '₱#,##0.00';
+    categorySheet.getColumn(3).width = 12;
+    categorySheet.getColumn(3).numFmt = '0.0%';
+    categorySheet.getColumn(4).width = 10;
+  }
   
-  // By Month Sheet
-  if (data.byMonth.length > 0) {
+  // By Building Sheet
+  if (data.byBuilding && data.byBuilding.length > 0) {
+    const buildingSheet = workbook.addWorksheet('By Building');
+    
+    buildingSheet.addRow(['Expenses by Building']);
+    buildingSheet.getRow(1).font = { size: 14, bold: true };
+    buildingSheet.addRow([]);
+    buildingSheet.addRow(['Building', 'Amount', 'Count']);
+    buildingSheet.getRow(3).font = { bold: true };
+    buildingSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.byBuilding.forEach((item: any) => {
+      buildingSheet.addRow([item.buildingName, item.amount, item.count]);
+    });
+    
+    buildingSheet.getColumn(1).width = 30;
+    buildingSheet.getColumn(2).width = 15;
+    buildingSheet.getColumn(2).numFmt = '₱#,##0.00';
+    buildingSheet.getColumn(3).width = 10;
+  }
+  
+  // Expense Details Sheet
+  if (data.details && data.details.length > 0) {
+    const detailsSheet = workbook.addWorksheet('Expense Details');
+    
+    detailsSheet.addRow(['Expense Details']);
+    detailsSheet.getRow(1).font = { size: 14, bold: true };
+    detailsSheet.addRow([]);
+    detailsSheet.addRow(['Date', 'Description', 'Category', 'Building', 'Vendor', 'Amount', 'Status']);
+    detailsSheet.getRow(3).font = { bold: true };
+    detailsSheet.getRow(3).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+    
+    data.details.forEach((item: any) => {
+      detailsSheet.addRow([
+        new Date(item.expenseDate),
+        item.description,
+        item.category.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        item.buildingName || '-',
+        item.vendorName || '-',
+        item.amount,
+        item.expenseStatus
+      ]);
+    });
+    
+    detailsSheet.getColumn(1).width = 12;
+    detailsSheet.getColumn(1).numFmt = 'yyyy-mm-dd';
+    detailsSheet.getColumn(2).width = 40;
+    detailsSheet.getColumn(3).width = 20;
+    detailsSheet.getColumn(4).width = 25;
+    detailsSheet.getColumn(5).width = 25;
+    detailsSheet.getColumn(6).width = 15;
+    detailsSheet.getColumn(6).numFmt = '₱#,##0.00';
+    detailsSheet.getColumn(7).width = 12;
+  }
+  
+  // Legacy support: By Month Sheet (if available)
+  if (data.byMonth && data.byMonth.length > 0) {
     const monthSheet = workbook.addWorksheet('By Month');
     
     monthSheet.addRow(['Expenses by Month']);
@@ -532,8 +636,8 @@ export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
     monthSheet.getColumn(3).width = 10;
   }
   
-  // Top Expenses Sheet
-  if (data.topExpenses.length > 0) {
+  // Legacy support: Top Expenses Sheet (if available)
+  if (data.topExpenses && data.topExpenses.length > 0) {
     const topSheet = workbook.addWorksheet('Top Expenses');
     
     topSheet.addRow(['Top Expenses']);

@@ -406,7 +406,8 @@ export interface DatabaseExpense {
 
 export interface UtilityBill {
   id: string;
-  buildingId: string;
+  buildingId?: string; // Optional: can be room-specific or building-wide
+  roomId?: string; // Optional: room/apartment this bill is for
   utilityType: 'electricity' | 'water' | 'gas' | 'internet' | 'cable' | 'waste' | 'other';
   providerName: string;
   providerAccountNumber?: string;
@@ -425,7 +426,8 @@ export interface UtilityBill {
 
 export interface DatabaseUtilityBill {
   id: string;
-  building_id: string;
+  building_id?: string; // Optional: can be room-specific or building-wide
+  room_id?: string; // Optional: room/apartment this bill is for
   utility_type: 'electricity' | 'water' | 'gas' | 'internet' | 'cable' | 'waste' | 'other';
   provider_name: string;
   provider_account_number?: string;

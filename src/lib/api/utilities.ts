@@ -2,8 +2,8 @@ import pool from '../db';
 
 export interface UtilityBill {
   id: string;
-  buildingId: string;
-  roomId?: string;
+  buildingId?: string; // Optional: can be room-specific or building-wide
+  roomId?: string; // Optional: room/apartment this bill is for
   utilityType: 'electricity' | 'water' | 'gas' | 'internet' | 'cable' | 'waste' | 'other';
   amount: number;
   billingPeriodStart: Date;
@@ -108,10 +108,10 @@ export async function getUtilityBills(
     const query = `
       SELECT 
         ub.*,
-        b.building_name,
+        b.name as building_name,
         r.room_number
       FROM utility_bills ub
-      INNER JOIN buildings b ON ub.building_id = b.id
+      LEFT JOIN buildings b ON ub.building_id = b.id
       LEFT JOIN rooms r ON ub.room_id = r.id
       ${whereClause}
       ORDER BY ub.due_date DESC, ub.created_at DESC
@@ -142,10 +142,10 @@ export async function getUtilityBillById(id: string): Promise<UtilityBill | null
     const query = `
       SELECT 
         ub.*,
-        b.building_name,
+        b.name as building_name,
         r.room_number
       FROM utility_bills ub
-      INNER JOIN buildings b ON ub.building_id = b.id
+      LEFT JOIN buildings b ON ub.building_id = b.id
       LEFT JOIN rooms r ON ub.room_id = r.id
       WHERE ub.id = $1 AND ub.is_active = true
     `;
@@ -178,8 +178,13 @@ export async function createUtilityBill(billData: Partial<UtilityBill>): Promise
       RETURNING *
     `;
     
+    // Ensure either buildingId or roomId is provided
+    if (!billData.buildingId && !billData.roomId) {
+      throw new Error('Either buildingId or roomId must be provided');
+    }
+    
     const values = [
-      billData.buildingId,
+      billData.buildingId || null,
       billData.roomId || null,
       billData.utilityType,
       billData.amount,
@@ -419,7 +424,7 @@ export async function getUtilityBillSummary(filters: UtilityFilters = {}): Promi
 function mapRowToUtilityBill(row: Record<string, unknown>): UtilityBill {
   return {
     id: String(row.id),
-    buildingId: String(row.building_id),
+    buildingId: row.building_id ? String(row.building_id) : undefined,
     roomId: row.room_id ? String(row.room_id) : undefined,
     utilityType: String(row.utility_type) as UtilityBill['utilityType'],
     amount: Number(row.amount),

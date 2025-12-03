@@ -40,6 +40,12 @@ export default async function ReportsPage() {
           icon: DollarSign
         },
         {
+          name: 'Expense Report',
+          description: 'List of all expenses details and summary total by month, quarterly, six months and annual',
+          href: '/admin/bills-expenses/reports',
+          icon: DollarSign
+        },
+        {
           name: 'Comprehensive Financial Report',
           description: 'Complete financial overview with trends',
           href: '/admin/financial/reports',

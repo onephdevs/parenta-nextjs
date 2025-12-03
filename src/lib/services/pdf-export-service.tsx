@@ -313,7 +313,7 @@ const OccupancyReportPDF = ({ data }: { data: any }) => (
 );
 
 /**
- * Expense Report PDF Component
+ * Expense Report PDF Component (with period support)
  */
 const ExpenseReportPDF = ({ data }: { data: any }) => (
   <Document>
@@ -322,7 +322,7 @@ const ExpenseReportPDF = ({ data }: { data: any }) => (
       <View style={styles.header}>
         <Text style={styles.title}>Expense Report</Text>
         <Text style={styles.subtitle}>
-          Period: {data.summary.period}
+          Period: {data.summary.period} ({data.summary.periodType || 'monthly'})
         </Text>
         <Text style={styles.subtitle}>
           Generated: {new Date().toLocaleString()}
@@ -350,28 +350,78 @@ const ExpenseReportPDF = ({ data }: { data: any }) => (
         </View>
       </View>
 
-      {/* By Category Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Expenses by Category</Text>
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={styles.tableCell}>Category</Text>
-            <Text style={styles.tableCellRight}>Amount</Text>
-            <Text style={styles.tableCellRight}>%</Text>
-            <Text style={styles.tableCellRight}>Count</Text>
-          </View>
-          {data.byCategory.map((item: any, index: number) => (
-            <View key={index} style={styles.tableRow}>
-              <Text style={styles.tableCell}>{item.category}</Text>
-              <Text style={styles.tableCellRight}>
-                ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </Text>
-              <Text style={styles.tableCellRight}>{item.percentage.toFixed(1)}%</Text>
-              <Text style={styles.tableCellRight}>{item.count}</Text>
+      {/* By Period Section */}
+      {data.byPeriod && data.byPeriod.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Expenses by Period</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.tableCell}>Period</Text>
+              <Text style={styles.tableCellRight}>Amount</Text>
+              <Text style={styles.tableCellRight}>Count</Text>
             </View>
-          ))}
+            {data.byPeriod.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={styles.tableCell}>{item.period}</Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>{item.count}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
+
+      {/* By Category Section */}
+      {data.byCategory && data.byCategory.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Expenses by Category</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.tableCell}>Category</Text>
+              <Text style={styles.tableCellRight}>Amount</Text>
+              <Text style={styles.tableCellRight}>%</Text>
+              <Text style={styles.tableCellRight}>Count</Text>
+            </View>
+            {data.byCategory.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={styles.tableCell}>
+                  {item.category.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                </Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>{item.percentage.toFixed(1)}%</Text>
+                <Text style={styles.tableCellRight}>{item.count}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* By Building Section */}
+      {data.byBuilding && data.byBuilding.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Expenses by Building</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.tableCell}>Building</Text>
+              <Text style={styles.tableCellRight}>Amount</Text>
+              <Text style={styles.tableCellRight}>Count</Text>
+            </View>
+            {data.byBuilding.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={styles.tableCell}>{item.buildingName}</Text>
+                <Text style={styles.tableCellRight}>
+                  ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight}>{item.count}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Footer */}
       <Text style={styles.footer}>Parenta Property Management System</Text>

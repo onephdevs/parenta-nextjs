@@ -242,7 +242,11 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                     errors.category ? 'border-red-300' : ''
                   }`}
                 >
+                  <option value="cleaning">Cleaning</option>
                   <option value="maintenance">Maintenance</option>
+                  <option value="repair">Repair</option>
+                  <option value="upgrade">Upgrade</option>
+                  <option value="garbage_collection">Garbage Collection</option>
                   <option value="utilities">Utilities</option>
                   <option value="supplies">Supplies</option>
                   <option value="services">Services</option>

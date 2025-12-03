@@ -729,6 +729,230 @@ export async function generateExpenseReport(
 }
 
 /**
+ * Generate Expense Report by Period (Monthly, Quarterly, Semi-Annual, Annual)
+ */
+export async function generateExpenseReportByPeriod(
+  startDate: string,
+  endDate: string,
+  periodType: 'monthly' | 'quarterly' | 'semi-annual' | 'annual' = 'monthly',
+  filters?: {
+    category?: string;
+    buildingId?: string;
+    roomId?: string;
+  }
+): Promise<{
+  summary: {
+    totalExpenses: number;
+    totalCount: number;
+    averageExpense: number;
+    period: string;
+    periodType: string;
+  };
+  byPeriod: Array<{
+    period: string;
+    amount: number;
+    count: number;
+  }>;
+  byCategory: Array<{
+    category: string;
+    amount: number;
+    count: number;
+    percentage: number;
+  }>;
+  byBuilding: Array<{
+    buildingId: string;
+    buildingName: string;
+    amount: number;
+    count: number;
+  }>;
+  details: Array<{
+    id: string;
+    description: string;
+    amount: number;
+    category: string;
+    buildingName?: string;
+    roomNumber?: string;
+    expenseDate: string;
+    vendorName?: string;
+    expenseStatus: string;
+  }>;
+}> {
+  const client = await pool.connect();
+  
+  try {
+    // Build WHERE clause with filters
+    const conditions: string[] = ['e.expense_date BETWEEN $1 AND $2', 'e.is_active = true'];
+    const values: unknown[] = [startDate, endDate];
+    let paramCount = 2;
+
+    if (filters?.category) {
+      paramCount++;
+      conditions.push(`e.category = $${paramCount}`);
+      values.push(filters.category);
+    }
+
+    if (filters?.buildingId) {
+      paramCount++;
+      conditions.push(`e.building_id = $${paramCount}`);
+      values.push(filters.buildingId);
+    }
+
+    if (filters?.roomId) {
+      paramCount++;
+      conditions.push(`e.room_id = $${paramCount}`);
+      values.push(filters.roomId);
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+    // Summary
+    const summaryQuery = `
+      SELECT 
+        COALESCE(SUM(e.amount), 0) as total_expenses,
+        COUNT(*) as total_count,
+        COALESCE(AVG(e.amount), 0) as average_expense
+      FROM expenses e
+      ${whereClause}
+    `;
+    const summaryResult = await client.query(summaryQuery, values);
+    
+    const totalExpenses = parseFloat(summaryResult.rows[0].total_expenses);
+    const summary = {
+      totalExpenses,
+      totalCount: parseInt(summaryResult.rows[0].total_count),
+      averageExpense: parseFloat(summaryResult.rows[0].average_expense),
+      period: `${startDate} to ${endDate}`,
+      periodType,
+    };
+
+    // Get all expenses for period grouping
+    const expensesQuery = `
+      SELECT 
+        e.id,
+        e.description,
+        e.amount,
+        e.category,
+        e.expense_date,
+        e.vendor_name,
+        e.expense_status,
+        b.name as building_name,
+        r.room_number
+      FROM expenses e
+      LEFT JOIN buildings b ON e.building_id = b.id
+      LEFT JOIN rooms r ON e.room_id = r.id
+      ${whereClause}
+      ORDER BY e.expense_date ASC
+    `;
+    const expensesResult = await client.query(expensesQuery, values);
+    const expenses = expensesResult.rows;
+
+    // Group by period
+    const periodMap = new Map<string, { amount: number; count: number }>();
+    
+    expenses.forEach((expense: any) => {
+      const date = new Date(expense.expense_date);
+      let periodKey: string;
+      
+      switch (periodType) {
+        case 'quarterly':
+          const quarter = Math.floor(date.getMonth() / 3) + 1;
+          periodKey = `Q${quarter} ${date.getFullYear()}`;
+          break;
+        case 'semi-annual':
+          const half = date.getMonth() < 6 ? 'H1' : 'H2';
+          periodKey = `${half} ${date.getFullYear()}`;
+          break;
+        case 'annual':
+          periodKey = date.getFullYear().toString();
+          break;
+        default: // monthly
+          periodKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+      
+      if (!periodMap.has(periodKey)) {
+        periodMap.set(periodKey, { amount: 0, count: 0 });
+      }
+      
+      const period = periodMap.get(periodKey)!;
+      period.amount += parseFloat(expense.amount || 0);
+      period.count += 1;
+    });
+    
+    const byPeriod = Array.from(periodMap.entries())
+      .map(([period, data]) => ({ period, amount: data.amount, count: data.count }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+
+    // By Category
+    const categoryQuery = `
+      SELECT 
+        e.category,
+        COALESCE(SUM(e.amount), 0) as amount,
+        COUNT(*) as count
+      FROM expenses e
+      ${whereClause}
+      GROUP BY e.category
+      ORDER BY amount DESC
+    `;
+    const categoryResult = await client.query(categoryQuery, values);
+    
+    const byCategory = categoryResult.rows.map((row: any) => ({
+      category: row.category,
+      amount: parseFloat(row.amount),
+      count: parseInt(row.count),
+      percentage: totalExpenses > 0 ? (parseFloat(row.amount) / totalExpenses) * 100 : 0,
+    }));
+
+    // By Building
+    const buildingQuery = `
+      SELECT 
+        b.id as building_id,
+        b.name as building_name,
+        COALESCE(SUM(e.amount), 0) as amount,
+        COUNT(e.id) as count
+      FROM buildings b
+      LEFT JOIN expenses e ON e.building_id = b.id
+        AND e.expense_date BETWEEN $1 AND $2
+        AND e.is_active = true
+      WHERE b.is_active = true
+      GROUP BY b.id, b.name
+      HAVING SUM(e.amount) > 0
+      ORDER BY amount DESC
+    `;
+    const buildingResult = await client.query(buildingQuery, [startDate, endDate]);
+    
+    const byBuilding = buildingResult.rows.map((row: any) => ({
+      buildingId: row.building_id,
+      buildingName: row.building_name,
+      amount: parseFloat(row.amount),
+      count: parseInt(row.count),
+    }));
+
+    // Details (all expenses)
+    const details = expenses.map((row: any) => ({
+      id: row.id,
+      description: row.description,
+      amount: parseFloat(row.amount),
+      category: row.category,
+      buildingName: row.building_name,
+      roomNumber: row.room_number,
+      expenseDate: row.expense_date,
+      vendorName: row.vendor_name,
+      expenseStatus: row.expense_status,
+    }));
+
+    return {
+      summary,
+      byPeriod,
+      byCategory,
+      byBuilding,
+      details,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Get Tenant Financial Summary
  */
 export async function getTenantFinancialSummary(tenantId: string): Promise<TenantFinancialSummary> {
