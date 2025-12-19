@@ -65,7 +65,7 @@ export async function GET() {
     
     const scheduleResult = await pool.query(scheduleQuery, [tenant.id]);
     
-    // Fetch payment history
+    // Fetch payment history (only completed/paid payments, not pending invoices)
     const historyQuery = `
       SELECT 
         p.id,
@@ -86,6 +86,7 @@ export async function GET() {
       LEFT JOIN payment_allocations pa ON pa.payment_id = p.id
       LEFT JOIN invoices i ON i.id = pa.invoice_id
       WHERE p.tenant_id = $1
+        AND p.payment_status IN ('paid', 'partial')
       GROUP BY p.id, p.amount, p.payment_type, p.payment_method, p.payment_date, 
                p.due_date, p.payment_status, p.reference_number, p.notes,
                r.room_number, b.name

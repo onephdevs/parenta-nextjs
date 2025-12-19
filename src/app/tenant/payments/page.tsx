@@ -16,12 +16,16 @@ import {
   Filter,
   Search,
   X,
-  Printer
+  Printer,
+  Zap,
+  Droplet
 } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
 import PaymentForm from '@/components/features/tenant/PaymentForm';
+import DepositPaymentForm from '@/components/features/tenant/DepositPaymentForm';
+import UtilityDepositForm from '@/components/features/tenant/UtilityDepositForm';
 
 interface Payment {
   id: string;
@@ -88,11 +92,17 @@ export default function PaymentsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<string | null>(null);
+  const [showDepositForm, setShowDepositForm] = useState(false);
+  const [showUtilityDepositForm, setShowUtilityDepositForm] = useState(false);
+  const [depositBalance, setDepositBalance] = useState<number | null>(null);
+  const [utilityDepositData, setUtilityDepositData] = useState<any>(null);
   const { showNotification } = useNotifications();
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user.role === 'tenant') {
       fetchPaymentData();
+      fetchDepositData();
+      fetchUtilityDepositData();
     }
   }, [status, session]);
 
@@ -156,11 +166,20 @@ export default function PaymentsPage() {
           schedule,
         });
       } else {
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: paymentsData.error || 'Failed to load payment data'
-        });
+        // Check if it's a "No tenant profile found" error
+        if (paymentsData.error === 'No tenant profile found' || paymentsResponse.status === 404) {
+          showNotification({
+            type: 'error',
+            title: 'Profile Not Found',
+            message: 'No tenant profile found. Please contact admin to link your account to a tenant profile.'
+          });
+        } else {
+          showNotification({
+            type: 'error',
+            title: 'Error',
+            message: paymentsData.error || 'Failed to load payment data'
+          });
+        }
       }
 
       if (balanceResult.success) {
@@ -187,6 +206,42 @@ export default function PaymentsPage() {
   const handlePaymentComplete = () => {
     setShowPaymentForm(false);
     fetchPaymentData(); // Refresh payment data
+  };
+
+  const fetchDepositData = async () => {
+    try {
+      const response = await fetch('/api/tenant/deposits');
+      const data = await response.json();
+      if (data.success) {
+        setDepositBalance(data.data.balance);
+      }
+    } catch (error) {
+      console.error('Error fetching deposit data:', error);
+    }
+  };
+
+  const fetchUtilityDepositData = async () => {
+    try {
+      const response = await fetch('/api/tenant/utility-deposits');
+      const data = await response.json();
+      if (data.success) {
+        setUtilityDepositData(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching utility deposit data:', error);
+    }
+  };
+
+  const handleDepositComplete = () => {
+    setShowDepositForm(false);
+    fetchDepositData();
+    fetchPaymentData();
+  };
+
+  const handleUtilityDepositComplete = () => {
+    setShowUtilityDepositForm(false);
+    fetchUtilityDepositData();
+    fetchPaymentData();
   };
 
   const handleDownloadReceipt = (paymentId: string) => {
@@ -250,13 +305,19 @@ export default function PaymentsPage() {
     });
   };
 
-  const filteredPayments = (paymentData?.recentPayments || []).filter(payment => {
-    const matchesStatus = filterStatus === 'all' || payment.status === filterStatus;
-    const matchesSearch = payment.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payment.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payment.reference?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  // Filter payment history - only show completed payments (paid/partial)
+  const filteredPayments = (paymentData?.recentPayments || [])
+    .filter(payment => {
+      // Payment history only shows completed payments
+      const isCompleted = payment.status === 'paid' || payment.status === 'partial';
+      if (!isCompleted) return false;
+      
+      const matchesStatus = filterStatus === 'all' || payment.status === filterStatus;
+      const matchesSearch = payment.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           payment.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           payment.reference?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesStatus && matchesSearch;
+    });
 
   if (isLoading) {
     return (
@@ -420,63 +481,177 @@ export default function PaymentsPage() {
                 </div>
               )}
 
-              {/* Make Payment Section */}
-              {!showPaymentForm ? (
-                <div className="bg-white shadow rounded-lg p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
-                      <p className="text-sm text-gray-900">
-                        Pay your rent securely online with multiple payment options
-                      </p>
-                      <div className="mt-2 text-sm text-gray-900">
-                        <p>• Credit/Debit Cards (Visa, MasterCard, American Express)</p>
-                        <p>• Bank Transfer (ACH)</p>
-                        <p>• Online Banking</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-900 mb-2">
-                        {formatCurrency(balanceData?.nextAmount || paymentData?.nextAmount || 0)}
-                      </div>
-                      <div className="text-sm text-gray-900 mb-4">
-                        Due: {formatDate(balanceData?.nextDueDate || paymentData?.nextDueDate || '')}
-                      </div>
-                      <button
-                        onClick={handleMakePayment}
-                        className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        <CreditCard className="mr-2 h-5 w-5" />
-                        Pay Now
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white shadow rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
+              {/* Payment Options Tabs */}
+              <div className="bg-white shadow rounded-lg">
+                <div className="border-b border-gray-200">
+                  <nav className="flex -mb-px" aria-label="Tabs">
                     <button
-                      onClick={() => setShowPaymentForm(false)}
-                      className="text-gray-400 hover:text-gray-600"
+                      onClick={() => {
+                        setShowPaymentForm(false);
+                        setShowDepositForm(false);
+                        setShowUtilityDepositForm(false);
+                      }}
+                      className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                        !showPaymentForm && !showDepositForm && !showUtilityDepositForm
+                          ? 'border-blue-500 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
                     >
-                      <X className="h-5 w-5" />
+                      <CreditCard className="h-5 w-5 mx-auto mb-1" />
+                      Rent Payment
                     </button>
-                  </div>
-                  <PaymentForm
-                    invoices={paymentData?.schedule?.map(item => ({
-                      id: item.id,
-                      invoiceNumber: item.invoiceNumber,
-                      dueDate: item.dueDate,
-                      balanceDue: item.balanceDue,
-                      totalAmount: item.totalAmount,
-                      status: item.status,
-                    })) || []}
-                    onPaymentComplete={handlePaymentComplete}
-                    onCancel={() => setShowPaymentForm(false)}
-                  />
+                    <button
+                      onClick={() => {
+                        setShowPaymentForm(false);
+                        setShowDepositForm(true);
+                        setShowUtilityDepositForm(false);
+                      }}
+                      className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                        showDepositForm
+                          ? 'border-green-500 text-green-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <DollarSign className="h-5 w-5 mx-auto mb-1" />
+                      Deposit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPaymentForm(false);
+                        setShowDepositForm(false);
+                        setShowUtilityDepositForm(true);
+                      }}
+                      className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                        showUtilityDepositForm
+                          ? 'border-orange-500 text-orange-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <AlertCircle className="h-5 w-5 mx-auto mb-1" />
+                      Utility Deposit
+                    </button>
+                  </nav>
                 </div>
-              )}
+
+                <div className="p-6">
+                  {/* Rent Payment Form */}
+                  {!showPaymentForm && !showDepositForm && !showUtilityDepositForm && (
+                    <div>
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
+                          <p className="text-sm text-gray-900">
+                            Pay your rent securely online with multiple payment options
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-gray-900 mb-2">
+                            {formatCurrency(balanceData?.nextAmount || paymentData?.nextAmount || 0)}
+                          </div>
+                          <div className="text-sm text-gray-900 mb-4">
+                            Due: {formatDate(balanceData?.nextDueDate || paymentData?.nextDueDate || '')}
+                          </div>
+                          <button
+                            onClick={handleMakePayment}
+                            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <CreditCard className="mr-2 h-5 w-5" />
+                            Pay Now
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {showPaymentForm && (
+                    <div>
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
+                        <button
+                          onClick={() => setShowPaymentForm(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <PaymentForm
+                        invoices={paymentData?.schedule?.map(item => ({
+                          id: item.id,
+                          invoiceNumber: item.invoiceNumber,
+                          dueDate: item.dueDate,
+                          balanceDue: item.balanceDue,
+                          totalAmount: item.totalAmount,
+                          status: item.status,
+                        })) || []}
+                        onPaymentComplete={handlePaymentComplete}
+                        onCancel={() => setShowPaymentForm(false)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Deposit Payment Form */}
+                  {showDepositForm && (
+                    <div>
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">Add Deposit Payment</h3>
+                          {depositBalance !== null && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Current Deposit Balance: {formatCurrency(depositBalance)}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setShowDepositForm(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <DepositPaymentForm
+                        onPaymentComplete={handleDepositComplete}
+                        onCancel={() => setShowDepositForm(false)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Utility Deposit Form */}
+                  {showUtilityDepositForm && (
+                    <div>
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">Add Utility Deposit</h3>
+                          {utilityDepositData && utilityDepositData.hasAssignment && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Current Utility Deposit: {formatCurrency(utilityDepositData.utilityDepositPaid)} | 
+                              Room: {utilityDepositData.roomNumber} | 
+                              Building: {utilityDepositData.buildingName}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setShowUtilityDepositForm(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      {utilityDepositData && !utilityDepositData.hasAssignment ? (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <p className="text-yellow-800">
+                            You don't have an active room assignment. Please contact admin to assign you to a room first.
+                          </p>
+                        </div>
+                      ) : (
+                        <UtilityDepositForm
+                          onPaymentComplete={handleUtilityDepositComplete}
+                          onCancel={() => setShowUtilityDepositForm(false)}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Payment Schedule - Upcoming Invoices */}
               {paymentData && paymentData.schedule && paymentData.schedule.length > 0 && (
@@ -579,11 +754,9 @@ export default function PaymentsPage() {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="all">All Status</option>
+                        <option value="all">All Payments</option>
                         <option value="paid">Paid</option>
-                        <option value="pending">Pending</option>
-                        <option value="overdue">Overdue</option>
-                        <option value="failed">Failed</option>
+                        <option value="partial">Partial</option>
                       </select>
                     </div>
                   </div>

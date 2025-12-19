@@ -47,11 +47,60 @@ export default function DocumentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { showNotification } = useNotifications();
 
+  const fetchDocuments = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/tenant/documents');
+      const data = await response.json();
+
+      if (data.success) {
+        // Map API response to component format
+        setDocumentsData({
+          totalDocuments: data.data.totalDocuments,
+          documents: data.data.documents.map((doc: any) => ({
+            id: doc.id,
+            name: doc.name,
+            category: doc.category,
+            uploadedAt: doc.uploadedAt,
+            size: doc.size,
+            fileType: doc.fileType,
+            url: doc.url,
+            description: doc.description,
+          })),
+        });
+      } else {
+        // Check if it's a "No tenant profile found" error
+        if (data.error === 'No tenant profile found' || response.status === 404) {
+          showNotification({
+            type: 'error',
+            title: 'Profile Not Found',
+            message: 'No tenant profile found. Please contact admin to link your account to a tenant profile.'
+          });
+        } else {
+          showNotification({
+            type: 'error',
+            title: 'Error',
+            message: data.error || 'Failed to load documents'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load documents'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (status === 'authenticated' && session?.user.role === 'tenant') {
       fetchDocuments();
     }
-  }, [status, session]);
+  }, [status, session, showNotification]);
 
   // Show loading state while checking authentication
   if (status === 'loading' || isLoading) {
@@ -78,46 +127,6 @@ export default function DocumentsPage() {
   if (!session || session.user.role !== 'tenant') {
     redirect('/auth/signin?role=tenant');
   }
-
-  const fetchDocuments = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/tenant/documents');
-      const data = await response.json();
-
-      if (data.success) {
-        // Map API response to component format
-        setDocumentsData({
-          totalDocuments: data.data.totalDocuments,
-          documents: data.data.documents.map((doc: any) => ({
-            id: doc.id,
-            name: doc.name,
-            category: doc.category,
-            uploadedAt: doc.uploadedAt,
-            size: doc.size,
-            fileType: doc.fileType,
-            url: doc.url,
-            description: doc.description,
-          })),
-        });
-      } else {
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: data.error || 'Failed to load documents'
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load documents'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleDownload = (document: Document) => {
     if (document.url) {

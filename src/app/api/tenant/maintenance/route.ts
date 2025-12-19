@@ -14,29 +14,66 @@ export async function GET() {
       );
     }
 
+    // First, check if tenant profile exists
+    const tenantCheckQuery = `
+      SELECT t.id as tenant_id
+      FROM users u
+      INNER JOIN tenants t ON u.id = t.user_id
+      WHERE u.id = $1
+    `;
+
+    const tenantCheck = await pool.query(tenantCheckQuery, [session.user.id]);
+
+    if (tenantCheck.rows.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No tenant profile found',
+        },
+        { status: 404 }
+      );
+    }
+
+    const tenantId = tenantCheck.rows[0].tenant_id;
+
     // Get tenant's maintenance requests
     const query = `
       SELECT 
         mr.*,
         r.room_number,
         b.name as building_name
-      FROM users u
-      INNER JOIN tenants t ON u.id = t.user_id
-      INNER JOIN maintenance_requests mr ON t.id = mr.tenant_id
+      FROM maintenance_requests mr
       LEFT JOIN rooms r ON mr.room_id = r.id
       LEFT JOIN buildings b ON mr.building_id = b.id
-      WHERE u.id = $1
-      ORDER BY mr.request_date DESC
+      WHERE mr.tenant_id = $1
+      ORDER BY mr.created_at DESC
     `;
 
-    const result = await pool.query(query, [session.user.id]);
+    const result = await pool.query(query, [tenantId]);
+
+    // Transform database columns to frontend format
+    const requests = result.rows.map((row: any) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      priority: row.priority,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      scheduledDate: row.scheduled_date,
+      completedDate: row.completed_date,
+      notes: row.notes,
+      roomNumber: row.room_number,
+      buildingName: row.building_name
+    }));
 
     return NextResponse.json({
       success: true,
       data: { 
-        requests: result.rows,
-        total: result.rows.length,
-        active: result.rows.filter((r: any) => r.status !== 'completed' && r.status !== 'cancelled').length
+        requests,
+        total: requests.length,
+        active: requests.filter((r: any) => r.status !== 'completed' && r.status !== 'cancelled').length
       }
     });
 
@@ -79,11 +116,15 @@ export async function POST(request: Request) {
 
     // Get tenant's room information
     const tenantQuery = `
-      SELECT t.id as tenant_id, ta.room_id, r.building_id
+      SELECT 
+        t.id as tenant_id, 
+        tra.room_id, 
+        r.building_id
       FROM users u
       INNER JOIN tenants t ON u.id = t.user_id
-      LEFT JOIN tenant_assignments ta ON t.id = ta.tenant_id AND ta.end_date IS NULL
-      LEFT JOIN rooms r ON ta.room_id = r.id
+      LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id 
+        AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON tra.room_id = r.id
       WHERE u.id = $1
     `;
     
@@ -91,7 +132,7 @@ export async function POST(request: Request) {
 
     if (tenantResult.rows.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Tenant not found' },
+        { success: false, error: 'No tenant profile found' },
         { status: 404 }
       );
     }
@@ -108,9 +149,8 @@ export async function POST(request: Request) {
         description,
         category,
         priority,
-        status,
-        request_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
 

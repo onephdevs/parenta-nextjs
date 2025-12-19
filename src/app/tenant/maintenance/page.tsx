@@ -58,6 +58,42 @@ export default function MaintenancePage() {
     priority: 'medium'
   });
 
+  const fetchMaintenanceData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/tenant/maintenance');
+      const data = await response.json();
+
+      if (data.success) {
+        setMaintenanceData(data.data);
+      } else {
+        // Check if it's a "No tenant profile found" error
+        if (data.error === 'No tenant profile found' || response.status === 404) {
+          showNotification({
+            type: 'error',
+            title: 'Profile Not Found',
+            message: 'No tenant profile found. Please contact admin to link your account to a tenant profile.'
+          });
+        } else {
+          showNotification({
+            type: 'error',
+            title: 'Error',
+            message: data.error || 'Failed to load maintenance requests'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching maintenance data:', error);
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load maintenance requests'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (status === 'authenticated' && session?.user.role === 'tenant') {
       fetchMaintenanceData();
@@ -89,33 +125,6 @@ export default function MaintenancePage() {
   if (!session || session.user.role !== 'tenant') {
     redirect('/auth/signin?role=tenant');
   }
-
-  const fetchMaintenanceData = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/tenant/maintenance');
-      const data = await response.json();
-
-      if (data.success) {
-        setMaintenanceData(data.data);
-      } else {
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: 'Failed to load maintenance requests'
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching maintenance data:', error);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load maintenance requests'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
