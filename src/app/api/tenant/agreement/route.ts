@@ -116,10 +116,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
+    // Validate file type - check both MIME type and file extension
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isValidType = SUPPORTED_FILE_TYPES.includes(file.type) || 
+                        (file.type === '' && allowedExtensions.includes(fileExtension)) ||
+                        allowedExtensions.includes(fileExtension);
+    
+    if (!isValidType) {
       return NextResponse.json(
-        { success: false, error: `File type ${file.type} is not supported. Supported types: PDF, DOC, DOCX` },
+        { success: false, error: `File type ${file.type || fileExtension} is not supported. Supported types: PDF, DOC, DOCX` },
         { status: 400 }
       );
     }
@@ -153,31 +159,71 @@ export async function POST(request: NextRequest) {
     }
 
     // Save the uploaded file
-    const { fileName, filePath, fileSize } = await saveUploadedFile(file);
+    let savedFile;
+    try {
+      savedFile = await saveUploadedFile(file);
+    } catch (fileError) {
+      console.error('Error saving uploaded file:', fileError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to save file to disk. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    const { fileName, filePath, fileSize } = savedFile;
 
     // Create document record
     const documentName = formData.get('documentName') as string || `Tenant Agreement - ${file.name}`;
     const description = formData.get('description') as string || undefined;
 
-    const document = await createDocument({
-      tenantId,
-      documentName,
-      fileName,
-      filePath,
-      fileSize,
-      mimeType: file.type,
-      documentType: 'tenant_agreement',
-      description,
-      isPublic: false,
-      accessLevel: 'tenant',
-      uploadedBy: userId,
-    });
+    let document;
+    try {
+      document = await createDocument({
+        tenantId,
+        documentName,
+        fileName,
+        filePath,
+        fileSize,
+        mimeType: file.type || 'application/pdf', // Default to PDF if MIME type is missing
+        documentType: 'tenant_agreement',
+        description,
+        isPublic: false,
+        accessLevel: 'tenant',
+        uploadedBy: userId,
+      });
+    } catch (docError) {
+      console.error('Error creating document record:', docError);
+      // Try to clean up saved file if document creation fails
+      try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const fullPath = path.join(process.cwd(), 'public', filePath);
+        await fs.unlink(fullPath);
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+      return NextResponse.json(
+        { success: false, error: 'Failed to create document record. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     // Update tenant record with document ID
-    await pool.query(
-      'UPDATE tenants SET tenant_agreement_document_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [document.id, tenantId]
-    );
+    try {
+      await pool.query(
+        'UPDATE tenants SET tenant_agreement_document_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [document.id, tenantId]
+      );
+    } catch (updateError) {
+      console.error('Error updating tenant record:', updateError);
+      // Document was created but tenant update failed - this is less critical
+      return NextResponse.json({ 
+        success: true,
+        data: document,
+        message: 'Document uploaded but failed to link to tenant profile. Please contact admin.',
+        warning: 'Tenant record update failed'
+      }, { status: 200 });
+    }
 
     return NextResponse.json({ 
       success: true,
@@ -186,8 +232,9 @@ export async function POST(request: NextRequest) {
     }, { status: 200 });
   } catch (error) {
     console.error('Error uploading tenant agreement:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { success: false, error: 'Failed to upload tenant agreement' },
+      { success: false, error: `Failed to upload tenant agreement: ${errorMessage}` },
       { status: 500 }
     );
   }

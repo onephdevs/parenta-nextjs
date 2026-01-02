@@ -38,18 +38,30 @@ export default function DocumentUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
+    // Validate file type - check both MIME type and file extension
     const allowedTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ];
-    if (!allowedTypes.includes(file.type)) {
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    // Some browsers don't report correct MIME type, so check extension as fallback
+    const isValidType = allowedTypes.includes(file.type) || 
+                        (file.type === '' && allowedExtensions.includes(fileExtension)) ||
+                        allowedExtensions.includes(fileExtension);
+    
+    if (!isValidType) {
       showNotification({
         type: 'error',
         title: 'Invalid File',
         message: 'Please select a PDF, DOC, or DOCX file'
       });
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
@@ -60,6 +72,10 @@ export default function DocumentUpload({
         title: 'File Too Large',
         message: 'File must be less than 10MB'
       });
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
@@ -89,7 +105,9 @@ export default function DocumentUpload({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Upload failed');
+        const errorMessage = data.error || data.message || `Upload failed with status ${response.status}`;
+        console.error('Upload error response:', { status: response.status, data });
+        throw new Error(errorMessage);
       }
 
       showNotification({
