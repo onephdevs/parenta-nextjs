@@ -237,12 +237,16 @@ export default function TenantDashboard() {
               <div className="hidden md:flex items-center space-x-3 pl-4 border-l border-gray-200">
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">
-                    {session.user.name || session.user.email}
+                    {tenantData?.profile?.firstName && tenantData?.profile?.lastName
+                      ? `${tenantData.profile.firstName} ${tenantData.profile.lastName}`
+                      : session.user.name || session.user.email}
                   </p>
                   <p className="text-xs text-gray-900">Tenant</p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold">
-                  {session.user.name?.charAt(0) || session.user.email?.charAt(0)}
+                  {tenantData?.profile?.firstName?.charAt(0)?.toUpperCase() || 
+                   session.user.name?.charAt(0)?.toUpperCase() || 
+                   session.user.email?.charAt(0)?.toUpperCase()}
                 </div>
               </div>
               
