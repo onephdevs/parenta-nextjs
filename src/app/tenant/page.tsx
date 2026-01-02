@@ -24,14 +24,67 @@ import {
 import { LogoutButton } from '@/components/features/LogoutButton';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 
+interface TenantDashboardData {
+  profile: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  };
+  roomAssignment: {
+    roomId: string;
+    roomNumber: string;
+    floorNumber?: number;
+    roomType?: string;
+    buildingId: string;
+    buildingName: string;
+    address: string;
+    assignmentStart: string;
+    assignmentEnd?: string;
+    monthlyRate: number;
+    depositPaid?: number;
+    advancePaid?: number;
+    utilityDepositPaid?: number;
+  } | null;
+}
+
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
   const [isLoading, setIsLoading] = useState(true);
+  const [tenantData, setTenantData] = useState<TenantDashboardData | null>(null);
+  const [nextDueDate, setNextDueDate] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setIsLoading(false), 1000);
-  }, []);
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchTenantData();
+    }
+  }, [status, session]);
+
+  const fetchTenantData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/tenant/profile');
+      const data = await response.json();
+
+      if (data.success) {
+        setTenantData(data.data);
+        
+        // Calculate next due date (first of next month)
+        if (data.data.roomAssignment?.assignmentStart) {
+          const startDate = new Date(data.data.roomAssignment.assignmentStart);
+          const nextDue = new Date(startDate);
+          nextDue.setMonth(nextDue.getMonth() + 1);
+          nextDue.setDate(1);
+          setNextDueDate(nextDue.toISOString().split('T')[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tenant data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (status === 'loading' || isLoading) {
     return (
@@ -86,27 +139,77 @@ export default function TenantDashboard() {
     }
   ];
 
-  // Mock data - In production, this would come from API
-  const tenantInfo = {
-    roomNumber: '201A',
-    buildingName: 'Sunrise Residences',
-    address: '123 Main Street, Manila',
-    monthlyRent: 15000,
-    nextDueDate: '2025-11-01',
-    leaseEnd: '2026-10-31',
-    securityDeposit: 30000
+  // Get tenant info from API data or show placeholder
+  const tenantInfo = tenantData?.roomAssignment ? {
+    roomNumber: tenantData.roomAssignment.roomNumber || 'N/A',
+    buildingName: tenantData.roomAssignment.buildingName || 'N/A',
+    address: tenantData.roomAssignment.address || 'N/A',
+    monthlyRent: tenantData.roomAssignment.monthlyRate || 0,
+    nextDueDate: nextDueDate || new Date().toISOString().split('T')[0],
+    leaseEnd: tenantData.roomAssignment.assignmentEnd 
+      ? new Date(tenantData.roomAssignment.assignmentEnd).toISOString().split('T')[0]
+      : tenantData.roomAssignment.assignmentStart
+        ? new Date(new Date(tenantData.roomAssignment.assignmentStart).setFullYear(new Date(tenantData.roomAssignment.assignmentStart).getFullYear() + 1)).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0],
+    securityDeposit: tenantData.roomAssignment.depositPaid || 0
+  } : {
+    roomNumber: 'Not Assigned',
+    buildingName: 'N/A',
+    address: 'N/A',
+    monthlyRent: 0,
+    nextDueDate: new Date().toISOString().split('T')[0],
+    leaseEnd: new Date().toISOString().split('T')[0],
+    securityDeposit: 0
   };
 
-  const recentPayments = [
-    { id: 1, date: '2025-10-01', amount: 15000, status: 'Paid', type: 'Rent' },
-    { id: 2, date: '2025-09-01', amount: 15000, status: 'Paid', type: 'Rent' },
-    { id: 3, date: '2025-08-01', amount: 15000, status: 'Paid', type: 'Rent' }
-  ];
+  const [recentPayments, setRecentPayments] = useState<Array<{ id: string; date: string; amount: number; status: string; type: string }>>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<Array<{ id: string; title: string; status: string; date: string }>>([]);
 
-  const maintenanceRequests = [
-    { id: 1, title: 'Leaking faucet', status: 'Completed', date: '2025-10-15' },
-    { id: 2, title: 'AC not cooling', status: 'In Progress', date: '2025-10-20' }
-  ];
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchPaymentHistory();
+      fetchMaintenanceRequests();
+    }
+  }, [status, session]);
+
+  const fetchPaymentHistory = async () => {
+    try {
+      const response = await fetch('/api/tenant/payments');
+      const data = await response.json();
+      
+      if (data.success && data.data?.history) {
+        const payments = data.data.history.slice(0, 3).map((p: any) => ({
+          id: p.id,
+          date: p.paymentDate || p.payment_date,
+          amount: p.amount,
+          status: p.paymentStatus === 'paid' ? 'Paid' : p.paymentStatus,
+          type: p.paymentType || p.payment_type || 'Rent'
+        }));
+        setRecentPayments(payments);
+      }
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+    }
+  };
+
+  const fetchMaintenanceRequests = async () => {
+    try {
+      const response = await fetch('/api/tenant/maintenance');
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const requests = data.data.slice(0, 2).map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          status: r.status === 'completed' ? 'Completed' : r.status === 'in_progress' ? 'In Progress' : r.status,
+          date: r.createdAt || r.created_at
+        }));
+        setMaintenanceRequests(requests);
+      }
+    } catch (error) {
+      console.error('Error fetching maintenance requests:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-gray-50 to-green-50">
@@ -254,7 +357,7 @@ export default function TenantDashboard() {
               </span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
-              {recentPayments.length}
+              {recentPayments.length || 0}
             </h3>
             <p className="text-sm text-gray-900 mb-3">Payments Made</p>
             <div className="flex items-center justify-between text-xs">
@@ -276,11 +379,11 @@ export default function TenantDashboard() {
               </span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
-              {maintenanceRequests.filter(r => r.status === 'In Progress').length}
+              {maintenanceRequests.filter(r => r.status === 'In Progress').length || 0}
             </h3>
             <p className="text-sm text-gray-900 mb-3">Active Requests</p>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-900">{maintenanceRequests.length} total</span>
+              <span className="text-gray-900">{maintenanceRequests.length || 0} total</span>
               <Link href="/tenant/maintenance" className="text-green-600 hover:text-green-700 font-medium flex items-center">
                 View <ArrowRight className="h-3 w-3 ml-1" />
               </Link>
@@ -350,18 +453,22 @@ export default function TenantDashboard() {
               Recent Payments
             </h3>
             <div className="space-y-3">
-              {recentPayments.map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="font-medium text-gray-900">{payment.type}</p>
-                    <p className="text-xs text-gray-900">{new Date(payment.date).toLocaleDateString()}</p>
+              {recentPayments.length > 0 ? (
+                recentPayments.map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                    <div>
+                      <p className="font-medium text-gray-900">{payment.type}</p>
+                      <p className="text-xs text-gray-900">{new Date(payment.date).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">₱{payment.amount.toLocaleString()}</p>
+                      <p className="text-xs text-green-600">{payment.status}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">₱{payment.amount.toLocaleString()}</p>
-                    <p className="text-xs text-green-600">{payment.status}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-gray-900 py-4 text-center">No recent payments</p>
+              )}
             </div>
             <Link 
               href="/tenant/payments"
@@ -378,23 +485,27 @@ export default function TenantDashboard() {
               Maintenance Requests
             </h3>
             <div className="space-y-3">
-              {maintenanceRequests.map((request) => (
-                <div key={request.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{request.title}</p>
-                    <p className="text-xs text-gray-900">{new Date(request.date).toLocaleDateString()}</p>
+              {maintenanceRequests.length > 0 ? (
+                maintenanceRequests.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{request.title}</p>
+                      <p className="text-xs text-gray-900">{new Date(request.date).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        request.status === 'Completed' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {request.status}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      request.status === 'Completed' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {request.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-gray-900 py-4 text-center">No maintenance requests</p>
+              )}
             </div>
             <Link 
               href="/tenant/maintenance"
