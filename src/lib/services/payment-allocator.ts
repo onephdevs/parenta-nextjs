@@ -6,7 +6,7 @@
 
 import { Pool } from 'pg';
 import { PaymentAllocationRequest, PaymentAllocationResult } from '@/types/financial';
-import { getUnpaidInvoicesForTenant } from './invoice-generator';
+import { getUnpaidInvoicesForTenant, getUnpaidRentInvoicesForTenant } from './invoice-generator';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -83,6 +83,8 @@ export async function allocatePaymentToInvoices(
     }
 
     // Get unpaid invoices (sorted by due date, oldest first)
+    // Prioritize rent invoices, but include all invoice types for manual payments
+    // Note: Advance only applies to rent invoices, but manual payments can apply to any invoice
     const unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId);
 
     if (unpaidInvoices.length === 0) {
@@ -237,9 +239,10 @@ export async function allocatePaymentToInvoices(
 }
 
 /**
- * Apply tenant credit to an invoice
+ * Apply tenant credit (advance) to a RENT invoice only
+ * Advance must only apply to rent invoices, never to deposits, fees, damages, or other types
  */
-export async function applyCreditToInvoice(
+export async function applyCreditToRentInvoice(
   tenantId: string,
   invoiceId: string,
   creditAmount?: number
@@ -255,16 +258,28 @@ export async function applyCreditToInvoice(
   try {
     await client.query('BEGIN');
 
-    // Get tenant's available credit
+    // Get tenant's available credit (advance)
     const creditBalance = await getTenantCreditBalance(tenantId);
 
     if (creditBalance <= 0) {
-      throw new Error('No available credit for this tenant');
+      return {
+        success: false,
+        amountApplied: 0,
+        remainingCredit: 0,
+        invoiceStatus: '',
+        message: 'No available advance for this tenant'
+      };
     }
 
-    // Get invoice details
+    // Get invoice details and verify it's a rent invoice
     const invoiceResult = await client.query(
-      'SELECT id, invoice_number, total_amount, amount_paid, balance_due, invoice_status FROM invoices WHERE id = $1 AND tenant_id = $2',
+      `SELECT i.id, i.invoice_number, i.total_amount, i.amount_paid, i.balance_due, i.invoice_status,
+              COUNT(CASE WHEN ili.item_type = 'rent' THEN 1 END) as rent_items_count,
+              COUNT(ili.id) as total_items_count
+       FROM invoices i
+       LEFT JOIN invoice_line_items ili ON i.id = ili.invoice_id
+       WHERE i.id = $1 AND i.tenant_id = $2
+       GROUP BY i.id, i.invoice_number, i.total_amount, i.amount_paid, i.balance_due, i.invoice_status`,
       [invoiceId, tenantId]
     );
 
@@ -274,8 +289,25 @@ export async function applyCreditToInvoice(
 
     const invoice = invoiceResult.rows[0];
 
+    // Verify this is a rent invoice - advance only applies to rent invoices
+    if (invoice.rent_items_count === 0 || invoice.total_items_count === 0) {
+      return {
+        success: false,
+        amountApplied: 0,
+        remainingCredit: creditBalance,
+        invoiceStatus: invoice.invoice_status,
+        message: 'Advance can only be applied to rent invoices'
+      };
+    }
+
     if (invoice.balance_due <= 0) {
-      throw new Error('Invoice is already paid');
+      return {
+        success: false,
+        amountApplied: 0,
+        remainingCredit: creditBalance,
+        invoiceStatus: invoice.invoice_status,
+        message: 'Invoice is already paid'
+      };
     }
 
     // Determine how much credit to apply
@@ -336,16 +368,36 @@ export async function applyCreditToInvoice(
       amountApplied: amountToApply,
       remainingCredit,
       invoiceStatus: newStatus,
-      message: `Applied ₱${amountToApply.toFixed(2)} credit to invoice ${invoice.invoice_number}. Remaining credit: ₱${remainingCredit.toFixed(2)}`
+      message: `Applied ₱${amountToApply.toFixed(2)} advance to rent invoice ${invoice.invoice_number}. Remaining advance: ₱${remainingCredit.toFixed(2)}`
     };
 
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error applying credit to invoice:', error);
+    console.error('Error applying advance to rent invoice:', error);
     throw error;
   } finally {
     client.release();
   }
+}
+
+/**
+ * Apply tenant credit to an invoice (legacy function - use applyCreditToRentInvoice for rent invoices)
+ * This function applies credit to any invoice type - use with caution
+ */
+export async function applyCreditToInvoice(
+  tenantId: string,
+  invoiceId: string,
+  creditAmount?: number
+): Promise<{
+  success: boolean;
+  amountApplied: number;
+  remainingCredit: number;
+  invoiceStatus: string;
+  message: string;
+}> {
+  // For rent invoices, use the specialized function
+  // For other invoice types, this function can be used but advance should only apply to rent
+  return applyCreditToRentInvoice(tenantId, invoiceId, creditAmount);
 }
 
 /**
@@ -508,24 +560,98 @@ function buildAllocationMessage(
 }
 
 /**
- * Auto-apply existing credits to a new invoice
+ * Auto-apply existing advance (credits) to a new RENT invoice
+ * Advance only applies to rent invoices, cascading forward until exhausted
  */
 export async function autoApplyCreditsToNewInvoice(
   tenantId: string,
   invoiceId: string
 ): Promise<boolean> {
   try {
-    const creditBalance = await getTenantCreditBalance(tenantId);
-    
-    if (creditBalance > 0) {
-      await applyCreditToInvoice(tenantId, invoiceId);
-      return true;
-    }
-    
-    return false;
+    const result = await applyCreditToRentInvoice(tenantId, invoiceId);
+    return result.success;
   } catch (error) {
-    console.error('Error auto-applying credits:', error);
+    console.error('Error auto-applying advance to invoice:', error);
     return false;
+  }
+}
+
+/**
+ * Auto-apply available advance to all unpaid rent invoices (oldest first)
+ * Cascades forward until advance balance is exhausted
+ */
+export async function autoApplyAdvanceToUnpaidRentInvoices(
+  tenantId: string
+): Promise<{
+  success: boolean;
+  invoicesUpdated: number;
+  totalApplied: number;
+  remainingAdvance: number;
+}> {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Get available advance balance
+    const advanceBalance = await getTenantCreditBalance(tenantId);
+    
+    if (advanceBalance <= 0) {
+      return {
+        success: true,
+        invoicesUpdated: 0,
+        totalApplied: 0,
+        remainingAdvance: 0
+      };
+    }
+
+    // Get unpaid rent invoices only (oldest first)
+    const unpaidRentInvoices = await getUnpaidRentInvoicesForTenant(tenantId);
+    
+    if (unpaidRentInvoices.length === 0) {
+      return {
+        success: true,
+        invoicesUpdated: 0,
+        totalApplied: 0,
+        remainingAdvance: advanceBalance
+      };
+    }
+
+    let remainingAdvance = advanceBalance;
+    let invoicesUpdated = 0;
+    let totalApplied = 0;
+
+    // Apply advance to each unpaid rent invoice (oldest first) until exhausted
+    for (const invoice of unpaidRentInvoices) {
+      if (remainingAdvance <= 0) break;
+
+      const amountToApply = Math.min(remainingAdvance, parseFloat(invoice.balance_due));
+      
+      if (amountToApply > 0) {
+        const result = await applyCreditToRentInvoice(tenantId, invoice.id, amountToApply);
+        if (result.success) {
+          remainingAdvance -= result.amountApplied;
+          totalApplied += result.amountApplied;
+          invoicesUpdated++;
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      success: true,
+      invoicesUpdated,
+      totalApplied,
+      remainingAdvance
+    };
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error auto-applying advance to unpaid rent invoices:', error);
+    throw error;
+  } finally {
+    client.release();
   }
 }
 

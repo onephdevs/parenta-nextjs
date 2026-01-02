@@ -71,95 +71,28 @@ export async function generateInvoicesForTenant(
     const startDate = new Date(leaseStartDate);
     const endDate = new Date(leaseEndDate);
     
-    // Generate invoices
+    // Generate invoices - ONLY rent invoices (deposits are never invoiced)
     const invoiceIds: string[] = [];
     let invoiceCounter = 0;
 
-    // Create initial payment invoice (deposit + advance) as the first invoice
-    const initialPaymentAmount = (depositAmount || 0) + (advanceAmount || 0);
-    if (initialPaymentAmount > 0) {
-      const initialInvoiceNumber = `INV-${Date.now()}-${invoiceCounter}`;
-      const initialDueDate = new Date(startDate);
-      initialDueDate.setDate(5); // Due on the 5th of the month
-
-      const initialInvoiceResult = await client.query(
-        `INSERT INTO invoices (
+    // Create advance as tenant credit if provided (advance is prepaid rent, not an invoice)
+    if (advanceAmount && advanceAmount > 0) {
+      await client.query(
+        `INSERT INTO tenant_credits (
           tenant_id,
-          invoice_number,
-          issue_date,
-          due_date,
-          billing_period_start,
-          billing_period_end,
-          subtotal,
-          tax_amount,
-          total_amount,
-          amount_paid,
-          invoice_status,
-          notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING id`,
+          amount,
+          source,
+          description,
+          status
+        ) VALUES ($1, $2, $3, $4, $5)`,
         [
           tenantId,
-          initialInvoiceNumber,
-          startDate,
-          initialDueDate,
-          startDate,
-          startDate,
-          initialPaymentAmount,
-          0, // No tax
-          initialPaymentAmount,
-          0, // Not paid yet
-          'sent',
-          `Initial Payment - Deposit and Advance for ${room.building_name} - ${room.room_number}`
+          advanceAmount,
+          'manual',
+          `Initial advance payment for ${room.building_name} - ${room.room_number}`,
+          'available'
         ]
       );
-
-      const initialInvoiceId = initialInvoiceResult.rows[0].id;
-      invoiceIds.push(initialInvoiceId);
-      invoiceCounter++;
-
-      // Create invoice line items for initial payment
-      if (depositAmount && depositAmount > 0) {
-        const depositMonths = monthlyRent > 0 ? depositAmount / monthlyRent : 0;
-        const depositMonthsRounded = Math.round(depositMonths * 100) / 100; // Round to 2 decimal places
-        await client.query(
-          `INSERT INTO invoice_line_items (
-            invoice_id,
-            description,
-            quantity,
-            unit_price,
-            item_type
-          ) VALUES ($1, $2, $3, $4, $5)`,
-          [
-            initialInvoiceId,
-            `Security Deposit${depositMonthsRounded > 0 ? ` (${depositMonthsRounded} month${depositMonthsRounded !== 1 ? 's' : ''})` : ''}`,
-            1,
-            depositAmount,
-            'deposit'
-          ]
-        );
-      }
-
-      if (advanceAmount && advanceAmount > 0) {
-        const advanceMonths = monthlyRent > 0 ? advanceAmount / monthlyRent : 0;
-        const advanceMonthsRounded = Math.round(advanceMonths * 100) / 100; // Round to 2 decimal places
-        await client.query(
-          `INSERT INTO invoice_line_items (
-            invoice_id,
-            description,
-            quantity,
-            unit_price,
-            item_type
-          ) VALUES ($1, $2, $3, $4, $5)`,
-          [
-            initialInvoiceId,
-            `Advance Payment${advanceMonthsRounded > 0 ? ` (${advanceMonthsRounded} month${advanceMonthsRounded !== 1 ? 's' : ''})` : ''}`,
-            1,
-            advanceAmount,
-            'rent'
-          ]
-        );
-      }
     }
 
     // Calculate number of months in lease for monthly invoices
@@ -236,7 +169,7 @@ export async function generateInvoicesForTenant(
       const invoiceId = invoiceResult.rows[0].id;
       invoiceIds.push(invoiceId);
 
-      // Create invoice line item
+      // Create invoice line item (rent only)
       await client.query(
         `INSERT INTO invoice_line_items (
           invoice_id,
@@ -253,6 +186,16 @@ export async function generateInvoicesForTenant(
           'rent'
         ]
       );
+
+      // Automatically apply available advance to this rent invoice
+      // Advance only applies to rent invoices, cascading forward until exhausted
+      try {
+        const { applyCreditToRentInvoice } = await import('./payment-allocator');
+        await applyCreditToRentInvoice(tenantId, invoiceId);
+      } catch (advanceError) {
+        // Log but don't fail invoice generation if advance application fails
+        console.warn(`Could not auto-apply advance to invoice ${invoiceNumber}:`, advanceError);
+      }
     }
 
     // Handle deposit if provided
@@ -277,6 +220,16 @@ export async function generateInvoicesForTenant(
       depositRecorded = true;
     }
 
+    // After all invoices are created, auto-apply any remaining advance to unpaid rent invoices
+    // This ensures advance cascades forward to all newly created rent invoices
+    try {
+      const { autoApplyAdvanceToUnpaidRentInvoices } = await import('./payment-allocator');
+      await autoApplyAdvanceToUnpaidRentInvoices(tenantId);
+    } catch (advanceError) {
+      // Log but don't fail invoice generation if advance application fails
+      console.warn('Could not auto-apply advance to newly created invoices:', advanceError);
+    }
+
     await client.query('COMMIT');
 
     return {
@@ -285,7 +238,7 @@ export async function generateInvoicesForTenant(
       invoiceIds,
       depositRecorded,
       depositAmount: depositRecorded ? depositAmount : undefined,
-      message: `Successfully generated ${invoiceIds.length} invoice(s) for ${tenant.first_name} ${tenant.last_name}${depositRecorded ? ` and recorded deposit of ₱${depositAmount}` : ''}`
+      message: `Successfully generated ${invoiceIds.length} rent invoice(s) for ${tenant.first_name} ${tenant.last_name}${depositRecorded ? ` and recorded deposit of ₱${depositAmount}` : ''}`
     };
 
   } catch (error) {
@@ -415,6 +368,56 @@ export async function updateOverdueInvoices(): Promise<number> {
 /**
  * Get unpaid invoices for a tenant (sorted by due date, oldest first)
  */
+/**
+ * Get unpaid RENT invoices for a tenant (sorted by due date, oldest first)
+ * Used for automatic advance application - advance only applies to rent invoices
+ */
+export async function getUnpaidRentInvoicesForTenant(tenantId: string): Promise<Array<{
+  id: string;
+  invoiceNumber: string;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  dueDate: Date;
+  invoiceStatus: string;
+}>> {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        i.id,
+        i.invoice_number,
+        i.total_amount,
+        i.amount_paid,
+        i.balance_due,
+        i.due_date,
+        i.invoice_status
+      FROM invoices i
+      INNER JOIN invoice_line_items ili ON i.id = ili.invoice_id
+      WHERE i.tenant_id = $1
+        AND i.balance_due > 0
+        AND ili.item_type = 'rent'
+        AND i.invoice_status IN ('sent', 'partial', 'overdue')
+      GROUP BY i.id, i.invoice_number, i.total_amount, i.amount_paid, i.balance_due, i.due_date, i.invoice_status
+      HAVING COUNT(CASE WHEN ili.item_type = 'rent' THEN 1 END) > 0
+      ORDER BY i.due_date ASC, i.created_at ASC`,
+      [tenantId]
+    );
+
+    return result.rows.map(row => ({
+      id: row.id,
+      invoiceNumber: row.invoice_number,
+      totalAmount: parseFloat(row.total_amount),
+      amountPaid: parseFloat(row.amount_paid),
+      balanceDue: parseFloat(row.balance_due),
+      dueDate: row.due_date,
+      invoiceStatus: row.invoice_status
+    }));
+  } catch (error) {
+    console.error('Error getting unpaid rent invoices:', error);
+    throw error;
+  }
+}
+
 export async function getUnpaidInvoicesForTenant(tenantId: string): Promise<Array<{
   id: string;
   invoiceNumber: string;

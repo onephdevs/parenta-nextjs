@@ -225,20 +225,14 @@ export async function POST(request: Request) {
       );
     }
     
-    // For advance payments, automatically apply to future invoices if any exist
+    // For advance payments, automatically apply to unpaid RENT invoices only (oldest first)
+    // Advance cascades forward until exhausted, only applying to rent invoices
     if (isAdvance && creditId) {
       try {
-        const { applyCreditToInvoice, getUnpaidInvoicesForTenant } = await import('@/lib/services/payment-allocator');
-        const unpaidInvoices = await getUnpaidInvoicesForTenant(tenant.id);
-        
-        // Auto-apply advance to oldest unpaid invoice
-        if (unpaidInvoices.length > 0) {
-          const oldestInvoice = unpaidInvoices[0];
-          const advanceAmount = parseFloat(amount);
-          await applyCreditToInvoice(tenant.id, oldestInvoice.id, advanceAmount);
-        }
+        const { autoApplyAdvanceToUnpaidRentInvoices } = await import('@/lib/services/payment-allocator');
+        await autoApplyAdvanceToUnpaidRentInvoices(tenant.id);
       } catch (autoApplyError) {
-        console.warn('Could not auto-apply advance to invoice:', autoApplyError);
+        console.warn('Could not auto-apply advance to rent invoices:', autoApplyError);
         // Continue - credit is still created and will be applied later
       }
     }
