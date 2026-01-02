@@ -247,6 +247,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   <option value="repair">Repair</option>
                   <option value="upgrade">Upgrade</option>
                   <option value="garbage_collection">Garbage Collection</option>
+                  <option value="worker_wages">Worker Wages</option>
                   <option value="utilities">Utilities</option>
                   <option value="supplies">Supplies</option>
                   <option value="services">Services</option>

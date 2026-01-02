@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     }
     
     const body = await request.json();
-    const { amount, description, paymentMethod, referenceNumber } = body;
+    const { amount, paymentType, description, paymentMethod, referenceNumber } = body;
     
     if (!amount || amount <= 0) {
       return NextResponse.json(
@@ -141,16 +141,24 @@ export async function POST(request: Request) {
       );
     }
     
-    // Create deposit transaction
-    const transaction = await createDepositTransaction({
-      tenantId: tenant.id,
-      amount: parseFloat(amount),
-      transactionType: 'deposit',
-      description: description || 'Deposit payment',
-      referenceNumber: referenceNumber || undefined,
-    });
+    const paymentTypeValue = paymentType || 'deposit';
+    const isDeposit = paymentTypeValue === 'deposit';
     
-    // Also create a payment record for tracking
+    let transactionId: string | undefined;
+    
+    // For deposit payments, create deposit ledger transaction
+    if (isDeposit) {
+      const transaction = await createDepositTransaction({
+        tenantId: tenant.id,
+        amount: parseFloat(amount),
+        transactionType: 'deposit',
+        description: description || 'Deposit payment',
+        referenceNumber: referenceNumber || undefined,
+      });
+      transactionId = transaction.id;
+    }
+    
+    // Create payment record for both deposit and downpayment
     const paymentQuery = `
       INSERT INTO payments (
         tenant_id,
@@ -163,28 +171,29 @@ export async function POST(request: Request) {
         reference_number,
         notes
       ) VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE, $5, $6, $7)
-      RETURNING id
+      RETURNING id, payment_type
     `;
     
-    await pool.query(paymentQuery, [
+    const paymentResult = await pool.query(paymentQuery, [
       tenant.id,
       amount,
-      'deposit',
+      paymentTypeValue,
       paymentMethod || 'online',
       'paid',
       referenceNumber || null,
-      description || 'Deposit payment',
+      description || `${paymentTypeValue === 'deposit' ? 'Deposit' : 'Downpayment'} payment`,
     ]);
     
     return NextResponse.json({
       success: true,
       data: {
-        transactionId: transaction.id,
-        amount: transaction.amount,
-        transactionType: transaction.transactionType,
-        transactionDate: transaction.transactionDate,
+        paymentId: paymentResult.rows[0].id,
+        transactionId: transactionId,
+        amount: parseFloat(amount),
+        paymentType: paymentResult.rows[0].payment_type,
+        transactionDate: new Date().toISOString(),
       },
-      message: 'Deposit payment recorded successfully',
+      message: `${paymentTypeValue === 'deposit' ? 'Deposit' : 'Downpayment'} payment recorded successfully`,
     });
     
   } catch (error) {

@@ -17,12 +17,14 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // Normalize defaultRole to lowercase to match option values
+  const normalizedRole = (defaultRole?.toLowerCase() === 'admin' ? 'admin' : 'tenant') as UserRole;
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     firstName: '',
     lastName: '',
-    role: defaultRole,
+    role: normalizedRole,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {

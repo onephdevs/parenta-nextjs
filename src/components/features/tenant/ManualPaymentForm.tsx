@@ -1,20 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DollarSign, Loader2, CheckCircle2 } from 'lucide-react';
+import { CreditCard, Loader2, DollarSign } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
 
-interface DepositPaymentFormProps {
+interface ManualPaymentFormProps {
   onPaymentComplete?: () => void;
   onCancel?: () => void;
 }
 
-export default function DepositPaymentForm({ onPaymentComplete, onCancel }: DepositPaymentFormProps) {
-  const [paymentType, setPaymentType] = useState<'deposit' | 'downpayment'>('deposit');
+export default function ManualPaymentForm({ onPaymentComplete, onCancel }: ManualPaymentFormProps) {
+  const [paymentType, setPaymentType] = useState<string>('rent');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('online');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { showNotification } = useNotifications();
 
@@ -26,7 +26,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
       showNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please enter a valid deposit amount',
+        message: 'Please enter a valid payment amount',
       });
       return;
     }
@@ -34,7 +34,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
     setIsProcessing(true);
 
     try {
-      const response = await fetch('/api/tenant/deposits', {
+      const response = await fetch('/api/tenant/payments/manual', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -44,7 +44,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           paymentType,
           paymentMethod,
           referenceNumber: referenceNumber || undefined,
-          description: description || `${paymentType === 'deposit' ? 'Deposit' : 'Downpayment'} payment`,
+          notes: notes || undefined,
         }),
       });
 
@@ -53,8 +53,8 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
       if (data.success) {
         showNotification({
           type: 'success',
-          title: paymentType === 'deposit' ? 'Deposit Recorded' : 'Downpayment Recorded',
-          message: data.message || `Your ${paymentType} payment has been recorded successfully`,
+          title: 'Payment Recorded',
+          message: data.message || 'Your payment has been recorded successfully',
         });
 
         if (onPaymentComplete) {
@@ -64,15 +64,15 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
         showNotification({
           type: 'error',
           title: 'Payment Failed',
-          message: data.error || 'Failed to record deposit payment',
+          message: data.error || 'Failed to record payment',
         });
       }
     } catch (error) {
-      console.error('Error recording deposit payment:', error);
+      console.error('Error recording payment:', error);
       showNotification({
         type: 'error',
         title: 'Payment Failed',
-        message: 'An error occurred while recording your deposit payment',
+        message: 'An error occurred while recording your payment',
       });
     } finally {
       setIsProcessing(false);
@@ -86,53 +86,51 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
     }).format(amount);
   };
 
+  const getPaymentTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      rent: 'Rent',
+      deposit: 'Deposit',
+      downpayment: 'Downpayment',
+      utility: 'Utility',
+      late_fee: 'Late Fee',
+      other: 'Other',
+    };
+    return labels[type] || type;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
         <p className="text-sm text-blue-800">
-          <strong>Note:</strong> {paymentType === 'deposit' 
-            ? 'Deposit payments are added to your deposit balance and can be used for future rent payments or refunded upon move-out.'
-            : 'Downpayment is an initial payment made before moving in, typically used to secure the rental unit.'}
+          <strong>Note:</strong> Enter the payment amount you have paid. This will be recorded in your payment history.
         </p>
       </div>
 
-      {/* Payment Type Selection */}
+      {/* Payment Type */}
       <div>
         <label htmlFor="paymentType" className="block text-sm font-medium text-gray-900 mb-2">
           Payment Type *
         </label>
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => setPaymentType('deposit')}
-            className={`p-4 border-2 rounded-lg flex items-center justify-center space-x-2 ${
-              paymentType === 'deposit'
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
-          >
-            <DollarSign className={`h-5 w-5 ${paymentType === 'deposit' ? 'text-green-600' : 'text-gray-400'}`} />
-            <span className="font-medium">Deposit</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setPaymentType('downpayment')}
-            className={`p-4 border-2 rounded-lg flex items-center justify-center space-x-2 ${
-              paymentType === 'downpayment'
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
-          >
-            <DollarSign className={`h-5 w-5 ${paymentType === 'downpayment' ? 'text-blue-600' : 'text-gray-400'}`} />
-            <span className="font-medium">Downpayment</span>
-          </button>
-        </div>
+        <select
+          id="paymentType"
+          value={paymentType}
+          onChange={(e) => setPaymentType(e.target.value)}
+          required
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="rent">Rent</option>
+          <option value="deposit">Deposit</option>
+          <option value="downpayment">Downpayment</option>
+          <option value="utility">Utility</option>
+          <option value="late_fee">Late Fee</option>
+          <option value="other">Other</option>
+        </select>
       </div>
 
       {/* Payment Amount */}
       <div>
         <label htmlFor="amount" className="block text-sm font-medium text-gray-900 mb-2">
-          {paymentType === 'deposit' ? 'Deposit' : 'Downpayment'} Amount (₱) *
+          Payment Amount (₱) *
         </label>
         <input
           type="number"
@@ -147,7 +145,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
         />
         {amount && parseFloat(amount) > 0 && (
           <p className="mt-1 text-sm text-gray-600">
-            You are paying: {formatCurrency(parseFloat(amount))} as {paymentType}
+            Amount: {formatCurrency(parseFloat(amount))}
           </p>
         )}
       </div>
@@ -187,31 +185,29 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
         />
       </div>
 
-      {/* Description */}
+      {/* Notes */}
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-2">
-          Description (Optional)
+        <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-2">
+          Notes (Optional)
         </label>
         <textarea
-          id="description"
+          id="notes"
           rows={3}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Additional notes about this deposit..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Additional notes about this payment..."
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
       {/* Payment Summary */}
       {amount && parseFloat(amount) > 0 && (
-        <div className={`${paymentType === 'deposit' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'} border rounded-lg p-4`}>
-          <h4 className={`text-sm font-medium ${paymentType === 'deposit' ? 'text-green-900' : 'text-blue-900'} mb-2`}>
-            {paymentType === 'deposit' ? 'Deposit' : 'Downpayment'} Summary
-          </h4>
-          <div className={`space-y-1 text-sm ${paymentType === 'deposit' ? 'text-green-800' : 'text-blue-800'}`}>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Payment Summary</h4>
+          <div className="space-y-1 text-sm text-blue-800">
             <div className="flex justify-between">
               <span>Payment Type:</span>
-              <span className="font-medium capitalize">{paymentType}</span>
+              <span className="font-medium">{getPaymentTypeLabel(paymentType)}</span>
             </div>
             <div className="flex justify-between">
               <span>Amount:</span>
@@ -239,11 +235,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
         <button
           type="submit"
           disabled={isProcessing || !amount || parseFloat(amount) <= 0}
-          className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white ${
-            paymentType === 'deposit'
-              ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 disabled:bg-green-400'
-              : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 disabled:bg-blue-400'
-          } focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed`}
+          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed"
         >
           {isProcessing ? (
             <>
@@ -252,8 +244,8 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
             </>
           ) : (
             <>
-              <DollarSign className="h-5 w-5 mr-2" />
-              Record {paymentType === 'deposit' ? 'Deposit' : 'Downpayment'}
+              <CreditCard className="h-5 w-5 mr-2" />
+              Record Payment
             </>
           )}
         </button>

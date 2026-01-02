@@ -8,7 +8,9 @@ interface SignInPageProps {
 
 async function SignInContent({ searchParams }: SignInPageProps) {
   const params = await searchParams;
-  const role = (params.role as UserRole) || 'tenant';
+  // Normalize role to lowercase to match option values
+  const roleParam = params.role?.toLowerCase();
+  const role = (roleParam === 'admin' || roleParam === 'tenant' ? roleParam : 'tenant') as UserRole;
   const isAdmin = role === 'admin';
 
   return (

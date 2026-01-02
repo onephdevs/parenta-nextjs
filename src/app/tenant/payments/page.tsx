@@ -26,6 +26,7 @@ import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
 import PaymentForm from '@/components/features/tenant/PaymentForm';
 import DepositPaymentForm from '@/components/features/tenant/DepositPaymentForm';
 import UtilityDepositForm from '@/components/features/tenant/UtilityDepositForm';
+import ManualPaymentForm from '@/components/features/tenant/ManualPaymentForm';
 
 interface Payment {
   id: string;
@@ -94,6 +95,7 @@ export default function PaymentsPage() {
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<string | null>(null);
   const [showDepositForm, setShowDepositForm] = useState(false);
   const [showUtilityDepositForm, setShowUtilityDepositForm] = useState(false);
+  const [showManualPaymentForm, setShowManualPaymentForm] = useState(false);
   const [depositBalance, setDepositBalance] = useState<number | null>(null);
   const [utilityDepositData, setUtilityDepositData] = useState<any>(null);
   const { showNotification } = useNotifications();
@@ -242,6 +244,12 @@ export default function PaymentsPage() {
     setShowUtilityDepositForm(false);
     fetchUtilityDepositData();
     fetchPaymentData();
+  };
+
+  const handleManualPaymentComplete = () => {
+    setShowManualPaymentForm(false);
+    fetchPaymentData();
+    fetchDepositData();
   };
 
   const handleDownloadReceipt = (paymentId: string) => {
@@ -490,9 +498,10 @@ export default function PaymentsPage() {
                         setShowPaymentForm(false);
                         setShowDepositForm(false);
                         setShowUtilityDepositForm(false);
+                        setShowManualPaymentForm(false);
                       }}
                       className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                        !showPaymentForm && !showDepositForm && !showUtilityDepositForm
+                        !showPaymentForm && !showDepositForm && !showUtilityDepositForm && !showManualPaymentForm
                           ? 'border-blue-500 text-blue-600'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`}
@@ -505,6 +514,7 @@ export default function PaymentsPage() {
                         setShowPaymentForm(false);
                         setShowDepositForm(true);
                         setShowUtilityDepositForm(false);
+                        setShowManualPaymentForm(false);
                       }}
                       className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
                         showDepositForm
@@ -520,6 +530,7 @@ export default function PaymentsPage() {
                         setShowPaymentForm(false);
                         setShowDepositForm(false);
                         setShowUtilityDepositForm(true);
+                        setShowManualPaymentForm(false);
                       }}
                       className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
                         showUtilityDepositForm
@@ -530,12 +541,28 @@ export default function PaymentsPage() {
                       <AlertCircle className="h-5 w-5 mx-auto mb-1" />
                       Utility Deposit
                     </button>
+                    <button
+                      onClick={() => {
+                        setShowPaymentForm(false);
+                        setShowDepositForm(false);
+                        setShowUtilityDepositForm(false);
+                        setShowManualPaymentForm(true);
+                      }}
+                      className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                        showManualPaymentForm
+                          ? 'border-purple-500 text-purple-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <CreditCard className="h-5 w-5 mx-auto mb-1" />
+                      Manual Entry
+                    </button>
                   </nav>
                 </div>
 
                 <div className="p-6">
                   {/* Rent Payment Form */}
-                  {!showPaymentForm && !showDepositForm && !showUtilityDepositForm && (
+                  {!showPaymentForm && !showDepositForm && !showUtilityDepositForm && !showManualPaymentForm && (
                     <div>
                       <div className="flex items-center justify-between mb-6">
                         <div>
@@ -648,6 +675,30 @@ export default function PaymentsPage() {
                           onCancel={() => setShowUtilityDepositForm(false)}
                         />
                       )}
+                    </div>
+                  )}
+
+                  {/* Manual Payment Form */}
+                  {showManualPaymentForm && (
+                    <div>
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">Manual Payment Entry</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Enter payment amount you have paid manually
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowManualPaymentForm(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <ManualPaymentForm
+                        onPaymentComplete={handleManualPaymentComplete}
+                        onCancel={() => setShowManualPaymentForm(false)}
+                      />
                     </div>
                   )}
                 </div>

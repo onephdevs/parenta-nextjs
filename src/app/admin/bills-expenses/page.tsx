@@ -196,6 +196,7 @@ export default function BillsExpensesPage() {
       repair: 'bg-orange-100 text-orange-800',
       upgrade: 'bg-purple-100 text-purple-800',
       garbage_collection: 'bg-green-100 text-green-800',
+      worker_wages: 'bg-teal-100 text-teal-800',
       utilities: 'bg-yellow-100 text-yellow-800',
       supplies: 'bg-indigo-100 text-indigo-800',
       services: 'bg-pink-100 text-pink-800',
