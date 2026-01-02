@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useNotifications } from '@/context/NotificationContext';
 import { FileText, Download, X, Upload } from 'lucide-react';
 
@@ -26,13 +27,29 @@ export default function DocumentUpload({
 }: DocumentUploadProps) {
   const { showNotification } = useNotifications();
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Determine if we're in tenant portal (use tenant API) or admin portal (use admin API)
-  const isTenantContext = pathname?.startsWith('/tenant');
+  // Check both pathname and session role for reliability
+  // Priority: session role > pathname (session is more reliable)
+  const isTenantContext = session?.user?.role === 'tenant' || pathname?.startsWith('/tenant');
   const apiBaseUrl = isTenantContext ? '/api/tenant/agreement' : `/api/tenants/${tenantId}/agreement`;
+  
+  // Debug logging (remove in production if needed)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('DocumentUpload API selection:', {
+        pathname,
+        userRole: session?.user?.role,
+        isTenantContext,
+        apiBaseUrl,
+        tenantId
+      });
+    }
+  }, [pathname, session, isTenantContext, apiBaseUrl, tenantId]);
   
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,6 +118,29 @@ export default function DocumentUpload({
         method: 'POST',
         body: formData
       });
+
+      // Handle non-JSON responses (like 403 Forbidden HTML)
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorData;
+        
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+        } else {
+          // Handle HTML/text responses (like 403 Forbidden)
+          const text = await response.text();
+          errorData = {
+            success: false,
+            error: response.status === 403 
+              ? 'Access denied. Please ensure you are logged in as a tenant to upload your agreement.'
+              : `Upload failed with status ${response.status}: ${text.substring(0, 100)}`
+          };
+        }
+        
+        const errorMessage = errorData.error || errorData.message || `Upload failed with status ${response.status}`;
+        console.error('Upload error response:', { status: response.status, errorData, apiBaseUrl });
+        throw new Error(errorMessage);
+      }
 
       const data = await response.json();
 
