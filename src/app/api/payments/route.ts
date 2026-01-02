@@ -95,7 +95,7 @@ export async function POST(request: Request) {
         { 
           success: false, 
           error: 'Payment type is required',
-          details: 'Please specify the payment type (rent, deposit, downpayment, late_fee, utility, asset_rental, other)'
+          details: 'Please specify the payment type (rent, deposit, advance, late_fee, utility, asset_rental, other)'
         },
         { status: 400 }
       );

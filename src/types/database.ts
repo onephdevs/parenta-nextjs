@@ -271,7 +271,7 @@ export interface Payment {
   assignmentId?: string;
   assetAssignmentIds?: string[]; // Array of asset assignment IDs for this payment
   amount: number;
-  paymentType: 'rent' | 'deposit' | 'downpayment' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
+  paymentType: 'rent' | 'deposit' | 'advance' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
   paymentMethod: 'cash' | 'check' | 'bank_transfer' | 'credit_card' | 'online';
   paymentDate: Date;
   dueDate: Date;

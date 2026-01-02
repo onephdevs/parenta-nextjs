@@ -5,7 +5,7 @@ export interface Payment {
   tenantId: string;
   roomAssignmentId?: string;
   amount: number;
-  paymentType: 'rent' | 'deposit' | 'downpayment' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
+  paymentType: 'rent' | 'deposit' | 'advance' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
   paymentMethod?: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'online';
   paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;
@@ -42,7 +42,7 @@ export interface CreatePaymentData {
   tenantId: string;
   roomAssignmentId?: string;
   amount: number;
-  paymentType: 'rent' | 'deposit' | 'downpayment' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
+  paymentType: 'rent' | 'deposit' | 'advance' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
   paymentMethod?: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'online';
   paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;

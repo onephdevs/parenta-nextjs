@@ -162,8 +162,10 @@ export async function POST(request: Request) {
     
     const paymentTypeValue = paymentType || 'deposit';
     const isDeposit = paymentTypeValue === 'deposit';
+    const isAdvance = paymentTypeValue === 'advance';
     
     let transactionId: string | undefined;
+    let creditId: string | undefined;
     
     // For deposit payments, create deposit ledger transaction
     if (isDeposit) {
@@ -177,7 +179,19 @@ export async function POST(request: Request) {
       transactionId = transaction.id;
     }
     
-    // Create payment record for both deposit and downpayment
+    // For advance payments, create tenant credit (prepaid rent)
+    if (isAdvance) {
+      const { createTenantCredit } = await import('@/lib/api/tenant-credits');
+      const credit = await createTenantCredit({
+        tenantId: tenant.id,
+        amount: parseFloat(amount),
+        source: 'manual',
+        description: description || 'Advance payment (prepaid rent)',
+      });
+      creditId = credit.id;
+    }
+    
+    // Create payment record for deposit, advance, or other types
     const paymentQuery = `
       INSERT INTO payments (
         tenant_id,
@@ -200,19 +214,46 @@ export async function POST(request: Request) {
       paymentMethod || 'online',
       'paid',
       referenceNumber || null,
-      description || `${paymentTypeValue === 'deposit' ? 'Deposit' : 'Downpayment'} payment`,
+      description || `${paymentTypeValue === 'deposit' ? 'Deposit' : paymentTypeValue === 'advance' ? 'Advance' : 'Payment'} payment`,
     ]);
+    
+    // Link credit to payment if advance payment (update credit with payment_id)
+    if (isAdvance && creditId) {
+      await pool.query(
+        'UPDATE tenant_credits SET payment_id = $1 WHERE id = $2',
+        [paymentResult.rows[0].id, creditId]
+      );
+    }
+    
+    // For advance payments, automatically apply to future invoices if any exist
+    if (isAdvance && creditId) {
+      try {
+        const { applyCreditToInvoice, getUnpaidInvoicesForTenant } = await import('@/lib/services/payment-allocator');
+        const unpaidInvoices = await getUnpaidInvoicesForTenant(tenant.id);
+        
+        // Auto-apply advance to oldest unpaid invoice
+        if (unpaidInvoices.length > 0) {
+          const oldestInvoice = unpaidInvoices[0];
+          const advanceAmount = parseFloat(amount);
+          await applyCreditToInvoice(tenant.id, oldestInvoice.id, advanceAmount);
+        }
+      } catch (autoApplyError) {
+        console.warn('Could not auto-apply advance to invoice:', autoApplyError);
+        // Continue - credit is still created and will be applied later
+      }
+    }
     
     return NextResponse.json({
       success: true,
       data: {
         paymentId: paymentResult.rows[0].id,
         transactionId: transactionId,
+        creditId: creditId,
         amount: parseFloat(amount),
         paymentType: paymentResult.rows[0].payment_type,
         transactionDate: new Date().toISOString(),
       },
-      message: `${paymentTypeValue === 'deposit' ? 'Deposit' : 'Downpayment'} payment recorded successfully`,
+      message: `${paymentTypeValue === 'deposit' ? 'Deposit' : paymentTypeValue === 'advance' ? 'Advance' : 'Payment'} payment recorded successfully`,
     });
     
   } catch (error) {

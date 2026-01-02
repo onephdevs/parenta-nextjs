@@ -90,7 +90,7 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
     const labels: Record<string, string> = {
       rent: 'Rent',
       deposit: 'Deposit',
-      downpayment: 'Downpayment',
+      advance: 'Advance',
       utility: 'Utility',
       late_fee: 'Late Fee',
       other: 'Other',
@@ -120,7 +120,7 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
         >
           <option value="rent">Rent</option>
           <option value="deposit">Deposit</option>
-          <option value="downpayment">Downpayment</option>
+          <option value="advance">Advance</option>
           <option value="utility">Utility</option>
           <option value="late_fee">Late Fee</option>
           <option value="other">Other</option>

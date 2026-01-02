@@ -10,7 +10,7 @@ interface DepositPaymentFormProps {
 }
 
 export default function DepositPaymentForm({ onPaymentComplete, onCancel }: DepositPaymentFormProps) {
-  const [paymentType, setPaymentType] = useState<'deposit' | 'downpayment'>('deposit');
+  const [paymentType, setPaymentType] = useState<'deposit' | 'advance'>('deposit');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('online');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
@@ -44,7 +44,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           paymentType,
           paymentMethod,
           referenceNumber: referenceNumber || undefined,
-          description: description || `${paymentType === 'deposit' ? 'Deposit' : 'Downpayment'} payment`,
+          description: description || `${paymentType === 'deposit' ? 'Deposit' : 'Advance'} payment`,
         }),
       });
 
@@ -53,7 +53,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
       if (data.success) {
         showNotification({
           type: 'success',
-          title: paymentType === 'deposit' ? 'Deposit Recorded' : 'Downpayment Recorded',
+          title: paymentType === 'deposit' ? 'Deposit Recorded' : 'Advance Recorded',
           message: data.message || `Your ${paymentType} payment has been recorded successfully`,
         });
 
@@ -90,9 +90,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
         <p className="text-sm text-blue-800">
-          <strong>Note:</strong> {paymentType === 'deposit' 
-            ? 'Deposit payments are added to your deposit balance and can be used for future rent payments or refunded upon move-out.'
-            : 'Downpayment is an initial payment made before moving in, typically used to secure the rental unit.'}
+          <strong>Note:</strong> Deposits are held for security and refunded at move-out. Advances are applied to future rent payments.
         </p>
       </div>
 
@@ -116,15 +114,15 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           </button>
           <button
             type="button"
-            onClick={() => setPaymentType('downpayment')}
+            onClick={() => setPaymentType('advance')}
             className={`p-4 border-2 rounded-lg flex items-center justify-center space-x-2 ${
-              paymentType === 'downpayment'
+              paymentType === 'advance'
                 ? 'border-blue-500 bg-blue-50'
                 : 'border-gray-300 hover:border-gray-400'
             }`}
           >
-            <DollarSign className={`h-5 w-5 ${paymentType === 'downpayment' ? 'text-blue-600' : 'text-gray-400'}`} />
-            <span className="font-medium">Downpayment</span>
+            <DollarSign className={`h-5 w-5 ${paymentType === 'advance' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <span className="font-medium">Advance</span>
           </button>
         </div>
       </div>
@@ -132,7 +130,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
       {/* Payment Amount */}
       <div>
         <label htmlFor="amount" className="block text-sm font-medium text-gray-900 mb-2">
-          {paymentType === 'deposit' ? 'Deposit' : 'Downpayment'} Amount (₱) *
+          Amount (₱) *
         </label>
         <input
           type="number"
@@ -206,7 +204,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
       {amount && parseFloat(amount) > 0 && (
         <div className={`${paymentType === 'deposit' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'} border rounded-lg p-4`}>
           <h4 className={`text-sm font-medium ${paymentType === 'deposit' ? 'text-green-900' : 'text-blue-900'} mb-2`}>
-            {paymentType === 'deposit' ? 'Deposit' : 'Downpayment'} Summary
+            {paymentType === 'deposit' ? 'Deposit' : 'Advance'} Summary
           </h4>
           <div className={`space-y-1 text-sm ${paymentType === 'deposit' ? 'text-green-800' : 'text-blue-800'}`}>
             <div className="flex justify-between">
@@ -253,7 +251,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           ) : (
             <>
               <DollarSign className="h-5 w-5 mr-2" />
-              Record {paymentType === 'deposit' ? 'Deposit' : 'Downpayment'}
+              Record {paymentType === 'deposit' ? 'Deposit' : 'Advance'}
             </>
           )}
         </button>

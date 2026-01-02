@@ -553,7 +553,7 @@ export default function PaymentsPage() {
                       }`}
                     >
                       <DollarSign className="h-5 w-5 mx-auto mb-1" />
-                      Deposit
+                      Deposit & Advance
                     </button>
                     <button
                       onClick={() => {
@@ -651,12 +651,7 @@ export default function PaymentsPage() {
                     <div>
                       <div className="flex items-center justify-between mb-6">
                         <div>
-                          <h3 className="text-lg font-medium text-gray-900">Add Deposit Payment</h3>
-                          {depositBalance !== null && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              Current Deposit Balance: {formatCurrency(depositBalance)}
-                            </p>
-                          )}
+                          <h3 className="text-lg font-medium text-gray-900">Add Deposit or Advance</h3>
                         </div>
                         <button
                           onClick={() => setShowDepositForm(false)}

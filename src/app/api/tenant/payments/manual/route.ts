@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     }
     
     // Validate payment type
-    const validPaymentTypes = ['rent', 'deposit', 'downpayment', 'late_fee', 'utility', 'asset_rental', 'other'];
+    const validPaymentTypes = ['rent', 'deposit', 'advance', 'late_fee', 'utility', 'asset_rental', 'other'];
     if (!validPaymentTypes.includes(paymentType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid payment type' },

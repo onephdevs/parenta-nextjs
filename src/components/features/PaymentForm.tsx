@@ -434,7 +434,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                 >
                   <option value="rent">Rent</option>
                   <option value="deposit">Deposit</option>
-                  <option value="downpayment">Downpayment</option>
+                  <option value="advance">Advance</option>
                   <option value="fee">Fee</option>
                   <option value="utilities">Utilities</option>
                   <option value="other">Other</option>
