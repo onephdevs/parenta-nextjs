@@ -44,6 +44,7 @@ export interface CreatePaymentData {
   amount: number;
   paymentType: 'rent' | 'deposit' | 'downpayment' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
   paymentMethod?: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'online';
+  paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;
   dueDate?: Date;
   referenceNumber?: string;
@@ -82,6 +83,17 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
     RETURNING *
   `;
   
+  // Validate required fields
+  if (!paymentData.paymentType) {
+    throw new Error('Payment type is required');
+  }
+  if (!paymentData.amount || paymentData.amount <= 0) {
+    throw new Error('Payment amount must be greater than 0');
+  }
+  
+  // Use provided paymentStatus or default to 'pending'
+  const paymentStatus = paymentData.paymentStatus || 'pending';
+  
   const values = [
     paymentData.tenantId,
     paymentData.roomAssignmentId || null,
@@ -92,7 +104,7 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
     paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0], // Default to payment_date if not provided
     paymentData.referenceNumber || null,
     paymentData.notes || null,
-    'pending'
+    paymentStatus
   ];
 
   try {
