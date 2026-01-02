@@ -2,6 +2,7 @@ import { Document, DocumentCategory, DocumentFilters, DocumentsResponse, Documen
 import path from 'path';
 import fs from 'fs/promises';
 import pool from '@/lib/db';
+import { put, del } from '@vercel/blob';
 
 // Get all documents with filtering and pagination
 export async function getDocuments(
@@ -416,9 +417,22 @@ export async function deleteDocument(id: string): Promise<boolean> {
     
     await client.query('COMMIT');
 
-    // Try to delete the physical file (don't fail if it doesn't exist)
+    // Try to delete the physical file or blob
     try {
-      await fs.unlink(filePath);
+      // Check if it's a Vercel Blob URL
+      if (filePath && filePath.startsWith('https://') && filePath.includes('blob.vercel-storage.com')) {
+        // Extract blob URL and delete from Vercel Blob
+        try {
+          await del(filePath);
+          console.log('✅ Deleted document from Vercel Blob:', filePath);
+        } catch (blobError) {
+          console.warn(`Could not delete blob at ${filePath}:`, blobError);
+        }
+      } else if (filePath) {
+        // Local filesystem path - try to delete
+        const fullPath = path.join(process.cwd(), 'public', filePath);
+        await fs.unlink(fullPath);
+      }
     } catch (error) {
       console.warn(`Could not delete file at ${filePath}:`, error);
     }
@@ -538,31 +552,65 @@ export async function getDocumentStats(): Promise<DocumentStats> {
   };
 }
 
-// Save uploaded file to disk
+// Save uploaded file to Vercel Blob (or local filesystem if no blob token)
 export async function saveUploadedFile(file: File, uploadDir: string = 'uploads/documents'): Promise<{
   fileName: string;
   filePath: string;
   fileSize: number;
 }> {
-  // Ensure upload directory exists
-  const fullUploadDir = path.join(process.cwd(), 'public', uploadDir);
-  await fs.mkdir(fullUploadDir, { recursive: true });
-
   // Generate unique filename
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 15);
   const fileExtension = path.extname(file.name);
   const fileName = `${timestamp}-${randomSuffix}${fileExtension}`;
-  const filePath = path.join(fullUploadDir, fileName);
+  
+  // Check if BLOB_READ_WRITE_TOKEN is available (Vercel Blob)
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  
+  if (blobToken) {
+    // Use Vercel Blob Storage (production/Vercel deployment)
+    const blobPath = `documents/${fileName}`;
+    
+    console.log('📤 Uploading document to Vercel Blob:', blobPath);
+    
+    try {
+      const blob = await put(blobPath, file, {
+        access: 'public',
+        addRandomSuffix: false, // We already have a unique name
+      });
+      
+      console.log('✅ Document uploaded to Vercel Blob:', blob.url);
+      
+      return {
+        fileName,
+        filePath: blob.url, // Full blob URL for storing in DB
+        fileSize: file.size,
+      };
+    } catch (blobError) {
+      console.error('Error uploading to Vercel Blob:', blobError);
+      // Fall back to local filesystem if blob upload fails
+      console.log('⚠️ Falling back to local filesystem storage');
+    }
+  }
+  
+  // Fallback to local filesystem (local development without blob token)
+  try {
+    const fullUploadDir = path.join(process.cwd(), 'public', uploadDir);
+    await fs.mkdir(fullUploadDir, { recursive: true });
+    const filePath = path.join(fullUploadDir, fileName);
 
-  // Save file
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  await fs.writeFile(filePath, buffer);
+    // Save file
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    await fs.writeFile(filePath, buffer);
 
-  return {
-    fileName,
-    filePath: path.join(uploadDir, fileName), // Relative path for storing in DB
-    fileSize: file.size,
-  };
+    return {
+      fileName,
+      filePath: path.join(uploadDir, fileName), // Relative path for storing in DB
+      fileSize: file.size,
+    };
+  } catch (fsError) {
+    console.error('Error saving file to filesystem:', fsError);
+    throw new Error('Failed to save file. Please check server configuration.');
+  }
 } 

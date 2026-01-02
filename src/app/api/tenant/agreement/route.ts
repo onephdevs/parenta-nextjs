@@ -164,8 +164,9 @@ export async function POST(request: NextRequest) {
       savedFile = await saveUploadedFile(file);
     } catch (fileError) {
       console.error('Error saving uploaded file:', fileError);
+      const errorMessage = fileError instanceof Error ? fileError.message : 'Unknown error';
       return NextResponse.json(
-        { success: false, error: 'Failed to save file to disk. Please try again.' },
+        { success: false, error: `Failed to save file: ${errorMessage}. Please try again.` },
         { status: 500 }
       );
     }
@@ -193,12 +194,19 @@ export async function POST(request: NextRequest) {
       });
     } catch (docError) {
       console.error('Error creating document record:', docError);
-      // Try to clean up saved file if document creation fails
+      // Try to clean up saved file/blob if document creation fails
       try {
-        const fs = await import('fs/promises');
-        const path = await import('path');
-        const fullPath = path.join(process.cwd(), 'public', filePath);
-        await fs.unlink(fullPath);
+        // Check if it's a Vercel Blob URL
+        if (filePath && filePath.startsWith('https://') && filePath.includes('blob.vercel-storage.com')) {
+          const { del } = await import('@vercel/blob');
+          await del(filePath);
+        } else if (filePath) {
+          // Local filesystem path
+          const fs = await import('fs/promises');
+          const path = await import('path');
+          const fullPath = path.join(process.cwd(), 'public', filePath);
+          await fs.unlink(fullPath);
+        }
       } catch (cleanupError) {
         console.error('Error cleaning up file:', cleanupError);
       }
