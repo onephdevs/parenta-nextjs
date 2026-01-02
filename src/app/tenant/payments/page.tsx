@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   CreditCard, 
@@ -87,6 +87,7 @@ interface BalanceData {
 
 export default function PaymentsPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [paymentData, setPaymentData] = useState<PaymentSummary | null>(null);
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,8 +106,10 @@ export default function PaymentsPage() {
       fetchPaymentData();
       fetchDepositData();
       fetchUtilityDepositData();
+    } else if (status === 'unauthenticated') {
+      router.push('/auth/signin?role=tenant');
     }
-  }, [status, session]);
+  }, [status, session, router]);
 
   // Show loading state while checking authentication
   if (status === 'loading') {
@@ -122,7 +125,7 @@ export default function PaymentsPage() {
 
   // Redirect if not authenticated or not tenant
   if (!session || session.user.role !== 'tenant') {
-    redirect('/auth/signin?role=tenant');
+    return null; // Will redirect via useEffect
   }
 
   const fetchPaymentData = async () => {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   FileText, 
@@ -41,6 +41,7 @@ interface DocumentsData {
 
 export default function DocumentsPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [documentsData, setDocumentsData] = useState<DocumentsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
@@ -99,8 +100,10 @@ export default function DocumentsPage() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user.role === 'tenant') {
       fetchDocuments();
+    } else if (status === 'unauthenticated') {
+      router.push('/auth/signin?role=tenant');
     }
-  }, [status, session, showNotification]);
+  }, [status, session, router]);
 
   // Show loading state while checking authentication
   if (status === 'loading' || isLoading) {
@@ -125,7 +128,7 @@ export default function DocumentsPage() {
 
   // Redirect if not authenticated or not tenant
   if (!session || session.user.role !== 'tenant') {
-    redirect('/auth/signin?role=tenant');
+    return null; // Will redirect via useEffect
   }
 
   const handleDownload = (document: Document) => {

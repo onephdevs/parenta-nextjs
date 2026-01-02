@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, User, Home, Calendar, DollarSign, FileText } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
@@ -68,6 +68,7 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showNotification } = useNotifications();
@@ -75,8 +76,10 @@ export default function ProfilePage() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user.role === 'tenant') {
       fetchProfile();
+    } else if (status === 'unauthenticated') {
+      router.push('/auth/tenant/signin');
     }
-  }, [status, session]);
+  }, [status, session, router]);
 
   if (status === 'loading' || isLoading) {
     return (
@@ -92,7 +95,7 @@ export default function ProfilePage() {
   }
 
   if (!session || session.user.role !== 'tenant') {
-    redirect('/auth/tenant/signin');
+    return null; // Will redirect via useEffect
   }
 
   const fetchProfile = async () => {

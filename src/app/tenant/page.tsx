@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Home, 
@@ -51,6 +51,7 @@ interface TenantDashboardData {
 
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [tenantData, setTenantData] = useState<TenantDashboardData | null>(null);
   const [nextDueDate, setNextDueDate] = useState<string | null>(null);
@@ -58,8 +59,10 @@ export default function TenantDashboard() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user.role === 'tenant') {
       fetchTenantData();
+    } else if (status === 'unauthenticated') {
+      router.push('/auth/tenant/signin');
     }
-  }, [status, session]);
+  }, [status, session, router]);
 
   const fetchTenantData = async () => {
     try {
@@ -105,7 +108,7 @@ export default function TenantDashboard() {
   }
 
   if (!session || session.user.role !== 'tenant') {
-    redirect('/auth/tenant/signin');
+    return null; // Will redirect via useEffect
   }
 
   const quickActions = [

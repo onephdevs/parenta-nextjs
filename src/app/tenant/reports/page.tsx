@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -19,6 +19,7 @@ import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function ReportsPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [reportType, setReportType] = useState<'payments' | 'invoices' | 'summary'>('payments');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -26,6 +27,12 @@ export default function ReportsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
   const { showNotification } = useNotifications();
+
+  React.useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/tenant/signin');
+    }
+  }, [status, router]);
 
   if (status === 'loading') {
     return (
@@ -38,7 +45,7 @@ export default function ReportsPage() {
   }
 
   if (!session || session.user.role !== 'tenant') {
-    redirect('/auth/tenant/signin');
+    return null; // Will redirect via useEffect
   }
 
   // Set default date range (last 3 months)
