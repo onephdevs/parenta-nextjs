@@ -34,6 +34,7 @@ interface Payment {
   paymentDate: string;
   status: string;
   type: string;
+  method?: string;
   reference?: string;
   description?: string;
   roomNumber?: string;
@@ -145,19 +146,33 @@ export default function PaymentsPage() {
         const schedule = paymentsData.data.schedule || [];
         const history = paymentsData.data.history || [];
         
-        // Map history to Payment format
-        const recentPayments: Payment[] = history.map((p: any) => ({
-          id: p.id,
-          amount: p.amount,
-          paymentDate: p.paymentDate,
-          status: p.status,
-          type: p.paymentType,
-          reference: p.referenceNumber,
-          description: p.notes,
-          roomNumber: p.roomNumber,
-          buildingName: p.buildingName,
-          invoiceNumbers: p.invoiceNumbers,
-        }));
+        // Map history to Payment format - ensure all fields are properly mapped
+        const recentPayments: Payment[] = history.map((p: any) => {
+          // Debug log to see what data we're getting
+          if (!p.payment_type || !p.payment_status) {
+            console.warn('Payment missing type or status:', {
+              id: p.id,
+              payment_type: p.payment_type,
+              payment_status: p.payment_status,
+              notes: p.notes,
+              row: p
+            });
+          }
+          
+          return {
+            id: p.id,
+            amount: p.amount || 0,
+            paymentDate: p.paymentDate || p.payment_date,
+            status: p.status || p.payment_status || 'pending',
+            type: p.paymentType || p.payment_type || 'other',
+            method: p.paymentMethod || p.payment_method || 'cash',
+            reference: p.referenceNumber || p.reference_number || null,
+            description: p.notes || null,
+            roomNumber: p.roomNumber || p.room_number,
+            buildingName: p.buildingName || p.building_name,
+            invoiceNumbers: p.invoiceNumbers || p.invoice_numbers,
+          };
+        });
 
         setPaymentData({
           totalPaid: summary.totalPaid || 0,
@@ -827,13 +842,16 @@ export default function PaymentsPage() {
                               Amount
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                              Method
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Type
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Status
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                              Reference
+                              Description
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
                               Actions
@@ -850,16 +868,31 @@ export default function PaymentsPage() {
                                 {formatCurrency(payment.amount)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {payment.type}
+                                {payment.method ? (
+                                  <span className="capitalize">{String(payment.method).replace(/_/g, ' ')}</span>
+                                ) : (
+                                  <span className="text-gray-400 italic">-</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {payment.type ? (
+                                  <span className="capitalize">{String(payment.type).replace(/_/g, ' ')}</span>
+                                ) : (
+                                  <span className="text-gray-400 italic">-</span>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
-                                  {getStatusIcon(payment.status)}
-                                  <span className="ml-1">{payment.status}</span>
-                                </span>
+                                {payment.status ? (
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
+                                    {getStatusIcon(payment.status)}
+                                    <span className="ml-1 capitalize">{String(payment.status)}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 italic">-</span>
+                                )}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                                {payment.reference || 'N/A'}
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {payment.description || '-'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <div className="flex items-center space-x-3">

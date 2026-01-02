@@ -66,6 +66,7 @@ export async function GET() {
     const scheduleResult = await pool.query(scheduleQuery, [tenant.id]);
     
     // Fetch payment history (only completed/paid payments, not pending invoices)
+    // Join through assignment_id to get room information, with fallback to room_id
     const historyQuery = `
       SELECT 
         p.id,
@@ -77,19 +78,27 @@ export async function GET() {
         p.payment_status,
         p.reference_number,
         p.notes,
-        r.room_number,
-        b.name as building_name,
+        COALESCE(ra_r.room_number, direct_r.room_number) as room_number,
+        COALESCE(ra_b.name, direct_b.name) as building_name,
         STRING_AGG(DISTINCT i.invoice_number, ', ') as invoice_numbers
       FROM payments p
-      LEFT JOIN rooms r ON p.room_id = r.id
-      LEFT JOIN buildings b ON r.building_id = b.id
+      -- Join through assignment_id (preferred method)
+      LEFT JOIN tenant_room_assignments ra ON p.assignment_id = ra.id
+      LEFT JOIN rooms ra_r ON ra.room_id = ra_r.id
+      LEFT JOIN buildings ra_b ON ra_r.building_id = ra_b.id
+      -- Fallback: direct room_id join (for older payments)
+      LEFT JOIN rooms direct_r ON p.room_id = direct_r.id
+      LEFT JOIN buildings direct_b ON direct_r.building_id = direct_b.id
+      -- Join for invoice numbers
       LEFT JOIN payment_allocations pa ON pa.payment_id = p.id
       LEFT JOIN invoices i ON i.id = pa.invoice_id
       WHERE p.tenant_id = $1
-        AND p.payment_status IN ('paid', 'partial')
+        AND p.payment_status IN ('paid', 'partial', 'completed', 'pending')
+        AND p.payment_type IS NOT NULL
+        AND p.payment_status IS NOT NULL
       GROUP BY p.id, p.amount, p.payment_type, p.payment_method, p.payment_date, 
                p.due_date, p.payment_status, p.reference_number, p.notes,
-               r.room_number, b.name
+               ra_r.room_number, ra_b.name, direct_r.room_number, direct_b.name
       ORDER BY p.payment_date DESC, p.due_date DESC
       LIMIT 50
     `;
@@ -131,19 +140,19 @@ export async function GET() {
       address: row.address_line1 ? `${row.address_line1}, ${row.city || ''}`.trim() : null,
     }));
     
-    // Format history items
+    // Format history items - ensure all fields are properly extracted
     const history = historyResult.rows.map(row => ({
       id: row.id,
       amount: parseFloat(row.amount || 0),
-      paymentType: row.payment_type,
-      paymentMethod: row.payment_method,
+      paymentType: row.payment_type || 'other',
+      paymentMethod: row.payment_method || 'cash',
       paymentDate: row.payment_date,
       dueDate: row.due_date,
-      status: row.payment_status,
-      referenceNumber: row.reference_number,
-      notes: row.notes,
-      roomNumber: row.room_number,
-      buildingName: row.building_name,
+      status: row.payment_status || 'pending',
+      referenceNumber: row.reference_number || null,
+      notes: row.notes || null,
+      roomNumber: row.room_number || null,
+      buildingName: row.building_name || null,
       invoiceNumbers: row.invoice_numbers || null,
     }));
     
