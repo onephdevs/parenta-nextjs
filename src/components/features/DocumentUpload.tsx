@@ -35,8 +35,14 @@ export default function DocumentUpload({
   // Determine if we're in tenant portal (use tenant API) or admin portal (use admin API)
   // Check both pathname and session role for reliability
   // Priority: session role > pathname (session is more reliable)
+  // Explicitly check for admin context first, then tenant context
+  const isAdminContext = session?.user?.role === 'admin' || pathname?.startsWith('/admin');
   const isTenantContext = session?.user?.role === 'tenant' || pathname?.startsWith('/tenant');
-  const apiBaseUrl = isTenantContext ? '/api/tenant/agreement' : `/api/tenants/${tenantId}/agreement`;
+  
+  // Use tenant API only if explicitly in tenant context, otherwise use admin API
+  const apiBaseUrl = isTenantContext && !isAdminContext 
+    ? '/api/tenant/agreement' 
+    : `/api/tenants/${tenantId}/agreement`;
   
   // Debug logging (remove in production if needed)
   useEffect(() => {
@@ -44,6 +50,7 @@ export default function DocumentUpload({
       console.log('DocumentUpload API selection:', {
         pathname,
         userRole: session?.user?.role,
+        isAdminContext,
         isTenantContext,
         apiBaseUrl,
         tenantId
@@ -116,7 +123,8 @@ export default function DocumentUpload({
 
       const response = await fetch(apiBaseUrl, {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include' // Ensure cookies/session are sent with the request
       });
 
       // Handle non-JSON responses (like 403 Forbidden HTML)
@@ -188,7 +196,8 @@ export default function DocumentUpload({
 
     try {
       const response = await fetch(apiBaseUrl, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include' // Ensure cookies/session are sent with the request
       });
 
       const data = await response.json();
