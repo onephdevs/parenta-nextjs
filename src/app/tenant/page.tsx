@@ -109,7 +109,9 @@ export default function TenantDashboard() {
       const data = await response.json();
       
       if (data.success && data.data) {
-        const requests = data.data.slice(0, 2).map((r: any) => ({
+        // API returns { requests, total, active }, so access data.data.requests
+        const requestsArray = Array.isArray(data.data.requests) ? data.data.requests : (Array.isArray(data.data) ? data.data : []);
+        const requests = requestsArray.slice(0, 2).map((r: any) => ({
           id: r.id,
           title: r.title,
           status: r.status === 'completed' ? 'Completed' : r.status === 'in_progress' ? 'In Progress' : r.status,

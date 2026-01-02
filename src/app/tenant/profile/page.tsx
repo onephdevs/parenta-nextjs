@@ -73,31 +73,6 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const { showNotification } = useNotifications();
 
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
-      fetchProfile();
-    } else if (status === 'unauthenticated') {
-      router.push('/auth/tenant/signin');
-    }
-  }, [status, session, router]);
-
-  if (status === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="space-y-6">
-            <SkeletonCard showHeader={true} lines={5} />
-            <SkeletonCard showHeader={true} lines={3} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!session || session.user.role !== 'tenant') {
-    return null; // Will redirect via useEffect
-  }
-
   const fetchProfile = async () => {
     try {
       setIsLoading(true);
@@ -124,6 +99,31 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchProfile();
+    } else if (status === 'unauthenticated') {
+      router.push('/auth/tenant/signin');
+    }
+  }, [status, session, router]);
+
+  if (status === 'loading' || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <SkeletonCard showHeader={true} lines={5} />
+            <SkeletonCard showHeader={true} lines={3} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || session.user.role !== 'tenant') {
+    return null; // Will redirect via useEffect
+  }
 
   const formatCurrency = (amount: number | undefined | null) => {
     if (!amount) return 'N/A';
