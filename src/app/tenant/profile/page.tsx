@@ -211,11 +211,13 @@ export default function ProfilePage() {
                   </div>
                   
                   {/* Deposit and Advance Information */}
-                  {(profileData.roomAssignment.depositPaid || profileData.roomAssignment.advancePaid || profileData.roomAssignment.utilityDepositPaid) && (
+                  {((profileData.roomAssignment.depositPaid && profileData.roomAssignment.depositPaid > 0) || 
+                    (profileData.roomAssignment.advancePaid && profileData.roomAssignment.advancePaid > 0) || 
+                    (profileData.roomAssignment.utilityDepositPaid && profileData.roomAssignment.utilityDepositPaid > 0)) && (
                     <div className="mt-6 pt-6 border-t border-white/20">
                       <h4 className="text-lg font-semibold mb-3">Deposits & Advance</h4>
                       <div className="grid md:grid-cols-3 gap-4">
-                        {profileData.roomAssignment.depositPaid && (
+                        {profileData.roomAssignment.depositPaid && profileData.roomAssignment.depositPaid > 0 && (
                           <div className="bg-white/10 rounded-lg p-3">
                             <p className="text-sm opacity-80">Deposit</p>
                             <p className="font-semibold text-lg">
@@ -233,7 +235,7 @@ export default function ProfilePage() {
                             )}
                           </div>
                         )}
-                        {profileData.roomAssignment.advancePaid && (
+                        {profileData.roomAssignment.advancePaid && profileData.roomAssignment.advancePaid > 0 && (
                           <div className="bg-white/10 rounded-lg p-3">
                             <p className="text-sm opacity-80">Advance</p>
                             <p className="font-semibold text-lg">
@@ -241,7 +243,7 @@ export default function ProfilePage() {
                             </p>
                           </div>
                         )}
-                        {profileData.roomAssignment.utilityDepositPaid && (
+                        {profileData.roomAssignment.utilityDepositPaid && profileData.roomAssignment.utilityDepositPaid > 0 && (
                           <div className="bg-white/10 rounded-lg p-3">
                             <p className="text-sm opacity-80">Utility Deposit</p>
                             <p className="font-semibold text-lg">
