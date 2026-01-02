@@ -75,8 +75,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate category
-    const validCategories = ['maintenance', 'utilities', 'supplies', 'services', 'insurance', 'taxes', 'other'];
+    // Validate category - must match all options in ExpenseForm dropdown
+    const validCategories = [
+      'cleaning',
+      'maintenance',
+      'repair',
+      'upgrade',
+      'garbage_collection',
+      'worker_wages',
+      'utilities',
+      'supplies',
+      'services',
+      'insurance',
+      'taxes',
+      'other'
+    ];
     if (!validCategories.includes(category)) {
       return NextResponse.json(
         { error: 'Invalid category' },
