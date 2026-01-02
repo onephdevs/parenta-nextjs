@@ -5,11 +5,11 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface CreditTransaction {
-  id: number;
+  id: string | number;
   amount: number;
   transactionType: 'credit' | 'debit' | 'applied_to_invoice';
   description: string;
-  relatedInvoiceId?: number;
+  relatedInvoiceId?: string | number;
   createdAt: string;
 }
 
@@ -50,7 +50,32 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
       if (historyRes.ok) {
         const historyData = await historyRes.json();
         // API returns { success: true, data: <array> } for history
-        const history = Array.isArray(historyData.data) ? historyData.data : (historyData.history || []);
+        const rawHistory = Array.isArray(historyData.data) ? historyData.data : (historyData.history || []);
+        
+        // Transform API response to match component's CreditTransaction interface
+        // API returns TenantCredit objects with 'source' and 'status', but component expects 'transactionType'
+        const history: CreditTransaction[] = rawHistory.map((item: any) => {
+          // Map source/status to transactionType
+          let transactionType: 'credit' | 'debit' | 'applied_to_invoice' = 'credit';
+          
+          if (item.status === 'applied') {
+            transactionType = 'applied_to_invoice';
+          } else if (item.source === 'adjustment' && item.amount < 0) {
+            transactionType = 'debit';
+          } else {
+            transactionType = 'credit';
+          }
+          
+          return {
+            id: item.id || String(item.id),
+            amount: parseFloat(item.amount || 0),
+            transactionType,
+            description: item.description || 'No description',
+            relatedInvoiceId: item.appliedToInvoiceId || item.applied_to_invoice_id,
+            createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+          };
+        });
+        
         setHistory(history);
       }
     } catch (error) {
@@ -114,14 +139,19 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
     }
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatDate = (date: string | Date) => {
+    if (!date) return 'Date not available';
+    try {
+      return new Date(date).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   const getTransactionColor = (type: string) => {
@@ -293,26 +323,26 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
             {history.map((transaction) => (
               <div
                 key={transaction.id}
-                className={`flex items-start space-x-3 p-4 rounded-lg border ${getTransactionColor(transaction.transactionType)}`}
+                className={`flex items-start space-x-3 p-4 rounded-lg border ${getTransactionColor(transaction.transactionType || 'credit')}`}
               >
                 <div className="flex-shrink-0 mt-0.5">
-                  {getTransactionIcon(transaction.transactionType)}
+                  {getTransactionIcon(transaction.transactionType || 'credit')}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-900 capitalize">
-                        {transaction.transactionType.replace('_', ' ')}
+                        {transaction.transactionType?.replace(/_/g, ' ') || 'Transaction'}
                       </p>
-                      <p className="text-xs text-gray-900 mt-1">{transaction.description}</p>
-                      <p className="text-xs text-gray-900 mt-1">{formatDate(transaction.createdAt)}</p>
+                      <p className="text-xs text-gray-900 mt-1">{transaction.description || 'No description'}</p>
+                      <p className="text-xs text-gray-900 mt-1">{transaction.createdAt ? formatDate(transaction.createdAt) : 'Date not available'}</p>
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold ${
-                        transaction.transactionType === 'credit' ? 'text-green-600' : 'text-red-600'
+                        transaction.transactionType === 'credit' || !transaction.transactionType ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {transaction.transactionType === 'credit' ? '+' : '-'}
-                        {formatCurrency(Math.abs(transaction.amount))}
+                        {(transaction.transactionType === 'credit' || !transaction.transactionType) ? '+' : '-'}
+                        {formatCurrency(Math.abs(transaction.amount || 0))}
                       </p>
                       {transaction.relatedInvoiceId && (
                         <a
