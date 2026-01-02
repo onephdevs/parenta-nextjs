@@ -97,7 +97,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     }
 
     if (formData.securityDeposit && formData.securityDeposit < 0) {
-      newErrors.securityDeposit = 'Security deposit cannot be negative';
+      newErrors.securityDeposit = 'Deposit cannot be negative';
     }
 
     setErrors(newErrors);
@@ -589,9 +589,9 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             </div>
 
             <div>
-              <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-900">
-                Security Deposit ({currencySymbol})
-              </label>
+                <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-900">
+                  Deposit ({currencySymbol})
+                </label>
               <input
                 type="number"
                 name="securityDeposit"

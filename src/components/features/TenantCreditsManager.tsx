@@ -34,15 +34,28 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
 
   const loadCreditData = async () => {
     try {
-      const response = await fetch(`/api/tenant-credits/${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(data.balance || 0);
-        setHistory(data.history || []);
+      // Fetch balance (aggregated total) and history separately
+      const [balanceRes, historyRes] = await Promise.all([
+        fetch(`/api/tenant-credits/${tenantId}?type=balance`),
+        fetch(`/api/tenant-credits/${tenantId}?type=history`)
+      ]);
+      
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        // API returns { success: true, data: <number> } for balance
+        const balance = typeof balanceData.data === 'number' ? balanceData.data : (balanceData.data?.balance || balanceData.balance || 0);
+        setBalance(balance);
+      }
+      
+      if (historyRes.ok) {
+        const historyData = await historyRes.json();
+        // API returns { success: true, data: <array> } for history
+        const history = Array.isArray(historyData.data) ? historyData.data : (historyData.history || []);
+        setHistory(history);
       }
     } catch (error) {
-      console.error('Error loading credit data:', error);
-      addNotification('Failed to load credit information', 'error');
+      console.error('Error loading advance data:', error);
+      addNotification('Failed to load advance information', 'error');
     } finally {
       setLoading(false);
     }
@@ -170,17 +183,17 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
       <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Tenant Credits</h3>
-            <p className="mt-1 text-sm text-gray-900">Manage advance payments and credits for {tenantName}</p>
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Advance</h3>
+            <p className="mt-1 text-sm text-gray-900">Manage prepaid rent credits for {tenantName}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-900">Current Balance</p>
+            <p className="text-sm text-gray-900">Total Advance</p>
             <p className="text-3xl font-bold text-purple-600">{formatCurrency(balance)}</p>
           </div>
         </div>
       </div>
 
-      {/* Add/Deduct Credit Form */}
+      {/* Add/Deduct Advance Form */}
       <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
         {!showAddForm ? (
           <button
@@ -190,7 +203,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
             <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add/Deduct Credit
+            Add/Deduct Advance
           </button>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -228,8 +241,8 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
                   required
                   className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
                 >
-                  <option value="credit">Add Credit</option>
-                  <option value="debit">Deduct Credit</option>
+                  <option value="credit">Add Advance</option>
+                  <option value="debit">Deduct Advance</option>
                 </select>
               </div>
 
@@ -320,8 +333,8 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="mt-2 text-sm text-gray-900">No credit transactions yet</p>
-            <p className="text-xs text-gray-400">Credit transactions will appear here when payments exceed invoice amounts</p>
+            <p className="mt-2 text-sm text-gray-900">No advance transactions yet</p>
+            <p className="text-xs text-gray-400">Advance payments (prepaid rent) will appear here and are automatically applied to future invoices</p>
           </div>
         )}
       </div>

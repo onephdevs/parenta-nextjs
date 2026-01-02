@@ -27,7 +27,7 @@ interface Payment {
   description?: string;
 }
 
-interface TenantCredit {
+interface Advance {
   balance: number;
   history: {
     id: number;
@@ -38,7 +38,7 @@ interface TenantCredit {
   }[];
 }
 
-interface DepositLedger {
+interface Deposit {
   balance: number;
   history: {
     id: number;
@@ -56,8 +56,8 @@ interface TenantFinancialDetailsProps {
 export default function TenantFinancialDetails({ tenantId }: TenantFinancialDetailsProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [creditInfo, setCreditInfo] = useState<TenantCredit | null>(null);
-  const [depositInfo, setDepositInfo] = useState<DepositLedger | null>(null);
+  const [advanceInfo, setAdvanceInfo] = useState<Advance | null>(null);
+  const [depositInfo, setDepositInfo] = useState<Deposit | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,13 +81,17 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
         }
 
         if (creditsRes.ok) {
-          const data = await creditsRes.json();
-          setCreditInfo(data);
+          const response = await creditsRes.json();
+          // API returns { success: true, data: <number> } for balance (aggregated total)
+          const balance = typeof response.data === 'number' ? response.data : (response.data?.balance || response.balance || 0);
+          setAdvanceInfo({ balance, history: [] });
         }
 
         if (depositsRes.ok) {
-          const data = await depositsRes.json();
-          setDepositInfo(data);
+          const response = await depositsRes.json();
+          // API returns { success: true, data: <number> } for balance (aggregated total)
+          const balance = typeof response.data === 'number' ? response.data : (response.data?.balance || response.balance || 0);
+          setDepositInfo({ balance, history: [] });
         }
       } catch (error) {
         console.error('Error loading financial data:', error);
@@ -157,31 +161,13 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
 
   return (
     <div className="space-y-6">
-      {/* Credit and Deposit Cards */}
+      {/* Deposit and Advance Cards - Deposit always appears first */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tenant Credit Card */}
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 shadow rounded-lg border-2 border-purple-200">
-          <div className="px-6 py-5">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-purple-900">Tenant Credit</h3>
-              <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-3xl font-bold text-purple-900">
-              {formatCurrency(creditInfo?.balance || 0)}
-            </p>
-            <p className="mt-2 text-xs text-purple-700">
-              Available credit from advance payments
-            </p>
-          </div>
-        </div>
-
-        {/* Deposit Balance Card */}
+        {/* Deposit Balance Card - Always First */}
         <div className="bg-gradient-to-br from-green-50 to-green-100 shadow rounded-lg border-2 border-green-200">
           <div className="px-6 py-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-green-900">Security Deposit</h3>
+              <h3 className="text-sm font-medium text-green-900">Deposit</h3>
               <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
@@ -190,7 +176,25 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
               {formatCurrency(depositInfo?.balance || 0)}
             </p>
             <p className="mt-2 text-xs text-green-700">
-              Refundable security deposit on hand
+              Total refundable security funds (not auto-applied)
+            </p>
+          </div>
+        </div>
+
+        {/* Advance Card - Always Second */}
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 shadow rounded-lg border-2 border-purple-200">
+          <div className="px-6 py-5">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-purple-900">Advance</h3>
+              <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-3xl font-bold text-purple-900">
+              {formatCurrency(advanceInfo?.balance || 0)}
+            </p>
+            <p className="mt-2 text-xs text-purple-700">
+              Total prepaid rent credits (auto-applied to invoices)
             </p>
           </div>
         </div>

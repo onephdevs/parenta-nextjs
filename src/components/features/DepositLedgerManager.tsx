@@ -39,11 +39,24 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
 
   const loadDepositData = async () => {
     try {
-      const response = await fetch(`/api/deposit-ledger/${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(data.balance || 0);
-        setHistory(data.history || []);
+      // Fetch balance (aggregated total) and history separately
+      const [balanceRes, historyRes] = await Promise.all([
+        fetch(`/api/deposit-ledger/${tenantId}?type=balance`),
+        fetch(`/api/deposit-ledger/${tenantId}?type=history`)
+      ]);
+      
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        // API returns { success: true, data: <number> } for balance
+        const balance = typeof balanceData.data === 'number' ? balanceData.data : (balanceData.data?.balance || balanceData.balance || 0);
+        setBalance(balance);
+      }
+      
+      if (historyRes.ok) {
+        const historyData = await historyRes.json();
+        // API returns { success: true, data: <array> } for history
+        const history = Array.isArray(historyData.data) ? historyData.data : (historyData.history || []);
+        setHistory(history);
       }
     } catch (error) {
       console.error('Error loading deposit data:', error);
@@ -184,11 +197,11 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
       <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Security Deposit</h3>
-            <p className="mt-1 text-sm text-gray-900">Manage security deposit for {tenantName}</p>
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Deposit</h3>
+            <p className="mt-1 text-sm text-gray-900">Manage refundable security deposit for {tenantName}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-900">Available Balance</p>
+            <p className="text-sm text-gray-900">Total Deposit</p>
             <p className="text-3xl font-bold text-green-600">{formatCurrency(balance)}</p>
           </div>
         </div>
@@ -406,7 +419,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p className="mt-2 text-sm text-gray-900">No deposit transactions yet</p>
-            <p className="text-xs text-gray-400">Deposits will be recorded when tenants pay security deposits</p>
+            <p className="text-xs text-gray-400">Deposits are refundable security funds that are not automatically applied to invoices</p>
           </div>
         )}
       </div>

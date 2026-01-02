@@ -257,17 +257,17 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                 </div>
               </div>
 
-              {/* Financial Details: Invoices, Payments, Credits, Deposits */}
+              {/* Financial Details: Invoices, Payments, Deposits, Advances */}
               <TenantFinancialDetails tenantId={tenant.id} />
 
-              {/* Tenant Credits Management */}
-              <TenantCreditsManager 
+              {/* Deposit Ledger Management - Always appears before Advance */}
+              <DepositLedgerManager 
                 tenantId={tenant.id} 
                 tenantName={`${tenant.firstName} ${tenant.lastName}`}
               />
 
-              {/* Deposit Ledger Management */}
-              <DepositLedgerManager 
+              {/* Advance Management - Always appears after Deposit */}
+              <TenantCreditsManager 
                 tenantId={tenant.id} 
                 tenantName={`${tenant.firstName} ${tenant.lastName}`}
               />
@@ -321,7 +321,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                       <dd className="mt-1 text-sm text-gray-900">{formatCurrency(tenant.monthlyIncome)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-gray-900">Security Deposit</dt>
+                      <dt className="text-sm font-medium text-gray-900">Deposit</dt>
                       <dd className="mt-1 text-sm text-gray-900">{formatCurrency(tenant.securityDeposit)}</dd>
                     </div>
                     <div>

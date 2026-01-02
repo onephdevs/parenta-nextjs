@@ -267,7 +267,7 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
                 </div>
                 {roomDetails.room.depositAmount && (
                   <div className="grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-900">Security Deposit</dt>
+                    <dt className="text-sm font-medium text-gray-900">Deposit</dt>
                     <dd className="col-span-2 text-sm text-gray-900">₱{parseFloat(roomDetails.room.depositAmount.toString()).toLocaleString()}</dd>
                   </div>
                 )}

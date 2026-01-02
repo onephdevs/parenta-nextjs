@@ -168,7 +168,7 @@ export default function RoomFinancialDashboard({
           {financialSummary.deposit_received > 0 && (
             <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
               <div>
-                <div className="font-medium text-gray-900">Security Deposit</div>
+                <div className="font-medium text-gray-900">Deposit</div>
                 <div className="text-sm text-gray-900">Amount received from current tenant</div>
               </div>
               <div className="text-lg font-semibold text-green-600">
