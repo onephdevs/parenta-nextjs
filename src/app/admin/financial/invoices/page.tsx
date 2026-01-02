@@ -46,7 +46,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     ]);
     
     invoicesData = invoicesResult;
-    tenants = tenantsData.tenants; // Extract tenants array from paginated response
+    tenants = Array.isArray(tenantsData.tenants) ? tenantsData.tenants : []; // Ensure tenants is always an array
     summary = summaryResult;
   } catch (error) {
     console.error('Error loading invoices:', error);
@@ -319,11 +319,15 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 >
                   <option value="">All Tenants</option>
-                  {tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.firstName} {tenant.lastName}
-                    </option>
-                  ))}
+                  {Array.isArray(tenants) && tenants.length > 0 ? (
+                    tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.firstName} {tenant.lastName}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No tenants available</option>
+                  )}
                 </select>
               </div>
 

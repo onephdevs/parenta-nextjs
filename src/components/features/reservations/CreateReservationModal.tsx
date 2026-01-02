@@ -242,11 +242,14 @@ export default function CreateReservationModal({
       const result = await response.json();
       
       if (result.success) {
-        const tenantsData = result.data?.tenants || result.data || [];
-        setTenants(tenantsData);
+        const tenantsData = result.data?.tenants || (Array.isArray(result.data) ? result.data : []);
+        setTenants(Array.isArray(tenantsData) ? tenantsData : []);
+      } else {
+        setTenants([]);
       }
     } catch (error) {
       console.error('Error fetching tenants:', error);
+      setTenants([]);
       showNotification({
         type: 'error',
         title: 'Error',
@@ -508,11 +511,15 @@ export default function CreateReservationModal({
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
             >
               <option value="">Select a tenant</option>
-              {tenants.map(tenant => (
-                <option key={tenant.id} value={tenant.id}>
-                  {tenant.firstName} {tenant.lastName} ({tenant.email})
-                </option>
-              ))}
+              {Array.isArray(tenants) && tenants.length > 0 ? (
+                tenants.map(tenant => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.firstName} {tenant.lastName} ({tenant.email})
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>{loadingTenants ? 'Loading tenants...' : 'No tenants available'}</option>
+              )}
             </select>
             <Link
               href="/admin/tenants/new"

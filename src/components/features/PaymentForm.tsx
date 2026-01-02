@@ -59,13 +59,30 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
         if (tenantsRes.ok) {
           const tenantsData = await tenantsRes.json();
-          // Handle both response formats: { success: true, data: [] } or { tenants: [] }
-          const tenantsList = tenantsData.data || tenantsData.tenants || [];
-          setTenants(tenantsList);
+          // Handle response format: { success: true, data: { tenants: [], pagination: {} } }
+          let tenantsList: Tenant[] = [];
+          if (tenantsData.success && tenantsData.data) {
+            tenantsList = Array.isArray(tenantsData.data.tenants) 
+              ? tenantsData.data.tenants 
+              : Array.isArray(tenantsData.data)
+              ? tenantsData.data
+              : [];
+          } else if (Array.isArray(tenantsData.tenants)) {
+            tenantsList = tenantsData.tenants;
+          } else if (Array.isArray(tenantsData.data)) {
+            tenantsList = tenantsData.data;
+          }
+          
+          // Ensure it's always an array
+          setTenants(Array.isArray(tenantsList) ? tenantsList : []);
+        } else {
+          console.error('Failed to fetch tenants:', tenantsRes.status);
+          setTenants([]);
         }
       } catch (error) {
         console.error('Error loading data:', error);
         addNotification('Failed to load tenant data', 'error');
+        setTenants([]); // Ensure tenants is always an array
       }
     };
 
@@ -297,12 +314,16 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   }`}
                 >
                   <option value="">Select a tenant</option>
-                  {tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.firstName} {tenant.lastName}
-                      {tenant.currentRoomId && ` (${tenant.buildingName} ${tenant.roomNumber})`}
-                    </option>
-                  ))}
+                  {Array.isArray(tenants) && tenants.length > 0 ? (
+                    tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.firstName} {tenant.lastName}
+                        {tenant.currentRoomId && ` (${tenant.buildingName} ${tenant.roomNumber})`}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Loading tenants...</option>
+                  )}
                 </select>
                 {errors.tenantId && (
                   <p className="mt-2 text-sm text-red-600">{errors.tenantId}</p>

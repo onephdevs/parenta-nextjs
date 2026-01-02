@@ -84,10 +84,15 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       const response = await fetch('/api/tenants');
       const result = await response.json();
       if (result.success) {
-        setTenants(result.data);
+        // Handle response format: { success: true, data: { tenants: [], pagination: {} } }
+        const tenantsList = result.data?.tenants || (Array.isArray(result.data) ? result.data : []);
+        setTenants(Array.isArray(tenantsList) ? tenantsList : []);
+      } else {
+        setTenants([]);
       }
     } catch (error) {
       console.error('Error fetching tenants:', error);
+      setTenants([]);
     }
   };
 
@@ -327,11 +332,15 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="">Select a tenant</option>
-                  {tenants.map(tenant => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.firstName} {tenant.lastName} ({tenant.email})
-                    </option>
-                  ))}
+                  {Array.isArray(tenants) && tenants.length > 0 ? (
+                    tenants.map(tenant => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.firstName} {tenant.lastName} ({tenant.email})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Loading tenants...</option>
+                  )}
                 </select>
               </div>
 
