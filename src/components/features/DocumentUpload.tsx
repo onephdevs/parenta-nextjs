@@ -137,10 +137,13 @@ export default function DocumentUpload({
         } else {
           // Handle HTML/text responses (like 403 Forbidden)
           const text = await response.text();
+          const contextMessage = isTenantContext 
+            ? 'Please ensure you are logged in as a tenant to upload your agreement.'
+            : 'Please ensure you are logged in as an admin to upload tenant agreements.';
           errorData = {
             success: false,
             error: response.status === 403 
-              ? 'Access denied. Please ensure you are logged in as a tenant to upload your agreement.'
+              ? `Access denied. ${contextMessage}`
               : `Upload failed with status ${response.status}: ${text.substring(0, 100)}`
           };
         }
@@ -210,10 +213,13 @@ export default function DocumentUpload({
         } else {
           // Handle HTML/text responses (like 403 Forbidden)
           const text = await response.text();
+          const contextMessage = isTenantContext 
+            ? 'Please ensure you are logged in as a tenant to manage your agreement.'
+            : 'Please ensure you are logged in as an admin to manage tenant agreements.';
           errorData = {
             success: false,
             error: response.status === 403 
-              ? 'Access denied. Please ensure you have the correct permissions.'
+              ? `Access denied. ${contextMessage}`
               : `Delete failed with status ${response.status}: ${text.substring(0, 100)}`
           };
         }

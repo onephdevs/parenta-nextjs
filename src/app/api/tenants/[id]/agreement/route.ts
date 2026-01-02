@@ -91,10 +91,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Validate file type
-    if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
+    // Validate file type - check both MIME type and file extension
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isValidType = SUPPORTED_FILE_TYPES.includes(file.type) || 
+                        (file.type === '' && allowedExtensions.includes(fileExtension)) ||
+                        allowedExtensions.includes(fileExtension);
+    
+    if (!isValidType) {
       return NextResponse.json(
-        { success: false, error: `File type ${file.type} is not supported. Supported types: PDF, DOC, DOCX` },
+        { success: false, error: `File type ${file.type || fileExtension} is not supported. Supported types: PDF, DOC, DOCX` },
         { status: 400 }
       );
     }
