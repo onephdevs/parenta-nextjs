@@ -8,6 +8,7 @@ import { ArrowLeft, User, Home, Calendar, DollarSign, FileText } from 'lucide-re
 import { useNotifications } from '@/context/NotificationContext';
 import ProfileForm from '@/components/features/tenant/ProfileForm';
 import OccupantList from '@/components/features/tenant/OccupantList';
+import DocumentUpload from '@/components/features/DocumentUpload';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 
 interface ProfileData {
@@ -64,6 +65,11 @@ interface ProfileData {
     notes?: string;
     isActive: boolean;
   }>;
+  agreementDocument?: {
+    id: string;
+    url: string;
+    name: string;
+  } | null;
 }
 
 export default function ProfilePage() {
@@ -292,6 +298,20 @@ export default function ProfilePage() {
                 initialData={profileData.profile}
                 onSave={fetchProfile}
               />
+
+              {/* Tenant Agreement */}
+              {profileData && (
+                <div className="bg-white shadow rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Tenant Agreement</h3>
+                  <DocumentUpload
+                    tenantId={profileData.profile.id}
+                    currentDocumentUrl={(profileData as any).agreementDocument?.url}
+                    currentDocumentName={(profileData as any).agreementDocument?.name}
+                    onUploadComplete={fetchProfile}
+                    onDeleteComplete={fetchProfile}
+                  />
+                </div>
+              )}
 
               {/* Occupants */}
               <OccupantList

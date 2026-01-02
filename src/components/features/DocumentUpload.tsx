@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { useNotifications } from '@/context/NotificationContext';
 import { FileText, Download, X, Upload } from 'lucide-react';
 
@@ -24,9 +25,14 @@ export default function DocumentUpload({
   accept = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 }: DocumentUploadProps) {
   const { showNotification } = useNotifications();
+  const pathname = usePathname();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Determine if we're in tenant portal (use tenant API) or admin portal (use admin API)
+  const isTenantContext = pathname?.startsWith('/tenant');
+  const apiBaseUrl = isTenantContext ? '/api/tenant/agreement' : `/api/tenants/${tenantId}/agreement`;
   
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,7 +81,7 @@ export default function DocumentUpload({
       formData.append('documentName', file.name);
       formData.append('documentType', documentType);
 
-      const response = await fetch(`/api/tenants/${tenantId}/agreement`, {
+      const response = await fetch(apiBaseUrl, {
         method: 'POST',
         body: formData
       });
@@ -123,7 +129,7 @@ export default function DocumentUpload({
     });
 
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/agreement`, {
+      const response = await fetch(apiBaseUrl, {
         method: 'DELETE'
       });
 

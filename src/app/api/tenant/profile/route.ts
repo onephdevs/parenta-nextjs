@@ -65,6 +65,24 @@ export async function GET() {
     
     const occupantsResult = await pool.query(occupantsQuery, [tenant.id]);
     
+    // Get tenant's agreement document ID
+    const tenantDocResult = await pool.query(
+      'SELECT tenant_agreement_document_id FROM tenants WHERE id = $1',
+      [tenant.id]
+    );
+    
+    // Get agreement document if exists
+    let agreementDocument = null;
+    const agreementDocumentId = tenantDocResult.rows[0]?.tenant_agreement_document_id;
+    if (agreementDocumentId) {
+      try {
+        const { getDocumentById } = await import('@/lib/api/documents');
+        agreementDocument = await getDocumentById(agreementDocumentId);
+      } catch (error) {
+        console.error('Error fetching agreement document:', error);
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       data: {
@@ -88,6 +106,11 @@ export async function GET() {
           tenantStatus: tenant.tenant_status,
           notes: tenant.notes,
         },
+        agreementDocument: agreementDocument ? {
+          id: agreementDocument.id,
+          url: agreementDocument.filePath || agreementDocument.url,
+          name: agreementDocument.documentName || agreementDocument.name,
+        } : null,
         roomAssignment: tenantData ? {
           roomId: tenantData.room_id,
           roomNumber: tenantData.room_number,
