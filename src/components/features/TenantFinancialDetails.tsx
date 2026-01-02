@@ -56,51 +56,85 @@ interface TenantFinancialDetailsProps {
 export default function TenantFinancialDetails({ tenantId }: TenantFinancialDetailsProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [advanceInfo, setAdvanceInfo] = useState<Advance | null>(null);
-  const [depositInfo, setDepositInfo] = useState<Deposit | null>(null);
+  const [advanceInfo, setAdvanceInfo] = useState<Advance>({ balance: 0, history: [] });
+  const [depositInfo, setDepositInfo] = useState<Deposit>({ balance: 0, history: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadFinancialData = async () => {
       try {
+        setLoading(true);
         const [invoicesRes, paymentsRes, creditsRes, depositsRes] = await Promise.all([
-          fetch(`/api/invoices?tenantId=${tenantId}`, { credentials: 'include' }),
-          fetch(`/api/payments?tenantId=${tenantId}`, { credentials: 'include' }),
-          fetch(`/api/tenant-credits/${tenantId}`, { credentials: 'include' }),
-          fetch(`/api/deposit-ledger/${tenantId}`, { credentials: 'include' })
+          fetch(`/api/invoices?tenantId=${String(tenantId)}`, { credentials: 'include' }).catch(() => null),
+          fetch(`/api/payments?tenantId=${String(tenantId)}`, { credentials: 'include' }).catch(() => null),
+          fetch(`/api/tenant-credits/${String(tenantId)}?type=balance`, { credentials: 'include' }).catch(() => null),
+          fetch(`/api/deposit-ledger/${String(tenantId)}?type=balance`, { credentials: 'include' }).catch(() => null)
         ]);
 
-        if (invoicesRes.ok) {
-          const data = await invoicesRes.json();
-          setInvoices(data.invoices || data.data || []);
+        if (invoicesRes?.ok) {
+          try {
+            const data = await invoicesRes.json();
+            setInvoices(data.invoices || data.data || []);
+          } catch (e) {
+            console.warn('Error parsing invoices response:', e);
+          }
         }
 
-        if (paymentsRes.ok) {
-          const data = await paymentsRes.json();
-          setPayments(data.payments || data.data || []);
+        if (paymentsRes?.ok) {
+          try {
+            const data = await paymentsRes.json();
+            setPayments(data.payments || data.data || []);
+          } catch (e) {
+            console.warn('Error parsing payments response:', e);
+          }
         }
 
-        if (creditsRes.ok) {
-          const response = await creditsRes.json();
-          // API returns { success: true, data: <number> } for balance (aggregated total)
-          const balance = typeof response.data === 'number' ? response.data : (response.data?.balance || response.balance || 0);
-          setAdvanceInfo({ balance, history: [] });
+        if (creditsRes?.ok) {
+          try {
+            const response = await creditsRes.json();
+            // API returns { success: true, data: <number> } for balance (aggregated total)
+            const balance = typeof response.data === 'number' 
+              ? response.data 
+              : (response.data?.balance || response.balance || 0);
+            setAdvanceInfo({ balance: Number(balance) || 0, history: [] });
+          } catch (e) {
+            console.warn('Error parsing advance response:', e);
+            setAdvanceInfo({ balance: 0, history: [] });
+          }
+        } else {
+          setAdvanceInfo({ balance: 0, history: [] });
         }
 
-        if (depositsRes.ok) {
-          const response = await depositsRes.json();
-          // API returns { success: true, data: <number> } for balance (aggregated total)
-          const balance = typeof response.data === 'number' ? response.data : (response.data?.balance || response.balance || 0);
-          setDepositInfo({ balance, history: [] });
+        if (depositsRes?.ok) {
+          try {
+            const response = await depositsRes.json();
+            // API returns { success: true, data: <number> } for balance (aggregated total)
+            const balance = typeof response.data === 'number' 
+              ? response.data 
+              : (response.data?.balance || response.balance || 0);
+            setDepositInfo({ balance: Number(balance) || 0, history: [] });
+          } catch (e) {
+            console.warn('Error parsing deposit response:', e);
+            setDepositInfo({ balance: 0, history: [] });
+          }
+        } else {
+          setDepositInfo({ balance: 0, history: [] });
         }
       } catch (error) {
         console.error('Error loading financial data:', error);
+        // Set defaults to prevent crashes
+        setAdvanceInfo({ balance: 0, history: [] });
+        setDepositInfo({ balance: 0, history: [] });
+        setInvoices([]);
+        setPayments([]);
       } finally {
         setLoading(false);
       }
     };
 
-    loadFinancialData();
+    if (tenantId) {
+      loadFinancialData();
+    }
   }, [tenantId]);
 
   const formatCurrency = (amount: number) => {
@@ -173,7 +207,7 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
               </svg>
             </div>
             <p className="text-3xl font-bold text-green-900">
-              {formatCurrency(depositInfo?.balance || 0)}
+              {formatCurrency(depositInfo.balance || 0)}
             </p>
             <p className="mt-2 text-xs text-green-700">
               Total refundable security funds (not auto-applied)
@@ -191,7 +225,7 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
               </svg>
             </div>
             <p className="text-3xl font-bold text-purple-900">
-              {formatCurrency(advanceInfo?.balance || 0)}
+              {formatCurrency(advanceInfo.balance || 0)}
             </p>
             <p className="mt-2 text-xs text-purple-700">
               Total prepaid rent credits (auto-applied to invoices)
