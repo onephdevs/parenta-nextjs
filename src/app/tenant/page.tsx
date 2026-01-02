@@ -55,14 +55,8 @@ export default function TenantDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [tenantData, setTenantData] = useState<TenantDashboardData | null>(null);
   const [nextDueDate, setNextDueDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
-      fetchTenantData();
-    } else if (status === 'unauthenticated') {
-      router.push('/auth/tenant/signin');
-    }
-  }, [status, session, router]);
+  const [recentPayments, setRecentPayments] = useState<Array<{ id: string; date: string; amount: number; status: string; type: string }>>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<Array<{ id: string; title: string; status: string; date: string }>>([]);
 
   const fetchTenantData = async () => {
     try {
@@ -88,6 +82,55 @@ export default function TenantDashboard() {
       setIsLoading(false);
     }
   };
+
+  const fetchPaymentHistory = async () => {
+    try {
+      const response = await fetch('/api/tenant/payments');
+      const data = await response.json();
+      
+      if (data.success && data.data?.history) {
+        const payments = data.data.history.slice(0, 3).map((p: any) => ({
+          id: p.id,
+          date: p.paymentDate || p.payment_date,
+          amount: p.amount,
+          status: p.paymentStatus === 'paid' ? 'Paid' : p.paymentStatus,
+          type: p.paymentType || p.payment_type || 'Rent'
+        }));
+        setRecentPayments(payments);
+      }
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+    }
+  };
+
+  const fetchMaintenanceRequests = async () => {
+    try {
+      const response = await fetch('/api/tenant/maintenance');
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const requests = data.data.slice(0, 2).map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          status: r.status === 'completed' ? 'Completed' : r.status === 'in_progress' ? 'In Progress' : r.status,
+          date: r.createdAt || r.created_at
+        }));
+        setMaintenanceRequests(requests);
+      }
+    } catch (error) {
+      console.error('Error fetching maintenance requests:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user.role === 'tenant') {
+      fetchTenantData();
+      fetchPaymentHistory();
+      fetchMaintenanceRequests();
+    } else if (status === 'unauthenticated') {
+      router.push('/auth/tenant/signin');
+    }
+  }, [status, session, router]);
 
   if (status === 'loading' || isLoading) {
     return (
@@ -163,55 +206,6 @@ export default function TenantDashboard() {
     nextDueDate: new Date().toISOString().split('T')[0],
     leaseEnd: new Date().toISOString().split('T')[0],
     securityDeposit: 0
-  };
-
-  const [recentPayments, setRecentPayments] = useState<Array<{ id: string; date: string; amount: number; status: string; type: string }>>([]);
-  const [maintenanceRequests, setMaintenanceRequests] = useState<Array<{ id: string; title: string; status: string; date: string }>>([]);
-
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
-      fetchPaymentHistory();
-      fetchMaintenanceRequests();
-    }
-  }, [status, session]);
-
-  const fetchPaymentHistory = async () => {
-    try {
-      const response = await fetch('/api/tenant/payments');
-      const data = await response.json();
-      
-      if (data.success && data.data?.history) {
-        const payments = data.data.history.slice(0, 3).map((p: any) => ({
-          id: p.id,
-          date: p.paymentDate || p.payment_date,
-          amount: p.amount,
-          status: p.paymentStatus === 'paid' ? 'Paid' : p.paymentStatus,
-          type: p.paymentType || p.payment_type || 'Rent'
-        }));
-        setRecentPayments(payments);
-      }
-    } catch (error) {
-      console.error('Error fetching payment history:', error);
-    }
-  };
-
-  const fetchMaintenanceRequests = async () => {
-    try {
-      const response = await fetch('/api/tenant/maintenance');
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        const requests = data.data.slice(0, 2).map((r: any) => ({
-          id: r.id,
-          title: r.title,
-          status: r.status === 'completed' ? 'Completed' : r.status === 'in_progress' ? 'In Progress' : r.status,
-          date: r.createdAt || r.created_at
-        }));
-        setMaintenanceRequests(requests);
-      }
-    } catch (error) {
-      console.error('Error fetching maintenance requests:', error);
-    }
   };
 
   return (
