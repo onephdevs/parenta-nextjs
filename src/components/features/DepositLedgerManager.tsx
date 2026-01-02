@@ -198,7 +198,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg leading-6 font-medium text-gray-900">Deposit</h3>
-            <p className="mt-1 text-sm text-gray-900">Manage refundable security deposit for {tenantName}</p>
+            <p className="mt-1 text-sm text-gray-900">Manage refundable deposit for {tenantName}</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-900">Total Deposit</p>
