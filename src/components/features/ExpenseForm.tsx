@@ -5,16 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 
 interface Building {
-  id: number;
+  id: string | number;
   name: string;
-  address: string;
+  address?: string;
 }
 
 interface Room {
-  id: number;
+  id: string | number;
   roomNumber: string;
-  buildingName: string;
-  buildingId: number;
+  buildingName?: string;
+  buildingId: string | number;
 }
 
 interface ExpenseFormData {
@@ -75,7 +75,17 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
         if (roomsRes.ok) {
           const roomsData = await roomsRes.json();
           // API returns { success: true, data: [...], pagination: {...} }
-          setRooms(roomsData.data || roomsData.rooms || []);
+          const roomsList = roomsData.data || roomsData.rooms || [];
+          
+          // Map rooms to ensure consistent structure
+          const mappedRooms: Room[] = roomsList.map((room: any) => ({
+            id: room.id,
+            roomNumber: room.roomNumber || room.room_number || '',
+            buildingName: room.buildingName || room.building_name || '',
+            buildingId: room.buildingId || room.building_id || '',
+          }));
+          
+          setRooms(mappedRooms);
         } else {
           console.error('Failed to load rooms:', roomsRes.status);
         }
@@ -91,15 +101,17 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
   // Filter rooms based on selected building
   useEffect(() => {
     if (formData.buildingId) {
+      // Convert both to strings for comparison (handles UUIDs and numbers)
+      const selectedBuildingId = String(formData.buildingId);
       const buildingRooms = rooms.filter(room => 
-        room.buildingId === parseInt(formData.buildingId)
+        String(room.buildingId) === selectedBuildingId
       );
       setFilteredRooms(buildingRooms);
       
       // Clear room selection if it doesn't belong to the selected building
       if (formData.roomId) {
-        const selectedRoom = rooms.find(r => r.id === parseInt(formData.roomId));
-        if (!selectedRoom || selectedRoom.buildingId !== parseInt(formData.buildingId)) {
+        const selectedRoom = rooms.find(r => String(r.id) === String(formData.roomId));
+        if (!selectedRoom || String(selectedRoom.buildingId) !== selectedBuildingId) {
           setFormData(prev => ({ ...prev, roomId: '' }));
         }
       }
@@ -327,8 +339,8 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                 >
                   <option value="">Select a room</option>
                   {filteredRooms.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      Room {room.roomNumber}
+                    <option key={room.id} value={String(room.id)}>
+                      {room.buildingName ? `${room.buildingName} - ` : ''}Room {room.roomNumber}
                     </option>
                   ))}
                 </select>
