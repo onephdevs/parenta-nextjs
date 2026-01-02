@@ -103,11 +103,20 @@ export async function getAllTenants(options?: {
     const countResult = await pool.query(countQuery, values);
     const total = parseInt(countResult.rows[0].count);
 
-    // Get paginated tenants
+    // Get paginated tenants with current monthly rent from active assignment
     const query = `
-      SELECT * FROM tenants
+      SELECT 
+        t.*,
+        tra.monthly_rate as current_monthly_rent,
+        r.room_number as current_room_number,
+        b.name as current_building_name
+      FROM tenants t
+      LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id 
+        AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON tra.room_id = r.id
+      LEFT JOIN buildings b ON r.building_id = b.id
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY t.created_at DESC
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
     
@@ -297,7 +306,12 @@ export async function createTenant(tenantData: Partial<Tenant>): Promise<Tenant>
 }
 
 // Helper function to map database row to Tenant object
-function mapRowToTenant(row: Record<string, unknown>): Tenant & { profilePictureUrl?: string | null } {
+function mapRowToTenant(row: Record<string, unknown>): Tenant & { 
+  profilePictureUrl?: string | null;
+  currentMonthlyRent?: number;
+  currentRoomNumber?: string;
+  currentBuildingName?: string;
+} {
   return {
     id: row.id as string,
     firstName: row.first_name as string,
@@ -322,6 +336,10 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & { profilePicture
     profilePictureUrl: row.profile_picture_url as string | null | undefined,
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
+    // Add current monthly rent from active assignment
+    currentMonthlyRent: row.current_monthly_rent ? parseFloat(row.current_monthly_rent as string) : undefined,
+    currentRoomNumber: row.current_room_number as string | undefined,
+    currentBuildingName: row.current_building_name as string | undefined,
   };
 }
 
