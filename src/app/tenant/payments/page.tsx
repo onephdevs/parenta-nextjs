@@ -233,10 +233,16 @@ export default function PaymentsPage() {
       const response = await fetch('/api/tenant/deposits');
       const data = await response.json();
       if (data.success) {
-        setDepositBalance(data.data.balance);
+        setDepositBalance(data.data.balance || 0);
+      } else {
+        // If API fails, set balance to 0 (non-critical)
+        console.warn('Failed to fetch deposit data:', data.error);
+        setDepositBalance(0);
       }
     } catch (error) {
-      console.error('Error fetching deposit data:', error);
+      // Non-critical error - page can still function without deposit data
+      console.warn('Error fetching deposit data (non-critical):', error);
+      setDepositBalance(0);
     }
   };
 
@@ -246,9 +252,15 @@ export default function PaymentsPage() {
       const data = await response.json();
       if (data.success) {
         setUtilityDepositData(data.data);
+      } else {
+        // If API fails, set to null (non-critical)
+        console.warn('Failed to fetch utility deposit data:', data.error);
+        setUtilityDepositData(null);
       }
     } catch (error) {
-      console.error('Error fetching utility deposit data:', error);
+      // Non-critical error - page can still function without utility deposit data
+      console.warn('Error fetching utility deposit data (non-critical):', error);
+      setUtilityDepositData(null);
     }
   };
 
