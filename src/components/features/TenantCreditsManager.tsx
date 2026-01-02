@@ -110,7 +110,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
           tenantId,
           amount: parseFloat(formData.amount),
           transactionType: formData.type,
-          description: formData.description || `Manual ${formData.type} by admin`
+          description: formData.description || `Manual ${formData.type === 'credit' ? 'advance' : 'deduction'} by admin`
         }),
       });
 
@@ -214,7 +214,7 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg leading-6 font-medium text-gray-900">Advance</h3>
-            <p className="mt-1 text-sm text-gray-900">Manage prepaid rent credits for {tenantName}</p>
+            <p className="mt-1 text-sm text-gray-900">Manage prepaid rent advance for {tenantName}</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-900">Total Advance</p>
@@ -332,7 +332,11 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-900 capitalize">
-                        {transaction.transactionType?.replace(/_/g, ' ') || 'Transaction'}
+                        {transaction.transactionType === 'credit' 
+                          ? 'Advance' 
+                          : transaction.transactionType === 'debit'
+                          ? 'Deduction'
+                          : transaction.transactionType?.replace(/_/g, ' ') || 'Transaction'}
                       </p>
                       <p className="text-xs text-gray-900 mt-1">{transaction.description || 'No description'}</p>
                       <p className="text-xs text-gray-900 mt-1">{transaction.createdAt ? formatDate(transaction.createdAt) : 'Date not available'}</p>

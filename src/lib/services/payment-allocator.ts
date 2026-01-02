@@ -86,7 +86,7 @@ export async function allocatePaymentToInvoices(
     const unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId);
 
     if (unpaidInvoices.length === 0) {
-      // No unpaid invoices - create credit for entire amount
+      // No unpaid invoices - create advance for entire amount
       await client.query(
         `INSERT INTO tenant_credits (
           tenant_id,
@@ -101,7 +101,7 @@ export async function allocatePaymentToInvoices(
           paymentAmount,
           'excess_payment',
           paymentId,
-          'No unpaid invoices - saved as credit',
+          'No unpaid invoices - saved as advance',
           'available'
         ]
       );
@@ -115,7 +115,7 @@ export async function allocatePaymentToInvoices(
         creditCreated: true,
         creditAmount: paymentAmount,
         depositUsed: 0,
-        message: `No unpaid invoices found. ₱${paymentAmount.toFixed(2)} saved as tenant credit.`
+        message: `No unpaid invoices found. ₱${paymentAmount.toFixed(2)} saved as tenant advance.`
       };
     }
 
