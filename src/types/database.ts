@@ -365,6 +365,7 @@ export interface DatabaseInvoiceLineItem {
 export interface Expense {
   id: string;
   buildingId?: string;
+  roomId?: string;
   category: string;
   description: string;
   amount: number;
@@ -384,6 +385,7 @@ export interface Expense {
 export interface DatabaseExpense {
   id: string;
   building_id?: string;
+  room_id?: string;
   category: string;
   description: string;
   amount: number;

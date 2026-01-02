@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
     }
 
     const expenseData = {
-      buildingId: body.buildingId ? parseInt(body.buildingId) : undefined,
-      roomId: body.roomId ? parseInt(body.roomId) : undefined,
+      buildingId: body.buildingId ? String(body.buildingId) : undefined,
+      roomId: body.roomId ? String(body.roomId) : undefined,
       amount: amountNum,
       category,
       description,

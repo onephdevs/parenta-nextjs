@@ -60,18 +60,24 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
     const loadData = async () => {
       try {
         const [buildingsRes, roomsRes] = await Promise.all([
-          fetch('/api/buildings'),
-          fetch('/api/rooms')
+          fetch('/api/buildings', { credentials: 'include' }),
+          fetch('/api/rooms', { credentials: 'include' })
         ]);
 
         if (buildingsRes.ok) {
           const buildingsData = await buildingsRes.json();
-          setBuildings(buildingsData.buildings || []);
+          // API returns { success: true, data: { buildings: [...], pagination: {...} } }
+          setBuildings(buildingsData.data?.buildings || buildingsData.buildings || []);
+        } else {
+          console.error('Failed to load buildings:', buildingsRes.status);
         }
 
         if (roomsRes.ok) {
           const roomsData = await roomsRes.json();
-          setRooms(roomsData.rooms || []);
+          // API returns { success: true, data: [...], pagination: {...} }
+          setRooms(roomsData.data || roomsData.rooms || []);
+        } else {
+          console.error('Failed to load rooms:', roomsRes.status);
         }
       } catch (error) {
         console.error('Error loading data:', error);

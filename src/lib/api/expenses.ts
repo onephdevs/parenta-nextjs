@@ -152,30 +152,94 @@ export async function getExpenseById(id: string): Promise<Expense | null> {
  */
 export async function createExpense(expenseData: Partial<Expense>): Promise<Expense> {
   try {
-    const query = `
-      INSERT INTO expenses (
-        building_id, category, amount, description,
-        vendor_name, expense_date, receipt_url, notes
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *
-    `;
+    // Always try to include room_id if provided, fallback to building-only if column doesn't exist
+    const hasRoomId = expenseData.roomId !== undefined && expenseData.roomId !== null;
     
-    const values = [
-      expenseData.buildingId || null,
-      expenseData.expenseCategory || expenseData.category || 'other',
-      expenseData.amount,
-      expenseData.description,
-      expenseData.vendor || expenseData.vendorName || null,
-      expenseData.expenseDate || new Date(),
-      expenseData.receiptUrl || null,
-      expenseData.notes || null,
-    ];
+    let query: string;
+    let values: unknown[];
+    
+    if (hasRoomId) {
+      query = `
+        INSERT INTO expenses (
+          building_id, room_id, category, amount, description,
+          vendor_name, expense_date, receipt_url, notes
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+      `;
+      
+      values = [
+        expenseData.buildingId || null,
+        expenseData.roomId || null,
+        expenseData.expenseCategory || expenseData.category || 'other',
+        expenseData.amount,
+        expenseData.description,
+        expenseData.vendor || expenseData.vendorName || null,
+        expenseData.expenseDate || new Date(),
+        expenseData.receiptUrl || null,
+        expenseData.notes || null,
+      ];
+    } else {
+      query = `
+        INSERT INTO expenses (
+          building_id, category, amount, description,
+          vendor_name, expense_date, receipt_url, notes
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+      `;
+      
+      values = [
+        expenseData.buildingId || null,
+        expenseData.expenseCategory || expenseData.category || 'other',
+        expenseData.amount,
+        expenseData.description,
+        expenseData.vendor || expenseData.vendorName || null,
+        expenseData.expenseDate || new Date(),
+        expenseData.receiptUrl || null,
+        expenseData.notes || null,
+      ];
+    }
     
     const result = await pool.query(query, values);
     return mapRowToExpense(result.rows[0]);
   } catch (error) {
     console.error('Error creating expense:', error);
+    // Provide more detailed error message
+    if (error instanceof Error) {
+      // Check if it's a column doesn't exist error (room_id column not migrated yet)
+      if (error.message.includes('room_id') || error.message.includes('column "room_id" does not exist')) {
+        // Try again without room_id (graceful fallback)
+        console.warn('room_id column not found, creating expense without room_id');
+        try {
+          const query = `
+            INSERT INTO expenses (
+              building_id, category, amount, description,
+              vendor_name, expense_date, receipt_url, notes
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+          `;
+          
+          const values = [
+            expenseData.buildingId || null,
+            expenseData.expenseCategory || expenseData.category || 'other',
+            expenseData.amount,
+            expenseData.description,
+            expenseData.vendor || expenseData.vendorName || null,
+            expenseData.expenseDate || new Date(),
+            expenseData.receiptUrl || null,
+            expenseData.notes || null,
+          ];
+          
+          const result = await pool.query(query, values);
+          return mapRowToExpense(result.rows[0]);
+        } catch (retryError) {
+          throw new Error(`Failed to create expense: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
+        }
+      }
+      throw new Error(`Failed to create expense: ${error.message}`);
+    }
     throw new Error('Failed to create expense');
   }
 }
@@ -385,12 +449,20 @@ function mapRowToExpense(row: Record<string, unknown>): Expense {
   return {
     id: String(row.id),
     buildingId: row.building_id ? String(row.building_id) : undefined,
+    roomId: row.room_id ? String(row.room_id) : undefined,
+    category: String(row.category || row.expense_category || 'other'),
     expenseCategory: String(row.category || row.expense_category || 'other'),
     amount: Number(row.amount),
     description: String(row.description),
     vendor: row.vendor_name ? String(row.vendor_name) : (row.vendor ? String(row.vendor) : undefined),
+    vendorName: row.vendor_name ? String(row.vendor_name) : (row.vendor ? String(row.vendor) : undefined),
+    vendorContact: row.vendor_contact ? String(row.vendor_contact) : undefined,
+    paymentMethod: String(row.payment_method || 'cash'),
     expenseDate: row.expense_date ? new Date(String(row.expense_date)) : new Date(),
     receiptUrl: row.receipt_url ? String(row.receipt_url) : undefined,
+    expenseStatus: String(row.expense_status || 'pending') as 'pending' | 'approved' | 'paid' | 'rejected',
+    isRecurring: Boolean(row.is_recurring),
+    recurrenceInterval: row.recurrence_interval ? String(row.recurrence_interval) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
     createdAt: new Date(String(row.created_at)),
     updatedAt: new Date(String(row.updated_at)),
