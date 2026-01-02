@@ -200,6 +200,29 @@ export default function DocumentUpload({
         credentials: 'include' // Ensure cookies/session are sent with the request
       });
 
+      // Handle non-JSON responses (like 403 Forbidden HTML)
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorData;
+        
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+        } else {
+          // Handle HTML/text responses (like 403 Forbidden)
+          const text = await response.text();
+          errorData = {
+            success: false,
+            error: response.status === 403 
+              ? 'Access denied. Please ensure you have the correct permissions.'
+              : `Delete failed with status ${response.status}: ${text.substring(0, 100)}`
+          };
+        }
+        
+        const errorMessage = errorData.error || errorData.message || `Delete failed with status ${response.status}`;
+        console.error('Delete error response:', { status: response.status, errorData, apiBaseUrl });
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
 
       if (!response.ok || !data.success) {
