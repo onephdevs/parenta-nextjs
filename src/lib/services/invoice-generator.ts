@@ -15,7 +15,11 @@ const pool = new Pool({
  * Creates one invoice per month from lease start to lease end
  */
 export async function generateInvoicesForTenant(
-  request: InvoiceGenerationRequest
+  request: InvoiceGenerationRequest,
+  options?: {
+    allowRetroactive?: boolean; // Default: false - only generate for new assignments
+    skipExistingCheck?: boolean; // Default: false - check if invoices already exist
+  }
 ): Promise<InvoiceGenerationResult> {
   const client = await pool.connect();
   
@@ -39,6 +43,32 @@ export async function generateInvoicesForTenant(
 
     if (new Date(leaseEndDate) <= new Date(leaseStartDate)) {
       throw new Error('Lease end date must be after start date');
+    }
+
+    // Check if rent invoices already exist for this tenant (unless skipExistingCheck is true)
+    if (!options?.skipExistingCheck) {
+      const existingInvoicesResult = await client.query(
+        `SELECT COUNT(*) as count
+         FROM invoices i
+         INNER JOIN invoice_line_items ili ON i.id = ili.invoice_id
+         WHERE i.tenant_id = $1
+           AND ili.item_type = 'rent'`,
+        [tenantId]
+      );
+
+      const existingCount = parseInt(existingInvoicesResult.rows[0]?.count || '0');
+      if (existingCount > 0 && !options?.allowRetroactive) {
+        // Invoices already exist and retroactive generation is not allowed
+        // This prevents creating invoices for already-active leases
+        await client.query('ROLLBACK');
+        return {
+          success: false,
+          invoicesCreated: 0,
+          invoiceIds: [],
+          depositRecorded: false,
+          message: `Rent invoices already exist for this tenant. Invoices are only generated when tenants are assigned.`
+        };
+      }
     }
 
     // Get tenant information for invoice
