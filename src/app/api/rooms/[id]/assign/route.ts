@@ -28,8 +28,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       depositPaid, 
       advanceAmount,
       utilityDepositAmount,
-      notes,
-      generateInvoices = true // Option to auto-generate invoices
+      notes
     } = await request.json();
     
     // Validation
@@ -216,9 +215,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     await client.query('COMMIT');
 
-    // Auto-generate invoices if requested and end date is provided
+    // Always generate rent invoices for new assignments if end date is provided
+    // This ensures all new tenant assignments automatically get rent invoices
+    // Note: This is forward-looking only - does not retroactively create invoices for existing assignments
     let invoiceResult;
-    if (generateInvoices && endDate) {
+    if (endDate) {
       try {
         invoiceResult = await generateInvoicesForTenant({
           tenantId,

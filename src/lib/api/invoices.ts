@@ -273,6 +273,13 @@ export async function updateInvoice(
   let paramIndex = 1;
 
   if (updates.status !== undefined) {
+    // Prevent manual setting of system-derived statuses (paid, partial)
+    // Only allow: draft, sent, cancelled
+    // paid and partial are system-derived based on amount_paid and balance_due
+    const allowedStatuses = ['draft', 'sent', 'cancelled'];
+    if (!allowedStatuses.includes(updates.status)) {
+      throw new Error(`Cannot manually set status '${updates.status}'. Allowed statuses: ${allowedStatuses.join(', ')}. Statuses 'paid' and 'partial' are system-derived.`);
+    }
     setClause.push(`invoice_status = $${paramIndex}`);
     values.push(updates.status);
     paramIndex++;
