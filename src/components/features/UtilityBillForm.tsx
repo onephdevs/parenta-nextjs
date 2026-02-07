@@ -10,7 +10,8 @@ interface UtilityBillFormProps {
 }
 
 export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBillFormProps) {
-  const [formData, setFormData] = useState<CreateUtilityBillData>({
+  type FormState = Omit<CreateUtilityBillData, 'amount' | 'usageAmount'> & { amount?: number; usageAmount?: number };
+  const [formData, setFormData] = useState<FormState>({
     buildingId: '',
     utilityType: 'electricity',
     providerName: '',
@@ -18,8 +19,8 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
     billingPeriodStart: new Date(),
     billingPeriodEnd: new Date(),
     dueDate: new Date(),
-    amount: 0,
-    usageAmount: 0,
+    amount: undefined,
+    usageAmount: undefined,
     usageUnit: '',
     billStatus: 'pending',
     billUrl: '',
@@ -90,7 +91,8 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
     if (!formData.providerName.trim()) {
       newErrors.providerName = 'Provider name is required';
     }
-    if (formData.amount <= 0) {
+    const amount = Number(formData.amount);
+    if (amount == null || amount <= 0 || Number.isNaN(amount)) {
       newErrors.amount = 'Amount must be greater than 0';
     }
     if (formData.billingPeriodStart >= formData.billingPeriodEnd) {
@@ -113,7 +115,11 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
 
     setLoading(true);
     try {
-      await onSubmit(formData);
+      await onSubmit({
+        ...formData,
+        amount: formData.amount ?? 0,
+        usageAmount: formData.usageAmount ?? 0,
+      });
     } catch (error) {
       console.error('Error submitting form:', error);
     } finally {
@@ -282,8 +288,8 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange('amount', parseFloat(e.target.value) || 0)}
+                  value={formData.amount ?? ''}
+                  onChange={(e) => handleInputChange('amount', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))}
                   className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                     errors.amount ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -328,8 +334,8 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.usageAmount}
-                onChange={(e) => handleInputChange('usageAmount', parseFloat(e.target.value) || 0)}
+                value={formData.usageAmount ?? ''}
+                onChange={(e) => handleInputChange('usageAmount', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Consumption amount"
               />

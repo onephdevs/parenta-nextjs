@@ -294,7 +294,7 @@ export default async function AdminDashboard() {
               <p className="text-sm text-gray-900 mb-3">Monthly Revenue</p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-900">{stats.financial.paidPayments} payments</span>
-                <Link href="/admin/payments" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                <Link href="/admin/financial/payments" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
                   View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
               </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 
 interface Asset {
@@ -9,6 +9,8 @@ interface Asset {
   assetType: string;
   serialNumber?: string;
   buildingName?: string;
+  assignedRoom?: string;
+  assignedTenant?: string;
   qrCodeGenerated?: boolean;
   trackingEnabled: boolean;
 }
@@ -25,6 +27,15 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
   const [showPrintView, setShowPrintView] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const { addNotification } = useNotifications();
+
+  // When print view is shown, open print dialog after content is rendered (QR images need time to load)
+  useEffect(() => {
+    if (!showPrintView || selectedAssets.length === 0) return;
+    const timer = setTimeout(() => {
+      window.print();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [showPrintView, selectedAssets.length]);
 
   const handleAssetSelect = (assetId: string, checked: boolean) => {
     if (checked) {
@@ -129,11 +140,6 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
       }
       
       setShowPrintView(true);
-      
-      // Small delay to ensure print view is rendered
-      setTimeout(() => {
-        window.print();
-      }, 100);
     } catch (error) {
       addNotification('Failed to prepare QR codes for printing', 'error');
     } finally {
@@ -246,6 +252,11 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                 />
                 <div className="mt-2 text-sm font-medium">{asset.assetName}</div>
                 <div className="text-xs text-gray-900">{asset.assetType}</div>
+                {(asset.assignedRoom || asset.buildingName) && (
+                  <div className="text-xs text-gray-900">
+                    Room: {asset.assignedRoom || '—'} {asset.buildingName ? ` · ${asset.buildingName}` : ''}
+                  </div>
+                )}
                 <div className="text-xs text-gray-900">ID: {asset.id}</div>
                 {asset.serialNumber && (
                   <div className="text-xs text-gray-900">SN: {asset.serialNumber}</div>

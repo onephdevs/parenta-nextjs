@@ -22,7 +22,7 @@ interface Room {
 interface InvoiceItem {
   description: string;
   quantity: number;
-  unitPrice: number;
+  unitPrice?: number;
   itemType: 'rent' | 'utilities' | 'fees' | 'deposit' | 'other';
 }
 
@@ -47,7 +47,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     billingPeriodStart: '',
     billingPeriodEnd: '',
     taxRate: 0.08, // 8% default tax rate
-    discountAmount: 0,
+    discountAmount: undefined as number | undefined,
     notes: '',
   });
 
@@ -169,7 +169,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'taxRate' || name === 'discountAmount' ? parseFloat(value) || 0 : value
+      [name]: name === 'taxRate' ? (parseFloat(value) || 0) : name === 'discountAmount' ? (value === '' ? undefined : (parseFloat(value) || 0)) : value
     }));
 
     // Fetch rooms when tenant is selected
@@ -181,7 +181,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     }
   };
 
-  const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number) => {
+  const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number | undefined) => {
     setItems(prev => prev.map((item, i) => 
       i === index ? { ...item, [field]: value } : item
     ));
@@ -203,9 +203,9 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
   };
 
   // Calculate totals
-  const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  const subtotal = items.reduce((sum, item) => sum + (item.quantity * (item.unitPrice ?? 0)), 0);
   const taxAmount = subtotal * formData.taxRate;
-  const totalAmount = subtotal + taxAmount - formData.discountAmount;
+  const totalAmount = subtotal + taxAmount - (formData.discountAmount ?? 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,7 +231,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       return;
     }
 
-    if (items.some(item => !item.description || item.unitPrice <= 0)) {
+    if (items.some(item => !item.description || (item.unitPrice ?? 0) <= 0)) {
       setError('Please fill in all item details with valid prices');
       setIsSubmitting(false);
       return;
@@ -252,13 +252,13 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
         billingPeriodEnd: formData.billingPeriodEnd || undefined,
         subtotal,
         taxAmount,
-        discountAmount: formData.discountAmount,
+        discountAmount: formData.discountAmount ?? 0,
         totalAmount,
         notes: formData.notes,
         items: items.map(item => ({
           description: item.description,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          unitPrice: item.unitPrice ?? 0,
           itemType: item.itemType,
         })),
       };
@@ -506,8 +506,8 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                       min="0"
                       step="0.01"
                       required
-                      value={item.unitPrice}
-                      onChange={(e) => handleItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      value={item.unitPrice ?? ''}
+                      onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
@@ -559,7 +559,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   name="discountAmount"
                   min="0"
                   step="0.01"
-                  value={formData.discountAmount}
+                  value={formData.discountAmount ?? ''}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
@@ -577,7 +577,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   <span className="text-sm text-gray-900">Tax ({(formData.taxRate * 100).toFixed(1)}%):</span>
                   <span className="text-sm font-medium">{formatCurrency(taxAmount)}</span>
                 </div>
-                {formData.discountAmount > 0 && (
+                {(formData.discountAmount ?? 0) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-900">Discount:</span>
                     <span className="text-sm font-medium text-red-600">-{formatCurrency(formData.discountAmount)}</span>

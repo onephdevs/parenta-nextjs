@@ -31,11 +31,11 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const type = resolvedSearchParams.type || '';
   const tenantId = resolvedSearchParams.tenant || '';
 
-  // Build filters
-  const filters: Record<string, unknown> = {};
-  if (status) filters.status = status;
-  if (type) filters.type = type;
-  if (tenantId) filters.tenantId = parseInt(tenantId);
+  // Build filters for getPayments (tenantId is UUID string; use paymentStatus/paymentType)
+  const filters: Parameters<typeof getPayments>[0] = {};
+  if (status) filters.paymentStatus = status === 'completed' ? 'paid' : status === 'failed' || status === 'refunded' ? 'cancelled' : status;
+  if (type) filters.paymentType = type === 'utilities' ? 'utility' : type === 'fee' ? 'other' : type;
+  if (tenantId) filters.tenantId = tenantId;
   if (search) filters.search = search;
 
   // Fetch data with error handling
@@ -62,6 +62,14 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
       totalPages: 0
     };
     tenants = [];
+    summary = null;
+  }
+
+  const uniqueTenants = Array.isArray(tenants)
+    ? tenants.filter((t, i, a) => a.findIndex((x) => x.id === t.id) === i)
+    : [];
+
+  if (!summary) {
     summary = {
       totalPayments: 0,
       totalAmount: 0,
@@ -303,8 +311,8 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 >
                   <option value="">All Tenants</option>
-                  {Array.isArray(tenants) && tenants.length > 0 ? (
-                    tenants.map((tenant) => (
+                  {uniqueTenants.length > 0 ? (
+                    uniqueTenants.map((tenant) => (
                       <option key={tenant.id} value={tenant.id}>
                         {tenant.firstName} {tenant.lastName}
                       </option>

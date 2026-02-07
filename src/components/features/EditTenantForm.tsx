@@ -58,7 +58,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     emergencyContactRelationship: tenant.emergencyContactRelationship || '',
     employmentStatus: tenant.employmentStatus as 'employed' | 'unemployed' | 'student' | 'retired' | 'other' || 'employed',
     employerName: tenant.employerName || '',
-    monthlyIncome: tenant.monthlyIncome || 0,
+    monthlyIncome: tenant.monthlyIncome ?? undefined,
     securityDeposit: tenant.securityDeposit || 0,
     leaseStartDate: tenant.leaseStartDate ? new Date(tenant.leaseStartDate).toISOString().split('T')[0] : '',
     leaseEndDate: tenant.leaseEndDate ? new Date(tenant.leaseEndDate).toISOString().split('T')[0] : '',
@@ -209,10 +209,13 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    
+    const optionalNumberFields = ['monthlyIncome'];
+    const isOptionalNumber = type === 'number' && optionalNumberFields.includes(name);
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? (value === '' ? 0 : Number(value)) : value,
+      [name]: type === 'number'
+        ? (isOptionalNumber ? (value === '' ? undefined : (Number.isNaN(Number(value)) ? prev[name as keyof TenantFormData] : Number(value))) : (value === '' ? 0 : Number(value)))
+        : value,
     }));
 
     // Clear error when user starts typing
@@ -569,7 +572,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
             <div>
               <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900">
-                Monthly Income ($)
+                Monthly Income (₱)
               </label>
               <input
                 type="number"
@@ -577,7 +580,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 id="monthlyIncome"
                 min="0"
                 step="0.01"
-                value={formData.monthlyIncome}
+                value={formData.monthlyIncome ?? ''}
                 onChange={handleInputChange}
                 className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
                   errors.monthlyIncome ? 'border-red-300' : ''

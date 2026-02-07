@@ -219,7 +219,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
             required
             min="0"
             step="1"
-            value={formData.monthlyRate || ''}
+            value={formData.monthlyRate ?? ''}
             onChange={handleInputChange}
             placeholder="e.g., 5000, 8000, 12000"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -306,7 +306,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
                     min="0"
                     max="200"
                     step="1"
-                    value={formData.depositPercentage || ''}
+                    value={formData.depositPercentage ?? ''}
                     onChange={(e) =>
                       setFormData(prev => ({ ...prev, depositPercentage: e.target.value ? parseFloat(e.target.value) : undefined }))
                     }
@@ -332,7 +332,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
                     name="depositFixedAmount"
                     min="0"
                     step="1"
-                    value={formData.depositFixedAmount || ''}
+                    value={formData.depositFixedAmount ?? ''}
                     onChange={(e) =>
                       setFormData(prev => ({ ...prev, depositFixedAmount: e.target.value ? parseFloat(e.target.value) : undefined }))
                     }

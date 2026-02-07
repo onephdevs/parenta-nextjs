@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Session } from 'next-auth';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
@@ -11,6 +11,8 @@ import { NotificationProvider } from '@/context/NotificationContext';
 import ToastContainer from '@/components/ui/ToastContainer';
 import { Bell, Search, Settings, Menu, X, ChevronRight } from 'lucide-react';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface AdminLayoutClientProps {
   children: React.ReactNode;
   session: Session;
@@ -20,14 +22,74 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [breadcrumbLabelOverrides, setBreadcrumbLabelOverrides] = useState<Record<string, string>>({});
   const pathname = usePathname();
+
+  // Fetch friendly names for dynamic segments (e.g. building name for /admin/buildings/[id])
+  useEffect(() => {
+    const paths = pathname.split('/').filter(Boolean);
+    if (paths[0] !== 'admin') return;
+    const segmentIndex = paths.length - 1;
+    const segment = paths[segmentIndex];
+    if (!segment || !UUID_REGEX.test(segment)) return;
+
+    const parent = paths[segmentIndex - 1];
+    if (parent === 'buildings') {
+      fetch(`/api/buildings/${segment}`, { credentials: 'include' })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data?.success && data?.data?.name) {
+            setBreadcrumbLabelOverrides((prev) => ({ ...prev, [pathname]: data.data.name }));
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+    if (parent === 'tenants') {
+      fetch(`/api/tenants/${segment}`, { credentials: 'include' })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data?.success && data?.data) {
+            const t = data.data;
+            const firstName = t.firstName ?? t.first_name;
+            const lastName = t.lastName ?? t.last_name;
+            const name = [firstName, lastName].filter(Boolean).join(' ') || t.email || 'Tenant';
+            setBreadcrumbLabelOverrides((prev) => ({ ...prev, [pathname]: name }));
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+    if (parent === 'rooms') {
+      fetch(`/api/rooms/${segment}`, { credentials: 'include' })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data?.success && data?.data) {
+            const label = data.data.roomNumber
+              ? `Room ${data.data.roomNumber}${data.data.buildingName ? ` · ${data.data.buildingName}` : ''}`
+              : 'Room';
+            setBreadcrumbLabelOverrides((prev) => ({ ...prev, [pathname]: label }));
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+    setBreadcrumbLabelOverrides((prev => {
+      const next = { ...prev };
+      delete next[pathname];
+      return next;
+    }));
+  }, [pathname]);
 
   // Generate breadcrumbs from pathname
   const getBreadcrumbs = () => {
     const paths = pathname.split('/').filter(Boolean);
     const breadcrumbs = paths.map((path, index) => {
       const href = '/' + paths.slice(0, index + 1).join('/');
-      const label = path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, ' ');
+      const override = index === paths.length - 1 ? breadcrumbLabelOverrides[pathname] : undefined;
+      const isLastSegment = index === paths.length - 1;
+      const isUuid = UUID_REGEX.test(path);
+      const label = override ?? (isLastSegment && isUuid ? 'Tenant' : (path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, ' ')));
       return { href, label };
     });
     return breadcrumbs;

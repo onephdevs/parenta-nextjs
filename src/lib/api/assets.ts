@@ -26,11 +26,9 @@ function mapDatabaseAssetToAsset(dbAsset: DatabaseAsset): Asset {
     description: dbAsset.description,
     notes: dbAsset.notes,
     isActive: dbAsset.is_active,
-    // Assignment fields will be implemented later when assignment system is built
-    // For now, we'll show assignment info based on status only
-    assignedRoom: undefined,
-    assignedTenant: undefined,
-    assignmentDate: undefined,
+    assignedRoom: (dbAsset as { assigned_room?: string }).assigned_room || undefined,
+    assignedTenant: (dbAsset as { assigned_tenant_name?: string }).assigned_tenant_name || undefined,
+    assignmentDate: (dbAsset as { assignment_date?: string }).assignment_date ? parseDate((dbAsset as { assignment_date: string }).assignment_date) : undefined,
     createdAt: parseDate(dbAsset.created_at),
     updatedAt: parseDate(dbAsset.updated_at)
   };
@@ -77,9 +75,15 @@ export async function getAllAssets(filters?: {
   
   try {
     let query = `
-      SELECT a.*, b.name as building_name
+      SELECT a.*, b.name as building_name,
+        aa.assignment_date as assignment_date,
+        r.room_number as assigned_room,
+        (t.first_name || ' ' || t.last_name) as assigned_tenant_name
       FROM assets a
       LEFT JOIN buildings b ON a.building_id = b.id
+      LEFT JOIN asset_assignments aa ON aa.asset_id = a.id AND aa.assignment_status = 'active'
+      LEFT JOIN rooms r ON aa.room_id = r.id
+      LEFT JOIN tenants t ON aa.tenant_id = t.id
       WHERE a.is_active = true
     `;
     
@@ -123,10 +127,14 @@ export async function getAllAssets(filters?: {
       params.push(`%${filters.searchTerm}%`);
     }
     
-    // Count total records
+    // Count total records (same FROM/WHERE/JOINs, only change SELECT to COUNT)
     const countQuery = query.replace(
-      'SELECT a.*, b.name as building_name',
-      'SELECT COUNT(a.id) as total'
+      `SELECT a.*, b.name as building_name,
+        aa.assignment_date as assignment_date,
+        r.room_number as assigned_room,
+        (t.first_name || ' ' || t.last_name) as assigned_tenant_name
+      FROM`,
+      'SELECT COUNT(a.id) as total FROM'
     );
     
     const countResult = await client.query(countQuery, params);
@@ -164,9 +172,15 @@ export async function getAssetById(assetId: string): Promise<Asset | null> {
   
   try {
     const query = `
-      SELECT a.*, b.name as building_name
+      SELECT a.*, b.name as building_name,
+        aa.assignment_date as assignment_date,
+        r.room_number as assigned_room,
+        (t.first_name || ' ' || t.last_name) as assigned_tenant_name
       FROM assets a
       LEFT JOIN buildings b ON a.building_id = b.id
+      LEFT JOIN asset_assignments aa ON aa.asset_id = a.id AND aa.assignment_status = 'active'
+      LEFT JOIN rooms r ON aa.room_id = r.id
+      LEFT JOIN tenants t ON aa.tenant_id = t.id
       WHERE a.id = $1 AND a.is_active = true
     `;
     

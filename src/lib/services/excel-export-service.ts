@@ -961,3 +961,111 @@ export async function generateVacantRoomsReportExcel(data: any): Promise<Buffer>
   
   return await workbook.xlsx.writeBuffer() as Buffer;
 }
+
+/**
+ * Generate Financial Report Excel (summary, revenue by category, expenses, trends, outstanding)
+ */
+export async function generateFinancialReportExcel(data: {
+  financialReport: any;
+  revenueByCategory: { category: string; amount: number; count: number }[];
+  expenseByCategory: { category: string; amount: number; count: number }[];
+  monthlyTrends: { month: string; revenue: number; expenses: number; profit: number }[];
+  outstandingBalances: { tenantName: string; totalAmount: number; overdueAmount: number; daysPastDue: number }[];
+}): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const { financialReport: r, revenueByCategory, expenseByCategory, monthlyTrends, outstandingBalances } = data;
+  const periodStart = r.period?.start ? new Date(r.period.start).toLocaleDateString('en-US') : '';
+  const periodEnd = r.period?.end ? new Date(r.period.end).toLocaleDateString('en-US') : '';
+
+  workbook.creator = 'Parenta Property Management';
+  workbook.created = new Date();
+
+  // Summary sheet
+  const summarySheet = workbook.addWorksheet('Summary');
+  summarySheet.mergeCells('A1:D1');
+  summarySheet.getCell('A1').value = 'Financial Report';
+  summarySheet.getCell('A1').font = { size: 18, bold: true };
+  summarySheet.mergeCells('A2:D2');
+  summarySheet.getCell('A2').value = `Period: ${periodStart} - ${periodEnd}`;
+  summarySheet.getCell('A2').font = { size: 12 };
+  summarySheet.addRow([]);
+  summarySheet.addRow(['Metric', 'Value']);
+  summarySheet.getRow(4).font = { bold: true };
+  summarySheet.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  summarySheet.addRow(['Total Revenue', r.revenue?.totalRevenue ?? 0]);
+  summarySheet.addRow(['Total Expenses', r.expenses?.totalExpenses ?? 0]);
+  summarySheet.addRow(['Net Profit', r.profitLoss?.netProfit ?? 0]);
+  summarySheet.addRow(['Profit Margin %', r.profitLoss?.profitMargin ?? 0]);
+  summarySheet.addRow(['Total Outstanding', r.outstandingBalances?.totalOutstanding ?? 0]);
+  summarySheet.addRow(['Overdue Outstanding', r.outstandingBalances?.overdueOutstanding ?? 0]);
+  summarySheet.getColumn(1).width = 22;
+  summarySheet.getColumn(2).width = 18;
+  [5, 6, 7, 8, 9, 10].forEach(row => {
+    summarySheet.getCell(`B${row}`).numFmt = '₱#,##0.00';
+  });
+  summarySheet.getCell('B8').numFmt = '0.0%';
+
+  // Revenue by category
+  const revSheet = workbook.addWorksheet('Revenue by Category');
+  revSheet.addRow(['Revenue by Category']).font = { size: 14, bold: true };
+  revSheet.addRow([]);
+  revSheet.addRow(['Category', 'Amount', 'Transactions']);
+  revSheet.getRow(3).font = { bold: true };
+  revSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  (revenueByCategory || []).forEach((item: any) => {
+    revSheet.addRow([item.category, item.amount, item.count]);
+  });
+  revSheet.getColumn(1).width = 20;
+  revSheet.getColumn(2).width = 16;
+  revSheet.getColumn(2).numFmt = '₱#,##0.00';
+
+  // Expenses by category
+  const expSheet = workbook.addWorksheet('Expenses by Category');
+  expSheet.addRow(['Expenses by Category']).font = { size: 14, bold: true };
+  expSheet.addRow([]);
+  expSheet.addRow(['Category', 'Amount', 'Count']);
+  expSheet.getRow(3).font = { bold: true };
+  expSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  (expenseByCategory || []).forEach((item: any) => {
+    expSheet.addRow([item.category, item.amount, item.count]);
+  });
+  expSheet.getColumn(1).width = 20;
+  expSheet.getColumn(2).width = 16;
+  expSheet.getColumn(2).numFmt = '₱#,##0.00';
+
+  // Monthly trends
+  const trendSheet = workbook.addWorksheet('Monthly Trends');
+  trendSheet.addRow(['Monthly Financial Trends']).font = { size: 14, bold: true };
+  trendSheet.addRow([]);
+  trendSheet.addRow(['Month', 'Revenue', 'Expenses', 'Profit']);
+  trendSheet.getRow(3).font = { bold: true };
+  trendSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  (monthlyTrends || []).forEach((t: any) => {
+    trendSheet.addRow([t.month, t.revenue, t.expenses, t.profit]);
+  });
+  trendSheet.getColumn(1).width = 12;
+  trendSheet.getColumn(2).width = 16;
+  trendSheet.getColumn(3).width = 16;
+  trendSheet.getColumn(4).width = 16;
+  trendSheet.getColumn(2).numFmt = '₱#,##0.00';
+  trendSheet.getColumn(3).numFmt = '₱#,##0.00';
+  trendSheet.getColumn(4).numFmt = '₱#,##0.00';
+
+  // Outstanding balances
+  const outSheet = workbook.addWorksheet('Outstanding Balances');
+  outSheet.addRow(['Outstanding Balances by Tenant']).font = { size: 14, bold: true };
+  outSheet.addRow([]);
+  outSheet.addRow(['Tenant', 'Total Outstanding', 'Overdue Amount', 'Days Past Due']);
+  outSheet.getRow(3).font = { bold: true };
+  outSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  (outstandingBalances || []).forEach((b: any) => {
+    outSheet.addRow([b.tenantName, b.totalAmount, b.overdueAmount, b.daysPastDue]);
+  });
+  outSheet.getColumn(1).width = 28;
+  outSheet.getColumn(2).width = 18;
+  outSheet.getColumn(3).width = 18;
+  outSheet.getColumn(2).numFmt = '₱#,##0.00';
+  outSheet.getColumn(3).numFmt = '₱#,##0.00';
+
+  return await workbook.xlsx.writeBuffer() as Buffer;
+}

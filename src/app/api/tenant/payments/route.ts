@@ -57,7 +57,7 @@ export async function GET() {
       LEFT JOIN rooms r ON tra.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       WHERE i.tenant_id = $1
-        AND i.invoice_status IN ('sent', 'partial', 'overdue')
+        AND i.invoice_status IN ('draft', 'sent', 'partial', 'overdue')
         AND i.balance_due > 0
       ORDER BY i.due_date ASC
       LIMIT 50

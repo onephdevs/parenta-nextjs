@@ -266,9 +266,10 @@ export default function CreateReservationModal({
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'monthlyRate' || name === 'reservationDeposit' || 
-              name === 'advanceAmount' || name === 'utilityDepositAmount'
+      [name]: name === 'monthlyRate' || name === 'reservationDeposit'
         ? (value ? parseFloat(value) : 0)
+        : name === 'advanceAmount' || name === 'utilityDepositAmount'
+        ? (value === '' ? 0 : value ? parseFloat(value) : 0)
         : name === 'reservationDate' || name === 'expiryDate'
         ? new Date(value)
         : value
@@ -279,12 +280,12 @@ export default function CreateReservationModal({
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Validate deposit is required (must be > 0)
-    if (!formData.reservationDeposit || formData.reservationDeposit <= 0) {
+    // Validate deposit is non-negative
+    if (typeof formData.reservationDeposit !== 'number' || formData.reservationDeposit < 0) {
       showNotification({
         type: 'error',
-        title: 'Deposit Required',
-        message: 'Reservation deposit is required. No reservation can be created without a deposit payment.',
+        title: 'Invalid Deposit',
+        message: 'Reservation deposit must be 0 or greater.',
       });
       setIsSubmitting(false);
       return;
@@ -301,9 +302,9 @@ export default function CreateReservationModal({
       return;
     }
 
-    // Validate deposit meets requirements (building config or room config)
+    // Validate deposit meets minimum when one is set (building config or room config)
     const currentRequiredDeposit = buildingConfig ? requiredDeposit : calculateRequiredDepositLocal();
-    if (currentRequiredDeposit > 0 && formData.reservationDeposit < currentRequiredDeposit) {
+    if (currentRequiredDeposit > 0 && (formData.reservationDeposit < currentRequiredDeposit)) {
       showNotification({
         type: 'error',
         title: 'Insufficient Deposit',
@@ -435,7 +436,7 @@ export default function CreateReservationModal({
       <button
         type="submit"
         form="create-reservation-form"
-        disabled={isSubmitting || !formData.reservationDeposit || formData.reservationDeposit <= 0}
+        disabled={isSubmitting || (typeof formData.reservationDeposit !== 'number') || formData.reservationDeposit < 0 || (displayRequiredDeposit > 0 && formData.reservationDeposit < displayRequiredDeposit)}
         className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? 'Creating...' : 'Create Reservation'}
@@ -603,19 +604,18 @@ export default function CreateReservationModal({
             type="number"
             id="reservationDeposit"
             name="reservationDeposit"
-            required
-            min={displayRequiredDeposit > 0 ? displayRequiredDeposit : 0.01}
+            min={displayRequiredDeposit > 0 ? displayRequiredDeposit : 0}
             step="0.01"
             value={formData.reservationDeposit}
             onChange={handleInputChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          {(!formData.reservationDeposit || formData.reservationDeposit <= 0) && (
+          {typeof formData.reservationDeposit === 'number' && formData.reservationDeposit < 0 && (
             <p className="mt-1 text-sm text-red-600">
-              Reservation deposit is required. No reservation can be created without a deposit payment.
+              Reservation deposit cannot be negative.
             </p>
           )}
-          {displayRequiredDeposit > 0 && formData.reservationDeposit > 0 && formData.reservationDeposit < displayRequiredDeposit && (
+          {displayRequiredDeposit > 0 && formData.reservationDeposit >= 0 && formData.reservationDeposit < displayRequiredDeposit && (
             <p className="mt-1 text-sm text-red-600">
               Minimum deposit required: {formatCurrency(displayRequiredDeposit, currencyCode)}
             </p>
@@ -632,16 +632,17 @@ export default function CreateReservationModal({
           <div>
             <label htmlFor="advanceAmount" className="block text-sm font-medium text-gray-900 mb-1">
               Advance Payment ({currencySymbol}) (Optional)
-              <span className="text-gray-500"> (Min: {formatCurrency(requiredAdvance, currencyCode)})</span>
+              <span className="text-gray-500"> — 0 for none, or min {formatCurrency(requiredAdvance, currencyCode)} if provided</span>
             </label>
             <input
               type="number"
               id="advanceAmount"
               name="advanceAmount"
-              min={requiredAdvance}
+              min={0}
               step="0.01"
-              value={formData.advanceAmount || 0}
+              value={formData.advanceAmount === 0 ? '' : formData.advanceAmount}
               onChange={handleInputChange}
+              placeholder="0"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
             <p className="mt-1 text-sm text-gray-600">
@@ -655,16 +656,17 @@ export default function CreateReservationModal({
           <div>
             <label htmlFor="utilityDepositAmount" className="block text-sm font-medium text-gray-900 mb-1">
               Utility Deposit ({currencySymbol}) (Optional)
-              <span className="text-gray-500"> (Min: {formatCurrency(requiredUtility, currencyCode)})</span>
+              <span className="text-gray-500"> — 0 for none, or min {formatCurrency(requiredUtility, currencyCode)} if provided</span>
             </label>
             <input
               type="number"
               id="utilityDepositAmount"
               name="utilityDepositAmount"
-              min={requiredUtility}
+              min={0}
               step="0.01"
-              value={formData.utilityDepositAmount || 0}
+              value={formData.utilityDepositAmount === 0 ? '' : formData.utilityDepositAmount}
               onChange={handleInputChange}
+              placeholder="0"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
             <p className="mt-1 text-sm text-gray-600">

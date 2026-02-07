@@ -25,6 +25,12 @@ interface Building {
   image?: string;
 }
 
+function formatBuildingAddress(b: { addressLine1?: string; city?: string; state?: string; postalCode?: string; address?: string }): string {
+  if (b.address) return b.address;
+  const parts = [b.addressLine1, b.city, b.state, b.postalCode].filter(Boolean);
+  return parts.length ? parts.join(', ') : '';
+}
+
 export default function LandingPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,8 +46,16 @@ export default function LandingPage() {
         const result = await response.json();
         if (result.success) {
           // Handle both response formats: { data: { buildings: [] } } or { data: [] }
-          const buildingsArray = result.data.buildings || result.data || [];
-          setBuildings(buildingsArray.slice(0, 6)); // Show top 6 buildings
+          const raw = result.data.buildings || result.data || [];
+          const buildingsArray: Building[] = raw.slice(0, 6).map((b: Record<string, unknown>) => ({
+            id: String(b.id),
+            name: String(b.name ?? ''),
+            address: formatBuildingAddress(b as Parameters<typeof formatBuildingAddress>[0]),
+            totalUnits: Number(b.totalUnits) || 0,
+            availableUnits: Number(b.vacantUnits) || 0,
+            image: b.image as string | undefined,
+          }));
+          setBuildings(buildingsArray);
         }
       }
     } catch (error) {

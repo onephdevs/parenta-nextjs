@@ -380,7 +380,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                   required
                   min="0"
                   step="0.01"
-                  value={formData.monthlyRate || ''}
+                  value={formData.monthlyRate ?? ''}
                   onChange={handleInputChange}
                   disabled={!isEditing}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -397,7 +397,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                   name="depositAmount"
                   min="0"
                   step="0.01"
-                  value={formData.depositAmount || ''}
+                  value={formData.depositAmount ?? ''}
                   onChange={handleInputChange}
                   disabled={!isEditing}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -488,7 +488,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                         min="0"
                         max="200"
                         step="1"
-                        value={formData.depositPercentage || ''}
+                        value={formData.depositPercentage ?? ''}
                         onChange={(e) =>
                           setFormData(prev => ({ ...prev, depositPercentage: e.target.value ? parseFloat(e.target.value) : undefined }))
                         }
@@ -515,7 +515,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
                         name="depositFixedAmount"
                         min="0"
                         step="1"
-                        value={formData.depositFixedAmount || ''}
+                        value={formData.depositFixedAmount ?? ''}
                         onChange={(e) =>
                           setFormData(prev => ({ ...prev, depositFixedAmount: e.target.value ? parseFloat(e.target.value) : undefined }))
                         }

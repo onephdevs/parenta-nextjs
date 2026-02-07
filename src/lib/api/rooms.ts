@@ -169,6 +169,16 @@ export async function getRoomById(id: string): Promise<Room | null> {
   }
 }
 
+// Normalize amenities to PostgreSQL TEXT[]: accept string (comma-separated) or array
+function normalizeAmenities(amenities: string | string[] | undefined): string[] {
+  if (amenities == null || amenities === '') return [];
+  if (Array.isArray(amenities)) return amenities.filter(Boolean).map((a) => String(a).trim());
+  return String(amenities)
+    .split(',')
+    .map((a) => a.trim())
+    .filter((a) => a.length > 0);
+}
+
 // Create room
 export async function createRoom(roomData: CreateRoomData): Promise<Room> {
   try {
@@ -182,6 +192,8 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
       RETURNING *
     `;
     
+    const amenitiesArray = normalizeAmenities(roomData.amenities);
+    
     const values = [
       roomData.buildingId,
       roomData.roomNumber,
@@ -194,7 +206,7 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
       roomData.depositType || 'one_month',
       roomData.depositPercentage,
       'vacant', // Default status
-      roomData.amenities || '',
+      amenitiesArray,
       roomData.description
     ];
     
@@ -235,7 +247,7 @@ export async function updateRoom(id: string, roomData: Partial<CreateRoomData>):
       }
 
       paramCount++;
-      const dbKey = key === 'buildingId' ? 'building_id' : 
+      const dbKey = key === 'buildingId' ? 'building_id' :
                    key === 'roomNumber' ? 'room_number' :
                    key === 'roomType' ? 'room_type' :
                    key === 'floorNumber' ? 'floor_number' :
@@ -249,7 +261,7 @@ export async function updateRoom(id: string, roomData: Partial<CreateRoomData>):
                    key === 'description' ? 'description' :
                    key;
       updates.push(`${dbKey} = $${paramCount}`);
-      values.push(value);
+      values.push(key === 'amenities' ? normalizeAmenities(value as string | string[]) : value);
     });
 
     if (updates.length === 0) {

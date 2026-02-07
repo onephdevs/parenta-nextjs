@@ -111,12 +111,32 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const amount = Number(paymentData.amount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Valid amount is required', details: 'Amount must be a number greater than 0' },
+        { status: 400 }
+      );
+    }
+
+    const paymentDate = new Date(paymentData.paymentDate);
+    const dueDate = paymentData.dueDate ? new Date(paymentData.dueDate) : paymentDate;
+    if (Number.isNaN(paymentDate.getTime())) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid payment date', details: 'Please provide a valid payment date' },
+        { status: 400 }
+      );
+    }
+
+    const paymentMethod = paymentData.paymentMethod ? String(paymentData.paymentMethod).toLowerCase().replace(/\s+/g, '_') : undefined;
     
-    // Convert date strings to Date objects
     const createData = {
       ...paymentData,
-      paymentDate: new Date(paymentData.paymentDate),
-      dueDate: paymentData.dueDate ? new Date(paymentData.dueDate) : undefined,
+      amount,
+      paymentDate,
+      dueDate,
+      paymentMethod: paymentMethod || paymentData.paymentMethod,
     };
     
     const payment = await createPayment(createData);
@@ -180,11 +200,13 @@ export async function POST(request: Request) {
       }
     }
     
+    const details = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Create payment error:', error);
     return NextResponse.json(
       { 
         success: false, 
         error: 'Failed to create payment',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details
       },
       { status: 500 }
     );

@@ -22,9 +22,12 @@ interface Payment {
   amount: number;
   paymentDate: string;
   paymentMethod: string;
-  type: string;
-  status: string;
+  paymentType?: string;
+  paymentStatus?: string;
+  type?: string;
+  status?: string;
   description?: string;
+  notes?: string;
 }
 
 interface Advance {
@@ -168,11 +171,17 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'paid':
         return 'bg-green-100 text-green-800';
       case 'pending':
+      case 'partial':
         return 'bg-yellow-100 text-yellow-800';
       case 'failed':
+      case 'overdue':
         return 'bg-red-100 text-red-800';
+      case 'refunded':
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -363,15 +372,15 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
                         {payment.paymentMethod.replace('_', ' ')}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                        {payment.type}
+                        {(payment.paymentType ?? payment.type ?? '-').replace(/_/g, ' ')}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(payment.status)}`}>
-                          {payment.status}
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(payment.paymentStatus ?? payment.status ?? '')}`}>
+                          {(payment.paymentStatus ?? payment.status ?? '-').replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
-                        {payment.description || '-'}
+                        {payment.description ?? payment.notes ?? '-'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link

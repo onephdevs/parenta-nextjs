@@ -95,9 +95,8 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
         buildingType: 'residential',
         yearBuilt: undefined,
         totalFloors: undefined,
-        amenities: []
+        amenities: ''
       });
-      setAmenitiesInput('');
       
       onClose();
       

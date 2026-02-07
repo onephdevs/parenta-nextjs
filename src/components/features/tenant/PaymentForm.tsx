@@ -127,16 +127,23 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
           id="invoiceId"
           value={selectedInvoiceId}
           onChange={(e) => setSelectedInvoiceId(e.target.value)}
-          required
+          required={invoices.length > 0}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">Select an invoice</option>
+          <option value="">
+            {invoices.length === 0 ? 'No invoices due' : 'Select an invoice'}
+          </option>
           {invoices.map((invoice) => (
             <option key={invoice.id} value={invoice.id}>
               {invoice.invoiceNumber} - {formatCurrency(invoice.balanceDue)} due {new Date(invoice.dueDate).toLocaleDateString()}
             </option>
           ))}
         </select>
+        {invoices.length === 0 && (
+          <p className="mt-1 text-sm text-amber-700">
+            You have no invoices with a balance due. Use the &quot;Manual Entry&quot; tab to record a payment without an invoice.
+          </p>
+        )}
       </div>
 
       {/* Payment Amount */}
@@ -147,12 +154,15 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
         <input
           type="number"
           id="paymentAmount"
-          min="0.01"
+          min={0}
           max={maxAmount}
           step="0.01"
-          value={paymentAmount}
-          onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-          required
+          value={paymentAmount === 0 ? '' : paymentAmount}
+          onChange={(e) => {
+            const v = e.target.value;
+            setPaymentAmount(v === '' ? 0 : parseFloat(v) || 0);
+          }}
+          placeholder="0"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {selectedInvoice && (

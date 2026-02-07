@@ -139,7 +139,7 @@ export async function POST(request: Request) {
 
     const { tenant_id, room_id, building_id } = tenantResult.rows[0];
 
-    // Insert maintenance request
+    // Insert maintenance request (request_date comes from table DEFAULT CURRENT_DATE for admin listing)
     const insertQuery = `
       INSERT INTO maintenance_requests (
         tenant_id,

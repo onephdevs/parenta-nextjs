@@ -192,6 +192,8 @@ export async function POST(request: Request) {
     }
     
     // Create payment record for deposit, advance, or other types
+    // DB payment_type CHECK allows: rent, deposit, late_fee, utility, asset_rental, other (no 'advance')
+    const dbPaymentType = paymentTypeValue === 'advance' ? 'other' : paymentTypeValue;
     const paymentQuery = `
       INSERT INTO payments (
         tenant_id,
@@ -210,7 +212,7 @@ export async function POST(request: Request) {
     const paymentResult = await pool.query(paymentQuery, [
       tenant.id,
       amount,
-      paymentTypeValue,
+      dbPaymentType,
       paymentMethod || 'online',
       'paid',
       referenceNumber || null,
@@ -244,7 +246,7 @@ export async function POST(request: Request) {
         transactionId: transactionId,
         creditId: creditId,
         amount: parseFloat(amount),
-        paymentType: paymentResult.rows[0].payment_type,
+        paymentType: paymentTypeValue, // original type (e.g. 'advance') for display; DB stores 'other'
         transactionDate: new Date().toISOString(),
       },
       message: `${paymentTypeValue === 'deposit' ? 'Deposit' : paymentTypeValue === 'advance' ? 'Advance' : 'Payment'} payment recorded successfully`,

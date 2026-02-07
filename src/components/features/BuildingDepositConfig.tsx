@@ -219,7 +219,7 @@ export default function BuildingDepositConfigComponent({
                 name="depositAmount"
                 min="0"
                 step="0.01"
-                value={formData.depositAmount || ''}
+                value={formData.depositAmount ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="e.g., 9600"
@@ -239,7 +239,7 @@ export default function BuildingDepositConfigComponent({
                 min="0"
                 max="100"
                 step="0.01"
-                value={formData.depositPercentage || ''}
+                value={formData.depositPercentage ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="e.g., 50"
@@ -320,7 +320,7 @@ export default function BuildingDepositConfigComponent({
                 name="advanceAmount"
                 min="0"
                 step="0.01"
-                value={formData.advanceAmount || ''}
+                value={formData.advanceAmount ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="e.g., 4800"
@@ -340,7 +340,7 @@ export default function BuildingDepositConfigComponent({
                 min="0"
                 max="100"
                 step="0.01"
-                value={formData.advancePercentage || ''}
+                value={formData.advancePercentage ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="e.g., 50"

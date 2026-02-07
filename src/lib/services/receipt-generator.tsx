@@ -210,11 +210,11 @@ const ReceiptPDF = ({ data }: { data: ReceiptData }) => (
         </View>
       )}
 
-      {/* Amount */}
+      {/* Amount - use "P" (ASCII) instead of ₱ so PDF renders correctly in all viewers */}
       <View style={styles.amountRow}>
         <Text style={styles.amountLabel}>Amount Paid:</Text>
         <Text style={styles.amountValue}>
-          ₱{data.paymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          P {data.paymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Text>
       </View>
 

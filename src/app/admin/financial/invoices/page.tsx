@@ -59,24 +59,38 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
       totalPages: 0
     };
     tenants = [];
+    summary = null;
+  }
+
+  // Deduplicate tenants by id so option keys are unique (getAllTenants may return duplicates)
+  const uniqueTenants = Array.isArray(tenants)
+    ? tenants.filter((t, i, a) => a.findIndex((x) => x.id === t.id) === i)
+    : [];
+
+  if (!summary) {
     summary = {
       totalInvoices: 0,
       totalAmount: 0,
       paidAmount: 0,
+      paidInvoices: 0,
       pendingAmount: 0,
       overdueAmount: 0,
+      overdueInvoices: 0,
       paidCount: 0,
       sentCount: 0,
       overdueCount: 0,
-      draftCount: 0
+      draftCount: 0,
+      unpaidInvoices: 0,
+      unpaidAmount: 0,
     };
   }
 
   const formatCurrency = (amount: number) => {
+    const value = typeof amount === 'number' && !Number.isNaN(amount) ? amount : 0;
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
-    }).format(amount);
+    }).format(value);
   };
 
   const formatDate = (date: Date) => {
@@ -319,8 +333,8 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 >
                   <option value="">All Tenants</option>
-                  {Array.isArray(tenants) && tenants.length > 0 ? (
-                    tenants.map((tenant) => (
+                  {uniqueTenants.length > 0 ? (
+                    uniqueTenants.map((tenant) => (
                       <option key={tenant.id} value={tenant.id}>
                         {tenant.firstName} {tenant.lastName}
                       </option>

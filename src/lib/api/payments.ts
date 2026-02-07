@@ -71,7 +71,28 @@ export interface PaymentFilters {
   endDate?: Date;
   minAmount?: number;
   maxAmount?: number;
+  search?: string;
 }
+
+// Map app payment status to DB enum (schema: pending, paid, partial, overdue, cancelled)
+const mapPaymentStatusToDb = (status?: string): string => {
+  switch (status) {
+    case 'completed': return 'paid';
+    case 'failed':
+    case 'refunded': return 'cancelled';
+    default: return status || 'pending';
+  }
+};
+
+// Map app payment type to DB enum (schema: rent, deposit, late_fee, utility, asset_rental, other)
+const mapPaymentTypeToDb = (type: string): string => {
+  switch (type) {
+    case 'utilities': return 'utility';
+    case 'advance':
+    case 'fee': return 'other';
+    default: return type;
+  }
+};
 
 // Create a new payment
 export async function createPayment(paymentData: CreatePaymentData): Promise<Payment> {
@@ -91,14 +112,14 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
     throw new Error('Payment amount must be greater than 0');
   }
   
-  // Use provided paymentStatus or default to 'pending'
-  const paymentStatus = paymentData.paymentStatus || 'pending';
+  const paymentStatus = mapPaymentStatusToDb(paymentData.paymentStatus);
+  const paymentType = mapPaymentTypeToDb(paymentData.paymentType);
   
   const values = [
     paymentData.tenantId,
     paymentData.roomAssignmentId || null,
     paymentData.amount,
-    paymentData.paymentType,
+    paymentType,
     paymentData.paymentMethod || null,
     paymentData.paymentDate.toISOString().split('T')[0],
     paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0], // Default to payment_date if not provided
@@ -110,6 +131,8 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
   try {
     const result = await pool.query(query, values);
     const row = result.rows[0];
+    const dbStatus = row.payment_status as string;
+    const appStatus = dbStatus === 'paid' ? 'completed' : dbStatus === 'cancelled' ? 'failed' : dbStatus;
     
     return {
       id: row.id,
@@ -118,7 +141,7 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
       amount: parseFloat(row.amount),
       paymentType: row.payment_type,
       paymentMethod: row.payment_method,
-      paymentStatus: row.payment_status,
+      paymentStatus: appStatus as Payment['paymentStatus'],
       paymentDate: new Date(row.payment_date),
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
       referenceNumber: row.reference_number,
@@ -174,6 +197,16 @@ export async function getPayments(
   if (filters.maxAmount) {
     whereConditions.push(`p.amount <= $${paramIndex++}`);
     queryParams.push(filters.maxAmount);
+  }
+  if (filters.search && filters.search.trim()) {
+    whereConditions.push(`(
+      CONCAT(t.first_name, ' ', t.last_name) ILIKE $${paramIndex}
+      OR t.email ILIKE $${paramIndex}
+      OR p.notes ILIKE $${paramIndex}
+      OR p.reference_number ILIKE $${paramIndex}
+    )`);
+    queryParams.push(`%${filters.search.trim()}%`);
+    paramIndex++;
   }
 
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';

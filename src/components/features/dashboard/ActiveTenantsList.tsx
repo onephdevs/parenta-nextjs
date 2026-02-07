@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Users, AlertCircle, CheckCircle2, ArrowRight, DollarSign } from 'lucide-react';
 
@@ -61,6 +61,15 @@ export default function ActiveTenantsList() {
     }).format(amount);
   };
 
+  const uniqueTenants = useMemo(() => {
+    const seen = new Set<string>();
+    return tenants.filter((t) => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [tenants]);
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -101,7 +110,7 @@ export default function ActiveTenantsList() {
         </div>
       ) : (
         <div className="space-y-3">
-          {tenants.map((tenant) => (
+          {uniqueTenants.map((tenant) => (
             <Link
               key={tenant.id}
               href={`/admin/tenants/${tenant.id}`}

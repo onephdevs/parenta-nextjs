@@ -180,7 +180,7 @@ export default function ReservationDetail({ reservation, showConvertModal = fals
             <div>
               <dt className="text-sm font-medium text-gray-600">Room ID</dt>
               <dd className="mt-1 text-sm text-gray-900">
-                <Link href={`/admin/buildings/${reservation.roomId}/rooms`} className="text-purple-600 hover:text-purple-900">
+                <Link href={`/admin/rooms/${reservation.roomId}`} className="text-purple-600 hover:text-purple-900">
                   {reservation.roomId}
                 </Link>
               </dd>

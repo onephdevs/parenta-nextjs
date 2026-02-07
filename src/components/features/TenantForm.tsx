@@ -67,10 +67,10 @@ export default function TenantForm() {
     emergencyContactRelationship: '',
     employmentStatus: 'employed',
     employerName: '',
-    monthlyIncome: 0,
+    monthlyIncome: undefined,
     buildingId: '',
     roomId: '',
-    monthlyRent: 0,
+    monthlyRent: undefined,
     depositMonths: 1,
     advanceMonths: 1,
     leaseStartDate: '',
@@ -149,7 +149,7 @@ export default function TenantForm() {
       }
     } else if (!formData.roomId && !overrideMonthlyRent) {
       // Clear monthly rent when room is deselected and override is not checked
-      setFormData(prev => ({ ...prev, monthlyRent: 0 }));
+      setFormData(prev => ({ ...prev, monthlyRent: undefined }));
     }
   }, [formData.roomId, rooms, overrideMonthlyRent]);
 
@@ -325,10 +325,14 @@ export default function TenantForm() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    
+    const optionalNumberFields = ['monthlyIncome', 'monthlyRent'];
+    const numValue = value === '' ? undefined : Number(value);
+    const isOptionalNumber = type === 'number' && optionalNumberFields.includes(name);
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? (value === '' ? 0 : Number(value)) : value,
+      [name]: type === 'number'
+        ? (isOptionalNumber ? (value === '' ? undefined : (Number.isNaN(numValue) ? prev[name as keyof TenantFormData] : numValue)) : (value === '' ? 0 : Number(value)))
+        : value,
     }));
 
     if (errors[name]) {
@@ -464,7 +468,7 @@ export default function TenantForm() {
               id="monthlyIncome"
               min="0"
               step="0.01"
-              value={formData.monthlyIncome}
+              value={formData.monthlyIncome ?? ''}
               onChange={handleInputChange}
               className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
@@ -697,7 +701,7 @@ export default function TenantForm() {
               id="monthlyRent"
               min="0"
               step="1"
-              value={formData.monthlyRent}
+              value={formData.monthlyRent ?? ''}
               onChange={handleInputChange}
               required
               disabled={!overrideMonthlyRent && !formData.roomId}

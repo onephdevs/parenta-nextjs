@@ -42,9 +42,10 @@ export async function createReservation(
   try {
     await client.query('BEGIN');
 
-    // Validate deposit is required (must be > 0)
-    if (!reservationData.reservationDeposit || reservationData.reservationDeposit <= 0) {
-      throw new Error('Reservation deposit is required. No reservation can be created without a deposit payment.');
+    // Validate deposit is non-negative (0 is allowed)
+    const depositAmount = Number(reservationData.reservationDeposit);
+    if (Number.isNaN(depositAmount) || depositAmount < 0) {
+      throw new Error('Reservation deposit must be 0 or greater.');
     }
 
     // Validate room is available (vacant or reserved) and get building info
@@ -120,19 +121,21 @@ export async function createReservation(
           break;
       }
     } else {
-      // Default minimum deposit (3k minimum)
-      requiredDeposit = 3000;
+      // No building config and room has no deposit requirement: allow 0
+      requiredDeposit = 0;
     }
     
-    // Ensure deposit meets minimum requirement (3k minimum)
-    const minimumDeposit = buildingConfig?.minimumDepositAmount || 3000;
-    if (requiredDeposit < minimumDeposit) {
-      requiredDeposit = minimumDeposit;
+    // When building has config, enforce its minimum (or 3k fallback)
+    if (buildingConfig) {
+      const minimumDeposit = buildingConfig.minimumDepositAmount || 3000;
+      if (requiredDeposit < minimumDeposit) {
+        requiredDeposit = minimumDeposit;
+      }
     }
     
-    // Validate deposit meets requirements
-    if (reservationData.reservationDeposit < requiredDeposit) {
-      throw new Error(`Minimum deposit required: ${requiredDeposit.toLocaleString()}. Provided: ${reservationData.reservationDeposit.toLocaleString()}`);
+    // Validate deposit meets minimum when one is set
+    if (depositAmount < requiredDeposit) {
+      throw new Error(`Minimum deposit required: ${requiredDeposit.toLocaleString()}. Provided: ${depositAmount.toLocaleString()}`);
     }
     
     // Calculate advance and utility deposit if building config exists
@@ -166,9 +169,9 @@ export async function createReservation(
           return validityDate;
         })();
 
-    // Create payment record (deposit is always required, so this always executes)
+    // Create payment record only when deposit > 0
     let depositPaymentId: string | undefined;
-      // Create payment directly in the transaction
+    if (depositAmount > 0) {
       const paymentQuery = `
         INSERT INTO payments (
           tenant_id, assignment_id, amount, payment_type, payment_method,
@@ -176,11 +179,10 @@ export async function createReservation(
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id
       `;
-      
       const paymentResult = await client.query(paymentQuery, [
         reservationData.tenantId,
         null, // No assignment_id for reservation deposits
-        reservationData.reservationDeposit,
+        depositAmount,
         'deposit',
         'cash', // Default, can be updated later
         reservationDate.toISOString().split('T')[0],
@@ -189,8 +191,8 @@ export async function createReservation(
         `Reservation deposit for room reservation`,
         'paid' // Set directly to paid for reservation deposits
       ]);
-      
-    depositPaymentId = paymentResult.rows[0].id;
+      depositPaymentId = paymentResult.rows[0].id;
+    }
 
     // Create reservation with advance, utility deposit, and validity tracking
     const reservationQuery = `
@@ -209,7 +211,7 @@ export async function createReservation(
       reservationDate.toISOString().split('T')[0],
       expiryDate.toISOString().split('T')[0],
       reservationData.monthlyRate,
-      reservationData.reservationDeposit, // Deposit is always required, no need for || 0
+      depositAmount,
       advanceAmount || null,
       utilityDepositAmount || null,
       depositValidUntil ? depositValidUntil.toISOString().split('T')[0] : null,
@@ -289,7 +291,7 @@ export async function getAllReservations(filters?: {
         t.email as tenant_email,
         rm.room_number,
         b.name as building_name,
-        CURRENT_DATE - r.expiry_date as days_until_expiry
+        r.expiry_date - CURRENT_DATE as days_until_expiry
       FROM reservations r
       INNER JOIN tenants t ON r.tenant_id = t.id
       INNER JOIN rooms rm ON r.room_id = rm.id
@@ -339,7 +341,7 @@ export async function getReservationById(id: string): Promise<ReservationWithDet
         t.email as tenant_email,
         rm.room_number,
         b.name as building_name,
-        CURRENT_DATE - r.expiry_date as days_until_expiry
+        r.expiry_date - CURRENT_DATE as days_until_expiry
       FROM reservations r
       INNER JOIN tenants t ON r.tenant_id = t.id
       INNER JOIN rooms rm ON r.room_id = rm.id

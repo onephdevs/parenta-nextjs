@@ -1,14 +1,5 @@
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { Invoice, InvoiceFilters, InvoiceSummary, InvoicesResponse, InvoiceItem } from '@/types/financial';
-
-// Use the same pool configuration as other API files
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT || '5432'),
-});
 
 // Get all invoices with filtering and pagination
 export async function getInvoices(
@@ -377,15 +368,23 @@ export async function getInvoiceSummary(): Promise<InvoiceSummary> {
   const result = await pool.query(query);
   const row = result.rows[0];
 
+  const parseSafeInt = (v: unknown) => {
+    const n = parseInt(String(v), 10);
+    return Number.isNaN(n) ? 0 : n;
+  };
+  const parseSafeFloat = (v: unknown) => {
+    const n = parseFloat(String(v));
+    return Number.isNaN(n) ? 0 : n;
+  };
   return {
-    totalInvoices: parseInt(row.total_invoices),
-    totalAmount: parseFloat(row.total_amount),
-    paidInvoices: parseInt(row.paid_invoices),
-    paidAmount: parseFloat(row.paid_amount),
-    unpaidInvoices: parseInt(row.unpaid_invoices),
-    unpaidAmount: parseFloat(row.unpaid_amount),
-    overdueInvoices: parseInt(row.overdue_invoices),
-    overdueAmount: parseFloat(row.overdue_amount),
+    totalInvoices: parseSafeInt(row.total_invoices),
+    totalAmount: parseSafeFloat(row.total_amount),
+    paidInvoices: parseSafeInt(row.paid_invoices),
+    paidAmount: parseSafeFloat(row.paid_amount),
+    unpaidInvoices: parseSafeInt(row.unpaid_invoices),
+    unpaidAmount: parseSafeFloat(row.unpaid_amount),
+    overdueInvoices: parseSafeInt(row.overdue_invoices),
+    overdueAmount: parseSafeFloat(row.overdue_amount),
   };
 }
 

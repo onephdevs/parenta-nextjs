@@ -41,14 +41,14 @@ export default function TenantSignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 flex">
       {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full">
           {/* Back to Home */}
           <Link 
             href="/"
-            className="inline-flex items-center text-sm text-gray-900 hover:text-green-600 mb-8 transition"
+            className="inline-flex items-center text-sm text-gray-900 dark:text-gray-100 hover:text-green-600 dark:hover:text-green-400 mb-8 transition"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
@@ -61,29 +61,29 @@ export default function TenantSignIn() {
                 <User className="h-8 w-8 text-white" />
               </div>
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Tenant Portal</h2>
-            <p className="mt-2 text-gray-900">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Tenant Portal</h2>
+            <p className="mt-2 text-gray-900 dark:text-gray-300">
               Access your account and manage your rental
             </p>
           </div>
 
           {/* Error Alert */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-800">{error}</div>
+            <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-3 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-800 dark:text-red-200">{error}</div>
             </div>
           )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
                 Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  <Mail className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                 </div>
                 <input
                   id="email"
@@ -93,19 +93,19 @@ export default function TenantSignIn() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="tenant@email.com"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                 </div>
                 <input
                   id="password"
@@ -115,7 +115,7 @@ export default function TenantSignIn() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="••••••••"
                 />
               </div>
@@ -127,17 +127,17 @@ export default function TenantSignIn() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 dark:border-gray-600 rounded dark:bg-gray-800"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                   Remember me
                 </label>
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-green-600 hover:text-green-500">
+                <Link href="/auth/forgot-password?role=tenant" className="font-medium text-green-600 dark:text-green-400 hover:text-green-500 dark:hover:text-green-300">
                   Forgot password?
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -161,18 +161,18 @@ export default function TenantSignIn() {
           </form>
 
           {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm font-medium text-green-900 mb-2">Demo Tenant Credentials:</p>
-            <div className="text-xs text-green-700 space-y-1">
+          <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <p className="text-sm font-medium text-green-900 dark:text-green-200 mb-2">Demo Tenant Credentials:</p>
+            <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
               <p><strong>Email:</strong> tenant@parenta.com</p>
               <p><strong>Password:</strong> tenant123</p>
             </div>
           </div>
 
           {/* Help Section */}
-          <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-sm font-medium text-gray-900 mb-2">Need Help?</p>
-            <div className="text-xs text-gray-900 space-y-1">
+          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-200 mb-2">Need Help?</p>
+            <div className="text-xs text-gray-900 dark:text-gray-300 space-y-1">
               <p>• Contact your property manager for account access</p>
               <p>• Call our support: +63 (2) 1234-5678</p>
               <p>• Email: support@parenta.com</p>
@@ -181,7 +181,7 @@ export default function TenantSignIn() {
 
           {/* Back to Properties */}
           <div className="mt-6 text-center">
-            <Link href="/#properties" className="text-sm text-gray-900 hover:text-green-600">
+            <Link href="/#properties" className="text-sm text-gray-900 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400">
               ← Browse Available Properties
             </Link>
           </div>

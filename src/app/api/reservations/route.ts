@@ -58,13 +58,14 @@ export async function POST(request: Request) {
 
     const reservationData = await request.json();
     
-    // Basic validation
-    if (!reservationData.tenantId || !reservationData.roomId || !reservationData.expiryDate || !reservationData.monthlyRate || !reservationData.reservationDeposit || reservationData.reservationDeposit <= 0) {
+    // Basic validation (reservationDeposit may be 0)
+    const depositValid = typeof reservationData.reservationDeposit === 'number' && reservationData.reservationDeposit >= 0;
+    if (!reservationData.tenantId || !reservationData.roomId || !reservationData.expiryDate || reservationData.monthlyRate == null || reservationData.monthlyRate === '' || !depositValid) {
       return NextResponse.json(
         { 
           success: false, 
           error: 'Missing required fields',
-          details: 'Tenant ID, room ID, expiry date, monthly rate, and reservation deposit are required. Deposit must be greater than 0.'
+          details: 'Tenant ID, room ID, expiry date, monthly rate, and reservation deposit (0 or greater) are required.'
         },
         { status: 400 }
       );
