@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Mail } from 'lucide-react';
 
@@ -18,7 +19,7 @@ const roleLabels: Record<Role, string> = {
   staff: 'Staff',
 };
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const searchParams = useSearchParams();
   const roleParam = searchParams.get('role');
   const role: Role =
@@ -80,5 +81,17 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 flex items-center justify-center">
+        <div className="animate-pulse text-gray-500">Loading...</div>
+      </div>
+    }>
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }
