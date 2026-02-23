@@ -85,6 +85,59 @@ export default function AdminMaintenancePage() {
     assignedTo: ''
   });
 
+  const fetchMaintenanceRequests = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/maintenance');
+      const data = await response.json();
+
+      if (data.success) {
+        setRequests(data.data.requests || []);
+        setStats(data.data.stats || {});
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: 'Failed to load maintenance requests'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching maintenance requests:', error);
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load maintenance requests'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...requests];
+
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(r => r.status === filterStatus);
+    }
+    if (filterPriority !== 'all') {
+      filtered = filtered.filter(r => r.priority === filterPriority);
+    }
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter(r => r.category === filterCategory);
+    }
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(r =>
+        r.title?.toLowerCase().includes(term) ||
+        r.description?.toLowerCase().includes(term) ||
+        r.tenant_name?.toLowerCase().includes(term) ||
+        r.building_name?.toLowerCase().includes(term) ||
+        r.room_number?.toLowerCase().includes(term)
+      );
+    }
+    setFilteredRequests(filtered);
+  };
+
   useEffect(() => {
     if (status === 'authenticated' && (session?.user.role === 'admin' || session?.user.role === 'staff')) {
       fetchMaintenanceRequests();
@@ -118,67 +171,6 @@ export default function AdminMaintenancePage() {
   if (!session || (session.user.role !== 'admin' && session.user.role !== 'staff')) {
     redirect('/auth/admin/signin');
   }
-
-  const fetchMaintenanceRequests = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/maintenance');
-      const data = await response.json();
-
-      if (data.success) {
-        setRequests(data.data.requests || []);
-        setStats(data.data.stats || {});
-      } else {
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: 'Failed to load maintenance requests'
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching maintenance requests:', error);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load maintenance requests'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...requests];
-
-    // Filter by status
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(r => r.status === filterStatus);
-    }
-
-    // Filter by priority
-    if (filterPriority !== 'all') {
-      filtered = filtered.filter(r => r.priority === filterPriority);
-    }
-
-    // Filter by category
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter(r => r.category === filterCategory);
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(r => 
-        r.title?.toLowerCase().includes(term) ||
-        r.description?.toLowerCase().includes(term) ||
-        r.tenant_name?.toLowerCase().includes(term) ||
-        r.building_name?.toLowerCase().includes(term) ||
-        r.room_number?.toLowerCase().includes(term)
-      );
-    }
-
-    setFilteredRequests(filtered);
-  };
 
   const handleUpdateRequest = (request: MaintenanceRequest) => {
     setSelectedRequest(request);

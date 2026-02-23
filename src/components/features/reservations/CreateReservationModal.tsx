@@ -38,13 +38,14 @@ export default function CreateReservationModal({
   const [requiredUtility, setRequiredUtility] = useState(0);
   const [depositValidityDays, setDepositValidityDays] = useState(5);
   
-  const [formData, setFormData] = useState<CreateReservationData>({
+  type FormState = Omit<CreateReservationData, 'monthlyRate' | 'reservationDeposit'> & { monthlyRate?: number; reservationDeposit?: number };
+  const [formData, setFormData] = useState<FormState>({
     tenantId: initialTenantId || '',
     roomId: initialRoomId || '',
     reservationDate: new Date(),
     expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days from now
-    monthlyRate: 0,
-    reservationDeposit: 0,
+    monthlyRate: undefined,
+    reservationDeposit: undefined,
     advanceAmount: 0,
     utilityDepositAmount: 0,
     notes: '',
@@ -107,7 +108,7 @@ export default function CreateReservationModal({
         setDepositValidityDays(result.data.depositValidityDays || 5);
         
         // Calculate required amounts
-        const monthlyRate = formData.monthlyRate || selectedRoom?.monthlyRate || 0;
+        const monthlyRate = formData.monthlyRate ?? selectedRoom?.monthlyRate ?? 0;
         if (monthlyRate > 0) {
           calculateRequiredAmounts(buildingId, monthlyRate, result.data);
         }
@@ -115,7 +116,7 @@ export default function CreateReservationModal({
           setBuildingConfig(null);
           // Fall back to room-level calculation
           if (selectedRoom) {
-            const monthlyRate = formData.monthlyRate || selectedRoom.monthlyRate;
+            const monthlyRate = formData.monthlyRate ?? selectedRoom.monthlyRate;
             let deposit = 0;
             if (selectedRoom.depositRequired) {
               switch (selectedRoom.depositType) {
@@ -156,8 +157,8 @@ export default function CreateReservationModal({
         setRequiredAdvance(result.data.requiredAdvance || 0);
         setRequiredUtility(result.data.utilityDeposit || 0);
         
-        // Auto-fill deposit if it's the minimum
-        if (formData.reservationDeposit === 0 && result.data.requiredDeposit > 0) {
+        // Auto-fill deposit when minimum is known and field is empty or zero
+        if ((formData.reservationDeposit == null || formData.reservationDeposit === 0) && result.data.requiredDeposit > 0) {
           setFormData(prev => ({ ...prev, reservationDeposit: result.data.requiredDeposit }));
         }
       }
@@ -168,8 +169,9 @@ export default function CreateReservationModal({
   
   // Recalculate when monthly rate changes
   useEffect(() => {
-    if (selectedRoom && buildingConfig && formData.monthlyRate > 0) {
-      calculateRequiredAmounts(selectedRoom.buildingId, formData.monthlyRate, buildingConfig);
+    const rate = formData.monthlyRate ?? selectedRoom?.monthlyRate ?? 0;
+    if (selectedRoom && buildingConfig && rate > 0) {
+      calculateRequiredAmounts(selectedRoom.buildingId, rate, buildingConfig);
     }
   }, [formData.monthlyRate, selectedRoom, buildingConfig]);
 
@@ -264,28 +266,34 @@ export default function CreateReservationModal({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'monthlyRate' || name === 'reservationDeposit'
-        ? (value ? parseFloat(value) : 0)
-        : name === 'advanceAmount' || name === 'utilityDepositAmount'
-        ? (value === '' ? 0 : value ? parseFloat(value) : 0)
-        : name === 'reservationDate' || name === 'expiryDate'
-        ? new Date(value)
-        : value
-    }));
+    setFormData(prev => {
+      if (name === 'monthlyRate' || name === 'reservationDeposit') {
+        const num = value === '' ? undefined : parseFloat(value);
+        const final = num !== undefined && !Number.isNaN(num) ? num : (name === 'monthlyRate' ? prev.monthlyRate : prev.reservationDeposit);
+        return { ...prev, [name]: final };
+      }
+      if (name === 'advanceAmount' || name === 'utilityDepositAmount') {
+        const parsed = value === '' ? 0 : parseFloat(value);
+        const num = Number.isNaN(parsed) ? (name === 'advanceAmount' ? prev.advanceAmount : prev.utilityDepositAmount) : parsed;
+        return { ...prev, [name]: num };
+      }
+      if (name === 'reservationDate' || name === 'expiryDate') {
+        return { ...prev, [name]: new Date(value) };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Validate deposit is non-negative
-    if (typeof formData.reservationDeposit !== 'number' || formData.reservationDeposit < 0) {
+    const depositValue = formData.reservationDeposit ?? 0;
+    if (typeof formData.reservationDeposit === 'number' && Number.isNaN(formData.reservationDeposit) || depositValue < 0) {
       showNotification({
         type: 'error',
         title: 'Invalid Deposit',
-        message: 'Reservation deposit must be 0 or greater.',
+        message: 'Reservation deposit cannot be negative.',
       });
       setIsSubmitting(false);
       return;
@@ -304,11 +312,13 @@ export default function CreateReservationModal({
 
     // Validate deposit meets minimum when one is set (building config or room config)
     const currentRequiredDeposit = buildingConfig ? requiredDeposit : calculateRequiredDepositLocal();
-    if (currentRequiredDeposit > 0 && (formData.reservationDeposit < currentRequiredDeposit)) {
+    if (currentRequiredDeposit > 0 && (depositValue < currentRequiredDeposit)) {
       showNotification({
         type: 'error',
-        title: 'Insufficient Deposit',
-        message: `Minimum deposit required: ${formatCurrency(currentRequiredDeposit, currencyCode)}`,
+        title: 'Reservation deposit required',
+        message: depositValue === 0 || formData.reservationDeposit == null
+          ? `Reservation deposit is required. Minimum: ${formatCurrency(currentRequiredDeposit, currencyCode)}`
+          : `Minimum deposit required: ${formatCurrency(currentRequiredDeposit, currencyCode)}`,
       });
       setIsSubmitting(false);
       return;
@@ -354,6 +364,8 @@ export default function CreateReservationModal({
         },
         body: JSON.stringify({
           ...formData,
+          monthlyRate: formData.monthlyRate ?? 0,
+          reservationDeposit: formData.reservationDeposit ?? 0,
           reservationDate: formData.reservationDate?.toISOString().split('T')[0],
           expiryDate: formData.expiryDate.toISOString().split('T')[0],
         }),
@@ -379,8 +391,8 @@ export default function CreateReservationModal({
         roomId: '',
         reservationDate: new Date(),
         expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        monthlyRate: 0,
-        reservationDeposit: 0,
+        monthlyRate: undefined,
+        reservationDeposit: undefined,
         advanceAmount: 0,
         utilityDepositAmount: 0,
         notes: '',
@@ -407,7 +419,7 @@ export default function CreateReservationModal({
       return requiredDeposit;
     }
     if (!selectedRoom?.depositRequired) return 0;
-    const monthlyRate = formData.monthlyRate || selectedRoom.monthlyRate;
+    const monthlyRate = formData.monthlyRate ?? selectedRoom.monthlyRate;
     switch (selectedRoom.depositType) {
       case 'one_month':
         return monthlyRate;
@@ -436,7 +448,7 @@ export default function CreateReservationModal({
       <button
         type="submit"
         form="create-reservation-form"
-        disabled={isSubmitting || (typeof formData.reservationDeposit !== 'number') || formData.reservationDeposit < 0 || (displayRequiredDeposit > 0 && formData.reservationDeposit < displayRequiredDeposit)}
+        disabled={isSubmitting || (formData.reservationDeposit ?? 0) < 0 || (displayRequiredDeposit > 0 && (formData.reservationDeposit ?? 0) < displayRequiredDeposit)}
         className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? 'Creating...' : 'Create Reservation'}
@@ -586,8 +598,9 @@ export default function CreateReservationModal({
             required
             min="0"
             step="0.01"
-            value={formData.monthlyRate}
+            value={formData.monthlyRate ?? ''}
             onChange={handleInputChange}
+            placeholder="0"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
@@ -606,18 +619,21 @@ export default function CreateReservationModal({
             name="reservationDeposit"
             min={displayRequiredDeposit > 0 ? displayRequiredDeposit : 0}
             step="0.01"
-            value={formData.reservationDeposit}
+            value={formData.reservationDeposit ?? ''}
             onChange={handleInputChange}
+            placeholder="0"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          {typeof formData.reservationDeposit === 'number' && formData.reservationDeposit < 0 && (
+          {(formData.reservationDeposit ?? 0) < 0 && (
             <p className="mt-1 text-sm text-red-600">
               Reservation deposit cannot be negative.
             </p>
           )}
-          {displayRequiredDeposit > 0 && formData.reservationDeposit >= 0 && formData.reservationDeposit < displayRequiredDeposit && (
+          {displayRequiredDeposit > 0 && (formData.reservationDeposit == null || (formData.reservationDeposit >= 0 && formData.reservationDeposit < displayRequiredDeposit)) && (
             <p className="mt-1 text-sm text-red-600">
-              Minimum deposit required: {formatCurrency(displayRequiredDeposit, currencyCode)}
+              {formData.reservationDeposit == null || formData.reservationDeposit === 0
+                ? `Reservation deposit is required. Minimum: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
+                : `Minimum deposit required: ${formatCurrency(displayRequiredDeposit, currencyCode)}`}
             </p>
           )}
           {buildingConfig && depositValidityDays > 0 && (
@@ -640,7 +656,7 @@ export default function CreateReservationModal({
               name="advanceAmount"
               min={0}
               step="0.01"
-              value={formData.advanceAmount === 0 ? '' : formData.advanceAmount}
+              value={formData.advanceAmount === 0 || Number.isNaN(formData.advanceAmount) ? '' : formData.advanceAmount}
               onChange={handleInputChange}
               placeholder="0"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -664,7 +680,7 @@ export default function CreateReservationModal({
               name="utilityDepositAmount"
               min={0}
               step="0.01"
-              value={formData.utilityDepositAmount === 0 ? '' : formData.utilityDepositAmount}
+              value={formData.utilityDepositAmount === 0 || Number.isNaN(formData.utilityDepositAmount) ? '' : formData.utilityDepositAmount}
               onChange={handleInputChange}
               placeholder="0"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"

@@ -157,7 +157,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
           min={0}
           max={maxAmount}
           step="0.01"
-          value={paymentAmount === 0 ? '' : paymentAmount}
+          value={paymentAmount === 0 || Number.isNaN(paymentAmount) ? '' : paymentAmount}
           onChange={(e) => {
             const v = e.target.value;
             setPaymentAmount(v === '' ? 0 : parseFloat(v) || 0);

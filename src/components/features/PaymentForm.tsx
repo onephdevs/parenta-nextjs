@@ -348,7 +348,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                     type="number"
                     id="amount"
                     name="amount"
-                    value={formData.amount}
+                    value={formData.amount === '0' ? '' : formData.amount}
                     onChange={(e) => handleInputChange('amount', e.target.value)}
                     step="0.01"
                     min="0"
@@ -379,7 +379,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                     type="number"
                     id="depositAmount"
                     name="depositAmount"
-                    value={formData.depositAmount}
+                    value={formData.depositAmount === '0' ? '' : formData.depositAmount}
                     onChange={(e) => handleInputChange('depositAmount', e.target.value)}
                     step="0.01"
                     min="0"
@@ -398,20 +398,20 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
               </div>
 
               {/* Payment Breakdown Info */}
-              {parseFloat(formData.amount) > 0 && (
+              {(parseFloat(formData.amount) || 0) > 0 && (
                 <div className="col-span-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-purple-900 mb-2">Payment Breakdown</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-purple-700">To Deposit Ledger:</span>
                       <span className="ml-2 font-semibold text-purple-900">
-                        ₱{(parseFloat(formData.depositAmount) || 0).toLocaleString()}
+                        ₱{((parseFloat(formData.depositAmount) || 0)).toLocaleString()}
                       </span>
                     </div>
                     <div>
                       <span className="text-purple-700">To Invoice Payment:</span>
                       <span className="ml-2 font-semibold text-purple-900">
-                        ₱{(parseFloat(formData.amount) - (parseFloat(formData.depositAmount) || 0)).toLocaleString()}
+                        ₱{((parseFloat(formData.amount) || 0) - (parseFloat(formData.depositAmount) || 0)).toLocaleString()}
                       </span>
                     </div>
                   </div>

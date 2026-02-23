@@ -33,8 +33,11 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
  * @returns Formatted currency string
  */
 export function formatCurrency(amount: number, currencyCode: string = 'PHP'): string {
+  if (amount == null || Number.isNaN(amount)) {
+    amount = 0;
+  }
   const config = CURRENCIES[currencyCode] || CURRENCIES.PHP;
-  
+
   return new Intl.NumberFormat(config.locale, {
     style: 'currency',
     currency: config.code,

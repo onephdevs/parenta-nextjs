@@ -288,8 +288,16 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.amount ?? ''}
-                  onChange={(e) => handleInputChange('amount', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))}
+                  value={formData.amount === 0 || formData.amount === undefined || formData.amount === null ? '' : formData.amount}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      handleInputChange('amount', undefined);
+                    } else {
+                      const parsed = parseFloat(v);
+                      handleInputChange('amount', Number.isNaN(parsed) ? 0 : parsed);
+                    }
+                  }}
                   className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                     errors.amount ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -334,8 +342,16 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.usageAmount ?? ''}
-                onChange={(e) => handleInputChange('usageAmount', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))}
+                value={formData.usageAmount === 0 || formData.usageAmount === undefined || formData.usageAmount === null ? '' : formData.usageAmount}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '') {
+                    handleInputChange('usageAmount', undefined);
+                  } else {
+                    const parsed = parseFloat(v);
+                    handleInputChange('usageAmount', Number.isNaN(parsed) ? 0 : parsed);
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Consumption amount"
               />
