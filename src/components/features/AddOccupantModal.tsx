@@ -1,49 +1,57 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { FormField } from '@/components/forms/FormField';
 
 interface AddOccupantModalProps {
   isOpen: boolean;
   onClose: () => void;
   roomId: string;
-  tenantId?: string; // Optional: link to primary tenant
+  tenantId?: string;
   onSuccess: () => void;
 }
+
+const relationshipOptions = [
+  { value: '', label: 'Select relationship...' },
+  { value: 'spouse', label: 'Spouse' },
+  { value: 'child', label: 'Child' },
+  { value: 'parent', label: 'Parent' },
+  { value: 'sibling', label: 'Sibling' },
+  { value: 'relative', label: 'Relative' },
+  { value: 'friend', label: 'Friend' },
+  { value: 'other', label: 'Other' },
+];
+
+const emptyFormData = () => ({
+  firstName: '',
+  lastName: '',
+  relationshipToTenant: '',
+  dateOfBirth: '',
+  phone: '',
+  email: '',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+  emergencyContactRelationship: '',
+  moveInDate: new Date().toISOString().split('T')[0],
+  notes: '',
+});
 
 export default function AddOccupantModal({
   isOpen,
   onClose,
   roomId,
   tenantId,
-  onSuccess
+  onSuccess,
 }: AddOccupantModalProps) {
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError } = useNotifications();
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    relationshipToTenant: '',
-    dateOfBirth: '',
-    phone: '',
-    email: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    emergencyContactRelationship: '',
-    moveInDate: new Date().toISOString().split('T')[0],
-    notes: ''
-  });
-
-  const relationshipOptions = [
-    { value: '', label: 'Select relationship...' },
-    { value: 'spouse', label: 'Spouse' },
-    { value: 'child', label: 'Child' },
-    { value: 'parent', label: 'Parent' },
-    { value: 'sibling', label: 'Sibling' },
-    { value: 'relative', label: 'Relative' },
-    { value: 'friend', label: 'Friend' },
-    { value: 'other', label: 'Other' }
-  ];
+  const [formData, setFormData] = useState(emptyFormData());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,28 +74,15 @@ export default function AddOccupantModal({
           emergencyContactPhone: formData.emergencyContactPhone || null,
           emergencyContactRelationship: formData.emergencyContactRelationship || null,
           moveInDate: formData.moveInDate,
-          notes: formData.notes || null
-        })
+          notes: formData.notes || null,
+        }),
       });
 
       const result = await response.json();
 
       if (result.success) {
         showSuccess('Occupant added successfully!');
-        // Reset form
-        setFormData({
-          firstName: '',
-          lastName: '',
-          relationshipToTenant: '',
-          dateOfBirth: '',
-          phone: '',
-          email: '',
-          emergencyContactName: '',
-          emergencyContactPhone: '',
-          emergencyContactRelationship: '',
-          moveInDate: new Date().toISOString().split('T')[0],
-          notes: ''
-        });
+        setFormData(emptyFormData());
         onClose();
         onSuccess();
       } else {
@@ -101,193 +96,165 @@ export default function AddOccupantModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Add Occupant</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-900"
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Occupant"
+      description="Add a non-tenant occupant (e.g., relative, spouse, child) to this room."
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onClose} isDisabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-occupant-form" isLoading={loading}>
+            Add Occupant
+          </Button>
+        </>
+      }
+    >
+      <form id="add-occupant-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="First Name" htmlFor="firstName" required>
+            <Input
+              id="firstName"
+              type="text"
+              value={formData.firstName}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              required
+            />
+          </FormField>
+
+          <FormField label="Last Name" htmlFor="lastName" required>
+            <Input
+              id="lastName"
+              type="text"
+              value={formData.lastName}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              required
+            />
+          </FormField>
+        </div>
+
+        {tenantId && (
+          <FormField label="Relationship to Tenant" htmlFor="relationshipToTenant">
+            <Select
+              id="relationshipToTenant"
+              value={formData.relationshipToTenant}
+              onChange={(e) =>
+                setFormData({ ...formData, relationshipToTenant: e.target.value })
+              }
             >
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+              {relationshipOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Date of Birth" htmlFor="dateOfBirth">
+            <Input
+              id="dateOfBirth"
+              type="date"
+              value={formData.dateOfBirth}
+              onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+              min="1900-01-01"
+              max={new Date().toISOString().split('T')[0]}
+              style={{ colorScheme: 'light' }}
+            />
+          </FormField>
+
+          <FormField label="Move-in Date" htmlFor="moveInDate" required>
+            <Input
+              id="moveInDate"
+              type="date"
+              value={formData.moveInDate}
+              onChange={(e) => setFormData({ ...formData, moveInDate: e.target.value })}
+              min="2000-01-01"
+              max="2099-12-31"
+              required
+              style={{ colorScheme: 'light' }}
+            />
+          </FormField>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Phone" htmlFor="phone">
+            <Input
+              id="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            />
+          </FormField>
+
+          <FormField label="Email" htmlFor="email">
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+          </FormField>
+        </div>
+
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-3">Emergency Contact (Optional)</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Contact Name" htmlFor="emergencyContactName">
+              <Input
+                id="emergencyContactName"
+                type="text"
+                value={formData.emergencyContactName}
+                onChange={(e) =>
+                  setFormData({ ...formData, emergencyContactName: e.target.value })
+                }
+              />
+            </FormField>
+
+            <FormField label="Contact Phone" htmlFor="emergencyContactPhone">
+              <Input
+                id="emergencyContactPhone"
+                type="tel"
+                value={formData.emergencyContactPhone}
+                onChange={(e) =>
+                  setFormData({ ...formData, emergencyContactPhone: e.target.value })
+                }
+              />
+            </FormField>
           </div>
 
-          <p className="text-sm text-gray-900 mb-4">
-            Add a non-tenant occupant (e.g., relative, spouse, child) to this room.
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900">First Name *</label>
-                <input
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900">Last Name *</label>
-                <input
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  required
-                />
-              </div>
-            </div>
-
-            {tenantId && (
-              <div>
-                <label className="block text-sm font-medium text-gray-900">Relationship to Tenant</label>
-                <select
-                  value={formData.relationshipToTenant}
-                  onChange={(e) => setFormData({ ...formData, relationshipToTenant: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                >
-                  {relationshipOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900">Date of Birth</label>
-                <input
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                  min="1900-01-01"
-                  max={new Date().toISOString().split('T')[0]}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  style={{
-                    colorScheme: 'light',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900">Move-in Date *</label>
-                <input
-                  type="date"
-                  value={formData.moveInDate}
-                  onChange={(e) => setFormData({ ...formData, moveInDate: e.target.value })}
-                  min="2000-01-01"
-                  max="2099-12-31"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  required
-                  style={{
-                    colorScheme: 'light',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900">Phone</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Emergency Contact (Optional)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Contact Name</label>
-                  <input
-                    type="text"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Contact Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.emergencyContactPhone}
-                    onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-900">Relationship</label>
-                <input
-                  type="text"
-                  value={formData.emergencyContactRelationship}
-                  onChange={(e) => setFormData({ ...formData, emergencyContactRelationship: e.target.value })}
-                  placeholder="e.g., Parent, Sibling"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900">Notes</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                placeholder="Additional notes about this occupant..."
-              />
-            </div>
-
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-              >
-                {loading ? 'Adding...' : 'Add Occupant'}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          <FormField
+            label="Relationship"
+            htmlFor="emergencyContactRelationship"
+            className="mt-4"
+          >
+            <Input
+              id="emergencyContactRelationship"
+              type="text"
+              value={formData.emergencyContactRelationship}
+              onChange={(e) =>
+                setFormData({ ...formData, emergencyContactRelationship: e.target.value })
+              }
+              placeholder="e.g., Parent, Sibling"
+            />
+          </FormField>
         </div>
-      </div>
-    </div>
+
+        <FormField label="Notes" htmlFor="notes">
+          <Textarea
+            id="notes"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            rows={3}
+            placeholder="Additional notes about this occupant..."
+          />
+        </FormField>
+      </form>
+    </Dialog>
   );
 }
-
-

@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card, CardHeader, CardBody, CardFooter } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 interface Tenant {
   id: string;
@@ -46,7 +53,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     dueDate: '',
     billingPeriodStart: '',
     billingPeriodEnd: '',
-    taxRate: 0.08, // 8% default tax rate
+    taxRate: 0.08,
     discountAmount: undefined as number | undefined,
     notes: '',
   });
@@ -60,19 +67,16 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     },
   ]);
 
-  // Fetch tenants on component mount
   useEffect(() => {
     fetchTenants();
   }, []);
 
-  // Fetch tenant rooms when tenantId prop is provided
   useEffect(() => {
     if (tenantId && formData.tenantId) {
       fetchTenantRooms(formData.tenantId);
     }
   }, [tenantId]);
 
-  // Fetch room details if roomId is provided but no tenantId
   useEffect(() => {
     if (roomId && !tenantId) {
       fetchRoomDetails(roomId);
@@ -84,7 +88,6 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       const response = await fetch('/api/tenants');
       const result = await response.json();
       if (result.success) {
-        // Handle response format: { success: true, data: { tenants: [], pagination: {} } }
         const tenantsList = result.data?.tenants || (Array.isArray(result.data) ? result.data : []);
         setTenants(Array.isArray(tenantsList) ? tenantsList : []);
       } else {
@@ -101,8 +104,6 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       const response = await fetch(`/api/tenants/${tenantId}`);
       const result = await response.json();
       if (result.success && result.data.currentAssignment) {
-        // For now, we'll just use the current assignment
-        // In a more complex system, we might show all available rooms for the tenant
         const room: Room = {
           id: result.data.currentAssignment.roomId || '',
           roomNumber: result.data.currentAssignment.roomNumber,
@@ -110,11 +111,10 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
           monthlyRate: result.data.currentAssignment.monthlyRate,
         };
         setTenantRooms([room]);
-        // Auto-select the room if there's only one
-        setFormData(prev => ({ ...prev, roomId: room.id }));
+        setFormData((prev) => ({ ...prev, roomId: room.id }));
       } else {
         setTenantRooms([]);
-        setFormData(prev => ({ ...prev, roomId: '' }));
+        setFormData((prev) => ({ ...prev, roomId: '' }));
       }
     } catch (error) {
       console.error('Error fetching tenant rooms:', error);
@@ -124,39 +124,37 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
 
   const fetchRoomDetails = async (roomId: string) => {
     try {
-      // Fetch room details
       const roomResponse = await fetch(`/api/rooms/${roomId}`);
       const roomResult = await roomResponse.json();
-      
+
       if (roomResult.success && roomResult.data) {
         const roomData = roomResult.data;
-        
-        // Create room object for dropdown
+
         const room: Room = {
           id: roomData.id,
           roomNumber: roomData.roomNumber,
           buildingName: roomData.buildingName || 'Unknown Building',
           monthlyRate: roomData.monthlyRate || 0,
         };
-        
+
         setTenantRooms([room]);
-        
-        // If room has a tenant assigned, auto-select the tenant
+
         if (roomData.currentTenantId) {
-          setFormData(prev => ({ 
-            ...prev, 
+          setFormData((prev) => ({
+            ...prev,
             roomId: room.id,
-            tenantId: roomData.currentTenantId 
+            tenantId: roomData.currentTenantId,
           }));
-          
-          // Pre-fill invoice item with rent
+
           if (room.monthlyRate > 0 && items[0].unitPrice === 0) {
-            setItems([{
-              description: `Monthly Rent - ${room.roomNumber}`,
-              quantity: 1,
-              unitPrice: room.monthlyRate,
-              itemType: 'rent' as const,
-            }]);
+            setItems([
+              {
+                description: `Monthly Rent - ${room.roomNumber}`,
+                quantity: 1,
+                unitPrice: room.monthlyRate,
+                itemType: 'rent' as const,
+              },
+            ]);
           }
         }
       }
@@ -165,45 +163,57 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'taxRate' ? (parseFloat(value) || 0) : name === 'discountAmount' ? (value === '' ? undefined : (parseFloat(value) || 0)) : value
+      [name]:
+        name === 'taxRate'
+          ? parseFloat(value) || 0
+          : name === 'discountAmount'
+            ? value === ''
+              ? undefined
+              : parseFloat(value) || 0
+            : value,
     }));
 
-    // Fetch rooms when tenant is selected
     if (name === 'tenantId' && value) {
       fetchTenantRooms(value);
     } else if (name === 'tenantId' && !value) {
       setTenantRooms([]);
-      setFormData(prev => ({ ...prev, roomId: '' }));
+      setFormData((prev) => ({ ...prev, roomId: '' }));
     }
   };
 
-  const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number | undefined) => {
-    setItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, [field]: value } : item
-    ));
+  const handleItemChange = (
+    index: number,
+    field: keyof InvoiceItem,
+    value: string | number | undefined
+  ) => {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   const addItem = () => {
-    setItems(prev => [...prev, {
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      itemType: 'other',
-    }]);
+    setItems((prev) => [
+      ...prev,
+      {
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        itemType: 'other',
+      },
+    ]);
   };
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
-      setItems(prev => prev.filter((_, i) => i !== index));
+      setItems((prev) => prev.filter((_, i) => i !== index));
     }
   };
 
-  // Calculate totals
-  const subtotal = items.reduce((sum, item) => sum + (item.quantity * (item.unitPrice ?? 0)), 0);
+  const subtotal = items.reduce((sum, item) => sum + item.quantity * (item.unitPrice ?? 0), 0);
   const taxAmount = subtotal * formData.taxRate;
   const totalAmount = subtotal + taxAmount - (formData.discountAmount ?? 0);
 
@@ -212,7 +222,6 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     setIsSubmitting(true);
     setError(null);
 
-    // Validate required fields
     if (!formData.tenantId) {
       setError('Please select a tenant');
       setIsSubmitting(false);
@@ -231,7 +240,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       return;
     }
 
-    if (items.some(item => !item.description || (item.unitPrice ?? 0) <= 0)) {
+    if (items.some((item) => !item.description || (item.unitPrice ?? 0) <= 0)) {
       setError('Please fill in all item details with valid prices');
       setIsSubmitting(false);
       return;
@@ -240,7 +249,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     const loadingNotificationId = showNotification({
       type: 'loading',
       title: 'Creating invoice...',
-      message: 'Please wait while we create the invoice.'
+      message: 'Please wait while we create the invoice.',
     });
 
     try {
@@ -255,7 +264,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
         discountAmount: formData.discountAmount ?? 0,
         totalAmount,
         notes: formData.notes,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unitPrice ?? 0,
@@ -280,19 +289,17 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       updateNotification(loadingNotificationId, {
         type: 'success',
         title: 'Invoice created successfully!',
-        message: `Invoice ${result.data.invoice.invoiceNumber} has been created.`
+        message: `Invoice ${result.data.invoice.invoiceNumber} has been created.`,
       });
 
-      // Redirect to invoice detail page
       setTimeout(() => {
         router.push(`/admin/financial/invoices/${result.data.invoice.id}`);
       }, 1000);
-
     } catch (err) {
       updateNotification(loadingNotificationId, {
         type: 'error',
         title: 'Failed to create invoice',
-        message: err instanceof Error ? err.message : 'An error occurred'
+        message: err instanceof Error ? err.message : 'An error occurred',
       });
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -301,83 +308,73 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200">
+    <Card padding="none">
+      <CardHeader className="px-6 py-4 border-b border-gray-200 mb-0">
         <h3 className="text-lg font-medium text-gray-900">Create New Invoice</h3>
         <p className="text-sm text-gray-900 mt-1">Generate an invoice for tenant payments</p>
-      </div>
+      </CardHeader>
 
-      <div className="p-6">
+      <CardBody className="p-6">
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
+          <Alert variant="danger" className="mb-4">
+            {error}
+          </Alert>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-          {/* Basic Information */}
           <div>
             <h4 className="text-md font-medium text-gray-900 mb-4">Invoice Details</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="tenantId" className="block text-sm font-medium text-gray-900 mb-1">
-                  Tenant *
-                </label>
-                <select
+              <FormField label="Tenant" htmlFor="tenantId" required>
+                <Select
                   id="tenantId"
                   name="tenantId"
                   required
                   value={formData.tenantId}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="">Select a tenant</option>
                   {Array.isArray(tenants) && tenants.length > 0 ? (
-                    tenants.map(tenant => (
+                    tenants.map((tenant) => (
                       <option key={tenant.id} value={tenant.id}>
                         {tenant.firstName} {tenant.lastName} ({tenant.email})
                       </option>
                     ))
                   ) : (
-                    <option value="" disabled>Loading tenants...</option>
+                    <option value="" disabled>
+                      Loading tenants...
+                    </option>
                   )}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="roomId" className="block text-sm font-medium text-gray-900 mb-1">
-                  Room *
-                </label>
-                <select
+              <FormField label="Room" htmlFor="roomId" required>
+                <Select
                   id="roomId"
                   name="roomId"
                   required
                   value={formData.roomId}
                   onChange={handleInputChange}
-                  disabled={!formData.tenantId || tenantRooms.length === 0}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  isDisabled={!formData.tenantId || tenantRooms.length === 0}
                 >
                   <option value="">
-                    {!formData.tenantId 
-                      ? 'Select a tenant first' 
-                      : tenantRooms.length === 0 
-                        ? 'No rooms available' 
-                        : 'Select a room'
-                    }
+                    {!formData.tenantId
+                      ? 'Select a tenant first'
+                      : tenantRooms.length === 0
+                        ? 'No rooms available'
+                        : 'Select a room'}
                   </option>
-                  {tenantRooms.map(room => (
+                  {tenantRooms.map((room) => (
                     <option key={room.id} value={room.id}>
-                      Room {room.roomNumber} - {room.buildingName} ({formatCurrency(room.monthlyRate)}/month)
+                      Room {room.roomNumber} - {room.buildingName} (
+                      {formatCurrency(room.monthlyRate)}/month)
                     </option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="dueDate" className="block text-sm font-medium text-gray-900 mb-1">
-                  Due Date *
-                </label>
-                <input
+              <FormField label="Due Date" htmlFor="dueDate" required>
+                <Input
                   type="date"
                   id="dueDate"
                   name="dueDate"
@@ -386,18 +383,12 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   onChange={handleInputChange}
                   min="2000-01-01"
                   max="2099-12-31"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  style={{ colorScheme: 'light' }}
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="billingPeriodStart" className="block text-sm font-medium text-gray-900 mb-1">
-                  Billing Period Start
-                </label>
-                <input
+              <FormField label="Billing Period Start" htmlFor="billingPeriodStart">
+                <Input
                   type="date"
                   id="billingPeriodStart"
                   name="billingPeriodStart"
@@ -405,18 +396,12 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   onChange={handleInputChange}
                   min="2000-01-01"
                   max="2099-12-31"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  style={{ colorScheme: 'light' }}
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="billingPeriodEnd" className="block text-sm font-medium text-gray-900 mb-1">
-                  Billing Period End
-                </label>
-                <input
+              <FormField label="Billing Period End" htmlFor="billingPeriodEnd">
+                <Input
                   type="date"
                   id="billingPeriodEnd"
                   name="billingPeriodEnd"
@@ -424,103 +409,97 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   onChange={handleInputChange}
                   min={formData.billingPeriodStart || '2000-01-01'}
                   max="2099-12-31"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  style={{ colorScheme: 'light' }}
                 />
-              </div>
+              </FormField>
             </div>
           </div>
 
-          {/* Invoice Items */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-md font-medium text-gray-900">Invoice Items</h4>
-              <button
-                type="button"
-                onClick={addItem}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+              <Button type="button" variant="secondary" size="sm" onClick={addItem}>
                 Add Item
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-4">
               {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border border-gray-200 rounded-md">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Description *
-                    </label>
-                    <input
+                <div
+                  key={index}
+                  className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border border-gray-200 rounded-md"
+                >
+                  <FormField
+                    label="Description"
+                    htmlFor={`item-description-${index}`}
+                    required
+                    className="md:col-span-2"
+                  >
+                    <Input
+                      id={`item-description-${index}`}
                       type="text"
                       required
                       value={item.description}
                       onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                       placeholder="Item description"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Type
-                    </label>
-                    <select
+                  <FormField label="Type" htmlFor={`item-type-${index}`}>
+                    <Select
+                      id={`item-type-${index}`}
                       value={item.itemType}
                       onChange={(e) => handleItemChange(index, 'itemType', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="rent">Rent</option>
                       <option value="utilities">Utilities</option>
                       <option value="fees">Fees</option>
                       <option value="deposit">Deposit</option>
                       <option value="other">Other</option>
-                    </select>
-                  </div>
+                    </Select>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Quantity
-                    </label>
-                    <input
+                  <FormField label="Quantity" htmlFor={`item-quantity-${index}`}>
+                    <Input
+                      id={`item-quantity-${index}`}
                       type="number"
                       min="1"
                       step="0.01"
                       value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 1)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      onChange={(e) =>
+                        handleItemChange(index, 'quantity', parseFloat(e.target.value) || 1)
+                      }
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Unit Price *
-                    </label>
-                    <input
+                  <FormField label="Unit Price" htmlFor={`item-unitPrice-${index}`} required>
+                    <Input
+                      id={`item-unitPrice-${index}`}
                       type="number"
                       min="0"
                       step="0.01"
                       required
                       value={item.unitPrice ?? ''}
-                      onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      onChange={(e) =>
+                        handleItemChange(
+                          index,
+                          'unitPrice',
+                          e.target.value === '' ? undefined : parseFloat(e.target.value) || 0
+                        )
+                      }
                     />
-                  </div>
+                  </FormField>
 
                   <div className="flex items-end">
                     {items.length > 1 && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        className="w-full border-red-300 text-red-700 hover:bg-red-50"
                         onClick={() => removeItem(index)}
-                        className="w-full px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                       >
                         Remove
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -528,15 +507,11 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
             </div>
           </div>
 
-          {/* Calculations */}
           <div>
             <h4 className="text-md font-medium text-gray-900 mb-4">Calculations</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="taxRate" className="block text-sm font-medium text-gray-900 mb-1">
-                  Tax Rate (%)
-                </label>
-                <input
+              <FormField label="Tax Rate (%)" htmlFor="taxRate">
+                <Input
                   type="number"
                   id="taxRate"
                   name="taxRate"
@@ -545,15 +520,11 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   step="0.01"
                   value={formData.taxRate}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="discountAmount" className="block text-sm font-medium text-gray-900 mb-1">
-                  Discount Amount
-                </label>
-                <input
+              <FormField label="Discount Amount" htmlFor="discountAmount">
+                <Input
                   type="number"
                   id="discountAmount"
                   name="discountAmount"
@@ -561,12 +532,10 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   step="0.01"
                   value={formData.discountAmount ?? ''}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
-              </div>
+              </FormField>
             </div>
 
-            {/* Totals Summary */}
             <div className="mt-6 bg-gray-50 p-4 rounded-md">
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -574,60 +543,52 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   <span className="text-sm font-medium">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-900">Tax ({(formData.taxRate * 100).toFixed(1)}%):</span>
+                  <span className="text-sm text-gray-900">
+                    Tax ({(formData.taxRate * 100).toFixed(1)}%):
+                  </span>
                   <span className="text-sm font-medium">{formatCurrency(taxAmount)}</span>
                 </div>
                 {(formData.discountAmount ?? 0) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-900">Discount:</span>
-                    <span className="text-sm font-medium text-red-600">-{formatCurrency(formData.discountAmount)}</span>
+                    <span className="text-sm font-medium text-red-600">
+                      -{formatCurrency(formData.discountAmount ?? 0)}
+                    </span>
                   </div>
                 )}
                 <div className="border-t border-gray-200 pt-2">
                   <div className="flex justify-between">
                     <span className="text-base font-medium text-gray-900">Total:</span>
-                    <span className="text-base font-bold text-gray-900">{formatCurrency(totalAmount)}</span>
+                    <span className="text-base font-bold text-gray-900">
+                      {formatCurrency(totalAmount)}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-1">
-              Notes
-            </label>
-            <textarea
+          <FormField label="Notes" htmlFor="notes">
+            <Textarea
               id="notes"
               name="notes"
               rows={4}
               value={formData.notes}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               placeholder="Additional notes or payment terms..."
             />
-          </div>
+          </FormField>
 
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-            >
+          <CardFooter className="flex justify-end space-x-3 pt-6 border-t border-gray-200 mt-0">
+            <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            </Button>
+            <Button type="submit" variant="primary" isLoading={isSubmitting}>
               {isSubmitting ? 'Creating...' : 'Create Invoice'}
-            </button>
-          </div>
+            </Button>
+          </CardFooter>
         </form>
-      </div>
-    </div>
+      </CardBody>
+    </Card>
   );
-} 
+}

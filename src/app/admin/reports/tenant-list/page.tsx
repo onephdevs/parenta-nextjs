@@ -17,8 +17,13 @@ import {
   Filter,
   Printer
 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
 
 export default function TenantListReportPage() {
   const { data: session, status } = useSession();
@@ -45,7 +50,14 @@ export default function TenantListReportPage() {
       const response = await fetch('/api/buildings');
       const data = await response.json();
       if (data.success) {
-        setBuildings(data.data || []);
+        const list = Array.isArray(data.data?.buildings)
+          ? data.data.buildings
+          : Array.isArray(data.data)
+            ? data.data
+            : Array.isArray(data.buildings)
+              ? data.buildings
+              : [];
+        setBuildings(list);
       }
     } catch (error) {
       console.error('Error fetching buildings:', error);
@@ -173,118 +185,94 @@ export default function TenantListReportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/reports"
-                className="text-gray-600 hover:text-gray-900"
+    <div className="space-y-6 p-6">
+      <Link
+        href="/admin/reports"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Reports
+      </Link>
+      <PageHeader
+        title="Tenant List Report"
+        description="List of tenants with balances and past due status"
+        actions={
+          reportData ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => handleExport('excel')}
+                isLoading={isExporting}
+                leftIcon={<FileSpreadsheet className="h-4 w-4" />}
               >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Tenant List Report</h1>
-                <p className="text-sm text-gray-600">List of tenants with balances and past due status</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              {reportData && (
-                <>
-                  <button
-                    onClick={() => handleExport('excel')}
-                    disabled={isExporting}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    {isExporting ? 'Exporting...' : 'Export Excel'}
-                  </button>
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    disabled={isExporting}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <FileType className="h-4 w-4 mr-2" />
-                    {isExporting ? 'Exporting...' : 'Export PDF'}
-                  </button>
-                  <button
-                    onClick={handlePrint}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+                Export Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleExport('pdf')}
+                isLoading={isExporting}
+                leftIcon={<FileType className="h-4 w-4" />}
+              >
+                Export PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handlePrint}
+                leftIcon={<Printer className="h-4 w-4" />}
+              >
+                Print
+              </Button>
+            </>
+          ) : undefined
+        }
+      />
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center mb-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center">
             <Filter className="h-5 w-5 text-gray-600 mr-2" />
             <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tenant Status
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Building
-              </label>
-              <select
-                value={buildingId}
-                onChange={(e) => setBuildingId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Buildings</option>
-                {buildings.map((building) => (
-                  <option key={building.id} value={building.id}>
-                    {building.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleGenerateReport}
-                disabled={isGenerating}
-                className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Generate Report
-                  </>
-                )}
-              </button>
-            </div>
+        </CardHeader>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField label="Tenant Status" htmlFor="statusFilter">
+            <Select
+              id="statusFilter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="inactive">Inactive</option>
+            </Select>
+          </FormField>
+          <FormField label="Building" htmlFor="buildingId">
+            <Select
+              id="buildingId"
+              value={buildingId}
+              onChange={(e) => setBuildingId(e.target.value)}
+            >
+              <option value="">All Buildings</option>
+              {buildings.map((building) => (
+                <option key={building.id} value={building.id}>
+                  {building.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <div className="flex items-end">
+            <Button
+              onClick={handleGenerateReport}
+              isLoading={isGenerating}
+              className="w-full"
+              leftIcon={!isGenerating ? <FileText className="h-4 w-4" /> : undefined}
+            >
+              {isGenerating ? 'Generating...' : 'Generate Report'}
+            </Button>
           </div>
         </div>
+      </Card>
 
         {/* Report Summary */}
         {reportData && reportData.summary && (
@@ -397,12 +385,11 @@ export default function TenantListReportPage() {
         )}
 
         {!reportData && !isGenerating && (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
+          <Card className="p-12 text-center">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">Generate a report to view tenant list data</p>
-          </div>
+          </Card>
         )}
-      </div>
     </div>
   );
 }

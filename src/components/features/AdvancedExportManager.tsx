@@ -3,20 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { ExportRequest, ReportBuilder } from '@/types/documents';
 import { useNotifications } from '@/hooks/useNotifications';
-import { 
-  Download, 
-  FileText, 
-  Calendar, 
-  Filter, 
-  RefreshCw, 
-  Trash2, 
-  Eye, 
-  Settings,
-  Plus,
-  X,
-  CheckCircle,
-  ArrowRight
-} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
+import { Input } from '@/components/ui/Input';
+import { Dialog } from '@/components/ui/Dialog';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/Tabs';
 
 interface AdvancedExportManagerProps {
   onExportCreated?: () => void;
@@ -98,7 +93,6 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
       const data = await response.json();
 
       if (data.success) {
-        // Simulate download (in production, this would be an actual file download)
         addNotification('Download started', 'success');
         window.open(data.data.downloadUrl, '_blank');
       } else {
@@ -138,56 +132,36 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Advanced Export Manager</h2>
           <p className="text-gray-900">Create custom reports and manage data exports</p>
         </div>
         <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setRefreshTrigger(prev => prev + 1)}
-            className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50"
-          >
+          <Button variant="outline" onClick={() => setRefreshTrigger(prev => prev + 1)}>
             Refresh
-          </button>
-          <button
-            onClick={() => setShowExportForm(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-          >
+          </Button>
+          <Button variant="primary" onClick={() => setShowExportForm(true)}>
             New Export
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabList>
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.id
-                  ? 'border-purple-500 text-purple-600'
-                  : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
+            <Tab key={tab.id} value={tab.id}>
               <span className="mr-2">{tab.icon}</span>
               {tab.name}
-            </button>
+            </Tab>
           ))}
-        </nav>
-      </div>
+        </TabList>
 
-      {/* Tab Content */}
-      <div className="mt-6">
-        {/* Export Queue Tab */}
-        {activeTab === 'exports' && (
+        <TabPanel value="exports">
           <div className="space-y-4">
             {exports.length > 0 ? (
               exports.map((exportReq) => (
-                <div key={exportReq.id} className="bg-white border border-gray-200 rounded-lg p-6">
+                <Card key={exportReq.id}>
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-medium text-gray-900">{exportReq.name}</h3>
@@ -205,27 +179,18 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
                     </div>
                     <div className="flex items-center space-x-2">
                       {exportReq.status === 'completed' && (
-                        <button
-                          onClick={() => handleDownload(exportReq.id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                        >
+                        <Button variant="success" size="sm" onClick={() => handleDownload(exportReq.id)}>
                           Download
-                        </button>
+                        </Button>
                       )}
                       {['pending', 'processing'].includes(exportReq.status) && (
-                        <button
-                          onClick={() => handleCancelExport(exportReq.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                        >
+                        <Button variant="danger" size="sm" onClick={() => handleCancelExport(exportReq.id)}>
                           Cancel
-                        </button>
+                        </Button>
                       )}
-                      <button
-                        onClick={() => handleDeleteExport(exportReq.id)}
-                        className="px-3 py-1 border border-gray-300 text-gray-900 rounded text-sm hover:bg-gray-50"
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteExport(exportReq.id)}>
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -255,33 +220,31 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
                   </div>
 
                   {exportReq.errorMessage && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                      <p className="text-sm text-red-700">{exportReq.errorMessage}</p>
-                    </div>
+                    <Alert variant="danger" className="mt-4">
+                      {exportReq.errorMessage}
+                    </Alert>
                   )}
-                </div>
+                </Card>
               ))
             ) : (
-              <div className="text-center py-12">
-                <div className="text-gray-400 text-6xl mb-4">📤</div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Exports Found</h3>
-                <p className="text-gray-900 mb-6">Create your first export to get started.</p>
-                <button
-                  onClick={() => setShowExportForm(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
-                >
-                  Create Export
-                </button>
-              </div>
+              <EmptyState
+                icon={<span className="text-6xl">📤</span>}
+                title="No Exports Found"
+                description="Create your first export to get started."
+                action={
+                  <Button variant="primary" onClick={() => setShowExportForm(true)}>
+                    Create Export
+                  </Button>
+                }
+              />
             )}
           </div>
-        )}
+        </TabPanel>
 
-        {/* Custom Reports Tab */}
-        {activeTab === 'reports' && (
+        <TabPanel value="reports">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {builders.map((builder) => (
-              <div key={builder.id} className="bg-white border border-gray-200 rounded-lg p-6">
+              <Card key={builder.id}>
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-medium text-gray-900">{builder.name}</h3>
@@ -318,39 +281,37 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
+                  <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700">
                     Run Report
-                  </button>
+                  </Button>
                   <div className="flex items-center space-x-2">
-                    <button className="text-sm text-blue-600 hover:text-blue-700">
+                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
                       Edit
-                    </button>
-                    <button className="text-sm text-gray-900 hover:text-gray-900">
+                    </Button>
+                    <Button variant="ghost" size="sm">
                       Clone
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
-        )}
+        </TabPanel>
 
-        {/* Scheduled Exports Tab */}
-        {activeTab === 'scheduled' && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">⏰</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Scheduled Exports</h3>
-            <p className="text-gray-900 mb-6">
-              Set up automated reports that run on a schedule and email results to recipients.
-            </p>
-            <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700">
-              Create Scheduled Export
-            </button>
-          </div>
-        )}
+        <TabPanel value="scheduled">
+          <EmptyState
+            icon={<span className="text-6xl">⏰</span>}
+            title="Scheduled Exports"
+            description="Set up automated reports that run on a schedule and email results to recipients."
+            action={
+              <Button variant="primary">
+                Create Scheduled Export
+              </Button>
+            }
+          />
+        </TabPanel>
 
-        {/* Export Templates Tab */}
-        {activeTab === 'templates' && (
+        <TabPanel value="templates">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { id: 'financial', name: 'Financial Report', description: 'Revenue, expenses, and profit analysis', icon: '💰' },
@@ -360,41 +321,40 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
               { id: 'assets', name: 'Asset Inventory', description: 'Complete asset list with tracking info', icon: '📦' },
               { id: 'utilities', name: 'Utilities Report', description: 'Utility usage and billing data', icon: '⚡' },
             ].map((template) => (
-              <div key={template.id} className="bg-white border border-gray-200 rounded-lg p-6 cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={template.id} className="cursor-pointer hover:shadow-md transition-shadow">
                 <div className="text-center">
                   <div className="text-4xl mb-3">{template.icon}</div>
                   <h3 className="text-lg font-medium text-gray-900">{template.name}</h3>
                   <p className="text-sm text-gray-900 mt-2">{template.description}</p>
-                  <button className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700">
+                  <Button variant="primary" size="sm" className="mt-4">
                     Use Template
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
-        )}
-      </div>
+        </TabPanel>
+      </Tabs>
 
-      {/* Export Form Modal */}
-      {showExportForm && (
-        <ExportFormModal
-          onClose={() => setShowExportForm(false)}
-          onExportCreated={() => {
-            setShowExportForm(false);
-            setRefreshTrigger(prev => prev + 1);
-            onExportCreated?.();
-          }}
-        />
-      )}
+      <ExportFormModal
+        isOpen={showExportForm}
+        onClose={() => setShowExportForm(false)}
+        onExportCreated={() => {
+          setShowExportForm(false);
+          setRefreshTrigger(prev => prev + 1);
+          onExportCreated?.();
+        }}
+      />
     </div>
   );
 }
 
-// Export Form Modal
 function ExportFormModal({
+  isOpen,
   onClose,
   onExportCreated,
 }: {
+  isOpen: boolean;
   onClose: () => void;
   onExportCreated: () => void;
 }) {
@@ -416,7 +376,7 @@ function ExportFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name) {
       addNotification('Export name is required', 'warning');
       return;
@@ -431,7 +391,7 @@ function ExportFormModal({
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         addNotification('Export created successfully', 'success');
         onExportCreated();
@@ -447,143 +407,106 @@ function ExportFormModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">Create New Export</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-900"
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Create New Export"
+      size="lg"
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="export-form" variant="primary" isLoading={loading}>
+            {loading ? 'Creating...' : 'Create Export'}
+          </Button>
+        </>
+      }
+    >
+      <form id="export-form" onSubmit={handleSubmit} className="space-y-4">
+        <FormField label="Export Name" htmlFor="export-name" required>
+          <Input
+            id="export-name"
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Enter export name..."
+            required
+          />
+        </FormField>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Export Type" htmlFor="export-type">
+            <Select
+              id="export-type"
+              value={formData.exportType}
+              onChange={(e) => setFormData({ ...formData, exportType: e.target.value })}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+              <option value="financial_report">Financial Report</option>
+              <option value="tenant_list">Tenant List</option>
+              <option value="maintenance_log">Maintenance Log</option>
+              <option value="occupancy_report">Occupancy Report</option>
+            </Select>
+          </FormField>
+
+          <FormField label="Format" htmlFor="export-format">
+            <Select
+              id="export-format"
+              value={formData.format}
+              onChange={(e) => setFormData({ ...formData, format: e.target.value })}
+            >
+              <option value="csv">CSV</option>
+              <option value="excel">Excel</option>
+              <option value="pdf">PDF</option>
+              <option value="json">JSON</option>
+            </Select>
+          </FormField>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Export Name
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-              placeholder="Enter export name..."
-              required
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Start Date" htmlFor="export-start-date">
+            <Input
+              id="export-start-date"
+              type="date"
+              value={formData.parameters.dateRange.startDate}
+              onChange={(e) => setFormData({
+                ...formData,
+                parameters: {
+                  ...formData.parameters,
+                  dateRange: {
+                    ...formData.parameters.dateRange,
+                    startDate: e.target.value,
+                  },
+                },
+              })}
+              min="2000-01-01"
+              max="2099-12-31"
+              style={{ colorScheme: 'light' }}
             />
-          </div>
+          </FormField>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Export Type
-              </label>
-              <select
-                value={formData.exportType}
-                onChange={(e) => setFormData({ ...formData, exportType: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
-              >
-                <option value="financial_report">Financial Report</option>
-                <option value="tenant_list">Tenant List</option>
-                <option value="maintenance_log">Maintenance Log</option>
-                <option value="occupancy_report">Occupancy Report</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Format
-              </label>
-              <select
-                value={formData.format}
-                onChange={(e) => setFormData({ ...formData, format: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
-              >
-                <option value="csv">CSV</option>
-                <option value="excel">Excel</option>
-                <option value="pdf">PDF</option>
-                <option value="json">JSON</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={formData.parameters.dateRange.startDate}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  parameters: {
-                    ...formData.parameters,
-                    dateRange: {
-                      ...formData.parameters.dateRange,
-                      startDate: e.target.value,
-                    },
+          <FormField label="End Date" htmlFor="export-end-date">
+            <Input
+              id="export-end-date"
+              type="date"
+              value={formData.parameters.dateRange.endDate}
+              onChange={(e) => setFormData({
+                ...formData,
+                parameters: {
+                  ...formData.parameters,
+                  dateRange: {
+                    ...formData.parameters.dateRange,
+                    endDate: e.target.value,
                   },
-                })}
-                min="2000-01-01"
-                max="2099-12-31"
-                style={{
-                  colorScheme: 'light',
-                }}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                End Date
-              </label>
-              <input
-                type="date"
-                value={formData.parameters.dateRange.endDate}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  parameters: {
-                    ...formData.parameters,
-                    dateRange: {
-                      ...formData.parameters.dateRange,
-                      endDate: e.target.value,
-                    },
-                  },
-                })}
-                min={formData.parameters.dateRange.startDate || '2000-01-01'}
-                max="2099-12-31"
-                style={{
-                  colorScheme: 'light',
-                }}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
-            >
-              {loading ? 'Creating...' : 'Create Export'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+                },
+              })}
+              min={formData.parameters.dateRange.startDate || '2000-01-01'}
+              max="2099-12-31"
+              style={{ colorScheme: 'light' }}
+            />
+          </FormField>
+        </div>
+      </form>
+    </Dialog>
   );
-} 
+}

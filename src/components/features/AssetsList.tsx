@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { Edit, Trash2, Eye, MapPin, Calendar, X, Package, AlertCircle, DollarSign, Info } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { IconButton } from '@/components/ui/IconButton';
+import { Button } from '@/components/ui/Button';
+import { AssetStatusBadge, AssetConditionBadge } from '@/components/domain/StatusBadges';
 
 interface Asset {
   id: string;
@@ -121,36 +124,11 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusColors = {
-      available: 'bg-green-100 text-green-800',
-      assigned: 'bg-blue-100 text-blue-800',
-      maintenance: 'bg-yellow-100 text-yellow-800',
-      disposed: 'bg-red-100 text-red-800'
-    };
+  const getStatusBadge = (status: string) => <AssetStatusBadge status={status} />;
 
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
-
-  const getConditionBadge = (condition: string) => {
-    const conditionColors = {
-      excellent: 'bg-green-100 text-green-800',
-      good: 'bg-blue-100 text-blue-800',
-      fair: 'bg-yellow-100 text-yellow-800',
-      poor: 'bg-orange-100 text-orange-800',
-      damaged: 'bg-red-100 text-red-800'
-    };
-
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${conditionColors[condition as keyof typeof conditionColors] || 'bg-gray-100 text-gray-800'}`}>
-        {condition.charAt(0).toUpperCase() + condition.slice(1)}
-      </span>
-    );
-  };
+  const getConditionBadge = (condition: string) => (
+    <AssetConditionBadge condition={condition} />
+  );
 
   const formatCurrency = (amount?: number) => {
     if (!amount) return '-';
@@ -207,14 +185,25 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {assets.map((asset) => (
+            {assets.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-16 text-center">
+                  <Package className="mx-auto h-10 w-10 text-gray-300" />
+                  <p className="mt-3 text-sm font-medium text-gray-900">No assets found</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Try adjusting filters, or add your first asset to get started.
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              assets.map((asset) => (
               <tr key={asset.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div>
                     <div className="text-sm font-medium text-gray-900">
                       {asset.assetName}
                     </div>
-                    <div className="text-sm text-gray-900">
+                    <div className="text-sm text-gray-500">
                       {asset.brand && asset.model ? `${asset.brand} ${asset.model}` : 
                        asset.brand || asset.model || 'No model info'}
                     </div>
@@ -230,11 +219,13 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     <div className="text-sm text-gray-900 capitalize">
                       {asset.assetType}
                     </div>
-                    {asset.buildingName && (
-                      <div className="text-sm text-gray-900 flex items-center gap-1">
+                    {asset.buildingName ? (
+                      <div className="text-sm text-gray-500 flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         {asset.buildingName}
                       </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">No building</div>
                     )}
                   </div>
                 </td>
@@ -254,7 +245,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                           </div>
                         )}
                         {asset.assignedTenant && (
-                          <div className="text-sm text-gray-900">
+                          <div className="text-sm text-gray-500">
                             Tenant: {asset.assignedTenant}
                           </div>
                         )}
@@ -264,7 +255,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                           </div>
                         )}
                         {!asset.assignedRoom && !asset.assignedTenant && (
-                          <div className="text-sm text-blue-600">
+                          <div className="text-sm text-purple-600">
                             Assigned (details pending)
                           </div>
                         )}
@@ -278,13 +269,13 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div>
-                    {asset.currentValue && (
+                    {asset.currentValue != null && asset.currentValue > 0 && (
                       <div className="text-sm text-gray-900">
                         Value: {formatCurrency(asset.currentValue)}
                       </div>
                     )}
-                    {asset.rentalRate && (
-                      <div className="text-sm text-gray-900">
+                    {asset.rentalRate != null && asset.rentalRate > 0 && (
+                      <div className="text-sm text-gray-500">
                         Rent: {formatCurrency(asset.rentalRate)}/mo
                       </div>
                     )}
@@ -294,35 +285,52 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                         {formatDate(asset.purchaseDate)}
                       </div>
                     )}
+                    {!(asset.currentValue || asset.rentalRate || asset.purchaseDate) && (
+                      <div className="text-sm text-gray-400">—</div>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex items-center gap-2">
-                    <button
+                  <div className="flex items-center gap-1">
+                    <IconButton
+                      label="View Details"
+                      variant="primary"
+                      size="sm"
                       onClick={() => setSelectedAsset(asset)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="View Details"
                     >
                       <Eye className="h-4 w-4" />
-                    </button>
-                    <button
+                    </IconButton>
+                    <a
+                      href={`/track/asset/${asset.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      title="Open tracking page"
+                      aria-label="Open tracking page"
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </a>
+                    <IconButton
+                      label="Edit Asset"
+                      variant="primary"
+                      size="sm"
                       onClick={() => onEdit(asset)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                      title="Edit Asset"
                     >
                       <Edit className="h-4 w-4" />
-                    </button>
-                    <button
+                    </IconButton>
+                    <IconButton
+                      label="Delete Asset"
+                      variant="danger"
+                      size="sm"
                       onClick={() => handleDeleteAsset(asset.id, asset.assetName)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Delete Asset"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </IconButton>
                   </div>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -335,47 +343,58 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total} assets
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                isDisabled={currentPage === 1}
               >
                 Previous
-              </button>
+              </Button>
               <span className="px-3 py-2 text-sm text-gray-900">
                 Page {currentPage} of {totalPages}
               </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                isDisabled={currentPage === totalPages}
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Enhanced Asset Details Modal */}
+      {/* Enhanced Asset Details Modal — inset past sidebar */}
       {selectedAsset && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            className="absolute inset-0 lg:left-64 bg-gray-900/50 backdrop-blur-sm"
+            onClick={() => setSelectedAsset(null)}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 lg:left-64 flex items-center justify-center p-4 pointer-events-none">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl pointer-events-auto">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-xl font-semibold text-white">{selectedAsset.assetName}</h3>
-                  <p className="text-blue-100 text-sm capitalize">
+                  <p className="text-purple-100 text-sm capitalize">
                     {selectedAsset.assetType} • {selectedAsset.brand && selectedAsset.model ? `${selectedAsset.brand} ${selectedAsset.model}` : 'Asset Details'}
                   </p>
                 </div>
-                <button
+                <IconButton
+                  label="Close"
+                  className="text-white hover:bg-white/10 hover:text-purple-100"
                   onClick={() => setSelectedAsset(null)}
-                  className="text-white hover:text-blue-200 transition-colors rounded-full p-1 hover:bg-white/10"
                 >
-                  <X className="h-6 w-6" />
-                </button>
+                  <X className="h-5 w-5" />
+                </IconButton>
               </div>
             </div>
 
@@ -571,13 +590,17 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                             <div>
                               <span className="text-gray-900">Annual Rental Yield:</span>
                               <p className="font-semibold text-green-600">
-                                {((selectedAsset.rentalRate * 12 / selectedAsset.currentValue) * 100).toFixed(1)}%
+                                {selectedAsset.currentValue > 0
+                                  ? `${((selectedAsset.rentalRate * 12 / selectedAsset.currentValue) * 100).toFixed(1)}%`
+                                  : '—'}
                               </p>
                             </div>
                             <div>
                               <span className="text-gray-900">Monthly ROI:</span>
                               <p className="font-semibold text-blue-600">
-                                {((selectedAsset.rentalRate / selectedAsset.currentValue) * 100).toFixed(2)}%
+                                {selectedAsset.currentValue > 0
+                                  ? `${((selectedAsset.rentalRate / selectedAsset.currentValue) * 100).toFixed(2)}%`
+                                  : '—'}
                               </p>
                             </div>
                           </div>
@@ -601,7 +624,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                     setSelectedAsset(null);
                     onEdit(selectedAsset);
                   }}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
                 >
                   <Edit className="h-4 w-4" />
                   Edit Asset
@@ -609,8 +632,9 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
               </div>
             </div>
           </div>
+          </div>
         </div>
       )}
     </div>
   );
-} 
+}

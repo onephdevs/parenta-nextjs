@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, User, Phone, Mail, Calendar, Briefcase, MapPin } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { Save, User, Phone, Mail, Calendar, Briefcase, MapPin } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
 
 interface ProfileData {
   firstName: string;
@@ -39,7 +45,6 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
     monthlyIncome: undefined,
     previousAddress: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { showNotification } = useNotifications();
 
@@ -50,7 +55,9 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
         lastName: initialData.lastName || '',
         email: initialData.email || '',
         phone: initialData.phone || '',
-        dateOfBirth: initialData.dateOfBirth ? initialData.dateOfBirth.split('T')[0] : '',
+        dateOfBirth: initialData.dateOfBirth
+          ? initialData.dateOfBirth.split('T')[0]
+          : '',
         emergencyContactName: initialData.emergencyContactName || '',
         emergencyContactPhone: initialData.emergencyContactPhone || '',
         emergencyContactRelationship: initialData.emergencyContactRelationship || '',
@@ -80,13 +87,10 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
       if (data.success) {
         showNotification({
           type: 'success',
-          title: 'Success',
-          message: 'Profile updated successfully',
+          title: 'Profile updated',
+          message: 'Your profile has been saved successfully.',
         });
-        
-        if (onSave) {
-          onSave();
-        }
+        onSave?.();
       } else {
         showNotification({
           type: 'error',
@@ -94,8 +98,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
           message: data.error || 'Failed to update profile',
         });
       }
-    } catch (error) {
-      console.error('Error updating profile:', error);
+    } catch {
       showNotification({
         type: 'error',
         title: 'Error',
@@ -106,9 +109,11 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: name === 'monthlyIncome' ? (value ? parseFloat(value) : undefined) : value,
     }));
@@ -116,132 +121,107 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      {/* Personal Information */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <User className="h-5 w-5 mr-2" />
           Personal Information
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-900 mb-1">
-              First Name *
-            </label>
-            <input
+          <FormField label="First Name" htmlFor="firstName" required>
+            <Input
               type="text"
               id="firstName"
               name="firstName"
               required
               value={formData.firstName}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-900 mb-1">
-              Last Name *
-            </label>
-            <input
+          </FormField>
+          <FormField label="Last Name" htmlFor="lastName" required>
+            <Input
               type="text"
               id="lastName"
               name="lastName"
               required
               value={formData.lastName}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1 flex items-center">
-              <Mail className="h-4 w-4 mr-1" />
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900"
-            />
-            <p className="text-xs text-gray-900 mt-1">Email cannot be changed</p>
-          </div>
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-900 mb-1 flex items-center">
-              <Phone className="h-4 w-4 mr-1" />
-              Phone
-            </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-900 mb-1 flex items-center">
-              <Calendar className="h-4 w-4 mr-1" />
-              Date of Birth
-            </label>
-            <input
-              type="date"
-              id="dateOfBirth"
-              name="dateOfBirth"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              min="1900-01-01"
-              max={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{
-                colorScheme: 'light',
-              }}
-            />
-          </div>
+          </FormField>
+          <FormField label="Email" htmlFor="email" hint="Email cannot be changed">
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="email"
+                id="email"
+                name="email"
+                className="pl-10"
+                value={formData.email}
+                isDisabled
+              />
+            </div>
+          </FormField>
+          <FormField label="Phone" htmlFor="phone">
+            <div className="relative">
+              <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="tel"
+                id="phone"
+                name="phone"
+                className="pl-10"
+                value={formData.phone}
+                onChange={handleChange}
+              />
+            </div>
+          </FormField>
+          <FormField label="Date of Birth" htmlFor="dateOfBirth">
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="date"
+                id="dateOfBirth"
+                name="dateOfBirth"
+                className="pl-10"
+                value={formData.dateOfBirth}
+                onChange={handleChange}
+                min="1900-01-01"
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+          </FormField>
         </div>
-      </div>
+      </Card>
 
-      {/* Emergency Contact */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-900 mb-1">
-              Contact Name
-            </label>
-            <input
+          <FormField label="Contact Name" htmlFor="emergencyContactName">
+            <Input
               type="text"
               id="emergencyContactName"
               name="emergencyContactName"
               value={formData.emergencyContactName}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div>
-            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-900 mb-1">
-              Contact Phone
-            </label>
-            <input
+          </FormField>
+          <FormField label="Contact Phone" htmlFor="emergencyContactPhone">
+            <Input
               type="tel"
               id="emergencyContactPhone"
               name="emergencyContactPhone"
               value={formData.emergencyContactPhone}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div className="md:col-span-2">
-            <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-900 mb-1">
-              Relationship
-            </label>
-            <select
+          </FormField>
+          <FormField
+            label="Relationship"
+            htmlFor="emergencyContactRelationship"
+            className="md:col-span-2"
+          >
+            <Select
               id="emergencyContactRelationship"
               name="emergencyContactRelationship"
               value={formData.emergencyContactRelationship}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select relationship</option>
               <option value="spouse">Spouse</option>
@@ -251,28 +231,23 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
               <option value="relative">Relative</option>
               <option value="friend">Friend</option>
               <option value="other">Other</option>
-            </select>
-          </div>
+            </Select>
+          </FormField>
         </div>
-      </div>
+      </Card>
 
-      {/* Employment Information */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <Briefcase className="h-5 w-5 mr-2" />
           Employment Information
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-900 mb-1">
-              Employment Status
-            </label>
-            <select
+          <FormField label="Employment Status" htmlFor="employmentStatus">
+            <Select
               id="employmentStatus"
               name="employmentStatus"
               value={formData.employmentStatus}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select status</option>
               <option value="employed">Employed</option>
@@ -280,79 +255,56 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
               <option value="unemployed">Unemployed</option>
               <option value="student">Student</option>
               <option value="retired">Retired</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="employerName" className="block text-sm font-medium text-gray-900 mb-1">
-              Employer Name
-            </label>
-            <input
+            </Select>
+          </FormField>
+          <FormField label="Employer Name" htmlFor="employerName">
+            <Input
               type="text"
               id="employerName"
               name="employerName"
               value={formData.employerName}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-          <div>
-            <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900 mb-1">
-              Monthly Income (₱)
-            </label>
-            <input
+          </FormField>
+          <FormField label="Monthly Income (₱)" htmlFor="monthlyIncome">
+            <Input
               type="number"
               id="monthlyIncome"
               name="monthlyIncome"
-              min="0"
-              step="0.01"
-              value={formData.monthlyIncome || ''}
+              min={0}
+              step={0.01}
+              value={formData.monthlyIncome ?? ''}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
+          </FormField>
         </div>
-      </div>
+      </Card>
 
-      {/* Previous Address */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <MapPin className="h-5 w-5 mr-2" />
           Previous Address
         </h3>
-        <div>
-          <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-900 mb-1">
-            Address
-          </label>
-          <textarea
+        <FormField label="Address" htmlFor="previousAddress">
+          <Textarea
             id="previousAddress"
             name="previousAddress"
             rows={3}
             value={formData.previousAddress}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-        </div>
-      </div>
+        </FormField>
+      </Card>
 
-      {/* Submit Button */}
       <div className="flex justify-end">
-        <button
+        <Button
           type="submit"
-          disabled={isSaving}
-          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed"
+          variant="success"
+          isLoading={isSaving}
+          leftIcon={<Save className="h-5 w-5" />}
         >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-5 w-5 mr-2" />
-              Save Changes
-            </>
-          )}
-        </button>
+          Save Changes
+        </Button>
       </div>
     </form>
   );

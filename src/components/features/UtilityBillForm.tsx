@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { UtilityBill, Building, CreateUtilityBillData } from '../../types/database';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
 
 interface UtilityBillFormProps {
   bill?: UtilityBill | null;
@@ -10,7 +16,10 @@ interface UtilityBillFormProps {
 }
 
 export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBillFormProps) {
-  type FormState = Omit<CreateUtilityBillData, 'amount' | 'usageAmount'> & { amount?: number; usageAmount?: number };
+  type FormState = Omit<CreateUtilityBillData, 'amount' | 'usageAmount'> & {
+    amount?: number;
+    usageAmount?: number;
+  };
   const [formData, setFormData] = useState<FormState>({
     buildingId: '',
     utilityType: 'electricity',
@@ -33,7 +42,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
 
   useEffect(() => {
     fetchBuildings();
-    
+
     if (bill) {
       setFormData({
         buildingId: bill.buildingId,
@@ -108,7 +117,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -128,18 +137,16 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
   };
 
   const handleInputChange = (field: keyof CreateUtilityBillData, value: unknown) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear error when user starts typing
+    setFormData((prev) => ({ ...prev, [field]: value }));
+
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
 
-    // Auto-update usage unit based on utility type
     if (field === 'utilityType') {
-      const selectedType = utilityTypes.find(type => type.value === value);
+      const selectedType = utilityTypes.find((type) => type.value === value);
       if (selectedType) {
-        setFormData(prev => ({ ...prev, usageUnit: selectedType.unit }));
+        setFormData((prev) => ({ ...prev, usageUnit: selectedType.unit }));
       }
     }
   };
@@ -150,7 +157,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <Card padding="none" className="max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             {bill ? 'Edit Utility Bill' : 'Add New Utility Bill'}
@@ -158,17 +165,12 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Building Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Building *
-            </label>
-            <select
+          <FormField label="Building" htmlFor="buildingId" required error={errors.buildingId}>
+            <Select
+              id="buildingId"
               value={formData.buildingId}
               onChange={(e) => handleInputChange('buildingId', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                errors.buildingId ? 'border-red-300' : 'border-gray-300'
-              }`}
+              isInvalid={Boolean(errors.buildingId)}
             >
               <option value="">Select a building</option>
               {buildings.map((building) => (
@@ -176,173 +178,139 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                   {building.name} - {building.city}, {building.state}
                 </option>
               ))}
-            </select>
-            {errors.buildingId && (
-              <p className="mt-1 text-sm text-red-600">{errors.buildingId}</p>
-            )}
-          </div>
+            </Select>
+          </FormField>
 
-          {/* Utility Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Utility Type *
-            </label>
-            <select
+          <FormField label="Utility Type" htmlFor="utilityType" required>
+            <Select
+              id="utilityType"
               value={formData.utilityType}
               onChange={(e) => handleInputChange('utilityType', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               {utilityTypes.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Provider Information */}
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Provider Name *
-              </label>
-              <input
+            <FormField
+              label="Provider Name"
+              htmlFor="providerName"
+              required
+              error={errors.providerName}
+            >
+              <Input
+                id="providerName"
                 type="text"
                 value={formData.providerName}
                 onChange={(e) => handleInputChange('providerName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.providerName ? 'border-red-300' : 'border-gray-300'
-                }`}
+                isInvalid={Boolean(errors.providerName)}
                 placeholder="e.g., Pacific Gas & Electric"
               />
-              {errors.providerName && (
-                <p className="mt-1 text-sm text-red-600">{errors.providerName}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Account Number
-              </label>
-              <input
+            <FormField label="Account Number" htmlFor="providerAccountNumber">
+              <Input
+                id="providerAccountNumber"
                 type="text"
                 value={formData.providerAccountNumber}
                 onChange={(e) => handleInputChange('providerAccountNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Account or service number"
               />
-            </div>
+            </FormField>
           </div>
 
-          {/* Billing Period */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Billing Period Start *
-              </label>
-              <input
+            <FormField label="Billing Period Start" htmlFor="billingPeriodStart" required>
+              <Input
+                id="billingPeriodStart"
                 type="date"
                 value={formatDateForInput(formData.billingPeriodStart)}
                 onChange={(e) => handleInputChange('billingPeriodStart', new Date(e.target.value))}
                 min="2000-01-01"
                 max="2099-12-31"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Billing Period End *
-              </label>
-              <input
+            <FormField
+              label="Billing Period End"
+              htmlFor="billingPeriodEnd"
+              required
+              error={errors.billingPeriodEnd}
+            >
+              <Input
+                id="billingPeriodEnd"
                 type="date"
                 value={formatDateForInput(formData.billingPeriodEnd)}
                 onChange={(e) => handleInputChange('billingPeriodEnd', new Date(e.target.value))}
                 min={formatDateForInput(formData.billingPeriodStart) || '2000-01-01'}
                 max="2099-12-31"
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.billingPeriodEnd ? 'border-red-300' : 'border-gray-300'
-                }`}
-                style={{
-                  colorScheme: 'light',
-                }}
+                isInvalid={Boolean(errors.billingPeriodEnd)}
+                style={{ colorScheme: 'light' }}
               />
-              {errors.billingPeriodEnd && (
-                <p className="mt-1 text-sm text-red-600">{errors.billingPeriodEnd}</p>
-              )}
-            </div>
+            </FormField>
           </div>
 
-          {/* Amount and Due Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Amount *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-900"></span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.amount === 0 || formData.amount === undefined || formData.amount === null ? '' : formData.amount}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === '') {
-                      handleInputChange('amount', undefined);
-                    } else {
-                      const parsed = parseFloat(v);
-                      handleInputChange('amount', Number.isNaN(parsed) ? 0 : parsed);
-                    }
-                  }}
-                  className={`w-full pl-8 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.amount ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="0.00"
-                />
-              </div>
-              {errors.amount && (
-                <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
-              )}
-            </div>
+            <FormField label="Amount" htmlFor="amount" required error={errors.amount}>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                min={0}
+                value={
+                  formData.amount === 0 ||
+                  formData.amount === undefined ||
+                  formData.amount === null
+                    ? ''
+                    : formData.amount
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '') {
+                    handleInputChange('amount', undefined);
+                  } else {
+                    const parsed = parseFloat(v);
+                    handleInputChange('amount', Number.isNaN(parsed) ? 0 : parsed);
+                  }
+                }}
+                isInvalid={Boolean(errors.amount)}
+                placeholder="0.00"
+              />
+            </FormField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Due Date *
-              </label>
-              <input
+            <FormField label="Due Date" htmlFor="dueDate" required error={errors.dueDate}>
+              <Input
+                id="dueDate"
                 type="date"
                 value={formatDateForInput(formData.dueDate)}
                 onChange={(e) => handleInputChange('dueDate', new Date(e.target.value))}
                 min={formatDateForInput(formData.billingPeriodEnd) || '2000-01-01'}
                 max="2099-12-31"
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.dueDate ? 'border-red-300' : 'border-gray-300'
-                }`}
-                style={{
-                  colorScheme: 'light',
-                }}
+                isInvalid={Boolean(errors.dueDate)}
+                style={{ colorScheme: 'light' }}
               />
-              {errors.dueDate && (
-                <p className="mt-1 text-sm text-red-600">{errors.dueDate}</p>
-              )}
-            </div>
+            </FormField>
           </div>
 
-          {/* Usage Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Usage Amount
-              </label>
-              <input
+            <FormField label="Usage Amount" htmlFor="usageAmount">
+              <Input
+                id="usageAmount"
                 type="number"
                 step="0.01"
-                min="0"
-                value={formData.usageAmount === 0 || formData.usageAmount === undefined || formData.usageAmount === null ? '' : formData.usageAmount}
+                min={0}
+                value={
+                  formData.usageAmount === 0 ||
+                  formData.usageAmount === undefined ||
+                  formData.usageAmount === null
+                    ? ''
+                    : formData.usageAmount
+                }
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v === '') {
@@ -352,91 +320,67 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
                     handleInputChange('usageAmount', Number.isNaN(parsed) ? 0 : parsed);
                   }
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Consumption amount"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Usage Unit
-              </label>
-              <input
+            <FormField label="Usage Unit" htmlFor="usageUnit">
+              <Input
+                id="usageUnit"
                 type="text"
                 value={formData.usageUnit}
                 onChange={(e) => handleInputChange('usageUnit', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="e.g., kWh, gallons, therms"
               />
-            </div>
+            </FormField>
           </div>
 
-          {/* Status and Bill URL */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Status
-              </label>
-              <select
+            <FormField label="Status" htmlFor="billStatus">
+              <Select
+                id="billStatus"
                 value={formData.billStatus}
                 onChange={(e) => handleInputChange('billStatus', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 {billStatuses.map((status) => (
                   <option key={status.value} value={status.value}>
                     {status.label}
                   </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </FormField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Bill URL (optional)
-              </label>
-              <input
+            <FormField label="Bill URL (optional)" htmlFor="billUrl">
+              <Input
+                id="billUrl"
                 type="url"
                 value={formData.billUrl}
                 onChange={(e) => handleInputChange('billUrl', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="https://..."
               />
-            </div>
+            </FormField>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Notes
-            </label>
-            <textarea
+          <FormField label="Notes" htmlFor="notes">
+            <Textarea
+              id="notes"
               value={formData.notes}
               onChange={(e) => handleInputChange('notes', e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Additional notes or comments about this bill..."
             />
-          </div>
+          </FormField>
 
-          {/* Form Actions */}
           <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
+            <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            </Button>
+            <Button type="submit" variant="primary" isLoading={loading}>
               {loading ? 'Saving...' : bill ? 'Update Bill' : 'Create Bill'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
-} 
+}

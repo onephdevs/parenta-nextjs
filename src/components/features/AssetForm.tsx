@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { FormField } from '@/components/forms/FormField';
 
 interface Asset {
   id: string;
@@ -21,7 +27,7 @@ interface Asset {
 }
 
 interface AssetFormProps {
-  asset?: Asset; // Optional asset for editing
+  asset?: Asset;
   buildings: Array<{ id: string; name: string }>;
   onSubmit: () => void;
   onCancel: () => void;
@@ -30,7 +36,7 @@ interface AssetFormProps {
 export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormProps) {
   const [loading, setLoading] = useState(false);
   const { addNotification, showLoading, dismissToast } = useNotifications();
-  
+
   const [formData, setFormData] = useState({
     assetName: asset?.assetName || '',
     assetType: asset?.assetType || '',
@@ -43,10 +49,9 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
     purchasePrice: asset?.purchasePrice?.toString() || '',
     currentValue: asset?.currentValue?.toString() || '',
     rentalRate: asset?.rentalRate?.toString() || '',
-    description: asset?.description || ''
+    description: asset?.description || '',
   });
 
-  // Update form when asset prop changes
   useEffect(() => {
     if (asset) {
       setFormData({
@@ -61,7 +66,7 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
         purchasePrice: asset.purchasePrice?.toString() || '',
         currentValue: asset.currentValue?.toString() || '',
         rentalRate: asset.rentalRate?.toString() || '',
-        description: asset.description || ''
+        description: asset.description || '',
       });
     }
   }, [asset]);
@@ -70,7 +75,6 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
     e.preventDefault();
     setLoading(true);
 
-    // Show loading toast
     const loadingToast = showLoading(asset ? 'Updating asset...' : 'Creating asset...');
 
     try {
@@ -83,32 +87,28 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
 
       const url = asset ? `/api/assets/${asset.id}` : '/api/assets';
       const method = asset ? 'PUT' : 'POST';
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitData)
+        body: JSON.stringify(submitData),
       });
 
       if (response.ok) {
-        // Dismiss loading toast
         if (loadingToast && dismissToast) {
           dismissToast(loadingToast);
         }
-        
-        // Don't show notification here - let the parent component handle it
         onSubmit();
       } else {
         throw new Error(`Failed to ${asset ? 'update' : 'create'} asset`);
       }
-    } catch (error) {
-      // Dismiss loading toast if it exists
+    } catch {
       if (loadingToast && dismissToast) {
         dismissToast(loadingToast);
       }
-      
+
       addNotification(
-        `Failed to ${asset ? 'update' : 'create'} asset. Please try again.`, 
+        `Failed to ${asset ? 'update' : 'create'} asset. Please try again.`,
         'error'
       );
     } finally {
@@ -124,34 +124,28 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
         <h2 className="text-xl font-semibold">
           {isEditing ? 'Edit Asset' : 'Add New Asset'}
         </h2>
-        <button onClick={onCancel} className="text-gray-400 hover:text-gray-900">
-          <X className="h-6 w-6" />
-        </button>
+        <IconButton label="Close" onClick={onCancel}>
+          <X className="h-5 w-5" />
+        </IconButton>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Asset Name *
-            </label>
-            <input
+          <FormField label="Asset Name" htmlFor="assetName" required>
+            <Input
+              id="assetName"
               type="text"
               value={formData.assetName}
-              onChange={(e) => setFormData(prev => ({ ...prev, assetName: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, assetName: e.target.value }))}
               required
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Asset Type *
-            </label>
-            <select
+          <FormField label="Asset Type" htmlFor="assetType" required>
+            <Select
+              id="assetType"
               value={formData.assetType}
-              onChange={(e) => setFormData(prev => ({ ...prev, assetType: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, assetType: e.target.value }))}
               required
             >
               <option value="">Select type</option>
@@ -162,167 +156,137 @@ export function AssetForm({ asset, buildings, onSubmit, onCancel }: AssetFormPro
               <option value="lighting">Lighting</option>
               <option value="security">Security</option>
               <option value="other">Other</option>
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Building
-            </label>
-            <select
+          <FormField label="Building" htmlFor="buildingId">
+            <Select
+              id="buildingId"
               value={formData.buildingId}
-              onChange={(e) => setFormData(prev => ({ ...prev, buildingId: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, buildingId: e.target.value }))}
             >
               <option value="">Select building</option>
-              {buildings.map(building => (
+              {buildings.map((building) => (
                 <option key={building.id} value={building.id}>
                   {building.name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Status
-            </label>
-            <select
+          <FormField label="Status" htmlFor="assetStatus">
+            <Select
+              id="assetStatus"
               value={formData.assetStatus}
-              onChange={(e) => setFormData(prev => ({ ...prev, assetStatus: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, assetStatus: e.target.value }))}
             >
               <option value="available">Available</option>
               <option value="assigned">Assigned</option>
               <option value="maintenance">Maintenance</option>
               <option value="disposed">Disposed</option>
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Condition
-            </label>
-            <select
+          <FormField label="Condition" htmlFor="assetCondition">
+            <Select
+              id="assetCondition"
               value={formData.assetCondition}
-              onChange={(e) => setFormData(prev => ({ ...prev, assetCondition: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, assetCondition: e.target.value }))
+              }
             >
               <option value="excellent">Excellent</option>
               <option value="good">Good</option>
               <option value="fair">Fair</option>
               <option value="poor">Poor</option>
               <option value="damaged">Damaged</option>
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Brand
-            </label>
-            <input
+          <FormField label="Brand" htmlFor="brand">
+            <Input
+              id="brand"
               type="text"
               value={formData.brand}
-              onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, brand: e.target.value }))}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Model
-            </label>
-            <input
+          <FormField label="Model" htmlFor="model">
+            <Input
+              id="model"
               type="text"
               value={formData.model}
-              onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, model: e.target.value }))}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Serial Number
-            </label>
-            <input
+          <FormField label="Serial Number" htmlFor="serialNumber">
+            <Input
+              id="serialNumber"
               type="text"
               value={formData.serialNumber}
-              onChange={(e) => setFormData(prev => ({ ...prev, serialNumber: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, serialNumber: e.target.value }))}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Purchase Price
-            </label>
-            <input
+          <FormField label="Purchase Price" htmlFor="purchasePrice">
+            <Input
+              id="purchasePrice"
               type="number"
               step="0.01"
               value={formData.purchasePrice}
-              onChange={(e) => setFormData(prev => ({ ...prev, purchasePrice: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, purchasePrice: e.target.value }))
+              }
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Current Value
-            </label>
-            <input
+          <FormField label="Current Value" htmlFor="currentValue">
+            <Input
+              id="currentValue"
               type="number"
               step="0.01"
               value={formData.currentValue}
-              onChange={(e) => setFormData(prev => ({ ...prev, currentValue: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, currentValue: e.target.value }))
+              }
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Rental Rate (per month)
-            </label>
-            <input
+          <FormField label="Rental Rate (per month)" htmlFor="rentalRate">
+            <Input
+              id="rentalRate"
               type="number"
               step="0.01"
               value={formData.rentalRate}
-              onChange={(e) => setFormData(prev => ({ ...prev, rentalRate: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setFormData((prev) => ({ ...prev, rentalRate: e.target.value }))}
             />
-          </div>
+          </FormField>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">
-            Description
-          </label>
-          <textarea
+        <FormField label="Description" htmlFor="description">
+          <Textarea
+            id="description"
             value={formData.description}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-        </div>
+        </FormField>
 
         <div className="flex justify-end gap-3 pt-6">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            isLoading={loading}
+            leftIcon={<Save className="h-4 w-4" />}
           >
-            {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-            <Save className="h-4 w-4" />
             {isEditing ? 'Update Asset' : 'Save Asset'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
   );
-} 
+}

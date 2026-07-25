@@ -5,6 +5,11 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Building2, Mail, Lock, AlertCircle, Briefcase, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 export default function StaffSignIn() {
   const router = useRouter();
@@ -67,25 +72,20 @@ export default function StaffSignIn() {
             </p>
           </div>
 
-          {/* Error Alert */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-800">{error}</div>
-            </div>
+            <Alert variant="danger" className="mb-6">
+              {error}
+            </Alert>
           )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
-                Email Address
-              </label>
+            <FormField label="Email Address" htmlFor="email" required>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
-                <input
+                <Input
                   id="email"
                   name="email"
                   type="email"
@@ -93,21 +93,18 @@ export default function StaffSignIn() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="staff@parenta.com"
+                  className="pl-10"
+                  placeholder="you@example.com"
                 />
               </div>
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
-                Password
-              </label>
+            <FormField label="Password" htmlFor="password" required>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
-                <input
+                <Input
                   id="password"
                   name="password"
                   type="password"
@@ -115,24 +112,14 @@ export default function StaffSignIn() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="pl-10"
                   placeholder="••••••••"
                 />
               </div>
-            </div>
+            </FormField>
 
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                  Remember me
-                </label>
-              </div>
+              <Checkbox id="remember-me" name="remember-me" label="Remember me" />
 
               <div className="text-sm">
                 <Link href="/auth/forgot-password?role=staff" className="font-medium text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300">
@@ -141,23 +128,9 @@ export default function StaffSignIn() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </button>
+            <Button type="submit" variant="primary" className="w-full" size="lg" isLoading={isLoading}>
+              Sign In
+            </Button>
           </form>
 
           {/* Demo Credentials */}

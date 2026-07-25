@@ -5,6 +5,7 @@ import { AdvancedFinancialMetrics } from '@/types/analytics';
 
 export default function AdvancedFinancialDashboard() {
   const [metrics, setMetrics] = useState<AdvancedFinancialMetrics | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('6months');
@@ -20,6 +21,7 @@ export default function AdvancedFinancialDashboard() {
       const data = await response.json();
       if (data.success) {
         setMetrics(data.data);
+        setIsDemo(Boolean(data.metadata?.isDemo));
       }
     } catch (error) {
       console.error('Error fetching advanced financial metrics:', error);
@@ -76,6 +78,11 @@ export default function AdvancedFinancialDashboard() {
 
   return (
     <div className="bg-white shadow rounded-lg">
+      {isDemo && (
+        <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-900">
+          Demo data: cash-flow forecasts, ROI, and benchmarks are illustrative until connected to live ledgers.
+        </div>
+      )}
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">

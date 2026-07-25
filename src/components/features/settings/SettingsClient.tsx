@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Session } from 'next-auth';
-import { Bell, Lock, Globe, Mail, Shield, Database } from 'lucide-react';
+import { Bell, Lock, Globe, Shield, Database } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { Card } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 interface SettingsClientProps {
   session: Session;
@@ -25,8 +30,8 @@ export default function SettingsClient({ session }: SettingsClientProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [saveMessageVariant, setSaveMessageVariant] = useState<'success' | 'danger'>('success');
 
-  // Load settings from database on mount
   useEffect(() => {
     loadSettings();
   }, []);
@@ -72,14 +77,16 @@ export default function SettingsClient({ session }: SettingsClientProps) {
 
       if (data.success) {
         setSaveMessage('Settings saved successfully!');
+        setSaveMessageVariant('success');
         setTimeout(() => setSaveMessage(''), 3000);
-        // Refresh the page to apply new settings
         window.location.reload();
       } else {
         setSaveMessage('Failed to save settings');
+        setSaveMessageVariant('danger');
       }
     } catch (error) {
       setSaveMessage('Failed to save settings');
+      setSaveMessageVariant('danger');
     } finally {
       setIsSaving(false);
     }
@@ -95,7 +102,6 @@ export default function SettingsClient({ session }: SettingsClientProps) {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
           <p className="mt-2 text-gray-900">
@@ -103,19 +109,13 @@ export default function SettingsClient({ session }: SettingsClientProps) {
           </p>
         </div>
 
-        {/* Save Message */}
         {saveMessage && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            saveMessage.includes('success') 
-              ? 'bg-green-50 text-green-800 border border-green-200' 
-              : 'bg-red-50 text-red-800 border border-red-200'
-          }`}>
+          <Alert variant={saveMessageVariant} className="mb-6">
             {saveMessage}
-          </div>
+          </Alert>
         )}
 
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          {/* Tabs */}
+        <Card padding="none" className="overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px overflow-x-auto">
               {tabs.map((tab) => {
@@ -138,9 +138,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
             </nav>
           </div>
 
-          {/* Tab Content */}
           <div className="p-6">
-            {/* Notifications Tab */}
             {activeTab === 'notifications' && (
               <div className="space-y-6">
                 <div>
@@ -148,123 +146,59 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                     Email Notifications
                   </h3>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium text-gray-900">
-                          Email Notifications
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          Receive notifications via email
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          setSettings({
-                            ...settings,
-                            emailNotifications: !settings.emailNotifications,
-                          })
-                        }
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings.emailNotifications ? 'bg-purple-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings.emailNotifications ? 'translate-x-6' : 'translate-x-1'
+                    {[
+                      {
+                        key: 'emailNotifications' as const,
+                        label: 'Email Notifications',
+                        description: 'Receive notifications via email',
+                      },
+                      {
+                        key: 'paymentReminders' as const,
+                        label: 'Payment Reminders',
+                        description: 'Get notified about upcoming payments',
+                      },
+                      {
+                        key: 'maintenanceAlerts' as const,
+                        label: 'Maintenance Alerts',
+                        description: 'Receive maintenance request notifications',
+                      },
+                      {
+                        key: 'monthlyReports' as const,
+                        label: 'Monthly Reports',
+                        description: 'Receive monthly financial reports',
+                      },
+                    ].map(({ key, label, description }) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-gray-900">
+                            {label}
+                          </label>
+                          <p className="text-sm text-gray-900">{description}</p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setSettings({
+                              ...settings,
+                              [key]: !settings[key],
+                            })
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            settings[key] ? 'bg-purple-600' : 'bg-gray-200'
                           }`}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium text-gray-900">
-                          Payment Reminders
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          Get notified about upcoming payments
-                        </p>
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              settings[key] ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
                       </div>
-                      <button
-                        onClick={() =>
-                          setSettings({
-                            ...settings,
-                            paymentReminders: !settings.paymentReminders,
-                          })
-                        }
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings.paymentReminders ? 'bg-purple-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings.paymentReminders ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium text-gray-900">
-                          Maintenance Alerts
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          Receive maintenance request notifications
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          setSettings({
-                            ...settings,
-                            maintenanceAlerts: !settings.maintenanceAlerts,
-                          })
-                        }
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings.maintenanceAlerts ? 'bg-purple-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings.maintenanceAlerts ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium text-gray-900">
-                          Monthly Reports
-                        </label>
-                        <p className="text-sm text-gray-900">
-                          Receive monthly financial reports
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          setSettings({
-                            ...settings,
-                            monthlyReports: !settings.monthlyReports,
-                          })
-                        }
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings.monthlyReports ? 'bg-purple-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings.monthlyReports ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Security Tab */}
             {activeTab === 'security' && (
               <div className="space-y-6">
                 <div>
@@ -300,40 +234,37 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                       </button>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Session Timeout
-                      </label>
-                      <select
+                    <FormField
+                      label="Session Timeout"
+                      htmlFor="session-timeout"
+                      hint="Automatically log out after this period of inactivity"
+                    >
+                      <Select
+                        id="session-timeout"
                         value={settings.sessionTimeout}
                         onChange={(e) =>
                           setSettings({ ...settings, sessionTimeout: e.target.value })
                         }
-                        className="block w-full max-w-xs px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                        className="max-w-xs"
                       >
                         <option value="15">15 minutes</option>
                         <option value="30">30 minutes</option>
                         <option value="60">1 hour</option>
                         <option value="120">2 hours</option>
                         <option value="480">8 hours</option>
-                      </select>
-                      <p className="mt-1 text-sm text-gray-900">
-                        Automatically log out after this period of inactivity
-                      </p>
-                    </div>
+                      </Select>
+                    </FormField>
 
                     <div className="pt-4 border-t border-gray-200">
-                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                        <Lock className="w-4 h-4 mr-2" />
+                      <Button variant="outline" leftIcon={<Lock className="w-4 h-4" />}>
                         Change Password
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Preferences Tab */}
             {activeTab === 'preferences' && (
               <div className="space-y-6">
                 <div>
@@ -341,80 +272,71 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                     Application Preferences
                   </h3>
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Language
-                      </label>
-                      <select
+                    <FormField label="Language" htmlFor="language">
+                      <Select
+                        id="language"
                         value={settings.language}
                         onChange={(e) =>
                           setSettings({ ...settings, language: e.target.value })
                         }
-                        className="block w-full max-w-xs px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                        className="max-w-xs"
                       >
                         <option value="en">English</option>
                         <option value="es">Spanish</option>
                         <option value="fil">Filipino</option>
-                      </select>
-                    </div>
+                      </Select>
+                    </FormField>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Timezone
-                      </label>
-                      <select
+                    <FormField label="Timezone" htmlFor="timezone">
+                      <Select
+                        id="timezone"
                         value={settings.timezone}
                         onChange={(e) =>
                           setSettings({ ...settings, timezone: e.target.value })
                         }
-                        className="block w-full max-w-xs px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                        className="max-w-xs"
                       >
                         <option value="Asia/Manila">Asia/Manila (GMT+8)</option>
                         <option value="America/New_York">America/New York (GMT-5)</option>
                         <option value="Europe/London">Europe/London (GMT+0)</option>
                         <option value="Asia/Tokyo">Asia/Tokyo (GMT+9)</option>
-                      </select>
-                    </div>
+                      </Select>
+                    </FormField>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Currency
-                      </label>
-                      <select
+                    <FormField label="Currency" htmlFor="currency">
+                      <Select
+                        id="currency"
                         value={settings.currency}
                         onChange={(e) =>
                           setSettings({ ...settings, currency: e.target.value })
                         }
-                        className="block w-full max-w-xs px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                        className="max-w-xs"
                       >
                         <option value="PHP">PHP (₱)</option>
                         <option value="USD">USD ($)</option>
                         <option value="EUR">EUR (€)</option>
-                      </select>
-                    </div>
+                      </Select>
+                    </FormField>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
-                        Date Format
-                      </label>
-                      <select
+                    <FormField label="Date Format" htmlFor="date-format">
+                      <Select
+                        id="date-format"
                         value={settings.dateFormat}
                         onChange={(e) =>
                           setSettings({ ...settings, dateFormat: e.target.value })
                         }
-                        className="block w-full max-w-xs px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                        className="max-w-xs"
                       >
                         <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                         <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                      </select>
-                    </div>
+                      </Select>
+                    </FormField>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* System Tab */}
             {activeTab === 'system' && (
               <div className="space-y-6">
                 <div>
@@ -443,14 +365,12 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Actions</h4>
                     <div className="flex flex-wrap gap-3">
-                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                        <Database className="w-4 h-4 mr-2" />
+                      <Button variant="outline" leftIcon={<Database className="w-4 h-4" />}>
                         Clear Cache
-                      </button>
-                      <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                        <Database className="w-4 h-4 mr-2" />
+                      </Button>
+                      <Button variant="outline" leftIcon={<Database className="w-4 h-4" />}>
                         Export Data
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -458,19 +378,13 @@ export default function SettingsClient({ session }: SettingsClientProps) {
             )}
           </div>
 
-          {/* Save Button */}
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="inline-flex items-center px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button variant="primary" onClick={handleSave} isLoading={isSaving}>
               {isSaving ? 'Saving...' : 'Save Settings'}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );
 }
-

@@ -1,0 +1,23 @@
+'use client';
+
+import { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+
+export interface EmptyStateProps {
+  icon?: ReactNode;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  className?: string;
+}
+
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+  return (
+    <div className={cn('text-center py-12 px-4', className)}>
+      {icon && <div className="mx-auto mb-3 flex justify-center text-gray-300">{icon}</div>}
+      <h3 className="text-sm font-medium text-gray-900">{title}</h3>
+      {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+      {action && <div className="mt-6 flex justify-center">{action}</div>}
+    </div>
+  );
+}

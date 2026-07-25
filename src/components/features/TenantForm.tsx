@@ -3,9 +3,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { FormField } from '@/components/forms/FormField';
+
+/** Assign API enforces this floor when no building deposit config exists */
+const MINIMUM_DEPOSIT_AMOUNT = 3000;
 
 interface Building {
-  id: number;
+  id: string;
   name: string;
 }
 
@@ -144,14 +153,27 @@ export default function TenantForm() {
   useEffect(() => {
     if (formData.roomId && !overrideMonthlyRent) {
       const selectedRoom = rooms.find(r => r.id === formData.roomId);
-      if (selectedRoom && selectedRoom.monthlyRate) {
-        setFormData(prev => ({ ...prev, monthlyRent: selectedRoom.monthlyRate }));
+      if (selectedRoom && selectedRoom.monthlyRate != null) {
+        setFormData(prev => ({
+          ...prev,
+          monthlyRent: Number(selectedRoom.monthlyRate),
+        }));
       }
     } else if (!formData.roomId && !overrideMonthlyRent) {
       // Clear monthly rent when room is deselected and override is not checked
       setFormData(prev => ({ ...prev, monthlyRent: undefined }));
     }
   }, [formData.roomId, rooms, overrideMonthlyRent]);
+
+  const computedDeposit = (formData.monthlyRent || 0) * formData.depositMonths;
+  const computedAdvance = (formData.monthlyRent || 0) * formData.advanceMonths;
+  // Assign API floors deposit at ₱3,000 — apply the same floor so low-rent rooms can still be assigned
+  const effectiveDeposit =
+    formData.roomId && computedDeposit < MINIMUM_DEPOSIT_AMOUNT
+      ? MINIMUM_DEPOSIT_AMOUNT
+      : computedDeposit;
+  const depositRaisedToMinimum =
+    Boolean(formData.roomId) && computedDeposit < MINIMUM_DEPOSIT_AMOUNT;
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -182,7 +204,7 @@ export default function TenantForm() {
       newErrors.monthlyIncome = 'Monthly income cannot be negative';
     }
 
-    if (formData.monthlyRent && formData.monthlyRent < 0) {
+    if (formData.monthlyRent != null && formData.monthlyRent < 0) {
       newErrors.monthlyRent = 'Monthly rent cannot be negative';
     }
 
@@ -192,6 +214,15 @@ export default function TenantForm() {
 
     if (formData.advanceMonths < 0) {
       newErrors.advanceMonths = 'Advance months cannot be negative';
+    }
+
+    // Room assignment requires positive rent + lease start (deposit floor applied at submit)
+    if (formData.roomId) {
+      if (!formData.monthlyRent || formData.monthlyRent <= 0) {
+        newErrors.monthlyRent = 'Monthly rent is required when assigning a room';
+      } else if (!formData.leaseStartDate) {
+        newErrors.leaseStartDate = 'Lease start date is required when assigning a room';
+      }
     }
 
     setErrors(newErrors);
@@ -232,18 +263,20 @@ export default function TenantForm() {
           monthlyRent: formData.monthlyRent || null,
           depositMonths: formData.depositMonths,
           advanceMonths: formData.advanceMonths,
-          buildingId: formData.buildingId ? parseInt(formData.buildingId) : null,
-          roomId: formData.roomId ? parseInt(formData.roomId) : null,
+          // IDs are UUIDs — never parseInt
+          buildingId: formData.buildingId || null,
+          roomId: formData.roomId || null,
         }),
       });
 
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to create tenant');
+        throw new Error(result.details || result.error || 'Failed to create tenant');
       }
 
       const tenantId = result.data.id;
+      const temporaryPassword = result.data.temporaryPassword as string | undefined;
 
       // If room is selected, assign tenant to room (this will trigger auto-invoicing)
       if (formData.roomId) {
@@ -253,6 +286,12 @@ export default function TenantForm() {
           message: 'Generating invoices automatically...'
         });
 
+        const monthlyRate = Number(formData.monthlyRent) || 0;
+        const depositFromMonths = monthlyRate * formData.depositMonths;
+        // Match assign API floor so rooms with tiny test rents can still be assigned
+        const depositPaid = Math.max(depositFromMonths, MINIMUM_DEPOSIT_AMOUNT);
+        const advanceAmount = monthlyRate * formData.advanceMonths;
+
         const assignResponse = await fetch(`/api/rooms/${formData.roomId}/assign`, {
           method: 'POST',
           headers: {
@@ -260,18 +299,23 @@ export default function TenantForm() {
           },
           body: JSON.stringify({
             tenantId: tenantId,
-            startDate: formData.leaseStartDate || new Date().toISOString(),
-            endDate: formData.leaseEndDate,
-            monthlyRate: formData.monthlyRent,
-            depositPaid: (formData.monthlyRent || 0) * formData.depositMonths,
-            advanceAmount: (formData.monthlyRent || 0) * formData.advanceMonths,
+            startDate: formData.leaseStartDate || new Date().toISOString().slice(0, 10),
+            endDate: formData.leaseEndDate || null,
+            monthlyRate,
+            depositPaid,
+            advanceAmount,
           }),
         });
 
         const assignResult = await assignResponse.json();
 
         if (!assignResult.success) {
-          throw new Error(assignResult.error || 'Failed to assign room');
+          // Tenant already exists — surface assignment failure clearly
+          throw new Error(
+            assignResult.details ||
+              assignResult.error ||
+              'Tenant was created but room assignment failed'
+          );
         }
 
         // Create detailed success message
@@ -292,29 +336,47 @@ export default function TenantForm() {
           detailMessage += `\n📊 Invoice range: ${invoiceDetails.firstInvoiceNumber} - ${invoiceDetails.lastInvoiceNumber}`;
         }
 
+        if (temporaryPassword) {
+          detailMessage += `\n\n🔑 Temporary login password (copy now — shown once):\n${temporaryPassword}`;
+        }
+
         updateNotification(loadingNotificationId, {
           type: 'success',
           title: 'Tenant Created & Room Assigned!',
           message: detailMessage
         });
       } else {
+        let message = `${formData.firstName} ${formData.lastName} has been added. You can assign a room later.`;
+        if (temporaryPassword) {
+          message += `\n\n🔑 Temporary login password (copy now — shown once):\n${temporaryPassword}`;
+        }
         updateNotification(loadingNotificationId, {
           type: 'success',
           title: 'Tenant created successfully!',
-          message: `${formData.firstName} ${formData.lastName} has been added. You can assign a room later.`
+          message,
         });
+      }
+
+      if (temporaryPassword) {
+        // Also surface via alert so it's hard to miss before redirect
+        window.alert(
+          `Tenant account created.\n\nEmail: ${formData.email}\nTemporary password: ${temporaryPassword}\n\nCopy this password now — it will not be shown again.`
+        );
       }
 
       setTimeout(() => {
         router.push(`/admin/tenants/${tenantId}`);
-      }, 1500);
+      }, temporaryPassword ? 2500 : 1500);
 
     } catch (error) {
       console.error('Error creating tenant:', error);
+      const message = error instanceof Error ? error.message : 'An error occurred';
       updateNotification(loadingNotificationId, {
         type: 'error',
-        title: 'Failed to create tenant',
-        message: error instanceof Error ? error.message : 'An error occurred'
+        title: message.toLowerCase().includes('assign') || message.toLowerCase().includes('deposit')
+          ? 'Room assignment failed'
+          : 'Failed to create tenant',
+        message,
       });
     } finally {
       setLoading(false);
@@ -351,85 +413,54 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-900">
-              First Name *
-            </label>
-            <input
+          <FormField label="First Name" htmlFor="firstName" required error={errors.firstName}>
+            <Input
               type="text"
               name="firstName"
               id="firstName"
               value={formData.firstName}
               onChange={handleInputChange}
-              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                errors.firstName ? 'border-red-300' : ''
-              }`}
+              isInvalid={Boolean(errors.firstName)}
               required
             />
-            {errors.firstName && (
-              <p className="mt-1 text-sm text-red-600">{errors.firstName}</p>
-            )}
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-900">
-              Last Name *
-            </label>
-            <input
+          <FormField label="Last Name" htmlFor="lastName" required error={errors.lastName}>
+            <Input
               type="text"
               name="lastName"
               id="lastName"
               value={formData.lastName}
               onChange={handleInputChange}
-              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                errors.lastName ? 'border-red-300' : ''
-              }`}
+              isInvalid={Boolean(errors.lastName)}
               required
             />
-            {errors.lastName && (
-              <p className="mt-1 text-sm text-red-600">{errors.lastName}</p>
-            )}
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-900">
-              Email *
-            </label>
-            <input
+          <FormField label="Email" htmlFor="email" required error={errors.email}>
+            <Input
               type="email"
               name="email"
               id="email"
               value={formData.email}
               onChange={handleInputChange}
-              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                errors.email ? 'border-red-300' : ''
-              }`}
+              isInvalid={Boolean(errors.email)}
               required
             />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-            )}
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-900">
-              Phone
-            </label>
-            <input
+          <FormField label="Phone" htmlFor="phone">
+            <Input
               type="tel"
               name="phone"
               id="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-900">
-              Date of Birth
-            </label>
-            <input
+          <FormField label="Date of Birth" htmlFor="dateOfBirth">
+            <Input
               type="date"
               name="dateOfBirth"
               id="dateOfBirth"
@@ -437,42 +468,32 @@ export default function TenantForm() {
               onChange={handleInputChange}
               min="1900-01-01"
               max={new Date().toISOString().split('T')[0]}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-              style={{
-                colorScheme: 'light',
-              }}
+              style={{ colorScheme: 'light' }}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-900">
-              Previous Address
-            </label>
-            <input
+          <FormField label="Previous Address" htmlFor="previousAddress">
+            <Input
               type="text"
               name="previousAddress"
               id="previousAddress"
               value={formData.previousAddress}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900">
-              Monthly Income (₱)
-            </label>
-            <input
+          <FormField label="Monthly Income (₱)" htmlFor="monthlyIncome" error={errors.monthlyIncome}>
+            <Input
               type="number"
               name="monthlyIncome"
               id="monthlyIncome"
-              min="0"
-              step="0.01"
+              min={0}
+              step={0.01}
               value={formData.monthlyIncome ?? ''}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
+              isInvalid={Boolean(errors.monthlyIncome)}
             />
-          </div>
+          </FormField>
         </div>
       </div>
 
@@ -482,53 +503,37 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div>
-            <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-900">
-              Contact Name
-            </label>
-            <input
+          <FormField label="Contact Name" htmlFor="emergencyContactName">
+            <Input
               type="text"
               name="emergencyContactName"
               id="emergencyContactName"
               value={formData.emergencyContactName}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-900">
-              Contact Phone
-            </label>
-            <input
+          <FormField label="Contact Phone" htmlFor="emergencyContactPhone" error={errors.emergencyContactPhone}>
+            <Input
               type="tel"
               name="emergencyContactPhone"
               id="emergencyContactPhone"
               value={formData.emergencyContactPhone}
               onChange={handleInputChange}
-              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                errors.emergencyContactPhone ? 'border-red-300' : ''
-              }`}
+              isInvalid={Boolean(errors.emergencyContactPhone)}
             />
-            {errors.emergencyContactPhone && (
-              <p className="mt-1 text-sm text-red-600">{errors.emergencyContactPhone}</p>
-            )}
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-900">
-              Relationship
-            </label>
-            <input
+          <FormField label="Relationship" htmlFor="emergencyContactRelationship">
+            <Input
               type="text"
               name="emergencyContactRelationship"
               id="emergencyContactRelationship"
               value={formData.emergencyContactRelationship}
               onChange={handleInputChange}
               placeholder="e.g., Parent, Spouse, Friend"
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
-          </div>
+          </FormField>
         </div>
       </div>
 
@@ -538,38 +543,30 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-900">
-              Employment Status
-            </label>
-            <select
+          <FormField label="Employment Status" htmlFor="employmentStatus">
+            <Select
               name="employmentStatus"
               id="employmentStatus"
               value={formData.employmentStatus}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             >
               <option value="employed">Employed</option>
               <option value="unemployed">Unemployed</option>
               <option value="student">Student</option>
               <option value="retired">Retired</option>
               <option value="other">Other</option>
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
-          <div>
-            <label htmlFor="employerName" className="block text-sm font-medium text-gray-900">
-              Employer Name
-            </label>
-            <input
+          <FormField label="Employer Name" htmlFor="employerName">
+            <Input
               type="text"
               name="employerName"
               id="employerName"
               value={formData.employerName}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
-          </div>
+          </FormField>
         </div>
       </div>
 
@@ -582,17 +579,17 @@ export default function TenantForm() {
         </p>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900">
-              Property (Optional)
-            </label>
-            <select
+          <FormField
+            label="Property (Optional)"
+            htmlFor="buildingId"
+            hint="Select a property to filter available rooms"
+          >
+            <Select
               name="buildingId"
               id="buildingId"
               value={formData.buildingId}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base bg-white"
-              disabled={!Array.isArray(buildings) || buildings.length === 0}
+              isDisabled={!Array.isArray(buildings) || buildings.length === 0}
             >
               <option value="">{Array.isArray(buildings) && buildings.length === 0 ? 'Loading properties...' : 'Select a property'}</option>
               {Array.isArray(buildings) && buildings.map((building) => (
@@ -600,29 +597,29 @@ export default function TenantForm() {
                   {building.name}
                 </option>
               ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-900">
-              Select a property to filter available rooms
-            </p>
-          </div>
+            </Select>
+          </FormField>
 
-          <div>
-            <label htmlFor="roomId" className="block text-sm font-medium text-gray-900">
-              Room (Optional)
-            </label>
-            <select
+          <FormField
+            label="Room (Optional)"
+            htmlFor="roomId"
+            hint={
+              formData.roomId
+                ? 'Invoices will be auto-generated after tenant creation'
+                : 'You can assign a room later from the tenant detail page'
+            }
+          >
+            <Select
               name="roomId"
               id="roomId"
               value={formData.roomId}
               onChange={handleInputChange}
-              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base bg-white ${
-                !filteredRooms.length ? 'bg-gray-50 text-gray-400' : ''
-              }`}
-              disabled={!filteredRooms.length}
+              isDisabled={!filteredRooms.length}
+              className={!filteredRooms.length ? 'bg-gray-50 text-gray-400' : undefined}
             >
               <option value="">
-                {formData.buildingId && !filteredRooms.length 
-                  ? 'No available rooms in this property' 
+                {formData.buildingId && !filteredRooms.length
+                  ? 'No available rooms in this property'
                   : 'Select a room'}
               </option>
               {filteredRooms.map((room) => (
@@ -630,13 +627,8 @@ export default function TenantForm() {
                   {room.buildingName} - Room {room.roomNumber} (₱{room.monthlyRate.toLocaleString()}/month)
                 </option>
               ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-900">
-              {formData.roomId 
-                ? 'Invoices will be auto-generated after tenant creation' 
-                : 'You can assign a room later from the tenant detail page'}
-            </p>
-          </div>
+            </Select>
+          </FormField>
 
           {formData.roomId && (
             <div className="sm:col-span-2 bg-purple-100 border border-purple-300 rounded-md p-4">
@@ -671,108 +663,113 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label htmlFor="monthlyRent" className="block text-sm font-medium text-gray-900">
-              Monthly Rent (₱) *
-            </label>
-            <div className="flex items-center mb-2">
-              <input
-                type="checkbox"
-                id="overrideMonthlyRent"
-                checked={overrideMonthlyRent}
-                onChange={(e) => {
-                  setOverrideMonthlyRent(e.target.checked);
-                  if (!e.target.checked && formData.roomId) {
-                    const selectedRoom = rooms.find(r => r.id === formData.roomId);
-                    if (selectedRoom) {
-                      setFormData(prev => ({ ...prev, monthlyRent: selectedRoom.monthlyRate }));
-                    }
+          <FormField
+            label="Monthly Rent (₱)"
+            htmlFor="monthlyRent"
+            required
+            error={errors.monthlyRent}
+            hint={
+              formData.roomId && !overrideMonthlyRent
+                ? 'Monthly rent is automatically set from the selected room'
+                : 'Enter amount in Philippine Pesos'
+            }
+          >
+            <Checkbox
+              id="overrideMonthlyRent"
+              checked={overrideMonthlyRent}
+              onChange={(e) => {
+                setOverrideMonthlyRent(e.target.checked);
+                if (!e.target.checked && formData.roomId) {
+                  const selectedRoom = rooms.find(r => r.id === formData.roomId);
+                  if (selectedRoom) {
+                    setFormData(prev => ({ ...prev, monthlyRent: Number(selectedRoom.monthlyRate) }));
                   }
-                }}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-              <label htmlFor="overrideMonthlyRent" className="ml-2 block text-sm text-gray-900">
-                Override monthly rent
-              </label>
-            </div>
-            <input
+                }
+              }}
+              label="Override monthly rent"
+              className="mb-2"
+            />
+            <Input
               type="number"
               name="monthlyRent"
               id="monthlyRent"
-              min="0"
-              step="1"
+              min={0}
+              step={1}
               value={formData.monthlyRent ?? ''}
               onChange={handleInputChange}
               required
-              disabled={!overrideMonthlyRent && !formData.roomId}
+              isDisabled={!overrideMonthlyRent && !formData.roomId}
+              isInvalid={Boolean(errors.monthlyRent)}
               placeholder="e.g., 5000, 8000, 12000"
-              className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                errors.monthlyRent ? 'border-red-300' : ''
-              } ${!overrideMonthlyRent && !formData.roomId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             />
-            {errors.monthlyRent && (
-              <p className="mt-1 text-sm text-red-600">{errors.monthlyRent}</p>
-            )}
-            <p className="mt-1 text-xs text-gray-900">
-              {formData.roomId && !overrideMonthlyRent 
-                ? 'Monthly rent is automatically set from the selected room' 
-                : 'Enter amount in Philippine Pesos'}
-            </p>
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="depositMonths" className="block text-sm font-medium text-gray-900">
-              Deposit Months *
-            </label>
-            <select
+          <FormField
+            label="Deposit Months"
+            htmlFor="depositMonths"
+            required
+            error={errors.depositMonths}
+            hint={`Deposit: ₱${computedDeposit.toLocaleString()}`}
+          >
+            <Select
               name="depositMonths"
               id="depositMonths"
               value={formData.depositMonths}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             >
               <option value="0">0 month</option>
               <option value="1">1 month</option>
               <option value="2">2 months</option>
               <option value="3">3 months</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-900">
-              Deposit: ₱{((formData.monthlyRent || 0) * formData.depositMonths).toLocaleString()}
-            </p>
-          </div>
+            </Select>
+            {depositRaisedToMinimum && (
+              <p className="text-xs text-amber-700 mt-1">
+                Building minimum of ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} will be charged on assign
+              </p>
+            )}
+          </FormField>
 
-          <div>
-            <label htmlFor="advanceMonths" className="block text-sm font-medium text-gray-900">
-              Advance Months *
-            </label>
-            <select
+          <FormField
+            label="Advance Months"
+            htmlFor="advanceMonths"
+            required
+            hint={`Advance: ₱${computedAdvance.toLocaleString()}`}
+          >
+            <Select
               name="advanceMonths"
               id="advanceMonths"
               value={formData.advanceMonths}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             >
               <option value="0">0 month</option>
               <option value="1">1 month</option>
               <option value="2">2 months</option>
               <option value="3">3 months</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-900">
-              Advance: ₱{((formData.monthlyRent || 0) * formData.advanceMonths).toLocaleString()}
-            </p>
-          </div>
+            </Select>
+          </FormField>
 
           {/* Total Amount Display */}
           <div className="sm:col-span-2 bg-purple-50 p-4 rounded-md border border-purple-200">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-900">Total Initial Payment:</span>
               <span className="text-lg font-bold text-purple-600">
-                ₱{((formData.monthlyRent || 0) * (formData.depositMonths + formData.advanceMonths)).toLocaleString()}
+                ₱{(effectiveDeposit + computedAdvance).toLocaleString()}
               </span>
             </div>
             <p className="mt-1 text-xs text-gray-900">
-              (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths} month{formData.depositMonths !== 1 ? 's' : ''} deposit) + (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''} advance)
+              (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths} month{formData.depositMonths !== 1 ? 's' : ''} deposit
+              {depositRaisedToMinimum
+                ? ` → ₱${MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} minimum`
+                : ''}
+              ) + (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''} advance)
             </p>
+            {depositRaisedToMinimum && (
+              <p className="mt-2 text-xs text-amber-800">
+                Room rent × deposit months is below the ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} building minimum.
+                Create Tenant will charge ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} deposit so assignment can proceed.
+                For real units, set a realistic monthly rent (e.g. ₱5,000+).
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -783,11 +780,8 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label htmlFor="leaseStartDate" className="block text-sm font-medium text-gray-900">
-              Lease Start Date
-            </label>
-            <input
+          <FormField label="Lease Start Date" htmlFor="leaseStartDate" error={errors.leaseStartDate}>
+            <Input
               type="date"
               name="leaseStartDate"
               id="leaseStartDate"
@@ -795,18 +789,13 @@ export default function TenantForm() {
               onChange={handleInputChange}
               min="2000-01-01"
               max="2099-12-31"
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-              style={{
-                colorScheme: 'light',
-              }}
+              isInvalid={Boolean(errors.leaseStartDate)}
+              style={{ colorScheme: 'light' }}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="leaseEndDate" className="block text-sm font-medium text-gray-900">
-              Lease End Date
-            </label>
-            <input
+          <FormField label="Lease End Date" htmlFor="leaseEndDate">
+            <Input
               type="date"
               name="leaseEndDate"
               id="leaseEndDate"
@@ -814,18 +803,12 @@ export default function TenantForm() {
               onChange={handleInputChange}
               min={formData.leaseStartDate || '2000-01-01'}
               max="2099-12-31"
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-              style={{
-                colorScheme: 'light',
-              }}
+              style={{ colorScheme: 'light' }}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="moveInDate" className="block text-sm font-medium text-gray-900">
-              Move In Date
-            </label>
-            <input
+          <FormField label="Move In Date" htmlFor="moveInDate">
+            <Input
               type="date"
               name="moveInDate"
               id="moveInDate"
@@ -833,12 +816,9 @@ export default function TenantForm() {
               onChange={handleInputChange}
               min="2000-01-01"
               max="2099-12-31"
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-              style={{
-                colorScheme: 'light',
-              }}
+              style={{ colorScheme: 'light' }}
             />
-          </div>
+          </FormField>
         </div>
       </div>
 
@@ -848,39 +828,31 @@ export default function TenantForm() {
         </h3>
         
         <div className="grid grid-cols-1 gap-6">
-          <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-900">
-              Notes
-            </label>
-            <textarea
+          <FormField label="Notes" htmlFor="notes">
+            <Textarea
               name="notes"
               id="notes"
               rows={4}
               value={formData.notes}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               placeholder="Any additional notes about this tenant..."
             />
-          </div>
+          </FormField>
         </div>
       </div>
 
       <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => router.back()}
-          disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+          isDisabled={loading}
         >
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        </Button>
+        <Button type="submit" isLoading={loading}>
           {loading ? 'Creating...' : 'Create Tenant'}
-        </button>
+        </Button>
       </div>
     </form>
   );

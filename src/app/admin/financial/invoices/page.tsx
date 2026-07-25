@@ -4,6 +4,15 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getInvoices, getInvoiceSummary } from '@/lib/api/invoices';
 import { getAllTenants } from '@/lib/api/tenants';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { Button } from '@/components/ui/Button';
+import { AlertTriangle, CheckCircle2, Clock, FileText, Plus } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
+import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
 
 interface SearchParams {
   page?: string;
@@ -150,188 +159,73 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const totalPages = Math.ceil(invoicesData.total / 20);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/financial"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Invoice Management</h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link
-                href="/admin/financial/invoices/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Create Invoice
-              </Link>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Invoice Management"
+        description="Create, track, and collect invoices"
+        actions={
+          <Link href="/admin/financial/invoices/new">
+            <Button leftIcon={<Plus className="h-4 w-4" />}>Create Invoice</Button>
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Paid Invoices"
+          value={formatCurrency(summary.paidAmount)}
+          subtitle={`${summary.paidInvoices} invoices`}
+          tone="green"
+          icon={<CheckCircle2 className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Unpaid Invoices"
+          value={formatCurrency(summary.unpaidAmount)}
+          subtitle={`${summary.unpaidInvoices} invoices`}
+          tone="yellow"
+          icon={<Clock className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Overdue"
+          value={formatCurrency(summary.overdueAmount)}
+          subtitle={`${summary.overdueInvoices} invoices`}
+          tone="red"
+          icon={<AlertTriangle className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Total Invoices"
+          value={summary.totalInvoices}
+          subtitle={`${formatCurrency(summary.totalAmount)} total value`}
+          tone="blue"
+          icon={<FileText className="h-5 w-5" />}
+        />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Paid Invoices</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.paidAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.paidInvoices} invoices</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Unpaid Invoices</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.unpaidAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.unpaidInvoices} invoices</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Overdue</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.overdueAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.overdueInvoices} invoices</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Total Invoices</dt>
-                    <dd className="text-lg font-medium text-gray-900">{summary.totalInvoices}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{formatCurrency(summary.totalAmount)} total value</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="px-6 py-4">
+        <Card className="mb-6">
             <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-1">
-                  Search
-                </label>
-                <input
+              <FormField label="Search" htmlFor="search">
+                <Input
                   type="text"
                   name="search"
                   id="search"
                   defaultValue={search}
                   placeholder="Search invoices..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-900 mb-1">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  id="status"
-                  defaultValue={status}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Status" htmlFor="status">
+                <Select name="status" id="status" defaultValue={status}>
                   <option value="">All Statuses</option>
                   <option value="draft">Draft</option>
                   <option value="sent">Sent</option>
                   <option value="paid">Paid</option>
                   <option value="overdue">Overdue</option>
                   <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="tenant" className="block text-sm font-medium text-gray-900 mb-1">
-                  Tenant
-                </label>
-                <select
-                  name="tenant"
-                  id="tenant"
-                  defaultValue={tenantId}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Tenant" htmlFor="tenant">
+                <Select name="tenant" id="tenant" defaultValue={tenantId}>
                   <option value="">All Tenants</option>
                   {uniqueTenants.length > 0 ? (
                     uniqueTenants.map((tenant) => (
@@ -340,22 +234,20 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                       </option>
                     ))
                   ) : (
-                    <option value="" disabled>No tenants available</option>
+                    <option value="" disabled>
+                      No tenants available
+                    </option>
                   )}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
               <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
+                <Button type="submit" className="w-full">
                   Filter
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </Card>
 
         {/* Invoices Table */}
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
@@ -404,8 +296,8 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
                             <p className="text-sm font-medium text-gray-900">
                               {invoice.invoiceNumber}
                             </p>
-                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(invoice.status)}`}>
-                              {invoice.status}
+                            <span className="ml-2">
+                              <InvoiceStatusBadge status={invoice.status} />
                             </span>
                             <span className="ml-2 text-lg font-semibold text-gray-900">
                               {formatCurrency(invoice.totalAmount)}
@@ -517,7 +409,6 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 } 

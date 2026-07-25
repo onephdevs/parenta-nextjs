@@ -2,6 +2,13 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
+import { ArrowLeft, Download } from 'lucide-react';
 import { 
   generateFinancialReport, 
   getRevenueByCategory, 
@@ -117,97 +124,66 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/financial"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Financial Reports</h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <a
-                href={`/api/reports/financial/export?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&format=xlsx`}
-                download
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Export Report
-              </a>
-            </div>
+    <div className="space-y-6 p-6">
+      <Link
+        href="/admin/financial"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Financial
+      </Link>
+      <PageHeader
+        title="Financial Reports"
+        description="Revenue, expenses, and outstanding balances"
+        actions={
+          <a
+            href={`/api/reports/financial/export?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&format=xlsx`}
+            download
+          >
+            <Button variant="outline" leftIcon={<Download className="h-4 w-4" />}>
+              Export Report
+            </Button>
+          </a>
+        }
+      />
+
+      <Card className="mb-6">
+        <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <FormField label="Start Date" htmlFor="startDate">
+            <Input
+              type="date"
+              name="startDate"
+              id="startDate"
+              defaultValue={startDate}
+            />
+          </FormField>
+
+          <FormField label="End Date" htmlFor="endDate">
+            <Input
+              type="date"
+              name="endDate"
+              id="endDate"
+              defaultValue={endDate}
+            />
+          </FormField>
+
+          <FormField label="Quick Period" htmlFor="period">
+            <Select name="period" id="period" defaultValue="">
+              <option value="">Custom Range</option>
+              <option value="this-month">This Month</option>
+              <option value="last-month">Last Month</option>
+              <option value="this-quarter">This Quarter</option>
+              <option value="this-year">This Year</option>
+            </Select>
+          </FormField>
+
+          <div className="flex items-end">
+            <Button type="submit" className="w-full">
+              Generate Report
+            </Button>
           </div>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Date Range Filter */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="px-6 py-4">
-            <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-              <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-gray-900 mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  name="startDate"
-                  id="startDate"
-                  defaultValue={startDate}
-                  className="block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm h-[38px]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="endDate" className="block text-sm font-medium text-gray-900 mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  name="endDate"
-                  id="endDate"
-                  defaultValue={endDate}
-                  className="block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm h-[38px]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="period" className="block text-sm font-medium text-gray-900 mb-1">
-                  Quick Period
-                </label>
-                <select
-                  name="period"
-                  id="period"
-                  className="block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm h-[38px]"
-                >
-                  <option value="">Custom Range</option>
-                  <option value="this-month">This Month</option>
-                  <option value="last-month">Last Month</option>
-                  <option value="this-quarter">This Quarter</option>
-                  <option value="this-year">This Year</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 h-[38px]"
-                >
-                  Generate Report
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        </form>
+      </Card>
 
         {/* Report Period */}
         <div className="bg-white shadow rounded-lg mb-6">
@@ -482,7 +458,6 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 } 

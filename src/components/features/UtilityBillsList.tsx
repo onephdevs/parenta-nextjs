@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UtilityBill, Building } from '../../types/database';
+import { UtilityBill, Building } from '@/types/database';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Card } from '@/components/ui/Card';
 
 interface Filters {
   buildingId?: string;
@@ -64,14 +68,14 @@ export default function UtilityBillsList({
     'internet',
     'cable',
     'waste',
-    'other'
+    'other',
   ];
 
   const billStatuses = [
     'pending',
     'paid',
     'overdue',
-    'disputed'
+    'disputed',
   ];
 
   const getStatusBadge = (status: string) => {
@@ -81,7 +85,7 @@ export default function UtilityBillsList({
       overdue: 'bg-red-100 text-red-800',
       disputed: 'bg-orange-100 text-orange-800',
     };
-    
+
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800'}`}>
         {status}
@@ -128,40 +132,32 @@ export default function UtilityBillsList({
   const hasActiveFilters = Object.values(filters).some(value => value && value !== '');
 
   return (
-    <div className="bg-white rounded-lg shadow border">
-      {/* Filters */}
+    <Card padding="none">
       <div className="p-6 border-b border-gray-200">
         <div className="flex flex-col space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium text-gray-900">Utility Bills</h3>
             {hasActiveFilters && (
-              <button
-                onClick={onClearFilters}
-                className="text-sm text-gray-900 hover:text-gray-900"
-              >
+              <Button variant="ghost" size="sm" onClick={onClearFilters}>
                 Clear all filters
-              </button>
+              </Button>
             )}
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            {/* Search */}
             <div className="lg:col-span-2">
-              <input
+              <Input
                 type="text"
                 placeholder="Search provider, account, notes..."
                 value={filters.search || ''}
                 onChange={(e) => onFilterChange({ search: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            {/* Building Filter */}
             <div>
-              <select
+              <Select
                 value={filters.buildingId || ''}
                 onChange={(e) => onFilterChange({ buildingId: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">All Buildings</option>
                 {buildings.map((building) => (
@@ -169,15 +165,13 @@ export default function UtilityBillsList({
                     {building.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
-            {/* Utility Type Filter */}
             <div>
-              <select
+              <Select
                 value={filters.utilityType || ''}
                 onChange={(e) => onFilterChange({ utilityType: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">All Types</option>
                 {utilityTypes.map((type) => (
@@ -185,15 +179,13 @@ export default function UtilityBillsList({
                     {getUtilityIcon(type)} {type.charAt(0).toUpperCase() + type.slice(1)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
-            {/* Status Filter */}
             <div>
-              <select
+              <Select
                 value={filters.billStatus || ''}
                 onChange={(e) => onFilterChange({ billStatus: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">All Statuses</option>
                 {billStatuses.map((status) => (
@@ -201,29 +193,24 @@ export default function UtilityBillsList({
                     {status.charAt(0).toUpperCase() + status.slice(1)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
-            {/* Date Range */}
             <div className="lg:col-span-1">
-              <input
+              <Input
                 type="date"
                 placeholder="Start Date"
                 value={filters.startDate || ''}
                 onChange={(e) => onFilterChange({ startDate: e.target.value || undefined })}
                 min="2000-01-01"
                 max="2099-12-31"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bills Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -256,25 +243,25 @@ export default function UtilityBillsList({
               [...Array(5)].map((_, index) => (
                 <tr key={index} className="animate-pulse">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-32"></div>
+                    <div className="h-4 bg-gray-200 rounded w-32" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    <div className="h-4 bg-gray-200 rounded w-24" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 rounded w-16" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-28"></div>
+                    <div className="h-4 bg-gray-200 rounded w-28" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    <div className="h-4 bg-gray-200 rounded w-20" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 rounded w-16" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    <div className="h-4 bg-gray-200 rounded w-24" />
                   </td>
                 </tr>
               ))
@@ -288,7 +275,7 @@ export default function UtilityBillsList({
               bills.map((bill) => {
                 const daysUntilDue = getDaysUntilDue(bill.dueDate);
                 const building = buildings.find(b => b.id === bill.buildingId);
-                
+
                 return (
                   <tr key={bill.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -338,15 +325,15 @@ export default function UtilityBillsList({
                         {formatDate(bill.dueDate)}
                       </div>
                       <div className={`text-xs ${
-                        daysUntilDue < 0 
-                          ? 'text-red-600' 
-                          : daysUntilDue <= 7 
-                            ? 'text-yellow-600' 
+                        daysUntilDue < 0
+                          ? 'text-red-600'
+                          : daysUntilDue <= 7
+                            ? 'text-yellow-600'
                             : 'text-gray-900'
                       }`}>
-                        {daysUntilDue < 0 
+                        {daysUntilDue < 0
                           ? `${Math.abs(daysUntilDue)} days overdue`
-                          : daysUntilDue === 0 
+                          : daysUntilDue === 0
                             ? 'Due today'
                             : `${daysUntilDue} days remaining`
                         }
@@ -357,37 +344,42 @@ export default function UtilityBillsList({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onEditBill(bill)}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           Edit
-                        </button>
-                        
+                        </Button>
+
                         {bill.billStatus !== 'paid' && (
-                          <select
+                          <Select
                             value=""
+                            size="sm"
                             onChange={(e) => {
                               if (e.target.value) {
                                 onUpdateStatus(bill.id, e.target.value);
                               }
                             }}
-                            className="text-xs border border-gray-300 rounded px-2 py-1"
+                            className="w-auto text-xs"
                           >
                             <option value="">Change Status</option>
                             <option value="paid">Mark as Paid</option>
                             <option value="overdue">Mark as Overdue</option>
                             <option value="disputed">Mark as Disputed</option>
                             <option value="pending">Mark as Pending</option>
-                          </select>
+                          </Select>
                         )}
-                        
-                        <button
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => onDeleteBill(bill.id)}
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -398,30 +390,31 @@ export default function UtilityBillsList({
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-900">
             Page {currentPage} of {totalPages}
           </div>
           <div className="flex space-x-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              isDisabled={currentPage === 1}
             >
               Previous
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              isDisabled={currentPage === totalPages}
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
-} 
+}

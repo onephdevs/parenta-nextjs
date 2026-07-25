@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { PaymentGateway } from '@/types/payments';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Card } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 export default function PaymentGatewayManager() {
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
@@ -35,7 +41,7 @@ export default function PaymentGatewayManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gatewayId, isActive: !isActive }),
       });
-      
+
       if (response.ok) {
         await fetchGateways();
       }
@@ -60,8 +66,7 @@ export default function PaymentGatewayManager() {
   }
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      {/* Tabs */}
+    <Card padding="none" className="shadow rounded-lg overflow-hidden">
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
           {tabs.map((tab) => (
@@ -82,13 +87,12 @@ export default function PaymentGatewayManager() {
       </div>
 
       <div className="p-6">
-        {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Gateway Status</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {gateways.map((gateway) => (
-                <div key={gateway.id} className="border border-gray-200 rounded-lg p-4">
+                <Card key={gateway.id} padding="sm" className="border border-gray-200 shadow-none">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
                       <div className="text-2xl">
@@ -136,42 +140,39 @@ export default function PaymentGatewayManager() {
                     </div>
                   </div>
 
-                  <button
+                  <Button
+                    variant="ghost"
+                    className="mt-3 w-full text-purple-600 hover:text-purple-700"
                     onClick={() => {
                       setSelectedGateway(gateway);
                       setShowConfig(true);
                       setActiveTab('gateways');
                     }}
-                    className="mt-3 w-full text-sm text-purple-600 hover:text-purple-700 font-medium"
                   >
                     Configure Settings
-                  </button>
-                </div>
+                  </Button>
+                </Card>
               ))}
             </div>
           </div>
         )}
 
-        {/* Gateway Settings Tab */}
         {activeTab === 'gateways' && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Gateway Configuration</h3>
-            
+
             {!showConfig ? (
               <div className="text-center py-8">
                 <div className="text-gray-400 text-6xl mb-4">⚙️</div>
                 <h4 className="text-lg font-medium text-gray-900 mb-2">Select a Gateway to Configure</h4>
                 <p className="text-gray-900 mb-6">Choose a payment gateway from the overview tab to manage its settings.</p>
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
-                >
+                <Button variant="primary" onClick={() => setActiveTab('overview')}>
                   Go to Overview
-                </button>
+                </Button>
               </div>
             ) : (
-              <GatewayConfigForm 
-                gateway={selectedGateway!} 
+              <GatewayConfigForm
+                gateway={selectedGateway!}
                 onSave={() => {
                   setShowConfig(false);
                   fetchGateways();
@@ -182,14 +183,13 @@ export default function PaymentGatewayManager() {
           </div>
         )}
 
-        {/* Payment Methods Tab */}
         {activeTab === 'methods' && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Supported Payment Methods</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {gateways.filter(g => g.isActive).flatMap(gateway =>
                 gateway.supportedMethods.map((method, index) => (
-                  <div key={`${gateway.id}-${index}`} className="border border-gray-200 rounded-lg p-4">
+                  <Card key={`${gateway.id}-${index}`} padding="sm" className="border border-gray-200 shadow-none">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className="text-2xl">{method.icon}</span>
                       <div>
@@ -209,36 +209,22 @@ export default function PaymentGatewayManager() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Card>
                 ))
               )}
             </div>
           </div>
         )}
 
-        {/* Testing Tab */}
         {activeTab === 'testing' && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Testing</h3>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">Test Mode Active</h3>
-                  <p className="mt-1 text-sm text-yellow-700">
-                    All transactions are processed in test mode. No real money will be charged.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <Alert variant="warning" title="Test Mode Active" className="mb-6">
+              All transactions are processed in test mode. No real money will be charged.
+            </Alert>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Test Cards */}
-              <div className="border border-gray-200 rounded-lg p-6">
+              <Card padding="md" className="border border-gray-200 shadow-none">
                 <h4 className="font-medium text-gray-900 mb-4">Test Credit Cards</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
@@ -254,35 +240,25 @@ export default function PaymentGatewayManager() {
                     <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Insufficient Funds</span>
                   </div>
                 </div>
-              </div>
+              </Card>
 
-              {/* Test Actions */}
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h4 className="font-medium text-gray-900 mb-4">Test Payment</h4>
-                <p className="text-sm text-gray-900 mb-4">
-                  Create a test payment to verify your gateway configuration.
-                </p>
-                <button className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 text-sm font-medium">
-                  Create Test Payment
-                </button>
-              </div>
+              <TestPaymentPanel gateways={gateways} />
             </div>
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
-// Gateway Configuration Form Component
-function GatewayConfigForm({ 
-  gateway, 
-  onSave, 
-  onCancel 
-}: { 
-  gateway: PaymentGateway; 
-  onSave: () => void; 
-  onCancel: () => void; 
+function GatewayConfigForm({
+  gateway,
+  onSave,
+  onCancel
+}: {
+  gateway: PaymentGateway;
+  onSave: () => void;
+  onCancel: () => void;
 }) {
   const [settings, setSettings] = useState(gateway.settings);
   const [saving, setSaving] = useState(false);
@@ -299,7 +275,7 @@ function GatewayConfigForm({
           isActive: gateway.isActive,
         }),
       });
-      
+
       if (response.ok) {
         onSave();
       }
@@ -326,104 +302,122 @@ function GatewayConfigForm({
       </div>
 
       <div className="space-y-6">
-        {/* Basic Settings */}
         <div>
           <h5 className="font-medium text-gray-900 mb-3">Basic Settings</h5>
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Currency
-              </label>
-              <select
-                value={settings.currency}
-                onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              >
-                <option value="PHP">PHP - Philippine Peso</option>
-                <option value="USD">USD - US Dollar</option>
-                <option value="EUR">EUR - Euro</option>
-                <option value="GBP">GBP - British Pound</option>
-              </select>
-            </div>
-          </div>
+          <FormField label="Currency" htmlFor="gateway-currency">
+            <Select
+              id="gateway-currency"
+              value={settings.currency}
+              onChange={(e) => setSettings({ ...settings, currency: e.target.value })}
+            >
+              <option value="PHP">PHP - Philippine Peso</option>
+              <option value="USD">USD - US Dollar</option>
+              <option value="EUR">EUR - Euro</option>
+              <option value="GBP">GBP - British Pound</option>
+            </Select>
+          </FormField>
         </div>
 
-        {/* Security Settings */}
         <div>
           <h5 className="font-medium text-gray-900 mb-3">Security Settings</h5>
           <div className="space-y-3">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={settings.testMode}
-                onChange={(e) => setSettings({ ...settings, testMode: e.target.checked })}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              />
-              <span className="ml-2 text-sm text-gray-900">Test Mode</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={settings.requireCvv}
-                onChange={(e) => setSettings({ ...settings, requireCvv: e.target.checked })}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              />
-              <span className="ml-2 text-sm text-gray-900">Require CVV</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={settings.allowSaveCard}
-                onChange={(e) => setSettings({ ...settings, allowSaveCard: e.target.checked })}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              />
-              <span className="ml-2 text-sm text-gray-900">Allow Save Card</span>
-            </label>
+            <Checkbox
+              label="Test Mode"
+              checked={settings.testMode}
+              onChange={(e) => setSettings({ ...settings, testMode: e.target.checked })}
+            />
+            <Checkbox
+              label="Require CVV"
+              checked={settings.requireCvv}
+              onChange={(e) => setSettings({ ...settings, requireCvv: e.target.checked })}
+            />
+            <Checkbox
+              label="Allow Save Card"
+              checked={settings.allowSaveCard}
+              onChange={(e) => setSettings({ ...settings, allowSaveCard: e.target.checked })}
+            />
           </div>
         </div>
 
-        {/* Payment Settings */}
         <div>
           <h5 className="font-medium text-gray-900 mb-3">Payment Settings</h5>
           <div className="space-y-3">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={settings.autoCapture}
-                onChange={(e) => setSettings({ ...settings, autoCapture: e.target.checked })}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              />
-              <span className="ml-2 text-sm text-gray-900">Auto-capture Payments</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={settings.enableRecurring}
-                onChange={(e) => setSettings({ ...settings, enableRecurring: e.target.checked })}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              />
-              <span className="ml-2 text-sm text-gray-900">Enable Recurring Payments</span>
-            </label>
+            <Checkbox
+              label="Auto-capture Payments"
+              checked={settings.autoCapture}
+              onChange={(e) => setSettings({ ...settings, autoCapture: e.target.checked })}
+            />
+            <Checkbox
+              label="Enable Recurring Payments"
+              checked={settings.enableRecurring}
+              onChange={(e) => setSettings({ ...settings, enableRecurring: e.target.checked })}
+            />
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-900 hover:bg-gray-50"
-          >
+        <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+          <Button variant="outline" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="primary" onClick={handleSave} isLoading={saving}>
             {saving ? 'Saving...' : 'Save Configuration'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
   );
-} 
+}
+
+function TestPaymentPanel({ gateways }: { gateways: PaymentGateway[] }) {
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState('');
+  const activeGateway = gateways.find((g) => g.isActive) || gateways[0];
+
+  const handleTestPayment = async () => {
+    if (!activeGateway) {
+      setMessage('No payment gateway configured.');
+      return;
+    }
+
+    setRunning(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/payment-gateways/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gatewayId: activeGateway.id, amount: 100 }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Test payment failed');
+      }
+      setMessage(result.message || 'Test payment succeeded (simulation).');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Test payment failed');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Card padding="md" className="border border-gray-200 shadow-none">
+      <h4 className="font-medium text-gray-900 mb-4">Test Payment</h4>
+      <p className="text-sm text-gray-900 mb-4">
+        Simulate a ₱100 test charge against {activeGateway?.name || 'your gateway'} (test mode only — no real charge).
+      </p>
+      <Button
+        type="button"
+        variant="primary"
+        className="w-full"
+        onClick={handleTestPayment}
+        isLoading={running}
+        isDisabled={!activeGateway}
+      >
+        {running ? 'Running test…' : 'Create Test Payment'}
+      </Button>
+      {message && (
+        <p className="mt-3 text-sm text-gray-800">{message}</p>
+      )}
+    </Card>
+  );
+}

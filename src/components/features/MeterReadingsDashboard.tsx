@@ -1,155 +1,323 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
+
+interface MeterReading {
+  id: string;
+  buildingId: string;
+  roomId?: string;
+  utilityType: string;
+  meterNumber?: string;
+  readingDate: string;
+  readingValue: number;
+  previousReading?: number;
+  usageCalculated?: number;
+  notes?: string;
+  building_name?: string;
+  room_number?: string;
+}
+
+interface BuildingOption {
+  id: string;
+  name: string;
+}
 
 export default function MeterReadingsDashboard() {
   const [loading, setLoading] = useState(true);
-  const [readings, setReadings] = useState([]);
+  const [readings, setReadings] = useState<MeterReading[]>([]);
+  const [buildings, setBuildings] = useState<BuildingOption[]>([]);
+  const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    buildingId: '',
+    utilityType: 'electricity',
+    readingDate: new Date().toISOString().slice(0, 10),
+    readingValue: '',
+    meterNumber: '',
+    notes: '',
+  });
+
+  const loadReadings = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [readingsRes, buildingsRes] = await Promise.all([
+        fetch('/api/meter-readings?limit=50'),
+        fetch('/api/buildings'),
+      ]);
+      const readingsData = await readingsRes.json();
+      const buildingsData = await buildingsRes.json();
+
+      if (!readingsRes.ok || !readingsData.success) {
+        throw new Error(readingsData.error || 'Failed to load meter readings');
+      }
+
+      setReadings(readingsData.data || []);
+
+      const list =
+        buildingsData.data?.buildings ||
+        buildingsData.data ||
+        buildingsData.buildings ||
+        [];
+      setBuildings(
+        (Array.isArray(list) ? list : []).map((b: { id: string; name: string }) => ({
+          id: b.id,
+          name: b.name,
+        }))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load meter readings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate loading state
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    loadReadings();
   }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch('/api/meter-readings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buildingId: form.buildingId,
+          utilityType: form.utilityType,
+          readingDate: form.readingDate,
+          readingValue: Number(form.readingValue),
+          meterNumber: form.meterNumber || undefined,
+          notes: form.notes || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create reading');
+      }
+      setShowForm(false);
+      setForm({
+        buildingId: '',
+        utilityType: 'electricity',
+        readingDate: new Date().toISOString().slice(0, 10),
+        readingValue: '',
+        meterNumber: '',
+        notes: '',
+      });
+      await loadReadings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create reading');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const monthCount = readings.filter((r) => {
+    const d = new Date(r.readingDate);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+
+  const uniqueMeters = new Set(
+    readings.map((r) => `${r.buildingId}-${r.utilityType}-${r.meterNumber || 'default'}`)
+  ).size;
 
   if (loading) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4" />
           <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-            <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+            <div className="h-4 bg-gray-200 rounded" />
+            <div className="h-4 bg-gray-200 rounded w-5/6" />
+            <div className="h-4 bg-gray-200 rounded w-4/6" />
           </div>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Meter Readings Dashboard</h2>
-          <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Reading
-          </button>
-        </div>
-        <p className="mt-2 text-sm text-gray-900">
-          Track and manage utility meter readings across all properties.
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">Meter Readings Dashboard</h2>
+            <Button variant="primary" onClick={() => setShowForm(true)}>
+              Add Reading
+            </Button>
+          </div>
+          <p className="text-sm text-gray-900">
+            Track and manage utility meter readings across all properties.
+          </p>
+        </CardHeader>
+        {error && (
+          <div className="px-6 pb-4">
+            <Alert variant="danger">{error}</Alert>
+          </div>
+        )}
+      </Card>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-900 truncate">Total Meters</dt>
-                  <dd className="text-lg font-medium text-gray-900">{readings.length}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-900 truncate">Recent Readings</dt>
-                  <dd className="text-lg font-medium text-gray-900">0</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-900 truncate">Pending Readings</dt>
-                  <dd className="text-lg font-medium text-gray-900">0</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-900 truncate">This Month</dt>
-                  <dd className="text-lg font-medium text-gray-900">0</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+        <StatCard label="Total Readings" value={readings.length} />
+        <StatCard label="Unique Meters" value={uniqueMeters} />
+        <StatCard label="This Month" value={monthCount} />
+        <StatCard label="Buildings" value={buildings.length} />
       </div>
 
-      {/* Main Content */}
-      <div className="bg-white shadow rounded-lg">
+      {showForm && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-medium text-gray-900">Add Meter Reading</h3>
+          </CardHeader>
+          <CardBody>
+            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField label="Building" htmlFor="meter-building" required>
+                <Select
+                  id="meter-building"
+                  required
+                  value={form.buildingId}
+                  onChange={(e) => setForm((f) => ({ ...f, buildingId: e.target.value }))}
+                >
+                  <option value="">Select building</option>
+                  {buildings.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Utility Type" htmlFor="meter-utility-type">
+                <Select
+                  id="meter-utility-type"
+                  value={form.utilityType}
+                  onChange={(e) => setForm((f) => ({ ...f, utilityType: e.target.value }))}
+                >
+                  <option value="electricity">Electricity</option>
+                  <option value="water">Water</option>
+                  <option value="gas">Gas</option>
+                  <option value="internet">Internet</option>
+                  <option value="other">Other</option>
+                </Select>
+              </FormField>
+
+              <FormField label="Reading Date" htmlFor="meter-reading-date" required>
+                <Input
+                  id="meter-reading-date"
+                  type="date"
+                  required
+                  value={form.readingDate}
+                  onChange={(e) => setForm((f) => ({ ...f, readingDate: e.target.value }))}
+                />
+              </FormField>
+
+              <FormField label="Reading Value" htmlFor="meter-reading-value" required>
+                <Input
+                  id="meter-reading-value"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={form.readingValue}
+                  onChange={(e) => setForm((f) => ({ ...f, readingValue: e.target.value }))}
+                />
+              </FormField>
+
+              <FormField label="Meter Number (optional)" htmlFor="meter-number">
+                <Input
+                  id="meter-number"
+                  type="text"
+                  value={form.meterNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, meterNumber: e.target.value }))}
+                />
+              </FormField>
+
+              <FormField label="Notes (optional)" htmlFor="meter-notes">
+                <Textarea
+                  id="meter-notes"
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  rows={1}
+                />
+              </FormField>
+
+              <div className="md:col-span-2 flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" isLoading={saving}>
+                  Save Reading
+                </Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      )}
+
+      <Card padding="none">
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
             Recent Meter Readings
           </h3>
-          
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No meter readings</h3>
-            <p className="mt-1 text-sm text-gray-900">Get started by adding your first meter reading.</p>
-            <div className="mt-6">
-              <button
-                type="button"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add Meter Reading
-              </button>
+
+          {readings.length === 0 ? (
+            <div className="text-center py-12">
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No meter readings</h3>
+              <p className="mt-1 text-sm text-gray-900">Get started by adding your first meter reading.</p>
+              <div className="mt-6">
+                <Button variant="primary" onClick={() => setShowForm(true)}>
+                  Add Meter Reading
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead>
+                  <tr className="text-left text-gray-700">
+                    <th className="py-2 pr-4">Date</th>
+                    <th className="py-2 pr-4">Building</th>
+                    <th className="py-2 pr-4">Utility</th>
+                    <th className="py-2 pr-4">Value</th>
+                    <th className="py-2">Meter #</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {readings.map((r) => (
+                    <tr key={r.id}>
+                      <td className="py-2 pr-4">{new Date(r.readingDate).toLocaleDateString()}</td>
+                      <td className="py-2 pr-4">{r.building_name || r.buildingId}</td>
+                      <td className="py-2 pr-4 capitalize">{r.utilityType}</td>
+                      <td className="py-2 pr-4">{Number(r.readingValue).toLocaleString()}</td>
+                      <td className="py-2">{r.meterNumber || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
     </div>
   );
-} 
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <Card padding="sm">
+      <dl>
+        <dt className="text-sm font-medium text-gray-900 truncate">{label}</dt>
+        <dd className="text-lg font-medium text-gray-900">{value}</dd>
+      </dl>
+    </Card>
+  );
+}

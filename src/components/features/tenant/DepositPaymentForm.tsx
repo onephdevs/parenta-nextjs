@@ -1,15 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DollarSign, Loader2, CheckCircle2 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { DollarSign } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
+import { cn } from '@/lib/utils';
 
 interface DepositPaymentFormProps {
   onPaymentComplete?: () => void;
   onCancel?: () => void;
 }
 
-export default function DepositPaymentForm({ onPaymentComplete, onCancel }: DepositPaymentFormProps) {
+export default function DepositPaymentForm({
+  onPaymentComplete,
+  onCancel,
+}: DepositPaymentFormProps) {
   const [paymentType, setPaymentType] = useState<'deposit' | 'advance'>('deposit');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('online');
@@ -44,7 +54,8 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           paymentType,
           paymentMethod,
           referenceNumber: referenceNumber || undefined,
-          description: description || `${paymentType === 'deposit' ? 'Deposit' : 'Advance'} payment`,
+          description:
+            description || `${paymentType === 'deposit' ? 'Deposit' : 'Advance'} payment`,
         }),
       });
 
@@ -57,9 +68,7 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           message: data.message || `Your ${paymentType} payment has been recorded successfully`,
         });
 
-        if (onPaymentComplete) {
-          onPaymentComplete();
-        }
+        onPaymentComplete?.();
       } else {
         showNotification({
           type: 'error',
@@ -79,60 +88,72 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
-    }).format(amount);
+    }).format(value);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <p className="text-sm text-blue-800">
-          <strong>Note:</strong> Deposits are held for security and refunded at move-out. Advances are applied to future rent payments.
-        </p>
-      </div>
+      <Alert variant="info">
+        <strong>Note:</strong> Deposits are held for security and refunded at move-out. Advances
+        are applied to future rent payments.
+      </Alert>
 
-      {/* Payment Type Selection */}
-      <div>
-        <label htmlFor="paymentType" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Type *
-        </label>
+      <FormField label="Payment Type" htmlFor="paymentType-deposit" required>
         <div className="grid grid-cols-2 gap-4">
           <button
             type="button"
             onClick={() => setPaymentType('deposit')}
-            className={`p-4 border-2 rounded-lg flex items-center justify-center space-x-2 ${
+            className={cn(
+              'p-4 border-2 rounded-lg flex items-center justify-center space-x-2',
               paymentType === 'deposit'
                 ? 'border-green-500 bg-green-50'
                 : 'border-gray-300 hover:border-gray-400'
-            }`}
+            )}
           >
-            <DollarSign className={`h-5 w-5 ${paymentType === 'deposit' ? 'text-green-600' : 'text-gray-400'}`} />
+            <DollarSign
+              className={cn(
+                'h-5 w-5',
+                paymentType === 'deposit' ? 'text-green-600' : 'text-gray-400'
+              )}
+            />
             <span className="font-medium">Deposit</span>
           </button>
           <button
             type="button"
             onClick={() => setPaymentType('advance')}
-            className={`p-4 border-2 rounded-lg flex items-center justify-center space-x-2 ${
+            className={cn(
+              'p-4 border-2 rounded-lg flex items-center justify-center space-x-2',
               paymentType === 'advance'
                 ? 'border-blue-500 bg-blue-50'
                 : 'border-gray-300 hover:border-gray-400'
-            }`}
+            )}
           >
-            <DollarSign className={`h-5 w-5 ${paymentType === 'advance' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <DollarSign
+              className={cn(
+                'h-5 w-5',
+                paymentType === 'advance' ? 'text-blue-600' : 'text-gray-400'
+              )}
+            />
             <span className="font-medium">Advance</span>
           </button>
         </div>
-      </div>
+      </FormField>
 
-      {/* Payment Amount */}
-      <div>
-        <label htmlFor="amount" className="block text-sm font-medium text-gray-900 mb-2">
-          Amount (₱) *
-        </label>
-        <input
+      <FormField
+        label="Amount (₱)"
+        htmlFor="amount"
+        required
+        hint={
+          amount && parseFloat(amount) > 0
+            ? `You are paying: ${formatCurrency(parseFloat(amount))} as ${paymentType}`
+            : undefined
+        }
+      >
+        <Input
           type="number"
           id="amount"
           min="0.01"
@@ -141,72 +162,50 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
           onChange={(e) => setAmount(e.target.value)}
           required
           placeholder="0.00"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        {amount && parseFloat(amount) > 0 && (
-          <p className="mt-1 text-sm text-gray-600">
-            You are paying: {formatCurrency(parseFloat(amount))} as {paymentType}
-          </p>
-        )}
-      </div>
+      </FormField>
 
-      {/* Payment Method */}
-      <div>
-        <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Method *
-        </label>
-        <select
+      <FormField label="Payment Method" htmlFor="paymentMethod" required>
+        <Select
           id="paymentMethod"
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="online">Online Payment</option>
           <option value="credit_card">Credit Card</option>
           <option value="bank_transfer">Bank Transfer</option>
           <option value="cash">Cash</option>
           <option value="check">Check</option>
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
-      {/* Reference Number */}
-      <div>
-        <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-900 mb-2">
-          Reference Number (Optional)
-        </label>
-        <input
+      <FormField label="Reference Number (Optional)" htmlFor="referenceNumber">
+        <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
           placeholder="Transaction reference, receipt number, etc."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </FormField>
 
-      {/* Description */}
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-2">
-          Description (Optional)
-        </label>
-        <textarea
+      <FormField label="Description (Optional)" htmlFor="description">
+        <Textarea
           id="description"
           rows={3}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Additional notes about this deposit..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </FormField>
 
-      {/* Payment Summary */}
       {amount && parseFloat(amount) > 0 && (
-        <div className={`${paymentType === 'deposit' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'} border rounded-lg p-4`}>
-          <h4 className={`text-sm font-medium ${paymentType === 'deposit' ? 'text-green-900' : 'text-blue-900'} mb-2`}>
-            {paymentType === 'deposit' ? 'Deposit' : 'Advance'} Summary
-          </h4>
-          <div className={`space-y-1 text-sm ${paymentType === 'deposit' ? 'text-green-800' : 'text-blue-800'}`}>
+        <Alert
+          variant={paymentType === 'deposit' ? 'success' : 'info'}
+          title={`${paymentType === 'deposit' ? 'Deposit' : 'Advance'} Summary`}
+        >
+          <div className="mt-2 space-y-1 text-sm">
             <div className="flex justify-between">
               <span>Payment Type:</span>
               <span className="font-medium capitalize">{paymentType}</span>
@@ -220,41 +219,24 @@ export default function DepositPaymentForm({ onPaymentComplete, onCancel }: Depo
               <span className="font-medium capitalize">{paymentMethod.replace('_', ' ')}</span>
             </div>
           </div>
-        </div>
+        </Alert>
       )}
 
-      {/* Submit Buttons */}
       <div className="flex items-center justify-end space-x-3">
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
-          >
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="submit"
-          disabled={isProcessing || !amount || parseFloat(amount) <= 0}
-          className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white ${
-            paymentType === 'deposit'
-              ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 disabled:bg-green-400'
-              : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 disabled:bg-blue-400'
-          } focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed`}
+          variant="success"
+          isLoading={isProcessing}
+          isDisabled={!amount || parseFloat(amount) <= 0}
+          leftIcon={<DollarSign className="h-5 w-5" />}
         >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <DollarSign className="h-5 w-5 mr-2" />
-              Record {paymentType === 'deposit' ? 'Deposit' : 'Advance'}
-            </>
-          )}
-        </button>
+          Record {paymentType === 'deposit' ? 'Deposit' : 'Advance'}
+        </Button>
       </div>
     </form>
   );

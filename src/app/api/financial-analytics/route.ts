@@ -297,6 +297,9 @@ export async function GET(request: NextRequest) {
         endDate,
         analysisType,
         generatedAt: new Date().toISOString(),
+        // Advanced forecasts/ROI/benchmarks are illustrative demo data until wired to live ledgers
+        isDemo: true,
+        dataSource: 'demo',
       },
     });
   } catch (error) {

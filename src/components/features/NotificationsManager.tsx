@@ -1,10 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 export default function NotificationsManager() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const { addNotification } = useNotifications();
 
   const handleGenerateReminders = async () => {
     setLoading(true);
@@ -20,13 +24,13 @@ export default function NotificationsManager() {
       setResult(data);
       
       if (data.success) {
-        alert(data.message);
+        addNotification(data.message, 'success');
       } else {
-        alert('Error: ' + (data.error || 'Failed to generate reminders'));
+        addNotification('Error: ' + (data.error || 'Failed to generate reminders'), 'error');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to generate reminders');
+      addNotification('Failed to generate reminders', 'error');
     } finally {
       setLoading(false);
     }
@@ -45,13 +49,13 @@ export default function NotificationsManager() {
       setResult(data);
       
       if (data.success) {
-        alert(data.message);
+        addNotification(data.message, 'success');
       } else {
-        alert('Error: ' + (data.error || 'Failed to process queue'));
+        addNotification('Error: ' + (data.error || 'Failed to process queue'), 'error');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to process notification queue');
+      addNotification('Failed to process notification queue', 'error');
     } finally {
       setLoading(false);
     }
@@ -62,43 +66,43 @@ export default function NotificationsManager() {
       <h2 className="text-2xl font-bold mb-6 text-gray-900">Notifications & Reminders</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* Generate Reminders Card */}
-        <div className="p-6 border border-gray-300 rounded-lg bg-white">
+        <Card>
           <h3 className="text-lg font-semibold mb-3 text-gray-900">📅 Generate Payment Reminders</h3>
           <p className="text-sm text-gray-900 mb-4">
             Automatically create reminders for upcoming invoice due dates based on your settings.
           </p>
-          <button
+          <Button
             onClick={handleGenerateReminders}
             disabled={loading}
-            className="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+            isLoading={loading}
+            className="w-full"
           >
             {loading ? 'Generating...' : 'Generate Reminders'}
-          </button>
-        </div>
+          </Button>
+        </Card>
 
-        {/* Process Queue Card */}
-        <div className="p-6 border border-gray-300 rounded-lg bg-white">
+        <Card>
           <h3 className="text-lg font-semibold mb-3 text-gray-900">📧 Process Notification Queue</h3>
           <p className="text-sm text-gray-900 mb-4">
             Send all pending notifications in the queue. This happens automatically, but you can trigger it manually.
           </p>
-          <button
+          <Button
+            variant="success"
             onClick={handleProcessQueue}
             disabled={loading}
-            className="w-full py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
+            isLoading={loading}
+            className="w-full"
           >
             {loading ? 'Processing...' : 'Process Queue'}
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
 
-      {/* Result Display */}
       {result && (
-        <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
+        <Card className="bg-gray-50">
           <h4 className="font-semibold mb-2">Last Operation Result:</h4>
           <pre className="text-xs overflow-auto">{JSON.stringify(result, null, 2)}</pre>
-        </div>
+        </Card>
       )}
 
       {/* Information Section */}

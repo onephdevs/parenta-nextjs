@@ -28,7 +28,11 @@ export async function getInvoices(
       i.invoice_number ILIKE $${paramIndex} OR
       CONCAT(t.first_name, ' ', t.last_name) ILIKE $${paramIndex} OR
       t.email ILIKE $${paramIndex} OR
-      i.description ILIKE $${paramIndex}
+      i.notes ILIKE $${paramIndex} OR
+      EXISTS (
+        SELECT 1 FROM invoice_line_items ili
+        WHERE ili.invoice_id = i.id AND ili.description ILIKE $${paramIndex}
+      )
     )`;
     params.push(`%${filters.search}%`);
     paramIndex++;
@@ -91,7 +95,9 @@ export async function getInvoices(
     taxAmount: parseFloat(row.tax_amount),
     totalAmount: parseFloat(row.total_amount),
     paidAmount: parseFloat(row.amount_paid || '0'),
-    description: row.description,
+    balanceDue: parseFloat(row.balance_due ?? String(parseFloat(row.total_amount) - parseFloat(row.amount_paid || '0'))),
+    // invoices table has notes only (no description column)
+    description: row.notes,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -108,7 +114,7 @@ export async function getInvoices(
 }
 
 // Get single invoice by ID
-export async function getInvoiceById(id: number): Promise<Invoice | null> {
+export async function getInvoiceById(id: string | number): Promise<Invoice | null> {
   const query = `
     SELECT 
       i.*,
@@ -158,7 +164,7 @@ export async function getInvoiceById(id: number): Promise<Invoice | null> {
     taxAmount: parseFloat(row.tax_amount),
     totalAmount: parseFloat(row.total_amount),
     paidAmount: parseFloat(row.amount_paid || '0'),
-    description: row.description,
+    description: row.notes,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -170,10 +176,12 @@ export async function getInvoiceById(id: number): Promise<Invoice | null> {
 
 // Create new invoice
 export async function createInvoice(invoiceData: {
-  tenantId: number;
+  tenantId: string;
   dueDate: string;
   description?: string;
   notes?: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
   items: Array<{
     description: string;
     quantity: number;
@@ -189,33 +197,41 @@ export async function createInvoice(invoiceData: {
     const subtotal = invoiceData.items.reduce((sum, item) => 
       sum + (item.quantity * item.unitPrice), 0
     );
-    const taxAmount = subtotal * 0.08; // 8% tax rate
+    // Keep tax at 0 for now — schema has tax_amount but UI/PH rent flows don't charge 8% VAT by default
+    const taxAmount = 0;
     const totalAmount = subtotal + taxAmount;
 
     // Generate invoice number
     const invoiceNumber = `INV-${Date.now()}`;
 
-    // Create invoice
+    // Store optional description in notes (no description column on invoices)
+    const notes = [invoiceData.description, invoiceData.notes]
+      .filter((part) => part && String(part).trim().length > 0)
+      .join(' — ') || null;
+
+    // Create invoice — columns must match schema.sql
     const invoiceQuery = `
       INSERT INTO invoices (
         tenant_id, invoice_number, invoice_status, issue_date, due_date,
-        subtotal, tax_amount, total_amount, amount_paid, description, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        billing_period_start, billing_period_end,
+        subtotal, tax_amount, total_amount, amount_paid, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
 
     const invoiceValues = [
       invoiceData.tenantId,
       invoiceNumber,
-      'draft',
+      'sent',
       new Date(),
       invoiceData.dueDate,
+      invoiceData.billingPeriodStart || null,
+      invoiceData.billingPeriodEnd || null,
       subtotal,
       taxAmount,
       totalAmount,
       0, // amount_paid
-      invoiceData.description,
-      invoiceData.notes,
+      notes,
     ];
 
     const invoiceResult = await client.query(invoiceQuery, invoiceValues);
@@ -250,7 +266,7 @@ export async function createInvoice(invoiceData: {
 
 // Update invoice
 export async function updateInvoice(
-  id: number,
+  id: string | number,
   updates: {
     status?: string;
     dueDate?: string;
@@ -282,15 +298,11 @@ export async function updateInvoice(
     paramIndex++;
   }
 
-  if (updates.description !== undefined) {
-    setClause.push(`description = $${paramIndex}`);
-    values.push(updates.description);
-    paramIndex++;
-  }
-
-  if (updates.notes !== undefined) {
+  // description maps to notes column (no description on invoices)
+  if (updates.description !== undefined || updates.notes !== undefined) {
+    const notesValue = updates.notes !== undefined ? updates.notes : updates.description;
     setClause.push(`notes = $${paramIndex}`);
-    values.push(updates.notes);
+    values.push(notesValue);
     paramIndex++;
   }
 
@@ -327,7 +339,7 @@ export async function updateInvoice(
 }
 
 // Delete invoice
-export async function deleteInvoice(id: number): Promise<boolean> {
+export async function deleteInvoice(id: string | number): Promise<boolean> {
   const client = await pool.connect();
   
   try {
@@ -341,7 +353,7 @@ export async function deleteInvoice(id: number): Promise<boolean> {
     
     await client.query('COMMIT');
     
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -389,7 +401,7 @@ export async function getInvoiceSummary(): Promise<InvoiceSummary> {
 }
 
 // Mark invoice as paid
-export async function markInvoiceAsPaid(id: number, paidAmount: number): Promise<Invoice | null> {
+export async function markInvoiceAsPaid(id: string | number, paidAmount: number): Promise<Invoice | null> {
   const invoice = await getInvoiceById(id);
   if (!invoice) {
     return null;
@@ -405,14 +417,14 @@ export async function markInvoiceAsPaid(id: number, paidAmount: number): Promise
 
 // Generate automated invoice for rent
 export async function generateRentInvoice(
-  tenantId: number,
-  roomId: number,
+  tenantId: string,
+  roomId: string,
   month: string, // Format: YYYY-MM
   dueDate: string
 ): Promise<Invoice> {
   // Get room rent amount
   const roomQuery = `
-    SELECT r.rent_amount, r.room_number, b.name as building_name
+    SELECT r.monthly_rate, r.room_number, b.name as building_name
     FROM rooms r
     LEFT JOIN buildings b ON r.building_id = b.id
     WHERE r.id = $1
@@ -435,7 +447,7 @@ export async function generateRentInvoice(
       {
         description: `Monthly Rent - ${month}`,
         quantity: 1,
-        unitPrice: parseFloat(room.rent_amount),
+        unitPrice: parseFloat(room.monthly_rate),
       },
     ],
   });

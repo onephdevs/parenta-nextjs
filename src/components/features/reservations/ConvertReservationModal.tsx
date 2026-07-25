@@ -7,6 +7,12 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import FullScreenModal from '@/components/ui/FullScreenModal';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
 
 interface ConvertReservationModalProps {
   reservation: ReservationWithDetails;
@@ -23,7 +29,7 @@ export default function ConvertReservationModal({
   const { showNotification, updateNotification } = useNotifications();
   const { currencyCode } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
@@ -37,9 +43,9 @@ export default function ConvertReservationModal({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
   };
 
@@ -47,7 +53,6 @@ export default function ConvertReservationModal({
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Validate dates
     if (formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
       showNotification({
         type: 'error',
@@ -73,7 +78,9 @@ export default function ConvertReservationModal({
         body: JSON.stringify({
           startDate: formData.startDate,
           endDate: formData.endDate || null,
-          depositPaid: formData.depositPaid ? parseFloat(formData.depositPaid) : reservation.reservationDeposit,
+          depositPaid: formData.depositPaid
+            ? parseFloat(formData.depositPaid)
+            : reservation.reservationDeposit,
           advanceAmount: formData.advanceAmount ? parseFloat(formData.advanceAmount) : undefined,
           notes: formData.notes,
           generateInvoices: formData.generateInvoices,
@@ -89,7 +96,8 @@ export default function ConvertReservationModal({
       updateNotification(loadingId, {
         type: 'success',
         title: 'Reservation converted successfully!',
-        message: 'The reservation has been converted to an assignment and the room status has been updated.',
+        message:
+          'The reservation has been converted to an assignment and the room status has been updated.',
       });
 
       onClose();
@@ -106,23 +114,16 @@ export default function ConvertReservationModal({
     }
   };
 
+  const currencyLabel = formatCurrency(0, currencyCode).replace(/[\d,.]/g, '');
+
   const actionButtons = (
     <>
-      <button
-        type="button"
-        onClick={onClose}
-        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-      >
+      <Button type="button" variant="outline" onClick={onClose}>
         Cancel
-      </button>
-      <button
-        type="submit"
-        form="convert-reservation-form"
-        disabled={isSubmitting}
-        className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isSubmitting ? 'Converting...' : 'Convert to Assignment'}
-      </button>
+      </Button>
+      <Button type="submit" form="convert-reservation-form" isLoading={isSubmitting}>
+        Convert to Assignment
+      </Button>
     </>
   );
 
@@ -135,9 +136,8 @@ export default function ConvertReservationModal({
       actionButtons={actionButtons}
     >
       <form id="convert-reservation-form" onSubmit={handleSubmit} className="space-y-6">
-        {/* Pre-filled Information Display */}
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-          <div className="text-sm font-medium text-gray-900">Reservation Details</div>
+        <Card padding="sm" className="bg-gray-50 border-gray-200">
+          <div className="text-sm font-medium text-gray-900 mb-2">Reservation Details</div>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Tenant:</span>
@@ -145,25 +145,27 @@ export default function ConvertReservationModal({
             </div>
             <div>
               <span className="text-gray-600">Room:</span>
-              <span className="ml-2 text-gray-900">{reservation.roomNumber} - {reservation.buildingName}</span>
+              <span className="ml-2 text-gray-900">
+                {reservation.roomNumber} - {reservation.buildingName}
+              </span>
             </div>
             <div>
               <span className="text-gray-600">Monthly Rate:</span>
-              <span className="ml-2 text-gray-900">{formatCurrency(reservation.monthlyRate, currencyCode)}</span>
+              <span className="ml-2 text-gray-900">
+                {formatCurrency(reservation.monthlyRate, currencyCode)}
+              </span>
             </div>
             <div>
               <span className="text-gray-600">Reservation Deposit:</span>
-              <span className="ml-2 text-gray-900">{formatCurrency(reservation.reservationDeposit, currencyCode)}</span>
+              <span className="ml-2 text-gray-900">
+                {formatCurrency(reservation.reservationDeposit, currencyCode)}
+              </span>
             </div>
           </div>
-        </div>
+        </Card>
 
-        {/* Lease Start Date */}
-        <div>
-          <label htmlFor="startDate" className="block text-sm font-medium text-gray-900 mb-1">
-            Lease Start Date *
-          </label>
-          <input
+        <FormField label="Lease Start Date" htmlFor="startDate" required>
+          <Input
             type="date"
             id="startDate"
             name="startDate"
@@ -172,19 +174,16 @@ export default function ConvertReservationModal({
             onChange={handleInputChange}
             min={new Date().toISOString().split('T')[0]}
             max="2099-12-31"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            style={{
-              colorScheme: 'light',
-            }}
+            style={{ colorScheme: 'light' }}
           />
-        </div>
+        </FormField>
 
-        {/* Lease End Date */}
-        <div>
-          <label htmlFor="endDate" className="block text-sm font-medium text-gray-900 mb-1">
-            Lease End Date (Optional)
-          </label>
-          <input
+        <FormField
+          label="Lease End Date (Optional)"
+          htmlFor="endDate"
+          hint="Leave empty for month-to-month lease"
+        >
+          <Input
             type="date"
             id="endDate"
             name="endDate"
@@ -192,22 +191,16 @@ export default function ConvertReservationModal({
             onChange={handleInputChange}
             min={formData.startDate || '2000-01-01'}
             max="2099-12-31"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            style={{
-              colorScheme: 'light',
-            }}
+            style={{ colorScheme: 'light' }}
           />
-          <p className="mt-1 text-sm text-gray-600">
-            Leave empty for month-to-month lease
-          </p>
-        </div>
+        </FormField>
 
-        {/* Deposit Paid */}
-        <div>
-          <label htmlFor="depositPaid" className="block text-sm font-medium text-gray-900 mb-1">
-            Deposit Paid ({formatCurrency(0, currencyCode).replace(/[\d,.]/g, '')})
-          </label>
-          <input
+        <FormField
+          label={`Deposit Paid (${currencyLabel})`}
+          htmlFor="depositPaid"
+          hint={`Pre-filled from reservation deposit: ${formatCurrency(reservation.reservationDeposit, currencyCode)}`}
+        >
+          <Input
             type="number"
             id="depositPaid"
             name="depositPaid"
@@ -215,19 +208,15 @@ export default function ConvertReservationModal({
             step="0.01"
             value={formData.depositPaid}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          <p className="mt-1 text-sm text-gray-600">
-            Pre-filled from reservation deposit: {formatCurrency(reservation.reservationDeposit, currencyCode)}
-          </p>
-        </div>
+        </FormField>
 
-        {/* Advance Payment */}
-        <div>
-          <label htmlFor="advanceAmount" className="block text-sm font-medium text-gray-900 mb-1">
-            Advance Payment ({formatCurrency(0, currencyCode).replace(/[\d,.]/g, '')}) (Optional)
-          </label>
-          <input
+        <FormField
+          label={`Advance Payment (${currencyLabel}) (Optional)`}
+          htmlFor="advanceAmount"
+          hint="Any advance rent payment made at the start of the lease"
+        >
+          <Input
             type="number"
             id="advanceAmount"
             name="advanceAmount"
@@ -235,45 +224,28 @@ export default function ConvertReservationModal({
             step="0.01"
             value={formData.advanceAmount}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          <p className="mt-1 text-sm text-gray-600">
-            Any advance rent payment made at the start of the lease
-          </p>
-        </div>
+        </FormField>
 
-        {/* Generate Invoices */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="generateInvoices"
-            name="generateInvoices"
-            checked={formData.generateInvoices}
-            onChange={handleInputChange}
-            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-          />
-          <label htmlFor="generateInvoices" className="ml-2 block text-sm text-gray-900">
-            Automatically generate invoices for the lease period
-          </label>
-        </div>
+        <Checkbox
+          id="generateInvoices"
+          name="generateInvoices"
+          checked={formData.generateInvoices}
+          onChange={handleInputChange}
+          label="Automatically generate invoices for the lease period"
+        />
 
-        {/* Notes */}
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-1">
-            Notes
-          </label>
-          <textarea
+        <FormField label="Notes" htmlFor="notes">
+          <Textarea
             id="notes"
             name="notes"
             rows={3}
             value={formData.notes}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             placeholder="Additional notes about this assignment..."
           />
-        </div>
+        </FormField>
       </form>
     </FullScreenModal>
   );
 }
-

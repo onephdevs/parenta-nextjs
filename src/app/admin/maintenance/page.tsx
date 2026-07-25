@@ -16,10 +16,20 @@ import {
   User,
   Building,
   AlertTriangle,
-  X,
   Save
 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { Dialog } from '@/components/ui/Dialog';
+import { FormField } from '@/components/forms/FormField';
+import { MaintenanceStatusBadge } from '@/components/domain/StatusBadges';
+import { Badge } from '@/components/ui/Badge';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 import SkeletonList from '@/components/ui/SkeletonList';
 
@@ -225,40 +235,18 @@ export default function AdminMaintenancePage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, { bg: string; text: string; icon: any }> = {
-      open: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: AlertCircle },
-      in_progress: { bg: 'bg-blue-100', text: 'text-blue-800', icon: Clock },
-      completed: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle2 },
-      cancelled: { bg: 'bg-gray-100', text: 'text-gray-800', icon: X }
-    };
-
-    const badge = badges[status] || badges.open;
-    const Icon = badge.icon;
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
-        <Icon className="h-3 w-3" />
-        {status.replace('_', ' ').toUpperCase()}
-      </span>
-    );
-  };
-
   const getPriorityBadge = (priority: string) => {
-    const badges: Record<string, { bg: string; text: string }> = {
-      urgent: { bg: 'bg-red-100', text: 'text-red-800' },
-      high: { bg: 'bg-orange-100', text: 'text-orange-800' },
-      medium: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-      low: { bg: 'bg-green-100', text: 'text-green-800' }
+    const toneMap: Record<string, 'danger' | 'warning' | 'success' | 'neutral'> = {
+      urgent: 'danger',
+      high: 'danger',
+      medium: 'warning',
+      low: 'success',
     };
-
-    const badge = badges[priority] || badges.medium;
-
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+      <Badge tone={toneMap[priority] || 'neutral'} className="gap-1">
         {priority === 'urgent' && <AlertTriangle className="h-3 w-3" />}
-        {priority.toUpperCase()}
-      </span>
+        {priority}
+      </Badge>
     );
   };
 
@@ -272,143 +260,80 @@ export default function AdminMaintenancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Page Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="md:flex md:items-center md:justify-between">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-                Maintenance Requests
-              </h1>
-              <p className="mt-1 text-sm text-gray-900">
-                Track and manage property maintenance requests
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Maintenance Requests"
+        description="Track and manage property maintenance requests"
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Requests"
+          value={stats.total}
+          tone="default"
+          icon={<Wrench className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Open"
+          value={stats.open}
+          tone="yellow"
+          icon={<AlertCircle className="h-5 w-5" />}
+        />
+        <StatCard
+          title="In Progress"
+          value={stats.inProgress}
+          tone="blue"
+          icon={<Clock className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Completed"
+          value={stats.completed}
+          tone="green"
+          icon={<CheckCircle2 className="h-5 w-5" />}
+        />
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <Wrench className="h-8 w-8 text-blue-600" />
-                Maintenance Requests
-              </h1>
-              <p className="mt-2 text-gray-900">
-                Manage and track all maintenance requests across properties
-              </p>
-            </div>
+      <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              className="pl-10"
+              placeholder="Search requests..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
+
+          <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="all">All Status</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </Select>
+
+          <Select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+            <option value="all">All Priority</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </Select>
+
+          <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <option value="all">All Categories</option>
+            <option value="plumbing">Plumbing</option>
+            <option value="electrical">Electrical</option>
+            <option value="hvac">HVAC</option>
+            <option value="appliance">Appliance</option>
+            <option value="structural">Structural</option>
+            <option value="other">Other</option>
+          </Select>
         </div>
+      </Card>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Total Requests</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              </div>
-              <Wrench className="h-8 w-8 text-gray-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Open</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.open}</p>
-              </div>
-              <AlertCircle className="h-8 w-8 text-yellow-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">In Progress</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
-              </div>
-              <Clock className="h-8 w-8 text-blue-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-              </div>
-              <CheckCircle2 className="h-8 w-8 text-green-400" />
-            </div>
-          </div>
-        </div>
-
-        {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search requests..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-
-            {/* Priority Filter */}
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Priority</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-
-            {/* Category Filter */}
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Categories</option>
-              <option value="plumbing">Plumbing</option>
-              <option value="electrical">Electrical</option>
-              <option value="hvac">HVAC</option>
-              <option value="appliance">Appliance</option>
-              <option value="flooring">Flooring</option>
-              <option value="structural">Structural</option>
-              <option value="pest_control">Pest Control</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Requests Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {isLoading ? (
             <div className="text-center py-12">
@@ -475,7 +400,7 @@ export default function AdminMaintenancePage() {
                         {getPriorityBadge(request.priority)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(request.status)}
+                        <MaintenanceStatusBadge status={request.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(request.request_date)}
@@ -495,144 +420,116 @@ export default function AdminMaintenancePage() {
             </div>
           )}
         </div>
-      </main>
 
-      {/* Update Modal */}
-      {showUpdateModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Update Maintenance Request</h3>
-                <button
-                  onClick={() => setShowUpdateModal(false)}
-                  className="text-gray-400 hover:text-gray-900"
+      <Dialog
+        isOpen={showUpdateModal && !!selectedRequest}
+        onClose={() => setShowUpdateModal(false)}
+        title="Update Maintenance Request"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowUpdateModal(false)}>
+              Cancel
+            </Button>
+            <Button leftIcon={<Save className="h-4 w-4" />} onClick={submitUpdate}>
+              Save Changes
+            </Button>
+          </>
+        }
+      >
+        {selectedRequest && (
+          <div className="space-y-4">
+            <Card padding="sm" className="bg-gray-50">
+              <h4 className="font-medium text-gray-900 mb-2">{selectedRequest.title}</h4>
+              <p className="text-sm text-gray-900">{selectedRequest.description}</p>
+              <div className="mt-2 flex items-center gap-2 text-sm text-gray-900">
+                <Building className="h-4 w-4" />
+                {selectedRequest.building_name} - {selectedRequest.room_number}
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-sm text-gray-900">
+                <User className="h-4 w-4" />
+                {selectedRequest.tenant_name}
+              </div>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField label="Status" htmlFor="update-status">
+                <Select
+                  id="update-status"
+                  value={updateData.status}
+                  onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
                 >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
+                  <option value="open">Open</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </Select>
+              </FormField>
 
-              <div className="space-y-4">
-                {/* Request Info */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">{selectedRequest.title}</h4>
-                  <p className="text-sm text-gray-900">{selectedRequest.description}</p>
-                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-900">
-                    <Building className="h-4 w-4" />
-                    {selectedRequest.building_name} - {selectedRequest.room_number}
-                  </div>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-900">
-                    <User className="h-4 w-4" />
-                    {selectedRequest.tenant_name}
-                  </div>
-                </div>
+              <FormField label="Priority" htmlFor="update-priority">
+                <Select
+                  id="update-priority"
+                  value={updateData.priority}
+                  onChange={(e) => setUpdateData({ ...updateData, priority: e.target.value })}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </Select>
+              </FormField>
 
-                {/* Update Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Status
-                    </label>
-                    <select
-                      value={updateData.status}
-                      onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="open">Open</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
+              <FormField label="Scheduled Date" htmlFor="update-scheduledDate">
+                <Input
+                  type="date"
+                  id="update-scheduledDate"
+                  value={updateData.scheduledDate}
+                  onChange={(e) =>
+                    setUpdateData({ ...updateData, scheduledDate: e.target.value })
+                  }
+                  style={{ colorScheme: 'light' }}
+                />
+              </FormField>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Priority
-                    </label>
-                    <select
-                      value={updateData.priority}
-                      onChange={(e) => setUpdateData({ ...updateData, priority: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
+              <FormField label="Completed Date" htmlFor="update-completedDate">
+                <Input
+                  type="date"
+                  id="update-completedDate"
+                  value={updateData.completedDate}
+                  onChange={(e) =>
+                    setUpdateData({ ...updateData, completedDate: e.target.value })
+                  }
+                  style={{ colorScheme: 'light' }}
+                />
+              </FormField>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Scheduled Date
-                    </label>
-                    <input
-                      type="date"
-                      value={updateData.scheduledDate}
-                      onChange={(e) => setUpdateData({ ...updateData, scheduledDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
+              <FormField
+                label="Assigned To"
+                htmlFor="update-assignedTo"
+                className="md:col-span-2"
+              >
+                <Input
+                  type="text"
+                  id="update-assignedTo"
+                  value={updateData.assignedTo}
+                  onChange={(e) => setUpdateData({ ...updateData, assignedTo: e.target.value })}
+                  placeholder="Staff member or contractor name"
+                />
+              </FormField>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Completed Date
-                    </label>
-                    <input
-                      type="date"
-                      value={updateData.completedDate}
-                      onChange={(e) => setUpdateData({ ...updateData, completedDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Assigned To
-                    </label>
-                    <input
-                      type="text"
-                      value={updateData.assignedTo}
-                      onChange={(e) => setUpdateData({ ...updateData, assignedTo: e.target.value })}
-                      placeholder="Staff member or contractor name"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={updateData.notes}
-                      onChange={(e) => setUpdateData({ ...updateData, notes: e.target.value })}
-                      rows={4}
-                      placeholder="Add notes about the maintenance work..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-3 pt-4">
-                  <button
-                    onClick={() => setShowUpdateModal(false)}
-                    className="px-4 py-2 text-gray-900 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={submitUpdate}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    Save Changes
-                  </button>
-                </div>
-              </div>
+              <FormField label="Notes" htmlFor="update-notes" className="md:col-span-2">
+                <Textarea
+                  id="update-notes"
+                  value={updateData.notes}
+                  onChange={(e) => setUpdateData({ ...updateData, notes: e.target.value })}
+                  rows={4}
+                  placeholder="Add notes about the maintenance work..."
+                />
+              </FormField>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Dialog>
     </div>
   );
 }

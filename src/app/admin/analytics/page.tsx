@@ -139,12 +139,51 @@ export default function AnalyticsPage() {
 
   const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
     try {
-      addNotification(`Generating ${format.toUpperCase()} report...`);
-      
-      // TODO: Implement export functionality
-      setTimeout(() => {
-        addNotification(`Analytics report exported as ${format.toUpperCase()}`);
-      }, 2000);
+      addNotification(`Generating ${format.toUpperCase()} export...`);
+
+      if (!metrics) {
+        addNotification('No analytics data to export yet. Refresh and try again.');
+        return;
+      }
+
+      // CSV of currently loaded metrics (honest client-side export)
+      // PDF/Excel fall back to the same CSV payload with a clear filename.
+      const rows: string[][] = [
+        ['Section', 'Metric', 'Value'],
+        ['Financial', 'Total Revenue', String(metrics.financial?.totalRevenue ?? '')],
+        ['Financial', 'Total Expenses', String(metrics.financial?.totalExpenses ?? '')],
+        ['Financial', 'Net Income', String(metrics.financial?.netIncome ?? '')],
+        ['Occupancy', 'Occupancy Rate', String(metrics.occupancy?.occupancyRate ?? '')],
+        ['Occupancy', 'Occupied Units', String(metrics.occupancy?.occupiedUnits ?? '')],
+        ['Occupancy', 'Vacant Units', String(metrics.occupancy?.vacantUnits ?? '')],
+        ['Tenants', 'Active Tenants', String(metrics.tenant?.activeTenants ?? '')],
+        ['Exported At', 'Timestamp', new Date().toISOString()],
+        ['Format Requested', 'format', format],
+      ];
+
+      const csv = rows
+        .map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        )
+        .join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `analytics-export-${new Date().toISOString().slice(0, 10)}.${
+        format === 'csv' ? 'csv' : format === 'excel' ? 'csv' : 'csv'
+      }`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      addNotification(
+        format === 'csv'
+          ? 'Analytics CSV downloaded'
+          : `${format.toUpperCase()} export downloaded as CSV (native ${format.toUpperCase()} not yet available)`
+      );
     } catch (error) {
       addNotification('Failed to export analytics report');
     }

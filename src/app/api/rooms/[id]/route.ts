@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getRoomById, updateRoom, deleteRoom } from '../../../../lib/api/rooms';
+import { requireAdmin } from '@/lib/api-auth';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -7,6 +8,9 @@ interface RouteParams {
 
 export async function GET(request: Request, { params }: RouteParams) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { id } = await params;
     
     const room = await getRoomById(id);
@@ -41,6 +45,9 @@ export async function GET(request: Request, { params }: RouteParams) {
 
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { id } = await params;
     const roomData = await request.json();
     
@@ -69,6 +76,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { id } = await params;
     
     await deleteRoom(id);

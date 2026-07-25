@@ -2,19 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
 import { 
   Plus, 
-  Filter, 
   Search, 
-  Edit, 
   Trash2, 
   CheckCircle2, 
   AlertCircle,
   Zap,
   Droplets,
-  Calendar,
-  DollarSign
+  DollarSign,
+  ArrowLeft
 } from 'lucide-react';
 
 interface RoomUtilityBill {
@@ -262,36 +266,24 @@ export default function RoomUtilityBillsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/bills-expenses"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Room Utility Bills</h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link
-                href="/admin/bills-expenses/utility-bills/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Bill
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 p-6">
+      <Link
+        href="/admin/bills-expenses"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Bills & Expenses
+      </Link>
+      <PageHeader
+        title="Room Utility Bills"
+        description="Track electricity and water bills by room"
+        actions={
+          <Link href="/admin/bills-expenses/utility-bills/new">
+            <Button leftIcon={<Plus className="h-4 w-4" />}>Add Bill</Button>
+          </Link>
+        }
+      />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
           <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -379,108 +371,82 @@ export default function RoomUtilityBillsPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-1">
-                  Search
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    id="search"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Room, building, provider..."
-                    className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="building" className="block text-sm font-medium text-gray-900 mb-1">
-                  Building
-                </label>
-                <select
-                  id="building"
-                  value={buildingFilter}
-                  onChange={(e) => setBuildingFilter(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
-                >
-                  <option value="">All Buildings</option>
-                  {buildings && Array.isArray(buildings) && buildings.map((building) => (
-                    <option key={building.id} value={building.id}>
-                      {building.name || building.building_name || building.buildingName || 'Unknown'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="utilityType" className="block text-sm font-medium text-gray-900 mb-1">
-                  Utility Type
-                </label>
-                <select
-                  id="utilityType"
-                  value={utilityTypeFilter}
-                  onChange={(e) => setUtilityTypeFilter(e.target.value as 'electricity' | 'water' | '')}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
-                >
-                  <option value="">All Types</option>
-                  <option value="electricity">⚡ Electricity</option>
-                  <option value="water">💧 Water</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-900 mb-1">
-                  Status
-                </label>
-                <select
-                  id="status"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
-                >
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="disputed">Disputed</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="dateFrom" className="block text-sm font-medium text-gray-900 mb-1">
-                  From Date
-                </label>
-                <input
-                  type="date"
-                  id="dateFrom"
-                  value={dateFromFilter}
-                  onChange={(e) => setDateFromFilter(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
+        <Card className="mb-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+            <FormField label="Search" htmlFor="search">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Input
+                  type="text"
+                  id="search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Room, building, provider..."
+                  className="pl-10"
                 />
               </div>
+            </FormField>
 
-              <div>
-                <label htmlFor="dateTo" className="block text-sm font-medium text-gray-900 mb-1">
-                  To Date
-                </label>
-                <input
-                  type="date"
-                  id="dateTo"
-                  value={dateToFilter}
-                  onChange={(e) => setDateToFilter(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base text-gray-900"
-                />
-              </div>
-            </div>
+            <FormField label="Building" htmlFor="building">
+              <Select
+                id="building"
+                value={buildingFilter}
+                onChange={(e) => setBuildingFilter(e.target.value)}
+              >
+                <option value="">All Buildings</option>
+                {buildings && Array.isArray(buildings) && buildings.map((building) => (
+                  <option key={building.id} value={building.id}>
+                    {building.name || building.building_name || building.buildingName || 'Unknown'}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Utility Type" htmlFor="utilityType">
+              <Select
+                id="utilityType"
+                value={utilityTypeFilter}
+                onChange={(e) => setUtilityTypeFilter(e.target.value as 'electricity' | 'water' | '')}
+              >
+                <option value="">All Types</option>
+                <option value="electricity">Electricity</option>
+                <option value="water">Water</option>
+              </Select>
+            </FormField>
+
+            <FormField label="Status" htmlFor="status">
+              <Select
+                id="status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+                <option value="disputed">Disputed</option>
+              </Select>
+            </FormField>
+
+            <FormField label="From Date" htmlFor="dateFrom">
+              <Input
+                type="date"
+                id="dateFrom"
+                value={dateFromFilter}
+                onChange={(e) => setDateFromFilter(e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="To Date" htmlFor="dateTo">
+              <Input
+                type="date"
+                id="dateTo"
+                value={dateToFilter}
+                onChange={(e) => setDateToFilter(e.target.value)}
+              />
+            </FormField>
           </div>
-        </div>
+        </Card>
 
         {/* Bills Table */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -490,12 +456,8 @@ export default function RoomUtilityBillsPage() {
             <div className="p-8 text-center text-gray-900">
               <p className="text-lg font-medium mb-2">No room utility bills found</p>
               <p className="text-sm text-gray-900 mb-4">Get started by adding a new bill</p>
-              <Link
-                href="/admin/bills-expenses/utility-bills/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Bill
+              <Link href="/admin/bills-expenses/utility-bills/new">
+                <Button leftIcon={<Plus className="h-4 w-4" />}>Add Bill</Button>
               </Link>
             </div>
           ) : (
@@ -581,7 +543,6 @@ export default function RoomUtilityBillsPage() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

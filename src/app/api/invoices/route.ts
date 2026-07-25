@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     const filters: Record<string, unknown> = {};
     if (search) filters.search = search;
     if (status) filters.status = status;
-    if (tenantIdParam) filters.tenantId = parseInt(tenantIdParam);
-    if (roomIdParam) filters.roomId = parseInt(roomIdParam);
+    if (tenantIdParam) filters.tenantId = tenantIdParam;
+    if (roomIdParam) filters.roomId = roomIdParam;
     if (dateFrom) filters.dateFrom = dateFrom;
     if (dateTo) filters.dateTo = dateTo;
 
@@ -54,12 +54,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     
-    // Validate required fields
-    const { tenantId, roomId, dueDate, items } = body;
+    // Validate required fields (roomId kept for UI context; invoices table has no room_id)
+    const { tenantId, dueDate, items } = body;
     
-    if (!tenantId || !roomId || !dueDate || !items || !Array.isArray(items)) {
+    if (!tenantId || !dueDate || !items || !Array.isArray(items)) {
       return NextResponse.json(
-        { error: 'Missing required fields: tenantId, roomId, dueDate, items' },
+        { error: 'Missing required fields: tenantId, dueDate, items' },
         { status: 400 }
       );
     }
@@ -90,12 +90,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // tenantId is a UUID — never parseInt
     const invoiceData = {
-      tenantId: parseInt(tenantId),
-      roomId: parseInt(roomId),
+      tenantId: String(tenantId),
       dueDate,
       description: body.description || '',
       notes: body.notes || '',
+      billingPeriodStart: body.billingPeriodStart || undefined,
+      billingPeriodEnd: body.billingPeriodEnd || undefined,
       items: items.map((item: Record<string, unknown>) => ({
         description: item.description,
         quantity: parseFloat(item.quantity as string),

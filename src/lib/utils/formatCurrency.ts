@@ -33,9 +33,8 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
  * @returns Formatted currency string
  */
 export function formatCurrency(amount: number, currencyCode: string = 'PHP'): string {
-  if (amount == null || Number.isNaN(amount)) {
-    amount = 0;
-  }
+  const n = typeof amount === 'number' ? amount : Number(amount);
+  const safe = Number.isFinite(n) ? n : 0;
   const config = CURRENCIES[currencyCode] || CURRENCIES.PHP;
 
   return new Intl.NumberFormat(config.locale, {
@@ -43,7 +42,7 @@ export function formatCurrency(amount: number, currencyCode: string = 'PHP'): st
     currency: config.code,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(safe);
 }
 
 /**

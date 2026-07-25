@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
 
 interface ProfilePictureUploadProps {
   tenantId: string;
@@ -34,7 +35,6 @@ export default function ProfilePictureUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       showNotification({
         type: 'error',
@@ -44,7 +44,6 @@ export default function ProfilePictureUpload({
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       showNotification({
         type: 'error',
@@ -54,20 +53,18 @@ export default function ProfilePictureUpload({
       return;
     }
 
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
 
-    // Auto-upload
     handleUpload(file);
   };
 
   const handleUpload = async (file: File) => {
     setIsUploading(true);
-    const notificationId = showNotification({
+    showNotification({
       type: 'loading',
       title: 'Uploading',
       message: 'Uploading profile picture...'
@@ -105,7 +102,6 @@ export default function ProfilePictureUpload({
         title: 'Upload Failed',
         message: error instanceof Error ? error.message : 'Failed to upload profile picture'
       });
-      // Revert preview on error
       setPreview(currentPictureUrl || null);
     } finally {
       setIsUploading(false);
@@ -118,7 +114,7 @@ export default function ProfilePictureUpload({
     }
 
     setIsDeleting(true);
-    const notificationId = showNotification({
+    showNotification({
       type: 'loading',
       title: 'Deleting',
       message: 'Deleting profile picture...'
@@ -181,23 +177,25 @@ export default function ProfilePictureUpload({
       </div>
 
       <div className="flex space-x-2">
-        <button
+        <Button
           type="button"
+          variant="success"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading || isDeleting}
-          className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          isDisabled={isUploading || isDeleting}
         >
           {preview ? 'Change' : 'Upload'}
-        </button>
+        </Button>
         {preview && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={handleDelete}
-            disabled={isUploading || isDeleting}
-            className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            isDisabled={isUploading || isDeleting}
           >
             Delete
-          </button>
+          </Button>
         )}
       </div>
 
@@ -215,4 +213,3 @@ export default function ProfilePictureUpload({
     </div>
   );
 }
-

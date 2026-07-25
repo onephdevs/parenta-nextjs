@@ -20,7 +20,14 @@ import {
   Zap,
   Droplet
 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
+import { StatCard } from '@/components/ui/StatCard';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
 import PaymentForm from '@/components/features/tenant/PaymentForm';
@@ -100,6 +107,7 @@ export default function PaymentsPage() {
   const [showManualPaymentForm, setShowManualPaymentForm] = useState(false);
   const [depositBalance, setDepositBalance] = useState<number | null>(null);
   const [utilityDepositData, setUtilityDepositData] = useState<any>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
   const { showNotification } = useNotifications();
 
   useEffect(() => {
@@ -111,23 +119,6 @@ export default function PaymentsPage() {
       router.push('/auth/signin?role=tenant');
     }
   }, [status, session, router]);
-
-  // Show loading state while checking authentication
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-900">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated or not tenant
-  if (!session || session.user.role !== 'tenant') {
-    return null; // Will redirect via useEffect
-  }
 
   const fetchPaymentData = async () => {
     try {
@@ -217,8 +208,6 @@ export default function PaymentsPage() {
     }
   };
 
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  
   const handleMakePayment = () => {
     setShowPaymentForm(true);
   };
@@ -357,6 +346,21 @@ export default function PaymentsPage() {
       return matchesStatus && matchesSearch;
     });
 
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-900">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || session.user.role !== 'tenant') {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -390,36 +394,18 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link
-                href="/tenant"
-                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back to Dashboard
-              </Link>
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <CreditCard className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <h1 className="text-xl font-semibold text-gray-900">Payments</h1>
-                <p className="text-sm text-gray-900">Manage your rent payments and history</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div className="space-y-6 p-6">
+      <Link
+        href="/tenant"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Dashboard
+      </Link>
+      <PageHeader
+        title="Payments"
+        description="Manage your rent payments and history"
+      />
           {paymentData && (
             <div className="space-y-6">
               {/* Payment Summary */}
@@ -507,12 +493,9 @@ export default function PaymentsPage() {
                         Please make a payment to avoid additional late fees. Late payments may result in additional charges.
                       </p>
                       <div className="mt-3">
-                        <button
-                          onClick={handleMakePayment}
-                          className="bg-red-100 text-red-800 rounded-md px-3 py-2 text-sm font-medium hover:bg-red-200"
-                        >
+                        <Button variant="success" size="sm" onClick={handleMakePayment}>
                           Make Payment Now
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -608,13 +591,14 @@ export default function PaymentsPage() {
                           <div className="text-sm text-gray-900 mb-4">
                             Due: {formatDate(balanceData?.nextDueDate || paymentData?.nextDueDate || '')}
                           </div>
-                          <button
+                          <Button
+                            variant="success"
+                            size="lg"
                             onClick={handleMakePayment}
-                            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            leftIcon={<CreditCard className="h-5 w-5" />}
                           >
-                            <CreditCard className="mr-2 h-5 w-5" />
                             Pay Now
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -815,25 +799,30 @@ export default function PaymentsPage() {
                     
                     {/* Filters */}
                     <div className="flex items-center space-x-4">
-                      <div className="relative">
-                        <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Search payments..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="all">All Payments</option>
-                        <option value="paid">Paid</option>
-                        <option value="partial">Partial</option>
-                      </select>
+                      <FormField htmlFor="payment-search" className="mb-0">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <Input
+                            id="payment-search"
+                            type="text"
+                            placeholder="Search payments..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 w-64"
+                          />
+                        </div>
+                      </FormField>
+                      <FormField htmlFor="payment-status-filter" className="mb-0">
+                        <Select
+                          id="payment-status-filter"
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                        >
+                          <option value="all">All Payments</option>
+                          <option value="paid">Paid</option>
+                          <option value="partial">Partial</option>
+                        </Select>
+                      </FormField>
                     </div>
                   </div>
 
@@ -935,15 +924,17 @@ export default function PaymentsPage() {
                           : 'No payment history available.'}
                       </p>
                       {(searchTerm || filterStatus !== 'all') && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setSearchTerm('');
                             setFilterStatus('all');
                           }}
-                          className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                          className="mt-2"
                         >
                           Clear filters
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
@@ -1001,8 +992,6 @@ export default function PaymentsPage() {
               </div>
             </div>
           )}
-        </div>
-      </main>
     </div>
   );
 } 

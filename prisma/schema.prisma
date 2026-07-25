@@ -1,0 +1,14 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// Prisma 7: connection URLs live in prisma.config.ts / env vars
+// - DATABASE_URL: transaction pooler (app runtime via driver adapter)
+// - DIRECT_URL: session pooler (CLI migrations) — set in prisma.config.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

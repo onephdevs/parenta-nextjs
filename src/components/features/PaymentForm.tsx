@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 interface Tenant {
   id: string;
@@ -289,7 +296,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      <div className="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6">
+      <Card>
         <div className="md:grid md:grid-cols-3 md:gap-6">
           <div className="md:col-span-1">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Payment Information</h3>
@@ -299,52 +306,56 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           </div>
           <div className="mt-5 md:mt-0 md:col-span-2">
             <div className="grid grid-cols-6 gap-6">
-              {/* Tenant Selection */}
-              <div className="col-span-6">
-                <label htmlFor="tenantId" className="block text-sm font-medium text-gray-900">
-                  Tenant *
-                </label>
-                <select
+              <FormField
+                label="Tenant"
+                htmlFor="tenantId"
+                required
+                error={errors.tenantId}
+                className="col-span-6"
+              >
+                <Select
                   id="tenantId"
                   name="tenantId"
                   value={formData.tenantId}
                   onChange={(e) => handleInputChange('tenantId', e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
-                    errors.tenantId ? 'border-red-300' : ''
-                  }`}
+                  isInvalid={Boolean(errors.tenantId)}
                 >
                   <option value="">Select a tenant</option>
                   {Array.isArray(tenants) && tenants.length > 0 ? (
                     tenants.map((tenant) => (
                       <option key={tenant.id} value={tenant.id}>
                         {tenant.firstName} {tenant.lastName}
-                        {tenant.currentRoomId && ` (${tenant.buildingName} ${tenant.roomNumber})`}
+                        {tenant.currentRoomId &&
+                          ` (${tenant.buildingName} ${tenant.roomNumber})`}
                       </option>
                     ))
                   ) : (
-                    <option value="" disabled>Loading tenants...</option>
+                    <option value="" disabled>
+                      Loading tenants...
+                    </option>
                   )}
-                </select>
-                {errors.tenantId && (
-                  <p className="mt-2 text-sm text-red-600">{errors.tenantId}</p>
-                )}
+                </Select>
                 {selectedTenant && !selectedTenant.currentRoomId && (
                   <p className="mt-2 text-sm text-blue-600">
-                    ℹ️ This tenant is not currently assigned to a room. Payment can still be recorded, but it won't be automatically allocated to invoices.
+                    This tenant is not currently assigned to a room. Payment can still be recorded,
+                    but it won&apos;t be automatically allocated to invoices.
                   </p>
                 )}
-              </div>
+              </FormField>
 
-              {/* Total Amount Paid */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
-                  Total Amount Paid *
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-900 text-base font-medium">₱</span>
-                  </div>
-                  <input
+              <FormField
+                label="Total Amount Paid"
+                htmlFor="amount"
+                required
+                error={errors.amount}
+                hint="Total amount received from tenant"
+                className="col-span-6 sm:col-span-3"
+              >
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
+                    ₱
+                  </span>
+                  <Input
                     type="number"
                     id="amount"
                     name="amount"
@@ -353,29 +364,24 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    className={`block w-full pl-9 pr-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 ${
-                      errors.amount ? 'border-red-300' : ''
-                    }`}
+                    className="pl-8"
+                    isInvalid={Boolean(errors.amount)}
                   />
                 </div>
-                {errors.amount && (
-                  <p className="mt-2 text-sm text-red-600">{errors.amount}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-900">
-                  Total amount received from tenant
-                </p>
-              </div>
+              </FormField>
 
-              {/* Deposit Amount */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="depositAmount" className="block text-sm font-medium text-gray-900">
-                  Deposit Amount
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-900 text-base font-medium">₱</span>
-                  </div>
-                  <input
+              <FormField
+                label="Deposit Amount"
+                htmlFor="depositAmount"
+                error={errors.depositAmount}
+                hint="Amount to add to deposit ledger (remainder goes to invoices)"
+                className="col-span-6 sm:col-span-3"
+              >
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
+                    ₱
+                  </span>
+                  <Input
                     type="number"
                     id="depositAmount"
                     name="depositAmount"
@@ -384,53 +390,48 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    className={`block w-full pl-9 pr-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 ${
-                      errors.depositAmount ? 'border-red-300' : ''
-                    }`}
+                    className="pl-8"
+                    isInvalid={Boolean(errors.depositAmount)}
                   />
                 </div>
-                {errors.depositAmount && (
-                  <p className="mt-2 text-sm text-red-600">{errors.depositAmount}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-900">
-                  Amount to add to deposit ledger (remainder goes to invoices)
-                </p>
-              </div>
+              </FormField>
 
-              {/* Payment Breakdown Info */}
               {(parseFloat(formData.amount) || 0) > 0 && (
-                <div className="col-span-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-purple-900 mb-2">Payment Breakdown</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <Alert variant="info" title="Payment Breakdown" className="col-span-6">
+                  <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-purple-700">To Deposit Ledger:</span>
-                      <span className="ml-2 font-semibold text-purple-900">
-                        ₱{((parseFloat(formData.depositAmount) || 0)).toLocaleString()}
+                      <span>To Deposit Ledger:</span>
+                      <span className="ml-2 font-semibold">
+                        ₱{(parseFloat(formData.depositAmount) || 0).toLocaleString()}
                       </span>
                     </div>
                     <div>
-                      <span className="text-purple-700">To Invoice Payment:</span>
-                      <span className="ml-2 font-semibold text-purple-900">
-                        ₱{((parseFloat(formData.amount) || 0) - (parseFloat(formData.depositAmount) || 0)).toLocaleString()}
+                      <span>To Invoice Payment:</span>
+                      <span className="ml-2 font-semibold">
+                        ₱
+                        {(
+                          (parseFloat(formData.amount) || 0) -
+                          (parseFloat(formData.depositAmount) || 0)
+                        ).toLocaleString()}
                       </span>
                     </div>
                   </div>
-                </div>
+                </Alert>
               )}
 
-              {/* Payment Type */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="type" className="block text-sm font-medium text-gray-900">
-                  Payment Type *
-                </label>
-                <select
+              <FormField
+                label="Payment Type"
+                htmlFor="type"
+                required
+                error={errors.type}
+                className="col-span-6 sm:col-span-3"
+              >
+                <Select
                   id="type"
                   name="type"
                   value={formData.type}
                   onChange={(e) => handleInputChange('type', e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
-                    errors.type ? 'border-red-300' : ''
-                  }`}
+                  isInvalid={Boolean(errors.type)}
                 >
                   <option value="rent">Rent</option>
                   <option value="deposit">Deposit</option>
@@ -438,18 +439,17 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   <option value="fee">Fee</option>
                   <option value="utilities">Utilities</option>
                   <option value="other">Other</option>
-                </select>
-                {errors.type && (
-                  <p className="mt-2 text-sm text-red-600">{errors.type}</p>
-                )}
-              </div>
+                </Select>
+              </FormField>
 
-              {/* Payment Date */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="paymentDate" className="block text-sm font-medium text-gray-900">
-                  Payment Date *
-                </label>
-                <input
+              <FormField
+                label="Payment Date"
+                htmlFor="paymentDate"
+                required
+                error={errors.paymentDate}
+                className="col-span-6 sm:col-span-3"
+              >
+                <Input
                   type="date"
                   id="paymentDate"
                   name="paymentDate"
@@ -457,95 +457,70 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
                   onChange={(e) => handleInputChange('paymentDate', e.target.value)}
                   min="2000-01-01"
                   max={new Date().toISOString().split('T')[0]}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
-                    errors.paymentDate ? 'border-red-300' : ''
-                  }`}
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  isInvalid={Boolean(errors.paymentDate)}
+                  style={{ colorScheme: 'light' }}
                 />
-                {errors.paymentDate && (
-                  <p className="mt-2 text-sm text-red-600">{errors.paymentDate}</p>
-                )}
-              </div>
+              </FormField>
 
-              {/* Payment Method */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900">
-                  Payment Method *
-                </label>
-                <select
+              <FormField
+                label="Payment Method"
+                htmlFor="paymentMethod"
+                required
+                error={errors.paymentMethod}
+                className="col-span-6 sm:col-span-3"
+              >
+                <Select
                   id="paymentMethod"
                   name="paymentMethod"
                   value={formData.paymentMethod}
                   onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 ${
-                    errors.paymentMethod ? 'border-red-300' : ''
-                  }`}
+                  isInvalid={Boolean(errors.paymentMethod)}
                 >
                   <option value="cash">Cash</option>
                   <option value="check">Check</option>
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="credit_card">Credit Card</option>
                   <option value="online">Online Payment</option>
-                </select>
-                {errors.paymentMethod && (
-                  <p className="mt-2 text-sm text-red-600">{errors.paymentMethod}</p>
-                )}
-              </div>
+                </Select>
+              </FormField>
 
-              {/* Transaction ID */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="transactionId" className="block text-sm font-medium text-gray-900">
-                  Transaction ID
-                </label>
-                <input
+              <FormField
+                label="Transaction ID"
+                htmlFor="transactionId"
+                className="col-span-6 sm:col-span-3"
+              >
+                <Input
                   type="text"
                   id="transactionId"
                   name="transactionId"
                   value={formData.transactionId}
                   onChange={(e) => handleInputChange('transactionId', e.target.value)}
                   placeholder="Optional transaction reference"
-                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                 />
-              </div>
+              </FormField>
 
-              {/* Description */}
-              <div className="col-span-6">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
-                  Description
-                </label>
-                <textarea
+              <FormField label="Description" htmlFor="description" className="col-span-6">
+                <Textarea
                   id="description"
                   name="description"
                   rows={4}
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Optional payment description or notes"
-                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 resize-none"
                 />
-              </div>
+              </FormField>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Form Actions */}
       <div className="flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
-        >
+        <Button type="button" variant="outline" onClick={handleCancel}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
-        >
-          {isLoading ? 'Recording...' : 'Record Payment'}
-        </button>
+        </Button>
+        <Button type="submit" isLoading={isLoading}>
+          Record Payment
+        </Button>
       </div>
     </form>
   );

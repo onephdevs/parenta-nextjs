@@ -30,11 +30,15 @@ export async function GET(request: Request) {
         t.phone as tenant_phone,
         r.room_number,
         b.name as building_name,
-        b.address as building_address
+        COALESCE(
+          NULLIF(TRIM(CONCAT_WS(', ', b.address_line1, b.address_line2, b.city, b.state, b.postal_code)), ''),
+          b.address_line1,
+          ''
+        ) as building_address
       FROM maintenance_requests mr
       LEFT JOIN tenants t ON mr.tenant_id = t.id
       LEFT JOIN rooms r ON mr.room_id = r.id
-      LEFT JOIN buildings b ON mr.building_id = b.id
+      LEFT JOIN buildings b ON b.id = COALESCE(mr.building_id, r.building_id)
       WHERE 1=1
     `;
 

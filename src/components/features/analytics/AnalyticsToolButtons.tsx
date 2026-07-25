@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 
 const tools = [
   {
@@ -29,15 +30,18 @@ export default function AnalyticsToolButtons() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {tools.map((tool) => (
-        <Link
-          key={tool.label}
-          href={tool.href}
-          className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 hover:border-gray-400 transition cursor-pointer relative z-10"
-        >
-          <svg className="mr-2 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tool.iconPath} />
-          </svg>
-          {tool.label}
+        <Link key={tool.label} href={tool.href}>
+          <Button
+            variant="outline"
+            className="w-full"
+            leftIcon={
+              <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tool.iconPath} />
+              </svg>
+            }
+          >
+            {tool.label}
+          </Button>
         </Link>
       ))}
     </div>

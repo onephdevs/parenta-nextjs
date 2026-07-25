@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getExpenseById } from '@/lib/api/expenses';
+import DeleteExpenseButton from '@/components/features/DeleteExpenseButton';
 
 interface ExpenseDetailPageProps {
   params: Promise<{
@@ -18,12 +19,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
     redirect('/auth/signin');
   }
 
-  const expenseId = parseInt(id);
-  if (isNaN(expenseId)) {
-    notFound();
-  }
-
-  const expense = await getExpenseById(expenseId);
+  const expense = await getExpenseById(id);
   
   if (!expense) {
     notFound();
@@ -128,12 +124,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
                 </svg>
                 Edit Expense
               </Link>
-              <button className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete
-              </button>
+              <DeleteExpenseButton expenseId={expense.id} />
             </div>
           </div>
         </div>

@@ -7,6 +7,12 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidInvoiceId(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,13 +22,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    const invoiceId = parseInt(id);
     
-    if (isNaN(invoiceId)) {
+    if (!isValidInvoiceId(id)) {
       return NextResponse.json({ error: 'Invalid invoice ID' }, { status: 400 });
     }
 
-    const invoice = await getInvoiceById(invoiceId);
+    const invoice = await getInvoiceById(id);
     
     if (!invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -50,9 +55,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    const invoiceId = parseInt(id);
     
-    if (isNaN(invoiceId)) {
+    if (!isValidInvoiceId(id)) {
       return NextResponse.json({ error: 'Invalid invoice ID' }, { status: 400 });
     }
 
@@ -73,7 +77,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (body.notes !== undefined) updates.notes = body.notes;
     if (body.paidAmount !== undefined) updates.paidAmount = parseFloat(body.paidAmount);
 
-    const invoice = await updateInvoice(invoiceId, updates);
+    const invoice = await updateInvoice(id, updates);
     
     if (!invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -102,13 +106,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    const invoiceId = parseInt(id);
     
-    if (isNaN(invoiceId)) {
+    if (!isValidInvoiceId(id)) {
       return NextResponse.json({ error: 'Invalid invoice ID' }, { status: 400 });
     }
 
-    const deleted = await deleteInvoice(invoiceId);
+    const deleted = await deleteInvoice(id);
     
     if (!deleted) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
@@ -126,4 +129,3 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     );
   }
 }
-

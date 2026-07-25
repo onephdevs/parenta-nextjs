@@ -7,6 +7,11 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import AdminFullScreenModal from '@/components/ui/AdminFullScreenModal';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { FormField } from '@/components/forms/FormField';
 import Link from 'next/link';
 
 interface CreateReservationModalProps {
@@ -438,21 +443,21 @@ export default function CreateReservationModal({
 
   const actionButtons = (
     <>
-      <button
-        type="button"
-        onClick={onClose}
-        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-      >
+      <Button type="button" variant="outline" onClick={onClose}>
         Cancel
-      </button>
-      <button
+      </Button>
+      <Button
         type="submit"
         form="create-reservation-form"
-        disabled={isSubmitting || (formData.reservationDeposit ?? 0) < 0 || (displayRequiredDeposit > 0 && (formData.reservationDeposit ?? 0) < displayRequiredDeposit)}
-        className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        isLoading={isSubmitting}
+        isDisabled={
+          (formData.reservationDeposit ?? 0) < 0 ||
+          (displayRequiredDeposit > 0 &&
+            (formData.reservationDeposit ?? 0) < displayRequiredDeposit)
+        }
       >
-        {isSubmitting ? 'Creating...' : 'Create Reservation'}
-      </button>
+        Create Reservation
+      </Button>
     </>
   );
 
@@ -465,92 +470,82 @@ export default function CreateReservationModal({
       actionButtons={actionButtons}
     >
       <form id="create-reservation-form" onSubmit={handleSubmit} className="space-y-6">
-        {/* Room Selection */}
-        <div>
-          <label htmlFor="roomId" className="block text-sm font-medium text-gray-900 mb-1">
-            Room *
-          </label>
-          <select
+        <FormField
+          label="Room"
+          htmlFor="roomId"
+          required
+          hint={
+            selectedRoom
+              ? `Monthly Rate: ${formatCurrency(selectedRoom.monthlyRate, currencyCode)}${
+                  requiredDeposit > 0
+                    ? ` | Required Deposit: ${formatCurrency(requiredDeposit, currencyCode)}`
+                    : ''
+                }${
+                  buildingConfig && requiredAdvance > 0
+                    ? ` | Required Advance: ${formatCurrency(requiredAdvance, currencyCode)}`
+                    : ''
+                }${
+                  buildingConfig && requiredUtility > 0
+                    ? ` | Utility Deposit: ${formatCurrency(requiredUtility, currencyCode)}`
+                    : ''
+                }`
+              : undefined
+          }
+        >
+          <Select
             id="roomId"
             name="roomId"
             required
             value={formData.roomId}
             onChange={handleInputChange}
-            disabled={loadingRooms}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
+            isDisabled={loadingRooms}
           >
             <option value="">Select a room</option>
-            {rooms.map(room => (
+            {rooms.map((room) => (
               <option key={room.id} value={room.id}>
                 {room.roomNumber} - {room.buildingName || 'Unknown Building'}
               </option>
             ))}
-          </select>
-          {selectedRoom && (
-            <p className="mt-1 text-sm text-gray-600">
-              Monthly Rate: {formatCurrency(selectedRoom.monthlyRate, currencyCode)}
-              {requiredDeposit > 0 && (
-                <span className="ml-2">
-                  | Required Deposit: {formatCurrency(requiredDeposit, currencyCode)}
-                </span>
-              )}
-              {buildingConfig && requiredAdvance > 0 && (
-                <span className="ml-2">
-                  | Required Advance: {formatCurrency(requiredAdvance, currencyCode)}
-                </span>
-              )}
-              {buildingConfig && requiredUtility > 0 && (
-                <span className="ml-2">
-                  | Utility Deposit: {formatCurrency(requiredUtility, currencyCode)}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
+          </Select>
+        </FormField>
 
-        {/* Tenant Selection */}
-        <div>
-          <label htmlFor="tenantId" className="block text-sm font-medium text-gray-900 mb-1">
-            Tenant *
-          </label>
+        <FormField label="Tenant" htmlFor="tenantId" required>
           <div className="flex gap-2">
-            <select
+            <Select
               id="tenantId"
               name="tenantId"
               required
               value={formData.tenantId}
               onChange={handleInputChange}
-              disabled={loadingTenants}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
+              isDisabled={loadingTenants}
+              className="flex-1"
             >
               <option value="">Select a tenant</option>
               {Array.isArray(tenants) && tenants.length > 0 ? (
-                tenants.map(tenant => (
+                tenants.map((tenant) => (
                   <option key={tenant.id} value={tenant.id}>
                     {tenant.firstName} {tenant.lastName} ({tenant.email})
                   </option>
                 ))
               ) : (
-                <option value="" disabled>{loadingTenants ? 'Loading tenants...' : 'No tenants available'}</option>
+                <option value="" disabled>
+                  {loadingTenants ? 'Loading tenants...' : 'No tenants available'}
+                </option>
               )}
-            </select>
+            </Select>
             <Link
               href="/admin/tenants/new"
               target="_blank"
-              className="px-4 py-2 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 hover:bg-gray-50"
             >
               New Tenant
             </Link>
           </div>
-        </div>
+        </FormField>
 
-        {/* Dates */}
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="reservationDate" className="block text-sm font-medium text-gray-900 mb-1">
-              Reservation Date *
-            </label>
-            <input
+          <FormField label="Reservation Date" htmlFor="reservationDate" required>
+            <Input
               type="date"
               id="reservationDate"
               name="reservationDate"
@@ -559,17 +554,12 @@ export default function CreateReservationModal({
               onChange={handleInputChange}
               min="2000-01-01"
               max="2099-12-31"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              style={{
-                colorScheme: 'light',
-              }}
+              style={{ colorScheme: 'light' }}
             />
-          </div>
-          <div>
-            <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-900 mb-1">
-              Expiry Date *
-            </label>
-            <input
+          </FormField>
+
+          <FormField label="Expiry Date" htmlFor="expiryDate" required>
+            <Input
               type="date"
               id="expiryDate"
               name="expiryDate"
@@ -578,20 +568,13 @@ export default function CreateReservationModal({
               onChange={handleInputChange}
               min={formData.reservationDate?.toISOString().split('T')[0] || '2000-01-01'}
               max="2099-12-31"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              style={{
-                colorScheme: 'light',
-              }}
+              style={{ colorScheme: 'light' }}
             />
-          </div>
+          </FormField>
         </div>
 
-        {/* Monthly Rate */}
-        <div>
-          <label htmlFor="monthlyRate" className="block text-sm font-medium text-gray-900 mb-1">
-            Monthly Rate ({currencySymbol}) *
-          </label>
-          <input
+        <FormField label={`Monthly Rate (${currencySymbol})`} htmlFor="monthlyRate" required>
+          <Input
             type="number"
             id="monthlyRate"
             name="monthlyRate"
@@ -601,19 +584,38 @@ export default function CreateReservationModal({
             value={formData.monthlyRate ?? ''}
             onChange={handleInputChange}
             placeholder="0"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-        </div>
+        </FormField>
 
-        {/* Reservation Deposit */}
-        <div>
-          <label htmlFor="reservationDeposit" className="block text-sm font-medium text-gray-900 mb-1">
-            Reservation Deposit ({currencySymbol}) <span className="text-red-600">*</span>
-            {displayRequiredDeposit > 0 && (
-              <span className="text-red-600"> (Min: {formatCurrency(displayRequiredDeposit, currencyCode)})</span>
-            )}
-          </label>
-          <input
+        <FormField
+          label={`Reservation Deposit (${currencySymbol})`}
+          htmlFor="reservationDeposit"
+          required
+          error={
+            (formData.reservationDeposit ?? 0) < 0
+              ? 'Reservation deposit cannot be negative.'
+              : displayRequiredDeposit > 0 &&
+                  (formData.reservationDeposit == null ||
+                    (formData.reservationDeposit >= 0 &&
+                      formData.reservationDeposit < displayRequiredDeposit))
+                ? formData.reservationDeposit == null || formData.reservationDeposit === 0
+                  ? `Reservation deposit is required. Minimum: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
+                  : `Minimum deposit required: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
+                : undefined
+          }
+          hint={
+            buildingConfig && depositValidityDays > 0
+              ? `Deposit valid for ${depositValidityDays} day${depositValidityDays !== 1 ? 's' : ''} from reservation date${
+                  displayRequiredDeposit > 0
+                    ? ` (Min: ${formatCurrency(displayRequiredDeposit, currencyCode)})`
+                    : ''
+                }`
+              : displayRequiredDeposit > 0
+                ? `Minimum: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
+                : undefined
+          }
+        >
+          <Input
             type="number"
             id="reservationDeposit"
             name="reservationDeposit"
@@ -622,90 +624,73 @@ export default function CreateReservationModal({
             value={formData.reservationDeposit ?? ''}
             onChange={handleInputChange}
             placeholder="0"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            isInvalid={
+              (formData.reservationDeposit ?? 0) < 0 ||
+              (displayRequiredDeposit > 0 &&
+                (formData.reservationDeposit == null ||
+                  (formData.reservationDeposit >= 0 &&
+                    formData.reservationDeposit < displayRequiredDeposit)))
+            }
           />
-          {(formData.reservationDeposit ?? 0) < 0 && (
-            <p className="mt-1 text-sm text-red-600">
-              Reservation deposit cannot be negative.
-            </p>
-          )}
-          {displayRequiredDeposit > 0 && (formData.reservationDeposit == null || (formData.reservationDeposit >= 0 && formData.reservationDeposit < displayRequiredDeposit)) && (
-            <p className="mt-1 text-sm text-red-600">
-              {formData.reservationDeposit == null || formData.reservationDeposit === 0
-                ? `Reservation deposit is required. Minimum: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
-                : `Minimum deposit required: ${formatCurrency(displayRequiredDeposit, currencyCode)}`}
-            </p>
-          )}
-          {buildingConfig && depositValidityDays > 0 && (
-            <p className="mt-1 text-sm text-gray-600">
-              Deposit valid for {depositValidityDays} day{depositValidityDays !== 1 ? 's' : ''} from reservation date
-            </p>
-          )}
-        </div>
+        </FormField>
 
-        {/* Advance Payment */}
         {buildingConfig && requiredAdvance > 0 && (
-          <div>
-            <label htmlFor="advanceAmount" className="block text-sm font-medium text-gray-900 mb-1">
-              Advance Payment ({currencySymbol}) (Optional)
-              <span className="text-gray-500"> — 0 for none, or min {formatCurrency(requiredAdvance, currencyCode)} if provided</span>
-            </label>
-            <input
+          <FormField
+            label={`Advance Payment (${currencySymbol}) (Optional)`}
+            htmlFor="advanceAmount"
+            hint={`0 for none, or min ${formatCurrency(requiredAdvance, currencyCode)} if provided. Any advance rent payment made at the start of the lease.`}
+          >
+            <Input
               type="number"
               id="advanceAmount"
               name="advanceAmount"
               min={0}
               step="0.01"
-              value={formData.advanceAmount === 0 || Number.isNaN(formData.advanceAmount) ? '' : formData.advanceAmount}
+              value={
+                formData.advanceAmount === 0 || Number.isNaN(formData.advanceAmount)
+                  ? ''
+                  : formData.advanceAmount
+              }
               onChange={handleInputChange}
               placeholder="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
-            <p className="mt-1 text-sm text-gray-600">
-              Any advance rent payment made at the start of the lease
-            </p>
-          </div>
+          </FormField>
         )}
 
-        {/* Utility Deposit */}
         {buildingConfig && requiredUtility > 0 && (
-          <div>
-            <label htmlFor="utilityDepositAmount" className="block text-sm font-medium text-gray-900 mb-1">
-              Utility Deposit ({currencySymbol}) (Optional)
-              <span className="text-gray-500"> — 0 for none, or min {formatCurrency(requiredUtility, currencyCode)} if provided</span>
-            </label>
-            <input
+          <FormField
+            label={`Utility Deposit (${currencySymbol}) (Optional)`}
+            htmlFor="utilityDepositAmount"
+            hint={`0 for none, or min ${formatCurrency(requiredUtility, currencyCode)} if provided. Utility deposit amount for this building.`}
+          >
+            <Input
               type="number"
               id="utilityDepositAmount"
               name="utilityDepositAmount"
               min={0}
               step="0.01"
-              value={formData.utilityDepositAmount === 0 || Number.isNaN(formData.utilityDepositAmount) ? '' : formData.utilityDepositAmount}
+              value={
+                formData.utilityDepositAmount === 0 ||
+                Number.isNaN(formData.utilityDepositAmount)
+                  ? ''
+                  : formData.utilityDepositAmount
+              }
               onChange={handleInputChange}
               placeholder="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
-            <p className="mt-1 text-sm text-gray-600">
-              Utility deposit amount for this building
-            </p>
-          </div>
+          </FormField>
         )}
 
-        {/* Notes */}
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-1">
-            Notes
-          </label>
-          <textarea
+        <FormField label="Notes" htmlFor="notes">
+          <Textarea
             id="notes"
             name="notes"
             rows={3}
             value={formData.notes}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             placeholder="Additional notes about this reservation..."
           />
-        </div>
+        </FormField>
       </form>
     </AdminFullScreenModal>
   );

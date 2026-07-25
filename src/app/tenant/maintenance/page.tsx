@@ -12,13 +12,25 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Filter,
   Search,
-  MessageSquare
+  MessageSquare,
+  X,
 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonList from '@/components/ui/SkeletonList';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { StatCard } from '@/components/ui/StatCard';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { FormField } from '@/components/forms/FormField';
+import { IconButton } from '@/components/ui/IconButton';
+import { MaintenanceStatusBadge } from '@/components/domain/StatusBadges';
+import { Badge, BadgeTone } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 interface MaintenanceRequest {
   id: string;
@@ -183,46 +195,16 @@ export default function MaintenancePage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'scheduled':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'pending':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
+  const getPriorityTone = (priority: string): BadgeTone => {
     switch (priority.toLowerCase()) {
       case 'high':
-        return 'bg-red-100 text-red-800';
+        return 'danger';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'warning';
       case 'low':
-        return 'bg-green-100 text-green-800';
+        return 'success';
       default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return <CheckCircle2 className="h-4 w-4" />;
-      case 'in_progress':
-        return <Wrench className="h-4 w-4" />;
-      case 'scheduled':
-        return <Calendar className="h-4 w-4" />;
-      case 'pending':
-        return <Clock className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
+        return 'neutral';
     }
   };
 
@@ -272,43 +254,27 @@ export default function MaintenancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link
-                href="/tenant"
-                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back to Dashboard
-              </Link>
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
-                  <Wrench className="h-6 w-6 text-orange-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <h1 className="text-xl font-semibold text-gray-900">Maintenance Requests</h1>
-                <p className="text-sm text-gray-900">Manage your maintenance requests and submit new ones</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowNewRequestForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Request
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div className="space-y-6 p-6">
+      <Link
+        href="/tenant"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Dashboard
+      </Link>
+      <PageHeader
+        title="Maintenance Requests"
+        description="Manage your maintenance requests and submit new ones"
+        actions={
+          <Button
+            variant="success"
+            leftIcon={<Plus className="h-4 w-4" />}
+            onClick={() => setShowNewRequestForm(true)}
+          >
+            New Request
+          </Button>
+        }
+      />
           {maintenanceData && (
             <div className="space-y-6">
               {/* Summary Stats */}
@@ -395,38 +361,39 @@ export default function MaintenancePage() {
                     </h3>
                     
                     {/* Filters */}
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-wrap items-center gap-3">
                       <div className="relative">
-                        <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
                           type="text"
                           placeholder="Search requests..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                          className="pl-10"
+                          aria-label="Search requests"
                         />
                       </div>
-                      <select
+                      <Select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        aria-label="Filter by status"
                       >
                         <option value="all">All Status</option>
                         <option value="pending">Pending</option>
                         <option value="scheduled">Scheduled</option>
                         <option value="in_progress">In Progress</option>
                         <option value="completed">Completed</option>
-                      </select>
-                      <select
+                      </Select>
+                      <Select
                         value={filterPriority}
                         onChange={(e) => setFilterPriority(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        aria-label="Filter by priority"
                       >
                         <option value="all">All Priority</option>
                         <option value="high">High</option>
                         <option value="medium">Medium</option>
                         <option value="low">Low</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
 
@@ -438,13 +405,10 @@ export default function MaintenancePage() {
                             <div className="flex-1">
                               <div className="flex items-center space-x-3 mb-2">
                                 <h4 className="text-lg font-medium text-gray-900">{request.title}</h4>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                                  {getStatusIcon(request.status)}
-                                  <span className="ml-1">{request.status.replace('_', ' ')}</span>
-                                </span>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(request.priority)}`}>
+                                <MaintenanceStatusBadge status={request.status} />
+                                <Badge tone={getPriorityTone(request.priority)}>
                                   {request.priority} priority
-                                </span>
+                                </Badge>
                               </div>
                               <p className="text-gray-900 mb-3">{request.description}</p>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-900">
@@ -484,136 +448,117 @@ export default function MaintenancePage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-900">
-                        {searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
+                    <EmptyState
+                      icon={<Wrench className="h-12 w-12" />}
+                      title={
+                        searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
+                          ? 'No matching requests'
+                          : 'No maintenance requests yet'
+                      }
+                      description={
+                        searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
                           ? 'No maintenance requests found matching your criteria.'
-                          : 'No maintenance requests yet. Submit a new request if you need assistance.'}
-                      </p>
-                      {(searchTerm || filterStatus !== 'all' || filterPriority !== 'all') && (
-                        <button
-                          onClick={() => {
-                            setSearchTerm('');
-                            setFilterStatus('all');
-                            setFilterPriority('all');
-                          }}
-                          className="mt-2 text-orange-600 hover:text-orange-800 text-sm"
-                        >
-                          Clear filters
-                        </button>
-                      )}
-                    </div>
+                          : 'Submit a new request if you need assistance.'
+                      }
+                      action={
+                        searchTerm || filterStatus !== 'all' || filterPriority !== 'all' ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setSearchTerm('');
+                              setFilterStatus('all');
+                              setFilterPriority('all');
+                            }}
+                          >
+                            Clear filters
+                          </Button>
+                        ) : undefined
+                      }
+                    />
                   )}
                 </div>
               </div>
             </div>
           )}
-        </div>
-      </main>
 
-      {/* New Request Modal */}
       {showNewRequestForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
-            <form onSubmit={handleSubmitRequest} className="p-6">
+          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto" padding="lg">
+            <form onSubmit={handleSubmitRequest}>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-medium text-gray-900">Submit Maintenance Request</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowNewRequestForm(false)}
-                  className="text-gray-400 hover:text-gray-900"
-                >
-                  <span className="sr-only">Close</span>
-                  ×
-                </button>
+                <IconButton label="Close" onClick={() => setShowNewRequestForm(false)}>
+                  <X className="h-5 w-5" />
+                </IconButton>
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-900">
-                    Title *
-                  </label>
-                  <input
+                <FormField label="Title" htmlFor="title" required>
+                  <Input
                     type="text"
                     id="title"
                     required
                     value={newRequest.title}
                     onChange={(e) => setNewRequest({ ...newRequest, title: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     placeholder="Brief description of the issue"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-900">
-                    Category *
-                  </label>
-                  <select
+                <FormField label="Category" htmlFor="category" required>
+                  <Select
                     id="category"
                     required
                     value={newRequest.category}
                     onChange={(e) => setNewRequest({ ...newRequest, category: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                   >
                     <option value="">Select a category</option>
                     {categories.map((category) => (
                       <option key={category} value={category}>
-                        {category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        {category.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
 
-                <div>
-                  <label htmlFor="priority" className="block text-sm font-medium text-gray-900">
-                    Priority
-                  </label>
-                  <select
+                <FormField label="Priority" htmlFor="priority">
+                  <Select
                     id="priority"
                     value={newRequest.priority}
                     onChange={(e) => setNewRequest({ ...newRequest, priority: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
 
-                <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-900">
-                    Description *
-                  </label>
-                  <textarea
+                <FormField label="Description" htmlFor="description" required>
+                  <Textarea
                     id="description"
                     required
                     rows={4}
                     value={newRequest.description}
                     onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     placeholder="Please provide detailed information about the issue, location, and any relevant details"
                   />
-                </div>
+                </FormField>
               </div>
 
               <div className="mt-6 flex items-center justify-end space-x-3">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowNewRequestForm(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                >
+                </Button>
+                <Button type="submit" variant="success">
                   Submit Request
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
     </div>

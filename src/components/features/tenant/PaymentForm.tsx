@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { CreditCard } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 interface Invoice {
   id: string;
@@ -19,7 +25,11 @@ interface PaymentFormProps {
   onCancel?: () => void;
 }
 
-export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel }: PaymentFormProps) {
+export default function PaymentForm({
+  invoices = [],
+  onPaymentComplete,
+  onCancel,
+}: PaymentFormProps) {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('online');
@@ -30,7 +40,6 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
   useEffect(() => {
     if (invoices.length > 0 && !selectedInvoiceId) {
-      // Auto-select first invoice
       const firstInvoice = invoices[0];
       setSelectedInvoiceId(firstInvoice.id);
       setPaymentAmount(firstInvoice.balanceDue);
@@ -39,7 +48,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
   useEffect(() => {
     if (selectedInvoiceId) {
-      const invoice = invoices.find(inv => inv.id === selectedInvoiceId);
+      const invoice = invoices.find((inv) => inv.id === selectedInvoiceId);
       if (invoice) {
         setPaymentAmount(invoice.balanceDue);
       }
@@ -84,9 +93,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
           message: data.message || 'Your payment has been processed successfully',
         });
 
-        if (onPaymentComplete) {
-          onPaymentComplete();
-        }
+        onPaymentComplete?.();
       } else {
         showNotification({
           type: 'error',
@@ -106,7 +113,7 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
     }
   };
 
-  const selectedInvoice = invoices.find(inv => inv.id === selectedInvoiceId);
+  const selectedInvoice = invoices.find((inv) => inv.id === selectedInvoiceId);
   const maxAmount = selectedInvoice ? selectedInvoice.balanceDue : 0;
 
   const formatCurrency = (amount: number) => {
@@ -118,40 +125,42 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      {/* Invoice Selection */}
-      <div>
-        <label htmlFor="invoiceId" className="block text-sm font-medium text-gray-900 mb-2">
-          Select Invoice to Pay *
-        </label>
-        <select
+      <FormField label="Select Invoice to Pay" htmlFor="invoiceId" required>
+        <Select
           id="invoiceId"
           value={selectedInvoiceId}
           onChange={(e) => setSelectedInvoiceId(e.target.value)}
           required={invoices.length > 0}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">
             {invoices.length === 0 ? 'No invoices due' : 'Select an invoice'}
           </option>
           {invoices.map((invoice) => (
             <option key={invoice.id} value={invoice.id}>
-              {invoice.invoiceNumber} - {formatCurrency(invoice.balanceDue)} due {new Date(invoice.dueDate).toLocaleDateString()}
+              {invoice.invoiceNumber} - {formatCurrency(invoice.balanceDue)} due{' '}
+              {new Date(invoice.dueDate).toLocaleDateString()}
             </option>
           ))}
-        </select>
+        </Select>
         {invoices.length === 0 && (
           <p className="mt-1 text-sm text-amber-700">
-            You have no invoices with a balance due. Use the &quot;Manual Entry&quot; tab to record a payment without an invoice.
+            You have no invoices with a balance due. Use the &quot;Manual Entry&quot; tab to record
+            a payment without an invoice.
           </p>
         )}
-      </div>
+      </FormField>
 
-      {/* Payment Amount */}
-      <div>
-        <label htmlFor="paymentAmount" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Amount (₱) *
-        </label>
-        <input
+      <FormField
+        label="Payment Amount (₱)"
+        htmlFor="paymentAmount"
+        required
+        hint={
+          selectedInvoice
+            ? `Balance due: ${formatCurrency(selectedInvoice.balanceDue)}`
+            : undefined
+        }
+      >
+        <Input
           type="number"
           id="paymentAmount"
           min={0}
@@ -163,68 +172,45 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
             setPaymentAmount(v === '' ? 0 : parseFloat(v) || 0);
           }}
           placeholder="0"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        {selectedInvoice && (
-          <p className="mt-1 text-sm text-gray-900">
-            Balance due: {formatCurrency(selectedInvoice.balanceDue)}
-          </p>
-        )}
-      </div>
+      </FormField>
 
-      {/* Payment Method */}
-      <div>
-        <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Method *
-        </label>
-        <select
+      <FormField label="Payment Method" htmlFor="paymentMethod" required>
+        <Select
           id="paymentMethod"
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="online">Online Payment</option>
           <option value="credit_card">Credit Card</option>
           <option value="bank_transfer">Bank Transfer</option>
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
-      {/* Reference Number */}
-      <div>
-        <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-900 mb-2">
-          Reference Number (Optional)
-        </label>
-        <input
+      <FormField label="Reference Number (Optional)" htmlFor="referenceNumber">
+        <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
           placeholder="Transaction reference, receipt number, etc."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </FormField>
 
-      {/* Notes */}
-      <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-2">
-          Notes (Optional)
-        </label>
-        <textarea
+      <FormField label="Notes (Optional)" htmlFor="notes">
+        <Textarea
           id="notes"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Additional notes about this payment..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </FormField>
 
-      {/* Payment Info */}
       {selectedInvoice && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">Payment Summary</h4>
-          <div className="space-y-1 text-sm text-blue-800">
+        <Alert variant="info" title="Payment Summary">
+          <div className="mt-2 space-y-1 text-sm">
             <div className="flex justify-between">
               <span>Invoice:</span>
               <span className="font-medium">{selectedInvoice.invoiceNumber}</span>
@@ -242,37 +228,24 @@ export default function PaymentForm({ invoices = [], onPaymentComplete, onCancel
               </div>
             )}
           </div>
-        </div>
+        </Alert>
       )}
 
-      {/* Submit Buttons */}
       <div className="flex items-center justify-end space-x-3">
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
-          >
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="submit"
-          disabled={isProcessing || !selectedInvoiceId || paymentAmount <= 0}
-          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed"
+          variant="success"
+          isLoading={isProcessing}
+          isDisabled={!selectedInvoiceId || paymentAmount <= 0}
+          leftIcon={<CreditCard className="h-5 w-5" />}
         >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <CreditCard className="h-5 w-5 mr-2" />
-              Process Payment
-            </>
-          )}
-        </button>
+          Process Payment
+        </Button>
       </div>
     </form>
   );

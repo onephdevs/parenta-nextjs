@@ -5,8 +5,14 @@ import { Building, Settings, Calculator, FileText, Info } from 'lucide-react';
 import AllocationRulesConfig from './AllocationRulesConfig';
 import CostAllocationCalculator from './CostAllocationCalculator';
 import TenantUtilityBills from './TenantUtilityBills';
-import { useNotifications } from '../../../hooks/useNotifications';
-import { Building as BuildingType } from '../../../types/database';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Building as BuildingType } from '@/types/database';
+import { Card } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
+import { Alert } from '@/components/ui/Alert';
+import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/Tabs';
+import { FormField } from '@/components/forms/FormField';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export default function CostAllocationDashboard() {
   const [buildings, setBuildings] = useState<BuildingType[]>([]);
@@ -14,7 +20,7 @@ export default function CostAllocationDashboard() {
   const [selectedBuilding, setSelectedBuilding] = useState<BuildingType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const { addNotification } = useNotifications();
+  const { showError } = useNotifications();
 
   useEffect(() => {
     fetchBuildings();
@@ -43,11 +49,7 @@ export default function CostAllocationDashboard() {
       }
     } catch (error) {
       console.error('Error fetching buildings:', error);
-      addNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load buildings'
-      });
+      showError('Failed to load buildings');
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +65,6 @@ export default function CostAllocationDashboard() {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">Cost Allocation System</h1>
@@ -73,26 +74,27 @@ export default function CostAllocationDashboard() {
           </div>
         </div>
 
-        {/* Building Selection */}
-        <div className="bg-white rounded-lg shadow border p-6">
+        <Card>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900">
             <Building className="h-5 w-5 text-gray-900" />
             Select Building
           </h3>
           <div className="flex items-center gap-4">
             <div className="flex-1 max-w-md">
-              <select
-                value={selectedBuildingId}
-                onChange={(e) => setSelectedBuildingId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Choose a building</option>
-                {buildings.map(building => (
-                  <option key={building.id} value={building.id}>
-                    {building.name} - {building.address}
-                  </option>
-                ))}
-              </select>
+              <FormField label="Building" htmlFor="building-select">
+                <Select
+                  id="building-select"
+                  value={selectedBuildingId}
+                  onChange={(e) => setSelectedBuildingId(e.target.value)}
+                >
+                  <option value="">Choose a building</option>
+                  {buildings.map(building => (
+                    <option key={building.id} value={building.id}>
+                      {building.name} - {building.address}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
             </div>
             {selectedBuilding && (
               <div className="text-sm text-gray-900">
@@ -102,166 +104,142 @@ export default function CostAllocationDashboard() {
           </div>
 
           {buildings.length === 0 && !isLoading && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-600" />
-                <span className="text-blue-800">
-                  No buildings found. Please create a building first to set up cost allocation.
-                </span>
-              </div>
-            </div>
+            <Alert variant="info" className="mt-4">
+              No buildings found. Please create a building first to set up cost allocation.
+            </Alert>
           )}
-        </div>
+        </Card>
 
-        {/* Main Content */}
         {selectedBuilding ? (
-          <div className="space-y-6">
-            {/* Tab Navigation */}
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                        activeTab === tab.id
-                          ? 'border-blue-500 text-blue-600'
-                          : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
-                      }`}
-                    >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabList>
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <Tab key={tab.id} value={tab.id}>
+                    <span className="flex items-center gap-2">
                       <Icon className="h-4 w-4" />
                       {tab.label}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+                    </span>
+                  </Tab>
+                );
+              })}
+            </TabList>
 
-            {/* Tab Content */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <div className="bg-white rounded-lg shadow border p-6">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-900">How Cost Allocation Works</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                          <Settings className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <h4 className="font-semibold mb-2 text-gray-900">1. Configure Rules</h4>
-                        <p className="text-sm text-gray-900">
-                          Set up allocation methods for each utility type (equal split, usage-based, room size, or custom)
-                        </p>
+            <TabPanel value="overview">
+              <Card>
+                <h3 className="text-lg font-semibold mb-4 text-gray-900">How Cost Allocation Works</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Settings className="h-6 w-6 text-blue-600" />
                       </div>
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                          <Calculator className="h-6 w-6 text-green-600" />
-                        </div>
-                        <h4 className="font-semibold mb-2 text-gray-900">2. Calculate Costs</h4>
-                        <p className="text-sm text-gray-900">
-                          Select a utility bill and automatically calculate how costs should be split among tenants
-                        </p>
-                      </div>
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                          <FileText className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <h4 className="font-semibold mb-2 text-gray-900">3. Generate Bills</h4>
-                        <p className="text-sm text-gray-900">
-                          Create individual tenant utility bills with detailed cost breakdowns and track payment status
-                        </p>
-                      </div>
+                      <h4 className="font-semibold mb-2 text-gray-900">1. Configure Rules</h4>
+                      <p className="text-sm text-gray-900">
+                        Set up allocation methods for each utility type (equal split, usage-based, room size, or custom)
+                      </p>
                     </div>
-
-                    <div className="mt-8">
-                      <h5 className="font-medium mb-3 text-gray-900">Allocation Methods</h5>
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                          <div>
-                            <div className="font-medium text-blue-800">Equal Split</div>
-                            <div className="text-sm text-blue-700">
-                              Divides utility costs equally among all active tenants
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                          <div>
-                            <div className="font-medium text-green-800">Usage-Based</div>
-                            <div className="text-sm text-green-700">
-                              Allocates costs based on actual meter readings and consumption
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
-                          <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
-                          <div>
-                            <div className="font-medium text-purple-800">Room Size</div>
-                            <div className="text-sm text-purple-700">
-                              Allocates costs proportionally based on room square footage
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                          <div>
-                            <div className="font-medium text-orange-800">Custom Rules</div>
-                            <div className="text-sm text-orange-700">
-                              Uses predefined custom percentages for specific allocation scenarios
-                            </div>
-                          </div>
-                        </div>
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Calculator className="h-6 w-6 text-green-600" />
                       </div>
+                      <h4 className="font-semibold mb-2 text-gray-900">2. Calculate Costs</h4>
+                      <p className="text-sm text-gray-900">
+                        Select a utility bill and automatically calculate how costs should be split among tenants
+                      </p>
                     </div>
-
-                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Info className="h-4 w-4 text-blue-600" />
-                        <span className="text-blue-800 font-medium">Common Area Costs:</span>
+                    <div className="text-center p-4 border rounded-lg">
+                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <FileText className="h-6 w-6 text-purple-600" />
                       </div>
-                      <p className="text-blue-700 text-sm mt-1">
-                        You can configure a percentage of each utility bill to cover shared spaces 
-                        (hallways, lobby, etc.) which will be split equally among all tenants.
+                      <h4 className="font-semibold mb-2 text-gray-900">3. Generate Bills</h4>
+                      <p className="text-sm text-gray-900">
+                        Create individual tenant utility bills with detailed cost breakdowns and track payment status
                       </p>
                     </div>
                   </div>
+
+                  <div className="mt-8">
+                    <h5 className="font-medium mb-3 text-gray-900">Allocation Methods</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                        <div>
+                          <div className="font-medium text-blue-800">Equal Split</div>
+                          <div className="text-sm text-blue-700">
+                            Divides utility costs equally among all active tenants
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                        <div>
+                          <div className="font-medium text-green-800">Usage-Based</div>
+                          <div className="text-sm text-green-700">
+                            Allocates costs based on actual meter readings and consumption
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                        <div>
+                          <div className="font-medium text-purple-800">Room Size</div>
+                          <div className="text-sm text-purple-700">
+                            Allocates costs proportionally based on room square footage
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                        <div>
+                          <div className="font-medium text-orange-800">Custom Rules</div>
+                          <div className="text-sm text-orange-700">
+                            Uses predefined custom percentages for specific allocation scenarios
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Alert variant="info" className="mt-6" title="Common Area Costs:">
+                    You can configure a percentage of each utility bill to cover shared spaces
+                    (hallways, lobby, etc.) which will be split equally among all tenants.
+                  </Alert>
                 </div>
-              </div>
-            )}
+              </Card>
+            </TabPanel>
 
-            {activeTab === 'rules' && (
-              <AllocationRulesConfig 
-                buildingId={selectedBuilding.id} 
-                buildingName={selectedBuilding.name} 
+            <TabPanel value="rules">
+              <AllocationRulesConfig
+                buildingId={selectedBuilding.id}
+                buildingName={selectedBuilding.name}
               />
-            )}
+            </TabPanel>
 
-            {activeTab === 'calculator' && (
-              <CostAllocationCalculator 
-                buildingId={selectedBuilding.id} 
-                buildingName={selectedBuilding.name} 
+            <TabPanel value="calculator">
+              <CostAllocationCalculator
+                buildingId={selectedBuilding.id}
+                buildingName={selectedBuilding.name}
               />
-            )}
+            </TabPanel>
 
-            {activeTab === 'bills' && (
+            <TabPanel value="bills">
               <TenantUtilityBills buildingId={selectedBuilding.id} />
-            )}
-          </div>
+            </TabPanel>
+          </Tabs>
         ) : (
           !isLoading && (
-            <div className="bg-white rounded-lg shadow border p-8 text-center">
-              <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Building</h3>
-              <p className="text-gray-900">
-                Choose a building to configure cost allocation rules and manage tenant utility bills.
-              </p>
-            </div>
+            <Card>
+              <EmptyState
+                icon={<Building className="h-12 w-12 text-gray-400" />}
+                title="Select a Building"
+                description="Choose a building to configure cost allocation rules and manage tenant utility bills."
+              />
+            </Card>
           )
         )}
       </div>
     </div>
   );
-} 
+}

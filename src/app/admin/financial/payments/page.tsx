@@ -4,6 +4,16 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getPayments, getPaymentSummary } from '@/lib/api/payments';
 import { getAllTenants } from '@/lib/api/tenants';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
+import { AlertTriangle, CheckCircle2, Clock, CreditCard, Plus } from 'lucide-react';
+import { PaymentStatusBadge } from '@/components/domain/StatusBadges';
+import { Badge } from '@/components/ui/Badge';
 
 interface SearchParams {
   page?: string;
@@ -131,185 +141,78 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const totalPages = Math.ceil(paymentsData.total / 20);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/financial"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Payment Management</h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link
-                href="/admin/financial/payments/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Record Payment
-              </Link>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Payment Management"
+        description="Record and track tenant payments"
+        actions={
+          <Link href="/admin/financial/payments/new">
+            <Button leftIcon={<Plus className="h-4 w-4" />}>Record Payment</Button>
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Completed"
+          value={formatCurrency(summary.completedAmount)}
+          tone="green"
+          icon={<CheckCircle2 className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Pending"
+          value={formatCurrency(summary.pendingAmount)}
+          tone="yellow"
+          icon={<Clock className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Overdue"
+          value={formatCurrency(summary.overdueAmount)}
+          tone="red"
+          icon={<AlertTriangle className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Total Payments"
+          value={summary.totalPayments}
+          tone="blue"
+          icon={<CreditCard className="h-5 w-5" />}
+        />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Completed</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.completedAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Pending</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.pendingAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Overdue</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.overdueAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Total Payments</dt>
-                    <dd className="text-lg font-medium text-gray-900">{summary.totalPayments}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="px-6 py-4">
+        <Card className="mb-6">
             <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-1">
-                  Search
-                </label>
-                <input
+              <FormField label="Search" htmlFor="search">
+                <Input
                   type="text"
                   name="search"
                   id="search"
                   defaultValue={search}
                   placeholder="Search payments..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-900 mb-1">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  id="status"
-                  defaultValue={status}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Status" htmlFor="status">
+                <Select name="status" id="status" defaultValue={status}>
                   <option value="">All Statuses</option>
                   <option value="completed">Completed</option>
                   <option value="pending">Pending</option>
                   <option value="failed">Failed</option>
                   <option value="refunded">Refunded</option>
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="type" className="block text-sm font-medium text-gray-900 mb-1">
-                  Type
-                </label>
-                <select
-                  name="type"
-                  id="type"
-                  defaultValue={type}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Type" htmlFor="type">
+                <Select name="type" id="type" defaultValue={type}>
                   <option value="">All Types</option>
                   <option value="rent">Rent</option>
                   <option value="deposit">Deposit</option>
                   <option value="fee">Fee</option>
                   <option value="utilities">Utilities</option>
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="tenant" className="block text-sm font-medium text-gray-900 mb-1">
-                  Tenant
-                </label>
-                <select
-                  name="tenant"
-                  id="tenant"
-                  defaultValue={tenantId}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Tenant" htmlFor="tenant">
+                <Select name="tenant" id="tenant" defaultValue={tenantId}>
                   <option value="">All Tenants</option>
                   {uniqueTenants.length > 0 ? (
                     uniqueTenants.map((tenant) => (
@@ -318,22 +221,20 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
                       </option>
                     ))
                   ) : (
-                    <option value="" disabled>No tenants available</option>
+                    <option value="" disabled>
+                      No tenants available
+                    </option>
                   )}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
               <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
+                <Button type="submit" className="w-full">
                   Filter
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </Card>
 
         {/* Payments Table */}
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
@@ -384,11 +285,11 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
                             <p className="text-sm font-medium text-gray-900">
                               {formatCurrency(payment.amount)}
                             </p>
-                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(payment.status)}`}>
-                              {payment.status}
+                            <span className="ml-2">
+                              <PaymentStatusBadge status={payment.status} />
                             </span>
-                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentTypeClass(payment.type)}`}>
-                              {payment.type}
+                            <span className="ml-2">
+                              <Badge tone="purple">{payment.type}</Badge>
                             </span>
                           </div>
                           <div className="mt-1 flex items-center text-sm text-gray-900">
@@ -497,7 +398,6 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 } 

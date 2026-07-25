@@ -7,6 +7,13 @@ import { Document, DocumentCategory, DOCUMENT_TYPES } from '@/types/document';
 import { useNotifications } from '@/hooks/useNotifications';
 import PDFPreview from './PDFPreview';
 import BulkDocumentOperations from './BulkDocumentOperations';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Button } from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Filter, Search } from 'lucide-react';
 
 interface DocumentsListProps {
   documents: Document[];
@@ -25,7 +32,7 @@ export default function DocumentsList({
 }: DocumentsListProps) {
   const router = useRouter();
   const urlSearchParams = useSearchParams();
-  const { addNotification } = useNotifications();
+  const { showNotification } = useNotifications();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
@@ -119,12 +126,12 @@ export default function DocumentsList({
       const result = await response.json();
 
       if (result.success) {
-        addNotification({
+        showNotification({
           type: 'success',
           title: 'Document deleted',
-          message: `Document "${documentName}" has been deleted successfully.`
+          message: `Document "${documentName}" has been deleted successfully.`,
         });
-        
+
         // Refresh the page to update the list
         router.refresh();
       } else {
@@ -132,10 +139,10 @@ export default function DocumentsList({
       }
     } catch (error) {
       console.error('Error deleting document:', error);
-      addNotification({
+      showNotification({
         type: 'error',
         title: 'Delete failed',
-        message: error instanceof Error ? error.message : 'Failed to delete document'
+        message: error instanceof Error ? error.message : 'Failed to delete document',
       });
     } finally {
       setIsDeleting(null);
@@ -206,102 +213,80 @@ export default function DocumentsList({
         tenants={[]}
       />
 
-      <div className="bg-white shadow rounded-lg">
-        {/* Search and Filters */}
-      <div className="p-6 border-b border-gray-200">
+      <Card padding="none" className="overflow-hidden">
+      <div className="p-6 border-b border-gray-200 space-y-4">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search documents..."
-                defaultValue={searchParams.search || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const timeoutId = setTimeout(() => handleSearch(value), 500);
-                  return () => clearTimeout(timeoutId);
-                }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            </div>
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              className="pl-10"
+              placeholder="Search documents..."
+              defaultValue={searchParams.search || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                window.setTimeout(() => handleSearch(value), 500);
+              }}
+            />
           </div>
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            leftIcon={<Filter className="h-4 w-4" />}
             onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           >
-            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z" />
-            </svg>
             Filters
-          </button>
+          </Button>
         </div>
 
-        {/* Expanded Filters */}
         {showFilters && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Category</label>
-              <select
-                value={searchParams.categoryId || ''}
-                onChange={(e) => handleFilterChange('categoryId', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="">All Categories</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Select
+              value={searchParams.categoryId || ''}
+              onChange={(e) => handleFilterChange('categoryId', e.target.value)}
+              aria-label="Category"
+            >
+              <option value="">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </Select>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Document Type</label>
-              <select
-                value={searchParams.documentType || ''}
-                onChange={(e) => handleFilterChange('documentType', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="">All Types</option>
-                {DOCUMENT_TYPES.map(type => (
-                  <option key={type} value={type}>
-                    {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              value={searchParams.documentType || ''}
+              onChange={(e) => handleFilterChange('documentType', e.target.value)}
+              aria-label="Document Type"
+            >
+              <option value="">All Types</option>
+              {DOCUMENT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
+                </option>
+              ))}
+            </Select>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Access Level</label>
-              <select
-                value={searchParams.accessLevel || ''}
-                onChange={(e) => handleFilterChange('accessLevel', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="">All Access Levels</option>
-                <option value="admin">Admin Only</option>
-                <option value="tenant">Tenant Access</option>
-                <option value="public">Public</option>
-              </select>
-            </div>
+            <Select
+              value={searchParams.accessLevel || ''}
+              onChange={(e) => handleFilterChange('accessLevel', e.target.value)}
+              aria-label="Access Level"
+            >
+              <option value="">All Access Levels</option>
+              <option value="admin">Admin Only</option>
+              <option value="tenant">Tenant Access</option>
+              <option value="public">Public</option>
+            </Select>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Expiry Status</label>
-              <select
-                value={searchParams.isExpired || ''}
-                onChange={(e) => handleFilterChange('isExpired', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="">All Documents</option>
-                <option value="false">Active Documents</option>
-                <option value="true">Expired Documents</option>
-              </select>
-            </div>
+            <Select
+              value={searchParams.isExpired || ''}
+              onChange={(e) => handleFilterChange('isExpired', e.target.value)}
+              aria-label="Expiry Status"
+            >
+              <option value="">All Documents</option>
+              <option value="false">Active Documents</option>
+              <option value="true">Expired Documents</option>
+            </Select>
           </div>
         )}
       </div>
@@ -312,11 +297,10 @@ export default function DocumentsList({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selectedDocuments.length === documents.length && documents.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  aria-label="Select all documents"
                 />
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
@@ -359,11 +343,10 @@ export default function DocumentsList({
               documents.map((document) => (
                 <tr key={document.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isDocumentSelected(document.id)}
                       onChange={(e) => handleDocumentSelect(document, e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      aria-label={`Select ${document.documentName}`}
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -622,6 +605,8 @@ export default function DocumentsList({
         </div>
       )}
 
+      </Card>
+
       {/* PDF Preview Modal */}
       {previewDocument && (
         <PDFPreview
@@ -630,7 +615,6 @@ export default function DocumentsList({
           onClose={() => setPreviewDocument(null)}
         />
       )}
-      </div>
     </div>
   );
 } 

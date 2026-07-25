@@ -65,6 +65,7 @@ export interface Invoice {
   taxAmount: number;
   totalAmount: number;
   paidAmount: number;
+  balanceDue?: number;
   description?: string;
   notes?: string;
   createdAt: Date;
@@ -92,7 +93,8 @@ export interface InvoiceItem {
 export interface InvoiceFilters {
   search?: string;
   status?: string;
-  tenantId?: number;
+  tenantId?: string | number;
+  roomId?: string | number;
   dateFrom?: string;
   dateTo?: string;
 }

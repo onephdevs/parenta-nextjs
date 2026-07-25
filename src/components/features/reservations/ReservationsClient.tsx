@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ReservationWithDetails } from '@/types/database';
 import ReservationsList from './ReservationsList';
+import { StatCard } from '@/components/ui/StatCard';
+import { AlertTriangle, CheckCircle2, Clock, CalendarDays } from 'lucide-react';
 
 interface ReservationsClientProps {
   initialReservations: ReservationWithDetails[];
@@ -15,7 +17,7 @@ export default function ReservationsClient({ initialReservations }: Reservations
     try {
       const response = await fetch('/api/reservations?limit=1000');
       const result = await response.json();
-      
+
       if (result.success) {
         setReservations(result.data.reservations);
       }
@@ -24,7 +26,6 @@ export default function ReservationsClient({ initialReservations }: Reservations
     }
   }, []);
 
-  // Listen for reservation created event to refresh the list
   useEffect(() => {
     const handleReservationCreated = () => {
       handleRefresh();
@@ -36,39 +37,48 @@ export default function ReservationsClient({ initialReservations }: Reservations
     };
   }, [handleRefresh]);
 
+  const activeCount = reservations.filter((r) => r.reservationStatus === 'active').length;
+  const expiredCount = reservations.filter(
+    (r) => r.isExpired && r.reservationStatus === 'active'
+  ).length;
+  const expiringSoonCount = reservations.filter(
+    (r) =>
+      r.daysUntilExpiry <= 7 &&
+      r.daysUntilExpiry >= 0 &&
+      r.reservationStatus === 'active'
+  ).length;
+  const convertedCount = reservations.filter((r) => r.reservationStatus === 'converted').length;
+
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">Active Reservations</div>
-          <div className="mt-2 text-3xl font-bold text-gray-900">
-            {reservations.filter(r => r.reservationStatus === 'active').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">Expired</div>
-          <div className="mt-2 text-3xl font-bold text-red-600">
-            {reservations.filter(r => r.isExpired && r.reservationStatus === 'active').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">Expiring Soon</div>
-          <div className="mt-2 text-3xl font-bold text-yellow-600">
-            {reservations.filter(r => r.daysUntilExpiry <= 7 && r.daysUntilExpiry >= 0 && r.reservationStatus === 'active').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">Converted</div>
-          <div className="mt-2 text-3xl font-bold text-blue-600">
-            {reservations.filter(r => r.reservationStatus === 'converted').length}
-          </div>
-        </div>
+        <StatCard
+          title="Active Reservations"
+          value={activeCount}
+          tone="default"
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Expired"
+          value={expiredCount}
+          tone="red"
+          icon={<AlertTriangle className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Expiring Soon"
+          value={expiringSoonCount}
+          tone="yellow"
+          icon={<Clock className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Converted"
+          value={convertedCount}
+          tone="blue"
+          icon={<CheckCircle2 className="h-5 w-5" />}
+        />
       </div>
 
-      {/* Reservations List */}
       <ReservationsList reservations={reservations} onRefresh={handleRefresh} />
     </div>
   );
 }
-

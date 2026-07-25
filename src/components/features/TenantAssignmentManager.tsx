@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { Dialog } from '@/components/ui/Dialog';
+import { FormField } from '@/components/forms/FormField';
 import AddOccupantModal from './AddOccupantModal';
+import { Plus, UserPlus, X } from 'lucide-react';
 
 interface Tenant {
   id: string;
@@ -74,7 +83,7 @@ export default function TenantAssignmentManager({
   assignmentHistory,
   roomMonthlyRate,
   room,
-  onAssignmentChange
+  onAssignmentChange,
 }: TenantAssignmentManagerProps) {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [showUnassignForm, setShowUnassignForm] = useState(false);
@@ -90,7 +99,7 @@ export default function TenantAssignmentManager({
     depositPaid: '',
     advanceAmount: '',
     utilityDepositAmount: '',
-    notes: ''
+    notes: '',
   });
   const [buildingConfig, setBuildingConfig] = useState<any>(null);
   const [requiredDeposit, setRequiredDeposit] = useState(0);
@@ -98,15 +107,14 @@ export default function TenantAssignmentManager({
   const [requiredUtility, setRequiredUtility] = useState(0);
   const [unassignFormData, setUnassignFormData] = useState({
     endDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
   });
 
-  // Fetch available tenants for assignment
   const fetchAvailableTenants = async () => {
     try {
       const response = await fetch('/api/tenants?status=available');
       const result = await response.json();
-      
+
       if (result.success) {
         setAvailableTenants(result.data);
       }
@@ -116,21 +124,18 @@ export default function TenantAssignmentManager({
     }
   };
 
-  // Fetch occupants for this room
   const fetchOccupants = async () => {
     try {
       const response = await fetch(`/api/occupants?roomId=${roomId}&activeOnly=true`);
       const result = await response.json();
-      
+
       if (result.success && Array.isArray(result.data)) {
         setOccupants(result.data);
       } else {
-        // Ensure occupants is always an array, even on error
         setOccupants([]);
       }
     } catch (error) {
       console.error('Error fetching occupants:', error);
-      // Ensure occupants is always an array, even on error
       setOccupants([]);
     }
   };
@@ -142,7 +147,6 @@ export default function TenantAssignmentManager({
     fetchOccupants();
   }, [showAssignForm, roomId]);
 
-  // Fetch building deposit config when roomId is available
   useEffect(() => {
     if (roomId) {
       fetchRoomBuildingId();
@@ -154,7 +158,6 @@ export default function TenantAssignmentManager({
     }
   }, [roomId]);
 
-  // Recalculate when monthly rate changes
   useEffect(() => {
     if (buildingConfig && assignFormData.monthlyRate) {
       const monthlyRate = parseFloat(assignFormData.monthlyRate) || roomMonthlyRate;
@@ -164,12 +167,11 @@ export default function TenantAssignmentManager({
     }
   }, [assignFormData.monthlyRate, buildingConfig]);
 
-  // Fetch room's building ID
   const fetchRoomBuildingId = async () => {
     try {
       const response = await fetch(`/api/rooms/${roomId}`);
       const result = await response.json();
-      
+
       if (result.success && result.data?.buildingId) {
         fetchBuildingDepositConfig(result.data.buildingId);
       } else {
@@ -184,12 +186,11 @@ export default function TenantAssignmentManager({
     }
   };
 
-  // Fetch building deposit config
   const fetchBuildingDepositConfig = async (buildingId: string) => {
     try {
       const response = await fetch(`/api/building-deposit-config?buildingId=${buildingId}`);
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         setBuildingConfig({ ...result.data, buildingId });
         const monthlyRate = parseFloat(assignFormData.monthlyRate) || roomMonthlyRate;
@@ -198,7 +199,6 @@ export default function TenantAssignmentManager({
         }
       } else {
         setBuildingConfig(null);
-        // Fall back to room-level calculation
         if (room) {
           const deposit = calculateRequiredDeposit();
           setRequiredDeposit(deposit);
@@ -211,15 +211,14 @@ export default function TenantAssignmentManager({
       setBuildingConfig(null);
     }
   };
-  
-  // Calculate required amounts based on building config
+
   const calculateRequiredAmounts = async (buildingId: string, monthlyRate: number) => {
     try {
       const response = await fetch(
         `/api/building-deposit-config/${buildingId}?action=calculate&monthlyRate=${monthlyRate}`
       );
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         setRequiredDeposit(result.data.requiredDeposit || 0);
         setRequiredAdvance(result.data.requiredAdvance || 0);
@@ -230,10 +229,9 @@ export default function TenantAssignmentManager({
     }
   };
 
-  // Calculate required deposit based on room configuration (fallback)
   const calculateRequiredDeposit = (): number => {
     if (buildingConfig) {
-      return requiredDeposit; // Use building config value
+      return requiredDeposit;
     }
     if (!room?.depositRequired) return 0;
 
@@ -243,9 +241,7 @@ export default function TenantAssignmentManager({
       case 'one_month':
         return monthlyRate;
       case 'percentage':
-        return room.depositPercentage
-          ? (monthlyRate * room.depositPercentage) / 100
-          : 0;
+        return room.depositPercentage ? (monthlyRate * room.depositPercentage) / 100 : 0;
       case 'fixed':
         return room.depositFixedAmount || 0;
       default:
@@ -253,38 +249,44 @@ export default function TenantAssignmentManager({
     }
   };
 
-  // Handle tenant assignment
   const handleAssignTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Validate deposit if required
     const currentRequiredDeposit = calculateRequiredDeposit();
     if (currentRequiredDeposit > 0) {
       const depositPaid = assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : 0;
 
       if (depositPaid < currentRequiredDeposit) {
-        showError(`Deposit required: ₱${currentRequiredDeposit.toLocaleString()}. Current: ₱${depositPaid.toLocaleString()}`);
+        showError(
+          `Deposit required: ₱${currentRequiredDeposit.toLocaleString()}. Current: ₱${depositPaid.toLocaleString()}`
+        );
         setLoading(false);
         return;
       }
     }
 
-    // Validate advance if provided
     if (assignFormData.advanceAmount && parseFloat(assignFormData.advanceAmount) > 0 && requiredAdvance > 0) {
       const advancePaid = parseFloat(assignFormData.advanceAmount);
       if (advancePaid < requiredAdvance) {
-        showError(`Advance required: ₱${requiredAdvance.toLocaleString()}. Current: ₱${advancePaid.toLocaleString()}`);
+        showError(
+          `Advance required: ₱${requiredAdvance.toLocaleString()}. Current: ₱${advancePaid.toLocaleString()}`
+        );
         setLoading(false);
         return;
       }
     }
 
-    // Validate utility deposit if provided
-    if (assignFormData.utilityDepositAmount && parseFloat(assignFormData.utilityDepositAmount) > 0 && requiredUtility > 0) {
+    if (
+      assignFormData.utilityDepositAmount &&
+      parseFloat(assignFormData.utilityDepositAmount) > 0 &&
+      requiredUtility > 0
+    ) {
       const utilityPaid = parseFloat(assignFormData.utilityDepositAmount);
       if (utilityPaid < requiredUtility) {
-        showError(`Utility deposit required: ₱${requiredUtility.toLocaleString()}. Current: ₱${utilityPaid.toLocaleString()}`);
+        showError(
+          `Utility deposit required: ₱${requiredUtility.toLocaleString()}. Current: ₱${utilityPaid.toLocaleString()}`
+        );
         setLoading(false);
         return;
       }
@@ -300,9 +302,11 @@ export default function TenantAssignmentManager({
           monthlyRate: parseFloat(assignFormData.monthlyRate),
           depositPaid: assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : undefined,
           advanceAmount: assignFormData.advanceAmount ? parseFloat(assignFormData.advanceAmount) : undefined,
-          utilityDepositAmount: assignFormData.utilityDepositAmount ? parseFloat(assignFormData.utilityDepositAmount) : undefined,
-          notes: assignFormData.notes
-        })
+          utilityDepositAmount: assignFormData.utilityDepositAmount
+            ? parseFloat(assignFormData.utilityDepositAmount)
+            : undefined,
+          notes: assignFormData.notes,
+        }),
       });
 
       const result = await response.json();
@@ -317,7 +321,7 @@ export default function TenantAssignmentManager({
           depositPaid: '',
           advanceAmount: '',
           utilityDepositAmount: '',
-          notes: ''
+          notes: '',
         });
         onAssignmentChange();
       } else {
@@ -331,7 +335,6 @@ export default function TenantAssignmentManager({
     }
   };
 
-  // Handle tenant unassignment
   const handleUnassignTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -343,8 +346,8 @@ export default function TenantAssignmentManager({
         body: JSON.stringify({
           tenantId: currentTenant?.tenant_id,
           endDate: unassignFormData.endDate,
-          notes: unassignFormData.notes
-        })
+          notes: unassignFormData.notes,
+        }),
       });
 
       const result = await response.json();
@@ -354,7 +357,7 @@ export default function TenantAssignmentManager({
         setShowUnassignForm(false);
         setUnassignFormData({
           endDate: new Date().toISOString().split('T')[0],
-          notes: ''
+          notes: '',
         });
         onAssignmentChange();
       } else {
@@ -368,52 +371,52 @@ export default function TenantAssignmentManager({
     }
   };
 
+  const depositInsufficient =
+    assignFormData.depositPaid &&
+    parseFloat(assignFormData.depositPaid) < calculateRequiredDeposit();
+
   return (
     <div className="space-y-6">
-      {/* Current Tenant Section */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <Card>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-900">Current Tenant</h3>
           {currentTenant ? (
             <div className="flex items-center space-x-3">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowAddOccupantModal(true)}
-                className="inline-flex items-center px-3 py-2 border border-purple-300 text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                leftIcon={<UserPlus className="h-4 w-4" />}
               >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
                 Add Occupant
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => setShowUnassignForm(true)}
-                className="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                leftIcon={<X className="h-4 w-4" />}
               >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
                 End Assignment
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
-              onClick={() => setShowAssignForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-            >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
+            <Button variant="primary" size="sm" onClick={() => setShowAssignForm(true)} leftIcon={<Plus className="h-4 w-4" />}>
               Assign Tenant
-            </button>
+            </Button>
           )}
         </div>
 
         {currentTenant ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <Alert variant="success" className="border-green-200">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
                 </svg>
               </div>
               <div className="ml-4 flex-1">
@@ -430,18 +433,21 @@ export default function TenantAssignmentManager({
                     </div>
                   )}
                   <div>
-                    <span className="font-medium">Move-in Date:</span> {new Date(currentTenant.start_date).toLocaleDateString()}
+                    <span className="font-medium">Move-in Date:</span>{' '}
+                    {new Date(currentTenant.start_date).toLocaleDateString()}
                   </div>
                   <div>
-                    <span className="font-medium">Monthly Rate:</span> ₱{parseFloat(currentTenant.monthly_rate.toString()).toLocaleString()}
+                    <span className="font-medium">Monthly Rate:</span> ₱
+                    {parseFloat(currentTenant.monthly_rate.toString()).toLocaleString()}
                   </div>
                   {currentTenant.deposit_paid && (
                     <div>
-                      <span className="font-medium">Deposit Paid:</span> ₱{parseFloat(currentTenant.deposit_paid.toString()).toLocaleString()}
+                      <span className="font-medium">Deposit Paid:</span> ₱
+                      {parseFloat(currentTenant.deposit_paid.toString()).toLocaleString()}
                     </div>
                   )}
                   <div>
-                    <span className="font-medium">Status:</span> 
+                    <span className="font-medium">Status:</span>
                     <span className="ml-1 capitalize">{currentTenant.tenant_status}</span>
                   </div>
                 </div>
@@ -453,72 +459,67 @@ export default function TenantAssignmentManager({
                 )}
               </div>
             </div>
-          </div>
+          </Alert>
         ) : (
           <div className="text-center py-8 text-gray-900">
             <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
             </svg>
             <p className="mt-2">No tenant currently assigned to this room</p>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Occupants Section */}
       {occupants.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">Other Occupants</h3>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowAddOccupantModal(true)}
-              className="inline-flex items-center px-3 py-2 border border-purple-300 text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              leftIcon={<Plus className="h-4 w-4" />}
             >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
               Add Occupant
-            </button>
+            </Button>
           </div>
           <div className="space-y-3">
-            {Array.isArray(occupants) && occupants.map((occupant) => (
-              <div key={occupant.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      {occupant.first_name || ''} {occupant.last_name || ''}
-                    </h4>
-                    {occupant.relationship_to_tenant && (
-                      <p className="text-sm text-gray-900 capitalize">
-                        {String(occupant.relationship_to_tenant)}
-                      </p>
-                    )}
-                    {occupant.phone && (
-                      <p className="text-sm text-gray-900">Phone: {occupant.phone}</p>
-                    )}
-                    {occupant.email && (
-                      <p className="text-sm text-gray-900">Email: {occupant.email}</p>
-                    )}
-                  </div>
-                  <div className="text-right text-sm text-gray-900">
+            {Array.isArray(occupants) &&
+              occupants.map((occupant) => (
+                <div key={occupant.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      Moved in: {new Date(occupant.move_in_date).toLocaleDateString()}
+                      <h4 className="font-medium text-gray-900">
+                        {occupant.first_name || ''} {occupant.last_name || ''}
+                      </h4>
+                      {occupant.relationship_to_tenant && (
+                        <p className="text-sm text-gray-900 capitalize">
+                          {String(occupant.relationship_to_tenant)}
+                        </p>
+                      )}
+                      {occupant.phone && <p className="text-sm text-gray-900">Phone: {occupant.phone}</p>}
+                      {occupant.email && <p className="text-sm text-gray-900">Email: {occupant.email}</p>}
                     </div>
-                    {occupant.move_out_date && (
-                      <div>
-                        Moved out: {new Date(occupant.move_out_date).toLocaleDateString()}
-                      </div>
-                    )}
+                    <div className="text-right text-sm text-gray-900">
+                      <div>Moved in: {new Date(occupant.move_in_date).toLocaleDateString()}</div>
+                      {occupant.move_out_date && (
+                        <div>Moved out: {new Date(occupant.move_out_date).toLocaleDateString()}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Assignment History */}
       {assignmentHistory.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <Card>
           <h3 className="text-lg font-medium text-gray-900 mb-4">Assignment History</h3>
           <div className="space-y-4">
             {assignmentHistory.map((assignment) => (
@@ -532,15 +533,19 @@ export default function TenantAssignmentManager({
                   </div>
                   <div className="text-right text-sm text-gray-900">
                     <div>
-                      {new Date(assignment.start_date).toLocaleDateString()} - 
+                      {new Date(assignment.start_date).toLocaleDateString()} -
                       {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'Current'}
                     </div>
-                    <div className="font-medium">₱{parseFloat(assignment.monthly_rate.toString()).toLocaleString()}/month</div>
-                    <div className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                      assignment.assignment_status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <div className="font-medium">
+                      ₱{parseFloat(assignment.monthly_rate.toString()).toLocaleString()}/month
+                    </div>
+                    <div
+                      className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        assignment.assignment_status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
                       {assignment.assignment_status}
                     </div>
                   </div>
@@ -548,236 +553,200 @@ export default function TenantAssignmentManager({
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Assign Tenant Modal */}
-      {showAssignForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Assign Tenant to Room</h3>
-              <form onSubmit={handleAssignTenant} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Select Tenant</label>
-                  <select
-                    value={assignFormData.tenantId}
-                    onChange={(e) => setAssignFormData({ ...assignFormData, tenantId: e.target.value })}
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    required
-                  >
-                    <option value="">Choose a tenant...</option>
-                    {availableTenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.first_name} {tenant.last_name} ({tenant.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      <Dialog
+        isOpen={showAssignForm}
+        onClose={() => setShowAssignForm(false)}
+        title="Assign Tenant to Room"
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowAssignForm(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="assign-tenant-form" variant="primary" isLoading={loading}>
+              Assign Tenant
+            </Button>
+          </>
+        }
+      >
+        <form id="assign-tenant-form" onSubmit={handleAssignTenant} className="space-y-4">
+          <FormField htmlFor="tenantId" label="Select Tenant" required>
+            <Select
+              id="tenantId"
+              value={assignFormData.tenantId}
+              onChange={(e) => setAssignFormData({ ...assignFormData, tenantId: e.target.value })}
+              required
+            >
+              <option value="">Choose a tenant...</option>
+              {availableTenants.map((tenant) => (
+                <option key={tenant.id} value={tenant.id}>
+                  {tenant.first_name} {tenant.last_name} ({tenant.email})
+                </option>
+              ))}
+            </Select>
+          </FormField>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Start Date</label>
-                  <input
-                    type="date"
-                    value={assignFormData.startDate}
-                    onChange={(e) => setAssignFormData({ ...assignFormData, startDate: e.target.value })}
-                    min="2000-01-01"
-                    max="2099-12-31"
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    required
-                    style={{
-                      colorScheme: 'light',
-                    }}
-                  />
-                </div>
+          <FormField htmlFor="startDate" label="Start Date" required>
+            <Input
+              id="startDate"
+              type="date"
+              value={assignFormData.startDate}
+              onChange={(e) => setAssignFormData({ ...assignFormData, startDate: e.target.value })}
+              min="2000-01-01"
+              max="2099-12-31"
+              required
+              style={{ colorScheme: 'light' }}
+            />
+          </FormField>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Monthly Rate (₱)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={assignFormData.monthlyRate}
-                    onChange={(e) => setAssignFormData({ ...assignFormData, monthlyRate: e.target.value })}
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    required
-                  />
-                </div>
+          <FormField htmlFor="monthlyRate" label="Monthly Rate (₱)" required>
+            <Input
+              id="monthlyRate"
+              type="number"
+              step="0.01"
+              value={assignFormData.monthlyRate}
+              onChange={(e) => setAssignFormData({ ...assignFormData, monthlyRate: e.target.value })}
+              required
+            />
+          </FormField>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">
-                    Deposit Paid (₱)
-                    {room?.depositRequired && (
-                      <span className="ml-2 text-red-600">*</span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={assignFormData.depositPaid}
-                    onChange={(e) => setAssignFormData({ ...assignFormData, depositPaid: e.target.value })}
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder={room?.depositRequired ? "Required" : "Optional"}
-                    required={room?.depositRequired}
-                  />
-                  {(room?.depositRequired || buildingConfig) && (
-                    <p className="mt-1 text-sm text-gray-900">
-                      <strong>Required deposit:</strong> ₱{calculateRequiredDeposit().toLocaleString()}
-                    </p>
-                  )}
-                  {assignFormData.depositPaid && parseFloat(assignFormData.depositPaid) < calculateRequiredDeposit() && (
-                    <p className="mt-1 text-sm text-red-600">
-                      Insufficient deposit. Required: ₱{calculateRequiredDeposit().toLocaleString()}
-                    </p>
-                  )}
-                  {buildingConfig && requiredAdvance > 0 && (
-                    <p className="mt-1 text-sm text-gray-600">
-                      <strong>Required advance:</strong> ₱{requiredAdvance.toLocaleString()}
-                    </p>
-                  )}
-                  {buildingConfig && requiredUtility > 0 && (
-                    <p className="mt-1 text-sm text-gray-600">
-                      <strong>Required utility deposit:</strong> ₱{requiredUtility.toLocaleString()}
-                    </p>
-                  )}
-                </div>
+          <FormField
+            htmlFor="depositPaid"
+            label={`Deposit Paid (₱)${room?.depositRequired ? ' *' : ''}`}
+            required={room?.depositRequired}
+            hint={
+              room?.depositRequired || buildingConfig
+                ? `Required deposit: ₱${calculateRequiredDeposit().toLocaleString()}${
+                    buildingConfig && requiredAdvance > 0
+                      ? `. Required advance: ₱${requiredAdvance.toLocaleString()}`
+                      : ''
+                  }${
+                    buildingConfig && requiredUtility > 0
+                      ? `. Required utility deposit: ₱${requiredUtility.toLocaleString()}`
+                      : ''
+                  }`
+                : undefined
+            }
+            error={
+              depositInsufficient
+                ? `Insufficient deposit. Required: ₱${calculateRequiredDeposit().toLocaleString()}`
+                : undefined
+            }
+          >
+            <Input
+              id="depositPaid"
+              type="number"
+              step="0.01"
+              value={assignFormData.depositPaid}
+              onChange={(e) => setAssignFormData({ ...assignFormData, depositPaid: e.target.value })}
+              placeholder={room?.depositRequired ? 'Required' : 'Optional'}
+              required={room?.depositRequired}
+              isInvalid={Boolean(depositInsufficient)}
+            />
+          </FormField>
 
-                {/* Advance Payment */}
-                {buildingConfig && requiredAdvance > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900">
-                      Advance Payment (₱) (Optional)
-                      <span className="ml-2 text-gray-500">(Min: ₱{requiredAdvance.toLocaleString()})</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={assignFormData.advanceAmount}
-                      onChange={(e) => setAssignFormData({ ...assignFormData, advanceAmount: e.target.value })}
-                      className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder="Optional"
-                    />
-                    <p className="mt-1 text-sm text-gray-600">
-                      Any advance rent payment made at the start of the lease
-                    </p>
-                  </div>
-                )}
+          {buildingConfig && requiredAdvance > 0 && (
+            <FormField
+              htmlFor="advanceAmount"
+              label="Advance Payment (₱) (Optional)"
+              hint={`Min: ₱${requiredAdvance.toLocaleString()}. Any advance rent payment made at the start of the lease.`}
+            >
+              <Input
+                id="advanceAmount"
+                type="number"
+                step="0.01"
+                value={assignFormData.advanceAmount}
+                onChange={(e) => setAssignFormData({ ...assignFormData, advanceAmount: e.target.value })}
+                placeholder="Optional"
+              />
+            </FormField>
+          )}
 
-                {/* Utility Deposit */}
-                {buildingConfig && requiredUtility > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900">
-                      Utility Deposit (₱) (Optional)
-                      <span className="ml-2 text-gray-500">(Min: ₱{requiredUtility.toLocaleString()})</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={assignFormData.utilityDepositAmount}
-                      onChange={(e) => setAssignFormData({ ...assignFormData, utilityDepositAmount: e.target.value })}
-                      className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder="Optional"
-                    />
-                    <p className="mt-1 text-sm text-gray-600">
-                      Utility deposit amount for this building
-                    </p>
-                  </div>
-                )}
+          {buildingConfig && requiredUtility > 0 && (
+            <FormField
+              htmlFor="utilityDepositAmount"
+              label="Utility Deposit (₱) (Optional)"
+              hint={`Min: ₱${requiredUtility.toLocaleString()}. Utility deposit amount for this building.`}
+            >
+              <Input
+                id="utilityDepositAmount"
+                type="number"
+                step="0.01"
+                value={assignFormData.utilityDepositAmount}
+                onChange={(e) =>
+                  setAssignFormData({ ...assignFormData, utilityDepositAmount: e.target.value })
+                }
+                placeholder="Optional"
+              />
+            </FormField>
+          )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Notes</label>
-                  <textarea
-                    value={assignFormData.notes}
-                    onChange={(e) => setAssignFormData({ ...assignFormData, notes: e.target.value })}
-                    rows={4}
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Optional notes about the assignment..."
-                  />
-                </div>
+          <FormField htmlFor="assignNotes" label="Notes">
+            <Textarea
+              id="assignNotes"
+              value={assignFormData.notes}
+              onChange={(e) => setAssignFormData({ ...assignFormData, notes: e.target.value })}
+              rows={4}
+              placeholder="Optional notes about the assignment..."
+            />
+          </FormField>
+        </form>
+      </Dialog>
 
-                <div className="flex space-x-3">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                  >
-                    {loading ? 'Assigning...' : 'Assign Tenant'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAssignForm(false)}
-                    className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+      {currentTenant && (
+        <Dialog
+          isOpen={showUnassignForm}
+          onClose={() => setShowUnassignForm(false)}
+          title="End Tenant Assignment"
+          size="md"
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowUnassignForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" form="unassign-tenant-form" variant="danger" isLoading={loading}>
+                End Assignment
+              </Button>
+            </>
+          }
+        >
+          <Alert variant="warning" className="mb-4">
+            This will end the assignment for{' '}
+            <strong>
+              {currentTenant.first_name} {currentTenant.last_name}
+            </strong>{' '}
+            and mark the room as vacant.
+          </Alert>
+          <form id="unassign-tenant-form" onSubmit={handleUnassignTenant} className="space-y-4">
+            <FormField htmlFor="endDate" label="End Date" required>
+              <Input
+                id="endDate"
+                type="date"
+                value={unassignFormData.endDate}
+                onChange={(e) => setUnassignFormData({ ...unassignFormData, endDate: e.target.value })}
+                min={unassignFormData.startDate || '2000-01-01'}
+                max="2099-12-31"
+                required
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField htmlFor="unassignNotes" label="Notes">
+              <Textarea
+                id="unassignNotes"
+                value={unassignFormData.notes}
+                onChange={(e) => setUnassignFormData({ ...unassignFormData, notes: e.target.value })}
+                rows={4}
+                placeholder="Reason for ending assignment..."
+              />
+            </FormField>
+          </form>
+        </Dialog>
       )}
 
-      {/* Unassign Tenant Modal */}
-      {showUnassignForm && currentTenant && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">End Tenant Assignment</h3>
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  This will end the assignment for <strong>{currentTenant.first_name} {currentTenant.last_name}</strong> and mark the room as vacant.
-                </p>
-              </div>
-              <form onSubmit={handleUnassignTenant} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">End Date</label>
-                  <input
-                    type="date"
-                    value={unassignFormData.endDate}
-                    onChange={(e) => setUnassignFormData({ ...unassignFormData, endDate: e.target.value })}
-                    min={unassignFormData.startDate || '2000-01-01'}
-                    max="2099-12-31"
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    required
-                    style={{
-                      colorScheme: 'light',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900">Notes</label>
-                  <textarea
-                    value={unassignFormData.notes}
-                    onChange={(e) => setUnassignFormData({ ...unassignFormData, notes: e.target.value })}
-                    rows={4}
-                    className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Reason for ending assignment..."
-                  />
-                </div>
-
-                <div className="flex space-x-3">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
-                  >
-                    {loading ? 'Processing...' : 'End Assignment'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowUnassignForm(false)}
-                    className="flex-1 bg-gray-300 text-gray-900 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Occupant Modal */}
       <AddOccupantModal
         isOpen={showAddOccupantModal}
         onClose={() => setShowAddOccupantModal(false)}
@@ -790,4 +759,4 @@ export default function TenantAssignmentManager({
       />
     </div>
   );
-} 
+}

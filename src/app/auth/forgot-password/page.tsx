@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 type Role = 'admin' | 'tenant' | 'staff';
 
@@ -40,28 +42,28 @@ function ForgotPasswordContent() {
           Back to sign in
         </Link>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+        <Card className="p-8">
           <div className="flex justify-center mb-6">
-            <div className="bg-blue-100 dark:bg-blue-900/40 p-3 rounded-xl">
-              <Mail className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            <div className="bg-purple-100 p-3 rounded-xl">
+              <Mail className="h-8 w-8 text-purple-600" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-center mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
             Forgot password?
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
+          <p className="text-gray-600 text-center mb-6">
             To reset your {label.toLowerCase()} account password, please contact your administrator or support.
           </p>
 
-          <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
+          <div className="space-y-4 text-sm text-gray-700">
             <p>
-              <strong className="text-gray-900 dark:text-gray-100">Option 1:</strong> Contact your property administrator to request a password reset.
+              <strong className="text-gray-900">Option 1:</strong> Contact your property administrator to request a password reset.
             </p>
             <p>
-              <strong className="text-gray-900 dark:text-gray-100">Option 2:</strong> Email support at{' '}
+              <strong className="text-gray-900">Option 2:</strong> Email support at{' '}
               <a
                 href="mailto:support@parenta.com"
-                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                className="text-purple-600 hover:underline font-medium"
               >
                 support@parenta.com
               </a>{' '}
@@ -69,16 +71,14 @@ function ForgotPasswordContent() {
             </p>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
-            <Link
-              href={signInHref}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Return to {label} sign in
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <Link href={signInHref} className="block">
+              <Button className="w-full" leftIcon={<ArrowLeft className="h-4 w-4" />}>
+                Return to {label} sign in
+              </Button>
             </Link>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

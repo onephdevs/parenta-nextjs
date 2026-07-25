@@ -18,8 +18,15 @@ import {
   FileSpreadsheet,
   FileCode
 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonList from '@/components/ui/SkeletonList';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
+import { StatCard } from '@/components/ui/StatCard';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 
 interface Document {
@@ -246,36 +253,18 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link
-                href="/tenant"
-                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back to Dashboard
-              </Link>
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
-                <p className="text-sm text-gray-900">Access and download your property documents</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div className="space-y-6 p-6">
+      <Link
+        href="/tenant"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Dashboard
+      </Link>
+      <PageHeader
+        title="Documents"
+        description="Access and download your property documents"
+      />
           {documentsData && (
             <div className="space-y-6">
               {/* Document Categories Overview */}
@@ -297,36 +286,36 @@ export default function DocumentsPage() {
               )}
 
               {/* Search and Filter */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 sm:space-x-4">
-                  <div className="flex-1">
+              <Card>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <FormField htmlFor="document-search" className="mb-0 flex-1">
                     <div className="relative">
-                      <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <input
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="document-search"
                         type="text"
                         placeholder="Search documents..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="pl-10"
                       />
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <Filter className="h-5 w-5 text-gray-400" />
-                    <select
+                  </FormField>
+                  <FormField label="Category" htmlFor="document-category" className="mb-0 sm:w-48">
+                    <Select
+                      id="document-category"
                       value={filterCategory}
                       onChange={(e) => setFilterCategory(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
                       {categories.map((category) => (
                         <option key={category} value={category}>
                           {category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)}
                         </option>
                       ))}
-                    </select>
-                  </div>
+                    </Select>
+                  </FormField>
                 </div>
-              </div>
+              </Card>
 
               {/* Documents List */}
               <div className="bg-white shadow rounded-lg">
@@ -367,20 +356,22 @@ export default function DocumentsPage() {
                               </div>
                             </div>
                             <div className="flex items-center space-x-2 ml-4">
-                              <button
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => handlePreview(document)}
-                                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                leftIcon={<Eye className="h-4 w-4" />}
                               >
-                                <Eye className="h-4 w-4 mr-1" />
                                 Preview
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                variant="success"
+                                size="sm"
                                 onClick={() => handleDownload(document)}
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                leftIcon={<Download className="h-4 w-4" />}
                               >
-                                <Download className="h-4 w-4 mr-1" />
                                 Download
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -400,15 +391,17 @@ export default function DocumentsPage() {
                           : 'Documents such as lease agreements, payment receipts, and maintenance records will appear here.'}
                       </p>
                       {(searchTerm || filterCategory !== 'all') && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setSearchTerm('');
                             setFilterCategory('all');
                           }}
-                          className="mt-4 text-purple-600 hover:text-purple-800 text-sm font-medium"
+                          className="mt-4"
                         >
                           Clear filters
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
@@ -443,8 +436,6 @@ export default function DocumentsPage() {
               </div>
             </div>
           )}
-        </div>
-      </main>
     </div>
   );
 } 

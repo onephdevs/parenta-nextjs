@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { Upload, X, FileText } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Alert';
+import { IconButton } from '@/components/ui/IconButton';
+import { Card } from '@/components/ui/Card';
 
 interface ReceiptUploadProps {
   paymentId: string;
@@ -46,7 +50,6 @@ export default function ReceiptUpload({
   };
 
   const handleFileSelect = (file: File) => {
-    // Validate file type
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       showNotification({
@@ -57,7 +60,6 @@ export default function ReceiptUpload({
       return;
     }
 
-    // Validate file size (5MB max)
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       showNotification({
@@ -70,7 +72,6 @@ export default function ReceiptUpload({
 
     setSelectedFile(file);
 
-    // Create preview for images
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -110,10 +111,10 @@ export default function ReceiptUpload({
           title: 'Success',
           message: 'Receipt uploaded successfully',
         });
-        
+
         setSelectedFile(null);
         setPreview(null);
-        
+
         if (onUploadComplete) {
           onUploadComplete();
         }
@@ -151,25 +152,16 @@ export default function ReceiptUpload({
   return (
     <div className="space-y-4">
       {currentReceipt ? (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm font-medium text-green-900">Receipt Uploaded</p>
-                <p className="text-xs text-green-700">
-                  {currentReceipt.fileName} • {new Date(currentReceipt.uploadedAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleDownload}
-              className="text-sm text-green-700 hover:text-green-900 font-medium"
-            >
+        <Alert variant="success" title="Receipt Uploaded">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs">
+              {currentReceipt.fileName} • {new Date(currentReceipt.uploadedAt).toLocaleDateString()}
+            </p>
+            <Button variant="ghost" size="sm" onClick={handleDownload} className="text-green-700 hover:text-green-900">
               Download
-            </button>
+            </Button>
           </div>
-        </div>
+        </Alert>
       ) : (
         <>
           {!selectedFile ? (
@@ -190,23 +182,25 @@ export default function ReceiptUpload({
                 accept=".pdf,.jpg,.jpeg,.png,.webp"
                 onChange={handleFileInputChange}
                 className="hidden"
-                id={`receipt-upload-${paymentId}`}
               />
-              <label
-                htmlFor={`receipt-upload-${paymentId}`}
-                className="cursor-pointer flex flex-col items-center"
+              <Upload className="h-12 w-12 text-gray-400 mb-4 mx-auto" />
+              <p className="text-sm font-medium text-gray-900 mb-1">
+                Drag and drop or choose a file
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                PDF, JPEG, or PNG (Max 5MB)
+              </p>
+              <Button
+                variant="success"
+                size="sm"
+                leftIcon={<Upload className="h-4 w-4" />}
+                onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="h-12 w-12 text-gray-400 mb-4" />
-                <p className="text-sm font-medium text-gray-900 mb-1">
-                  Click to upload or drag and drop
-                </p>
-                <p className="text-xs text-gray-500">
-                  PDF, JPEG, or PNG (Max 5MB)
-                </p>
-              </label>
+                Choose File
+              </Button>
             </div>
           ) : (
-            <div className="border border-gray-200 rounded-lg p-4">
+            <Card padding="sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
                   <FileText className="h-5 w-5 text-gray-400" />
@@ -217,12 +211,9 @@ export default function ReceiptUpload({
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={handleRemove}
-                  className="text-gray-400 hover:text-gray-600"
-                >
+                <IconButton label="Remove file" variant="ghost" onClick={handleRemove}>
                   <X className="h-5 w-5" />
-                </button>
+                </IconButton>
               </div>
 
               {preview && (
@@ -236,31 +227,20 @@ export default function ReceiptUpload({
               )}
 
               <div className="flex items-center space-x-3">
-                <button
+                <Button
+                  variant="success"
+                  className="flex-1"
                   onClick={handleUpload}
-                  disabled={isUploading}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  isLoading={isUploading}
+                  leftIcon={!isUploading ? <Upload className="h-4 w-4" /> : undefined}
                 >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Uploading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4" />
-                      <span>Upload Receipt</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleRemove}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                >
+                  {isUploading ? 'Uploading...' : 'Upload Receipt'}
+                </Button>
+                <Button variant="outline" onClick={handleRemove}>
                   Cancel
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           )}
         </>
       )}

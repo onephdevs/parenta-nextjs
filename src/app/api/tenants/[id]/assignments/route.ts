@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { assignTenantToRoom, endTenantAssignment } from '../../../../../lib/api/tenants';
+import { requireAdmin } from '@/lib/api-auth';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -7,6 +8,9 @@ interface RouteParams {
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { id: tenantId } = await params;
     const assignmentData = await request.json();
     
@@ -108,6 +112,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
 export async function PUT(request: Request) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const assignmentData = await request.json();
     
     // Basic validation

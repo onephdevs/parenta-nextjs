@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Card } from '@/components/ui/Card';
 
 interface Asset {
   id: string;
@@ -219,19 +222,13 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
         <div className="no-print mb-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">QR Code Print View</h3>
-            <div className="space-x-3">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-              >
+            <div className="space-x-3 flex items-center">
+              <Button onClick={() => window.print()}>
                 Print QR Codes
-              </button>
-              <button
-                onClick={() => setShowPrintView(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50"
-              >
+              </Button>
+              <Button variant="outline" onClick={() => setShowPrintView(false)}>
                 Back to Manager
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -281,42 +278,39 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
           <span className="text-sm text-gray-900">
             {selectedAssets.length} of {assets.length} selected
           </span>
-          <button
+          <Button
             onClick={handleGenerateSelected}
-            disabled={selectedAssets.length === 0 || loading}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={selectedAssets.length === 0}
+            isLoading={loading}
           >
             {loading ? 'Generating...' : 'Generate QR Codes'}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             onClick={handlePrintSelected}
-            disabled={selectedAssets.length === 0 || loading}
-            className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={selectedAssets.length === 0}
+            isLoading={loading}
           >
             Print Selected
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             onClick={handleExportSelected}
             disabled={selectedAssets.length === 0}
-            className="px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Export Data
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Bulk Actions */}
       <div className="bg-gray-50 rounded-lg p-4">
         <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedAssets.length === assets.length && assets.length > 0}
-              onChange={(e) => handleSelectAll(e.target.checked)}
-              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-            />
-            <span className="ml-2 text-sm text-gray-900">Select All Assets</span>
-          </label>
+          <Checkbox
+            label="Select All Assets"
+            checked={selectedAssets.length === assets.length && assets.length > 0}
+            onChange={(e) => handleSelectAll(e.target.checked)}
+          />
           <div className="text-sm text-gray-900">
             {assets.filter(a => a.qrCodeGenerated).length} of {assets.length} assets have QR codes
           </div>
@@ -324,7 +318,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
       </div>
 
       {/* Assets List */}
-      <div className="bg-white shadow rounded-lg">
+      <Card padding="none">
         <div className="px-6 py-4 border-b border-gray-200">
           <h4 className="text-lg font-medium text-gray-900">Assets</h4>
         </div>
@@ -334,11 +328,10 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedAssets.length === assets.length && assets.length > 0}
                     onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    className="gap-0"
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
@@ -362,11 +355,10 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
               {assets.map((asset) => (
                 <tr key={asset.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedAssets.includes(asset.id)}
                       onChange={(e) => handleAssetSelect(asset.id, e.target.checked)}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="gap-0"
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -405,14 +397,18 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => generateQRCode(asset.id, asset.assetName)}
                         className="text-purple-600 hover:text-purple-900"
                       >
                         Generate
-                      </button>
+                      </Button>
                       {qrCodes.has(asset.id) && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setSelectedAssets([asset.id]);
                             handlePrintSelected();
@@ -420,7 +416,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                           className="text-blue-600 hover:text-blue-900"
                         >
                           Print
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
@@ -429,7 +425,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       {/* QR Code Guidelines */}
       <div className="bg-blue-50 border border-blue-200 rounded-md p-4">

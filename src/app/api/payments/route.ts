@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getPayments, createPayment, PaymentFilters } from '@/lib/api/payments';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(request: Request) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { searchParams } = new URL(request.url);
     
     // Parse query parameters
@@ -65,6 +69,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const paymentData = await request.json();
     
     // Validate required fields

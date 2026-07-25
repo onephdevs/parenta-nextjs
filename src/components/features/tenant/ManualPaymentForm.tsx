@@ -1,15 +1,24 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CreditCard, Loader2, DollarSign } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { CreditCard } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 interface ManualPaymentFormProps {
   onPaymentComplete?: () => void;
   onCancel?: () => void;
 }
 
-export default function ManualPaymentForm({ onPaymentComplete, onCancel }: ManualPaymentFormProps) {
+export default function ManualPaymentForm({
+  onPaymentComplete,
+  onCancel,
+}: ManualPaymentFormProps) {
   const [paymentType, setPaymentType] = useState<string>('rent');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('online');
@@ -56,10 +65,7 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
           title: 'Payment Recorded',
           message: data.message || 'Your payment has been recorded successfully',
         });
-
-        if (onPaymentComplete) {
-          onPaymentComplete();
-        }
+        onPaymentComplete?.();
       } else {
         showNotification({
           type: 'error',
@@ -79,11 +85,11 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
-    }).format(amount);
+    }).format(value);
   };
 
   const getPaymentTypeLabel = (type: string) => {
@@ -100,23 +106,17 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <p className="text-sm text-blue-800">
-          <strong>Note:</strong> Enter the payment amount you have paid. This will be recorded in your payment history.
-        </p>
-      </div>
+      <Alert variant="info">
+        <strong>Note:</strong> Enter the payment amount you have paid. This will be recorded in
+        your payment history.
+      </Alert>
 
-      {/* Payment Type */}
-      <div>
-        <label htmlFor="paymentType" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Type *
-        </label>
-        <select
+      <FormField label="Payment Type" htmlFor="paymentType" required>
+        <Select
           id="paymentType"
           value={paymentType}
           onChange={(e) => setPaymentType(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="rent">Rent</option>
           <option value="deposit">Deposit</option>
@@ -124,15 +124,20 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
           <option value="utility">Utility</option>
           <option value="late_fee">Late Fee</option>
           <option value="other">Other</option>
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
-      {/* Payment Amount */}
-      <div>
-        <label htmlFor="amount" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Amount (₱) *
-        </label>
-        <input
+      <FormField
+        label="Payment Amount (₱)"
+        htmlFor="amount"
+        required
+        hint={
+          amount && parseFloat(amount) > 0
+            ? `Amount: ${formatCurrency(parseFloat(amount))}`
+            : undefined
+        }
+      >
+        <Input
           type="number"
           id="amount"
           min="0.01"
@@ -141,70 +146,47 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
           onChange={(e) => setAmount(e.target.value)}
           required
           placeholder="0.00"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        {amount && parseFloat(amount) > 0 && (
-          <p className="mt-1 text-sm text-gray-600">
-            Amount: {formatCurrency(parseFloat(amount))}
-          </p>
-        )}
-      </div>
+      </FormField>
 
-      {/* Payment Method */}
-      <div>
-        <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900 mb-2">
-          Payment Method *
-        </label>
-        <select
+      <FormField label="Payment Method" htmlFor="paymentMethod" required>
+        <Select
           id="paymentMethod"
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="online">Online Payment</option>
           <option value="credit_card">Credit Card</option>
           <option value="bank_transfer">Bank Transfer</option>
           <option value="cash">Cash</option>
           <option value="check">Check</option>
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
-      {/* Reference Number */}
-      <div>
-        <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-900 mb-2">
-          Reference Number (Optional)
-        </label>
-        <input
+      <FormField label="Reference Number (Optional)" htmlFor="referenceNumber">
+        <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
           placeholder="Transaction reference, receipt number, etc."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </FormField>
 
-      {/* Notes */}
-      <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-900 mb-2">
-          Notes (Optional)
-        </label>
-        <textarea
+      <FormField label="Notes (Optional)" htmlFor="notes">
+        <Textarea
           id="notes"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Additional notes about this payment..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </FormField>
 
-      {/* Payment Summary */}
       {amount && parseFloat(amount) > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">Payment Summary</h4>
-          <div className="space-y-1 text-sm text-blue-800">
+        <Alert variant="info" title="Payment Summary">
+          <div className="mt-2 space-y-1 text-sm">
             <div className="flex justify-between">
               <span>Payment Type:</span>
               <span className="font-medium">{getPaymentTypeLabel(paymentType)}</span>
@@ -215,40 +197,29 @@ export default function ManualPaymentForm({ onPaymentComplete, onCancel }: Manua
             </div>
             <div className="flex justify-between">
               <span>Payment Method:</span>
-              <span className="font-medium capitalize">{paymentMethod.replace('_', ' ')}</span>
+              <span className="font-medium capitalize">
+                {paymentMethod.replace('_', ' ')}
+              </span>
             </div>
           </div>
-        </div>
+        </Alert>
       )}
 
-      {/* Submit Buttons */}
       <div className="flex items-center justify-end space-x-3">
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-50"
-          >
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="submit"
-          disabled={isProcessing || !amount || parseFloat(amount) <= 0}
-          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed"
+          variant="success"
+          isLoading={isProcessing}
+          isDisabled={!amount || parseFloat(amount) <= 0}
+          leftIcon={<CreditCard className="h-5 w-5" />}
         >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <CreditCard className="h-5 w-5 mr-2" />
-              Record Payment
-            </>
-          )}
-        </button>
+          Record Payment
+        </Button>
       </div>
     </form>
   );

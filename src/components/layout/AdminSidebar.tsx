@@ -32,7 +32,11 @@ export default function AdminSidebar() {
   };
 
   const isActive = (href: string) => {
-    return pathname === href || pathname.startsWith(href + '/');
+    // Exact match for dashboard root so /admin does not light up on every admin page
+    if (href === '/admin') {
+      return pathname === '/admin';
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   const menuItems: MenuItem[] = [

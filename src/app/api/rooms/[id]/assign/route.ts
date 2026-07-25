@@ -10,6 +10,7 @@ import {
   getDepositValidityDate,
   isDepositRefundable,
 } from '@/lib/api/building-deposit-config';
+import { requireAdmin } from '@/lib/api-auth';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -19,6 +20,9 @@ export async function POST(request: Request, { params }: RouteParams) {
   const client = await pool.connect();
   
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { id: roomId } = await params;
     const { 
       tenantId, 

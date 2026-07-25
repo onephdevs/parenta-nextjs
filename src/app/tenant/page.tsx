@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { LogoutButton } from '@/components/features/LogoutButton';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import { Button } from '@/components/ui/Button';
 
 interface TenantDashboardData {
   profile: {
@@ -473,11 +474,10 @@ export default function TenantDashboard() {
                 <p className="text-sm text-gray-900 py-4 text-center">No recent payments</p>
               )}
             </div>
-            <Link 
-              href="/tenant/payments"
-              className="mt-6 w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition font-medium text-center block"
-            >
-              View All Payments
+            <Link href="/tenant/payments" className="mt-6 block">
+              <Button variant="success" className="w-full">
+                View All Payments
+              </Button>
             </Link>
           </div>
 

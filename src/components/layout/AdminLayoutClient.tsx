@@ -7,8 +7,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
 import GlobalSearchModal from '@/components/features/search/GlobalSearchModal';
-import { NotificationProvider } from '@/context/NotificationContext';
-import ToastContainer from '@/components/ui/ToastContainer';
 import { Bell, Search, Settings, Menu, X, ChevronRight } from 'lucide-react';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -98,7 +96,6 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <NotificationProvider>
       <div className="flex h-screen bg-gray-50">
       {/* Desktop Sidebar */}
       <div 
@@ -276,9 +273,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
         isOpen={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
       />
-      <ToastContainer />
     </div>
-    </NotificationProvider>
   );
 }
 

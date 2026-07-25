@@ -35,7 +35,11 @@ export interface CreateTenantWithUserData {
 /**
  * Creates both a user account and tenant profile in a single transaction
  */
-export async function createTenantWithUser(data: CreateTenantWithUserData): Promise<{ userId: string; tenantId: string }> {
+export async function createTenantWithUser(data: CreateTenantWithUserData): Promise<{
+  userId: string;
+  tenantId: string;
+  temporaryPassword?: string;
+}> {
   const client = await pool.connect();
   
   try {
@@ -118,6 +122,8 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     return {
       userId: user.id,
       tenantId,
+      // Only return when we generated it so admins can hand it off once
+      temporaryPassword: data.password ? undefined : password,
     };
     
   } catch (error) {

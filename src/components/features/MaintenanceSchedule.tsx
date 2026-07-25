@@ -3,6 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, AlertTriangle, Clock, CheckCircle, Wrench } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { StatCard } from '@/components/ui/StatCard';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 interface MaintenanceItem {
   asset: {
@@ -70,7 +74,6 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
 
       if (result.success) {
         addNotification('Maintenance marked as completed', 'success');
-        // Refresh the list
         setMaintenanceItems(prev => prev.filter(item => item.asset.id !== assetId));
       } else {
         throw new Error(result.error);
@@ -136,76 +139,51 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <Card>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
-      </div>
+      </Card>
     );
   }
 
   if (maintenanceItems.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="text-center">
-          <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">All Caught Up!</h3>
-          <p className="text-gray-900">No maintenance items scheduled or overdue.</p>
-        </div>
-      </div>
+      <Card>
+        <EmptyState
+          icon={<CheckCircle className="h-12 w-12 text-green-500" />}
+          title="All Caught Up!"
+          description="No maintenance items scheduled or overdue."
+        />
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Total Items</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {maintenanceItems.length}
-              </p>
-            </div>
-            <div className="bg-blue-500 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Overdue</p>
-              <p className="text-2xl font-bold text-red-600">
-                {groupedItems.overdue.length}
-              </p>
-            </div>
-            <div className="bg-red-500 p-3 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Upcoming</p>
-              <p className="text-2xl font-bold text-green-600">
-                {groupedItems.upcoming.length}
-              </p>
-            </div>
-            <div className="bg-green-500 p-3 rounded-lg">
-              <Clock className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Total Items"
+          value={maintenanceItems.length}
+          tone="blue"
+          icon={<Calendar className="h-6 w-6" />}
+        />
+        <StatCard
+          title="Overdue"
+          value={groupedItems.overdue.length}
+          tone="red"
+          icon={<AlertTriangle className="h-6 w-6" />}
+        />
+        <StatCard
+          title="Upcoming"
+          value={groupedItems.upcoming.length}
+          tone="green"
+          icon={<Clock className="h-6 w-6" />}
+        />
       </div>
 
-      {/* Overdue Items */}
       {groupedItems.overdue.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
+        <Card padding="none">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -256,25 +234,25 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
                       {getConditionBadge(item.asset.assetCondition)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
+                      <Button
+                        variant="success"
+                        size="sm"
                         onClick={() => handleMarkCompleted(item.asset.id)}
-                        className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 flex items-center gap-1"
+                        leftIcon={<Wrench className="h-4 w-4" />}
                       >
-                        <Wrench className="h-4 w-4" />
                         Mark Complete
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Upcoming Items */}
       {groupedItems.upcoming.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
+        <Card padding="none">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
               <Clock className="h-5 w-5 text-blue-500" />
@@ -325,21 +303,22 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
                       {getConditionBadge(item.asset.assetCondition)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => handleMarkCompleted(item.asset.id)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 flex items-center gap-1"
+                        leftIcon={<Wrench className="h-4 w-4" />}
                       >
-                        <Wrench className="h-4 w-4" />
                         Complete Early
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );
-} 
+}

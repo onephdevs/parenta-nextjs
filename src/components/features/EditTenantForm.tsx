@@ -6,6 +6,12 @@ import Link from 'next/link';
 import { TenantWithAssignments } from '@/lib/api/tenants';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
 import ProfilePictureUpload from './ProfilePictureUpload';
 import DocumentUpload from './DocumentUpload';
 
@@ -245,7 +251,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
+    <Card padding="none">
       <form onSubmit={handleSubmit} className="p-6 space-y-6 text-gray-900">
         {/* Current Room Assignment */}
         {tenant.currentAssignment && (
@@ -341,90 +347,55 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           </div>
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-900">
-                First Name *
-              </label>
-              <input
+            <FormField label="First Name" htmlFor="firstName" required error={errors.firstName}>
+              <Input
                 type="text"
                 name="firstName"
                 id="firstName"
                 value={formData.firstName}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.firstName ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.firstName)}
                 required
               />
-              {errors.firstName && (
-                <p className="mt-1 text-sm text-red-600">{errors.firstName}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-900">
-                Last Name *
-              </label>
-              <input
+            <FormField label="Last Name" htmlFor="lastName" required error={errors.lastName}>
+              <Input
                 type="text"
                 name="lastName"
                 id="lastName"
                 value={formData.lastName}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.lastName ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.lastName)}
                 required
               />
-              {errors.lastName && (
-                <p className="mt-1 text-sm text-red-600">{errors.lastName}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-900">
-                Email *
-              </label>
-              <input
+            <FormField label="Email" htmlFor="email" required error={errors.email}>
+              <Input
                 type="email"
                 name="email"
                 id="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.email ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.email)}
                 required
               />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-900">
-                Phone
-              </label>
-              <input
+            <FormField label="Phone" htmlFor="phone" error={errors.phone}>
+              <Input
                 type="tel"
                 name="phone"
                 id="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.phone ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.phone)}
               />
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-900">
-                Date of Birth
-              </label>
-              <input
+            <FormField label="Date of Birth" htmlFor="dateOfBirth">
+              <Input
                 type="date"
                 name="dateOfBirth"
                 id="dateOfBirth"
@@ -432,45 +403,34 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={handleInputChange}
                 min="1900-01-01"
                 max={new Date().toISOString().split('T')[0]}
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="tenantStatus" className="block text-sm font-medium text-gray-900">
-                Status
-              </label>
-              <select
+            <FormField label="Status" htmlFor="tenantStatus">
+              <Select
                 name="tenantStatus"
                 id="tenantStatus"
                 value={formData.tenantStatus}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               >
                 <option value="pending">Pending</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="terminated">Terminated</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
           </div>
 
-          <div className="mt-6">
-            <label htmlFor="previousAddress" className="block text-sm font-medium text-gray-900">
-              Previous Address
-            </label>
-            <textarea
+          <FormField label="Previous Address" htmlFor="previousAddress" className="mt-6">
+            <Textarea
               name="previousAddress"
               id="previousAddress"
               rows={4}
               value={formData.previousAddress}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             />
-          </div>
+          </FormField>
         </div>
 
         {/* Emergency Contact */}
@@ -480,53 +440,37 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           </h3>
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <div>
-              <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-900">
-                Name
-              </label>
-              <input
+            <FormField label="Name" htmlFor="emergencyContactName">
+              <Input
                 type="text"
                 name="emergencyContactName"
                 id="emergencyContactName"
                 value={formData.emergencyContactName}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-900">
-                Phone
-              </label>
-              <input
+            <FormField label="Phone" htmlFor="emergencyContactPhone" error={errors.emergencyContactPhone}>
+              <Input
                 type="tel"
                 name="emergencyContactPhone"
                 id="emergencyContactPhone"
                 value={formData.emergencyContactPhone}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.emergencyContactPhone ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.emergencyContactPhone)}
               />
-              {errors.emergencyContactPhone && (
-                <p className="mt-1 text-sm text-red-600">{errors.emergencyContactPhone}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-900">
-                Relationship
-              </label>
-              <input
+            <FormField label="Relationship" htmlFor="emergencyContactRelationship">
+              <Input
                 type="text"
                 name="emergencyContactRelationship"
                 id="emergencyContactRelationship"
                 value={formData.emergencyContactRelationship}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 placeholder="e.g., Parent, Sibling, Friend"
               />
-            </div>
+            </FormField>
           </div>
         </div>
 
@@ -537,80 +481,56 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           </h3>
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-              <label htmlFor="employmentStatus" className="block text-sm font-medium text-gray-900">
-                Employment Status
-              </label>
-              <select
+            <FormField label="Employment Status" htmlFor="employmentStatus">
+              <Select
                 name="employmentStatus"
                 id="employmentStatus"
                 value={formData.employmentStatus}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               >
                 <option value="employed">Employed</option>
                 <option value="unemployed">Unemployed</option>
                 <option value="student">Student</option>
                 <option value="retired">Retired</option>
                 <option value="other">Other</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
 
-            <div>
-              <label htmlFor="employerName" className="block text-sm font-medium text-gray-900">
-                Employer Name
-              </label>
-              <input
+            <FormField label="Employer Name" htmlFor="employerName">
+              <Input
                 type="text"
                 name="employerName"
                 id="employerName"
                 value={formData.employerName}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="monthlyIncome" className="block text-sm font-medium text-gray-900">
-                Monthly Income (₱)
-              </label>
-              <input
+            <FormField label="Monthly Income (₱)" htmlFor="monthlyIncome" error={errors.monthlyIncome}>
+              <Input
                 type="number"
                 name="monthlyIncome"
                 id="monthlyIncome"
-                min="0"
-                step="0.01"
+                min={0}
+                step={0.01}
                 value={formData.monthlyIncome ?? ''}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.monthlyIncome ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.monthlyIncome)}
               />
-              {errors.monthlyIncome && (
-                <p className="mt-1 text-sm text-red-600">{errors.monthlyIncome}</p>
-              )}
-            </div>
+            </FormField>
 
-            <div>
-                <label htmlFor="securityDeposit" className="block text-sm font-medium text-gray-900">
-                  Deposit ({currencySymbol})
-                </label>
-              <input
+            <FormField label={`Deposit (${currencySymbol})`} htmlFor="securityDeposit" error={errors.securityDeposit}>
+              <Input
                 type="number"
                 name="securityDeposit"
                 id="securityDeposit"
-                min="0"
-                step="0.01"
+                min={0}
+                step={0.01}
                 value={formData.securityDeposit}
                 onChange={handleInputChange}
-                className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                  errors.securityDeposit ? 'border-red-300' : ''
-                }`}
+                isInvalid={Boolean(errors.securityDeposit)}
               />
-              {errors.securityDeposit && (
-                <p className="mt-1 text-sm text-red-600">{errors.securityDeposit}</p>
-              )}
-            </div>
+            </FormField>
           </div>
         </div>
 
@@ -621,11 +541,8 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           </h3>
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-              <label htmlFor="leaseStartDate" className="block text-sm font-medium text-gray-900">
-                Lease Start Date
-              </label>
-              <input
+            <FormField label="Lease Start Date" htmlFor="leaseStartDate">
+              <Input
                 type="date"
                 name="leaseStartDate"
                 id="leaseStartDate"
@@ -633,18 +550,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={handleInputChange}
                 min="2000-01-01"
                 max="2099-12-31"
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="leaseEndDate" className="block text-sm font-medium text-gray-900">
-                Lease End Date
-              </label>
-              <input
+            <FormField label="Lease End Date" htmlFor="leaseEndDate">
+              <Input
                 type="date"
                 name="leaseEndDate"
                 id="leaseEndDate"
@@ -652,18 +563,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={handleInputChange}
                 min={formData.leaseStartDate || '2000-01-01'}
                 max="2099-12-31"
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="moveInDate" className="block text-sm font-medium text-gray-900">
-                Move-in Date
-              </label>
-              <input
+            <FormField label="Move-in Date" htmlFor="moveInDate">
+              <Input
                 type="date"
                 name="moveInDate"
                 id="moveInDate"
@@ -671,18 +576,12 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={handleInputChange}
                 min="2000-01-01"
                 max="2099-12-31"
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="moveOutDate" className="block text-sm font-medium text-gray-900">
-                Move-out Date
-              </label>
-              <input
+            <FormField label="Move-out Date" htmlFor="moveOutDate">
+              <Input
                 type="date"
                 name="moveOutDate"
                 id="moveOutDate"
@@ -690,30 +589,23 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={handleInputChange}
                 min={formData.moveInDate || '2000-01-01'}
                 max="2099-12-31"
-                className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
           </div>
         </div>
 
         {/* Notes */}
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-900">
-            Notes
-          </label>
-          <textarea
+        <FormField label="Notes" htmlFor="notes">
+          <Textarea
             name="notes"
             id="notes"
             rows={4}
             value={formData.notes}
             onChange={handleInputChange}
-            className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
             placeholder="Additional notes about the tenant..."
           />
-        </div>
+        </FormField>
 
         {/* Tenant Agreement Document */}
         <div>
@@ -735,59 +627,32 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
         {/* Form Actions */}
         <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-          {/* Delete Button - Left Side */}
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={handleDelete}
-            disabled={isDeleting || loading}
-            className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            isLoading={isDeleting}
+            isDisabled={loading}
+            className="border-red-300 text-red-700 hover:bg-red-50"
           >
-            {isDeleting ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Deleting...
-              </>
-            ) : (
-              <>
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete Tenant
-              </>
-            )}
-          </button>
+            Delete Tenant
+          </Button>
 
-          {/* Cancel & Save Buttons - Right Side */}
           <div className="flex space-x-3">
-            <Link
-              href={`/admin/tenants/${tenant.id}`}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
+              isDisabled={loading || isDeleting}
             >
               Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={loading || isDeleting}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Updating...
-                </>
-              ) : (
-                'Update Tenant'
-              )}
-            </button>
+            </Button>
+            <Button type="submit" isLoading={loading} isDisabled={isDeleting}>
+              {loading ? 'Updating...' : 'Update Tenant'}
+            </Button>
           </div>
         </div>
       </form>
-    </div>
+    </Card>
   );
 } 

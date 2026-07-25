@@ -1,19 +1,23 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  Search, 
-  Filter, 
-  Eye, 
-  CheckCircle, 
-  Clock, 
+import {
+  FileText,
+  Search,
+  Filter,
+  Eye,
+  CheckCircle,
+  Clock,
   AlertTriangle,
   Mail,
-  Loader2
 } from 'lucide-react';
-import { useNotifications } from '../../../hooks/useNotifications';
+import { useNotifications } from '@/hooks/useNotifications';
 import { format } from 'date-fns';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
 
 interface TenantUtilityBillsProps {
   buildingId?: string;
@@ -36,7 +40,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
   const [selectedBill, setSelectedBill] = useState<any | null>(null);
   const [filters, setFilters] = useState<BillFilters>({
     buildingId,
-    tenantId
+    tenantId,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -44,7 +48,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
   const [showBillDetail, setShowBillDetail] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const { addNotification } = useNotifications();
+  const { showNotification } = useNotifications();
 
   const itemsPerPage = 20;
 
@@ -61,7 +65,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
       setIsLoading(true);
       const params = new URLSearchParams({
         limit: itemsPerPage.toString(),
-        offset: ((currentPage - 1) * itemsPerPage).toString()
+        offset: ((currentPage - 1) * itemsPerPage).toString(),
       });
 
       if (buildingId) params.append('buildingId', buildingId);
@@ -78,10 +82,10 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
       }
     } catch (error) {
       console.error('Error fetching tenant utility bills:', error);
-      addNotification({
+      showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to load tenant utility bills'
+        message: 'Failed to load tenant utility bills',
       });
     } finally {
       setIsLoading(false);
@@ -93,7 +97,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(bill => 
+      filtered = filtered.filter(bill =>
         bill.tenantName?.toLowerCase().includes(searchLower) ||
         bill.roomNumber?.toLowerCase().includes(searchLower) ||
         bill.utilityType?.toLowerCase().includes(searchLower)
@@ -109,13 +113,13 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
     }
 
     if (filters.startDate) {
-      filtered = filtered.filter(bill => 
+      filtered = filtered.filter(bill =>
         new Date(bill.billingPeriodStart) >= new Date(filters.startDate!)
       );
     }
 
     if (filters.endDate) {
-      filtered = filtered.filter(bill => 
+      filtered = filtered.filter(bill =>
         new Date(bill.billingPeriodEnd) <= new Date(filters.endDate!)
       );
     }
@@ -134,7 +138,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
         body: JSON.stringify({
           billId,
           status,
-          paidDate: paidDate?.toISOString()
+          paidDate: paidDate?.toISOString(),
         }),
       });
 
@@ -142,10 +146,10 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
       if (data.success) {
         await fetchTenantBills();
-        addNotification({
+        showNotification({
           type: 'success',
           title: 'Status Updated',
-          message: `Bill status updated to ${status}`
+          message: `Bill status updated to ${status}`,
         });
         setShowBillDetail(false);
       } else {
@@ -153,10 +157,10 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
       }
     } catch (error) {
       console.error('Error updating bill status:', error);
-      addNotification({
+      showNotification({
         type: 'error',
         title: 'Update Error',
-        message: 'Failed to update bill status'
+        message: 'Failed to update bill status',
       });
     } finally {
       setIsUpdating(false);
@@ -164,7 +168,7 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
   };
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
+    const baseClasses = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
     switch (status) {
       case 'pending':
         return (
@@ -207,63 +211,64 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow border p-6">
+      <Card>
         <div className="space-y-4">
-          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded animate-pulse"></div>
+              <div key={i} className="h-20 bg-gray-200 rounded animate-pulse" />
             ))}
           </div>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow border p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Tenant Utility Bills
-          </h3>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-          </button>
-        </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Tenant Utility Bills
+            </h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              leftIcon={<Filter className="h-4 w-4" />}
+            >
+              Filters
+            </Button>
+          </div>
+        </CardHeader>
 
-        {/* Filters */}
         {showFilters && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
+          <div className="mb-6 mx-6 p-4 bg-gray-50 rounded-lg space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Search</label>
+              <FormField label="Search" htmlFor="bill-search">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                  <Input
+                    id="bill-search"
                     type="text"
                     placeholder="Search tenant, room, utility..."
                     value={filters.search || ''}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                    className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="pl-10"
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Utility Type</label>
-                <select
+              <FormField label="Utility Type" htmlFor="bill-utility-type">
+                <Select
+                  id="bill-utility-type"
                   value={filters.utilityType || 'all'}
-                  onChange={(e) => setFilters({ 
-                    ...filters, 
-                    utilityType: e.target.value === 'all' ? undefined : e.target.value 
+                  onChange={(e) => setFilters({
+                    ...filters,
+                    utilityType: e.target.value === 'all' ? undefined : e.target.value,
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Types</option>
                   <option value="electricity">Electricity</option>
@@ -273,201 +278,199 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                   <option value="cable">Cable TV</option>
                   <option value="waste">Waste</option>
                   <option value="other">Other</option>
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Status</label>
-                <select
+              <FormField label="Status" htmlFor="bill-status">
+                <Select
+                  id="bill-status"
                   value={filters.billStatus || 'all'}
-                  onChange={(e) => setFilters({ 
-                    ...filters, 
-                    billStatus: e.target.value === 'all' ? undefined : e.target.value 
+                  onChange={(e) => setFilters({
+                    ...filters,
+                    billStatus: e.target.value === 'all' ? undefined : e.target.value,
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Statuses</option>
                   <option value="pending">Pending</option>
                   <option value="sent">Sent</option>
                   <option value="paid">Paid</option>
                   <option value="overdue">Overdue</option>
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Period Start</label>
-                <input
+              <FormField label="Period Start" htmlFor="bill-period-start">
+                <Input
+                  id="bill-period-start"
                   type="date"
                   value={filters.startDate || ''}
                   onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                   min="2000-01-01"
                   max="2099-12-31"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  style={{ colorScheme: 'light' }}
                 />
-              </div>
+              </FormField>
             </div>
 
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setFilters({ buildingId, tenantId })}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Clear Filters
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">
-              {filteredBills.filter(b => b.billStatus === 'pending').length}
+        <CardBody>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">
+                {filteredBills.filter(b => b.billStatus === 'pending').length}
+              </div>
+              <div className="text-sm text-blue-600">Pending Bills</div>
             </div>
-            <div className="text-sm text-blue-600">Pending Bills</div>
-          </div>
-          <div className="p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">
-              {filteredBills.filter(b => b.billStatus === 'paid').length}
+            <div className="p-4 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">
+                {filteredBills.filter(b => b.billStatus === 'paid').length}
+              </div>
+              <div className="text-sm text-green-600">Paid Bills</div>
             </div>
-            <div className="text-sm text-green-600">Paid Bills</div>
-          </div>
-          <div className="p-4 bg-red-50 rounded-lg">
-            <div className="text-2xl font-bold text-red-600">
-              {filteredBills.filter(b => b.billStatus === 'overdue').length}
+            <div className="p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">
+                {filteredBills.filter(b => b.billStatus === 'overdue').length}
+              </div>
+              <div className="text-sm text-red-600">Overdue Bills</div>
             </div>
-            <div className="text-sm text-red-600">Overdue Bills</div>
-          </div>
-          <div className="p-4 bg-purple-50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">
-              ${filteredBills.reduce((sum, b) => sum + b.allocatedAmount, 0).toFixed(2)}
+            <div className="p-4 bg-purple-50 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">
+                ${filteredBills.reduce((sum, b) => sum + b.allocatedAmount, 0).toFixed(2)}
+              </div>
+              <div className="text-sm text-purple-600">Total Amount</div>
             </div>
-            <div className="text-sm text-purple-600">Total Amount</div>
           </div>
-        </div>
 
-        {/* Bills Table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Tenant
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Room
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Utility
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Period
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Due Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBills.map((bill) => (
-                <tr key={bill.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {bill.tenantName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {bill.roomNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                    {bill.utilityType}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {format(new Date(bill.billingPeriodStart), 'MMM d')} - {format(new Date(bill.billingPeriodEnd), 'MMM d, yyyy')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    ${bill.allocatedAmount.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(bill.billStatus)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {bill.dueDate && (
-                      <span className={`${new Date(bill.dueDate) < new Date() && bill.billStatus !== 'paid' ? 'text-red-600 font-medium' : ''}`}>
-                        {format(new Date(bill.dueDate), 'MMM d, yyyy')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <button
-                      onClick={() => {
-                        setSelectedBill(bill);
-                        setShowBillDetail(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Tenant
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Room
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Utility
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Period
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Due Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredBills.length === 0 && (
-          <div className="text-center py-8 text-gray-900">
-            No tenant utility bills found matching your criteria.
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredBills.map((bill) => (
+                  <tr key={bill.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {bill.tenantName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {bill.roomNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
+                      {bill.utilityType}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {format(new Date(bill.billingPeriodStart), 'MMM d')} - {format(new Date(bill.billingPeriodEnd), 'MMM d, yyyy')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      ${bill.allocatedAmount.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(bill.billStatus)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {bill.dueDate && (
+                        <span className={`${new Date(bill.dueDate) < new Date() && bill.billStatus !== 'paid' ? 'text-red-600 font-medium' : ''}`}>
+                          {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedBill(bill);
+                          setShowBillDetail(true);
+                        }}
+                        leftIcon={<Eye className="h-4 w-4" />}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <div className="text-sm text-gray-900">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} bills
+          {filteredBills.length === 0 && (
+            <div className="text-center py-8 text-gray-900">
+              No tenant utility bills found matching your criteria.
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Bill Detail Modal */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-gray-900">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} bills
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  isDisabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  isDisabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
       {showBillDetail && selectedBill && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <Card className="max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" padding="none">
             <div className="px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold">Utility Bill Details</h3>
             </div>
-            
+
             <div className="p-6 space-y-6">
-              {/* Bill Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-900">Tenant</label>
@@ -499,7 +502,6 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                 </div>
               </div>
 
-              {/* Cost Breakdown */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-900">Cost Breakdown</label>
                 <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
@@ -531,31 +533,33 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
                 </div>
               </div>
 
-              {/* Status Actions */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-900">Update Status</label>
-                <div className="flex gap-2">
-                  <button
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => updateBillStatus(selectedBill.id, 'sent')}
-                    disabled={isUpdating || selectedBill.billStatus === 'sent'}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    isDisabled={isUpdating || selectedBill.billStatus === 'sent'}
                   >
                     Mark as Sent
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="success"
+                    size="sm"
                     onClick={() => updateBillStatus(selectedBill.id, 'paid', new Date())}
-                    disabled={isUpdating || selectedBill.billStatus === 'paid'}
-                    className="px-3 py-1.5 text-sm bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                    isDisabled={isUpdating || selectedBill.billStatus === 'paid'}
                   >
                     Mark as Paid
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={() => updateBillStatus(selectedBill.id, 'overdue')}
-                    disabled={isUpdating || selectedBill.billStatus === 'overdue'}
-                    className="px-3 py-1.5 text-sm bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                    isDisabled={isUpdating || selectedBill.billStatus === 'overdue'}
                   >
                     Mark as Overdue
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -576,17 +580,14 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
               )}
 
               <div className="flex justify-end pt-4 border-t">
-                <button
-                  onClick={() => setShowBillDetail(false)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
+                <Button variant="secondary" onClick={() => setShowBillDetail(false)}>
                   Close
-                </button>
+                </Button>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
   );
-} 
+}

@@ -1,8 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Users, X, Save, Loader2 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { Plus, Edit, Trash2, Users, Save } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { IconButton } from '@/components/ui/IconButton';
+import { FormField } from '@/components/forms/FormField';
 
 interface Occupant {
   id: string;
@@ -263,72 +270,64 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
 
   if (isLoading) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-gray-200 rounded w-1/4"></div>
           <div className="h-20 bg-gray-200 rounded"></div>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white shadow rounded-lg p-6">
+    <Card>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-gray-900 flex items-center">
           <Users className="h-5 w-5 mr-2" />
           Occupants ({occupants.length})
         </h3>
         {!showAddForm && !editingId && (
-          <button
+          <Button
+            variant="success"
+            leftIcon={<Plus className="h-4 w-4" />}
             onClick={() => setShowAddForm(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
-            <Plus className="h-4 w-4 mr-2" />
             Add Occupant
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Add/Edit Form */}
       {(showAddForm || editingId) && (
-        <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <Card padding="sm" className="mb-6 bg-gray-50 border border-gray-200 shadow-none">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name *
-              </label>
-              <input
+            <FormField label="First Name" htmlFor="firstName" required>
+              <Input
+                id="firstName"
                 type="text"
                 name="firstName"
                 required
                 value={formData.firstName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name *
-              </label>
-              <input
+            </FormField>
+
+            <FormField label="Last Name" htmlFor="lastName" required>
+              <Input
+                id="lastName"
                 type="text"
                 name="lastName"
                 required
                 value={formData.lastName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Relationship to Tenant
-              </label>
-              <select
+            </FormField>
+
+            <FormField label="Relationship to Tenant" htmlFor="relationshipToTenant">
+              <Select
+                id="relationshipToTenant"
                 name="relationshipToTenant"
                 value={formData.relationshipToTenant}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select relationship</option>
                 <option value="spouse">Spouse</option>
@@ -338,78 +337,65 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
                 <option value="relative">Relative</option>
                 <option value="friend">Friend</option>
                 <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date of Birth
-              </label>
-              <input
+              </Select>
+            </FormField>
+
+            <FormField label="Date of Birth" htmlFor="dateOfBirth">
+              <Input
+                id="dateOfBirth"
                 type="date"
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleChange}
                 min="1900-01-01"
                 max={new Date().toISOString().split('T')[0]}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone
-              </label>
-              <input
+            </FormField>
+
+            <FormField label="Phone" htmlFor="phone">
+              <Input
+                id="phone"
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
+            </FormField>
+
+            <FormField label="Email" htmlFor="email">
+              <Input
+                id="email"
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Emergency Contact Name
-              </label>
-              <input
+            </FormField>
+
+            <FormField label="Emergency Contact Name" htmlFor="emergencyContactName">
+              <Input
+                id="emergencyContactName"
                 type="text"
                 name="emergencyContactName"
                 value={formData.emergencyContactName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Emergency Contact Phone
-              </label>
-              <input
+            </FormField>
+
+            <FormField label="Emergency Contact Phone" htmlFor="emergencyContactPhone">
+              <Input
+                id="emergencyContactPhone"
                 type="tel"
                 name="emergencyContactPhone"
                 value={formData.emergencyContactPhone}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Move-in Date *
-              </label>
-              <input
+            </FormField>
+
+            <FormField label="Move-in Date" htmlFor="moveInDate" required>
+              <Input
+                id="moveInDate"
                 type="date"
                 name="moveInDate"
                 required
@@ -417,73 +403,58 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
                 onChange={handleChange}
                 min="2000-01-01"
                 max="2099-12-31"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
+            </FormField>
+
+            <FormField label="Notes" htmlFor="notes" className="md:col-span-2">
+              <Textarea
+                id="notes"
                 name="notes"
                 rows={2}
                 value={formData.notes}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
+            </FormField>
           </div>
-          <div className="flex justify-end space-x-3 mt-4">
-            <button
-              onClick={cancelEdit}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-            >
+
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={cancelEdit}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="success"
+              leftIcon={<Save className="h-4 w-4" />}
               onClick={() => editingId ? handleUpdate(editingId) : handleAdd()}
-              disabled={isAdding}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400"
+              isLoading={isAdding}
             >
-              {isAdding ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingId ? 'Update' : 'Add'} Occupant
-                </>
-              )}
-            </button>
+              {editingId ? 'Update' : 'Add'} Occupant
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Occupants List */}
       {occupants.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
           <p>No occupants registered</p>
           {!showAddForm && (
-            <button
+            <Button
+              variant="ghost"
+              className="mt-4 text-green-600 hover:text-green-800"
               onClick={() => setShowAddForm(true)}
-              className="mt-4 text-blue-600 hover:text-blue-800"
             >
               Add your first occupant
-            </button>
+            </Button>
           )}
         </div>
       ) : (
         <div className="space-y-4">
           {occupants.map((occupant) => (
-            <div
+            <Card
               key={occupant.id}
-              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+              padding="sm"
+              className="border border-gray-200 shadow-none hover:shadow-md transition"
             >
               {editingId === occupant.id ? (
                 <div className="text-sm text-gray-500">Editing...</div>
@@ -522,28 +493,30 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2 ml-4">
-                    <button
+                  <div className="flex items-center gap-2 ml-4">
+                    <IconButton
+                      label="Edit occupant"
+                      variant="primary"
+                      size="sm"
                       onClick={() => startEdit(occupant)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Edit"
                     >
                       <Edit className="h-4 w-4" />
-                    </button>
-                    <button
+                    </IconButton>
+                    <IconButton
+                      label="Remove occupant"
+                      variant="danger"
+                      size="sm"
                       onClick={() => handleDelete(occupant.id)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Remove"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/Button';
 
 export default function LeaseManagement() {
   const [activeTab, setActiveTab] = useState<'alerts' | 'renewals' | 'moveouts'>('alerts');
@@ -74,58 +75,54 @@ export default function LeaseManagement() {
     }
   };
 
+  const tabClass = (tab: typeof activeTab) =>
+    `px-4 py-2 font-medium border-b-2 transition-colors ${
+      activeTab === tab
+        ? 'border-purple-500 text-purple-600'
+        : 'border-transparent text-gray-700 hover:text-gray-900'
+    }`;
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Lease Management</h2>
         {activeTab === 'alerts' && (
-          <button
+          <Button
+            variant="primary"
             onClick={handleGenerateAlerts}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+            isLoading={loading}
           >
             {loading ? 'Generating...' : 'Generate Alerts'}
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Tabs */}
       <div className="border-b border-gray-300 mb-6">
         <div className="flex gap-4">
           <button
+            type="button"
             onClick={() => setActiveTab('alerts')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === 'alerts' 
-                ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-700 hover:text-gray-900'
-            }`}
+            className={tabClass('alerts')}
           >
             ⚠️ Expiration Alerts
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('renewals')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === 'renewals' 
-                ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-700 hover:text-gray-900'
-            }`}
+            className={tabClass('renewals')}
           >
             🔄 Renewals
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('moveouts')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === 'moveouts' 
-                ? 'border-blue-500 text-blue-600' 
-                : 'border-transparent text-gray-700 hover:text-gray-900'
-            }`}
+            className={tabClass('moveouts')}
           >
             📦 Move-Outs
           </button>
         </div>
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="text-center py-8">Loading...</div>
       ) : (
@@ -252,4 +249,3 @@ export default function LeaseManagement() {
     </div>
   );
 }
-

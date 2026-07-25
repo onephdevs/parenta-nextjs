@@ -75,14 +75,23 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // Store user info in JWT when user signs in
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
+        token.email = user.email;
       }
+
+      // Support session.update() after profile edits
+      if (trigger === 'update' && session) {
+        if (session.firstName !== undefined) token.firstName = session.firstName;
+        if (session.lastName !== undefined) token.lastName = session.lastName;
+        if (session.email !== undefined) token.email = session.email;
+      }
+
       return token;
     },
 

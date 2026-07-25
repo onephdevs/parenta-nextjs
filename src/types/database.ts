@@ -481,6 +481,7 @@ export interface DatabaseUtilityMeterReading {
 export interface Asset {
   id: string;
   buildingId?: string;
+  buildingName?: string;
   assetName: string;
   assetType: string;
   brand?: string;

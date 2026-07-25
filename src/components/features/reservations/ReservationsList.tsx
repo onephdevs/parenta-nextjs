@@ -4,9 +4,15 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { ReservationWithDetails } from '@/types/database';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRouter } from 'next/navigation';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Button } from '@/components/ui/Button';
+import { ReservationStatusBadge } from '@/components/domain/StatusBadges';
+import { Badge } from '@/components/ui/Badge';
+import { Search } from 'lucide-react';
 
 interface ReservationsListProps {
   reservations: ReservationWithDetails[];
@@ -16,7 +22,6 @@ interface ReservationsListProps {
 export default function ReservationsList({ reservations, onRefresh }: ReservationsListProps) {
   const router = useRouter();
   const { formatCurrency: formatCurrencyUtil } = useCurrency();
-  const { currencyCode } = useCurrency();
   const { showNotification, updateNotification } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -85,42 +90,20 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
     return filtered;
   }, [reservations, searchTerm, selectedStatus, sortBy, sortOrder]);
 
-  const getStatusBadgeClass = (status: string, isExpired: boolean) => {
-    if (isExpired && status === 'active') {
-      return 'bg-red-100 text-red-800';
-    }
-    
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'converted':
-        return 'bg-blue-100 text-blue-800';
-      case 'expired':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getExpiryBadge = (reservation: ReservationWithDetails) => {
     if (reservation.isExpired) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-          Expired
-        </span>
-      );
+      return <Badge tone="danger">Expired</Badge>;
     }
-    
+
     if (reservation.daysUntilExpiry <= 7 && reservation.daysUntilExpiry >= 0) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          Expiring in {reservation.daysUntilExpiry} day{reservation.daysUntilExpiry !== 1 ? 's' : ''}
-        </span>
+        <Badge tone="warning">
+          Expiring in {reservation.daysUntilExpiry} day
+          {reservation.daysUntilExpiry !== 1 ? 's' : ''}
+        </Badge>
       );
     }
-    
+
     return null;
   };
 
@@ -168,63 +151,53 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      {/* Header with Search and Filters */}
+    <Card padding="none" className="overflow-hidden">
       <div className="border-b border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search by tenant, room, or building..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
+          <div className="relative flex-1 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              className="pl-10"
+              placeholder="Search by tenant, room, or building..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
 
-          {/* Filters and Controls */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Status Filter */}
-            <select
+            <Select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+              className="w-auto min-w-[9rem]"
             >
               <option value="">All Statuses</option>
               <option value="active">Active</option>
               <option value="converted">Converted</option>
               <option value="expired">Expired</option>
               <option value="cancelled">Cancelled</option>
-            </select>
+            </Select>
 
-            {/* Sort */}
-            <select
+            <Select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+              className="w-auto min-w-[11rem]"
             >
               <option value="expiryDate">Sort by Expiry Date</option>
               <option value="reservationDate">Sort by Reservation Date</option>
               <option value="tenantName">Sort by Tenant</option>
               <option value="roomNumber">Sort by Room</option>
               <option value="monthlyRate">Sort by Monthly Rate</option>
-            </select>
+            </Select>
 
-            {/* Sort Order */}
-            <button
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+              aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
             >
               {sortOrder === 'asc' ? '↑' : '↓'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -288,15 +261,19 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
                     {getExpiryBadge(reservation)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(reservation.monthlyRate, currencyCode)}
+                    {formatCurrencyUtil(reservation.monthlyRate)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatCurrency(reservation.reservationDeposit, currencyCode)}
+                    {formatCurrencyUtil(reservation.reservationDeposit)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(reservation.reservationStatus, reservation.isExpired)}`}>
-                      {reservation.reservationStatus.charAt(0).toUpperCase() + reservation.reservationStatus.slice(1)}
-                    </span>
+                    <ReservationStatusBadge
+                      status={
+                        reservation.isExpired && reservation.reservationStatus === 'active'
+                          ? 'expired'
+                          : reservation.reservationStatus
+                      }
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
@@ -330,7 +307,7 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }
 

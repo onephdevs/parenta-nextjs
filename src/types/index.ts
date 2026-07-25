@@ -38,12 +38,15 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 // Component Props Types
 export interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
+  isDisabled?: boolean;
   loading?: boolean;
+  isLoading?: boolean;
   children: React.ReactNode;
   onClick?: () => void;
+  className?: string;
 }
 
 export interface ModalProps {

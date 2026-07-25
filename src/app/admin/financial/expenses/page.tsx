@@ -4,6 +4,14 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getExpenses, getExpenseSummary } from '@/lib/api/expenses';
 import { getAllBuildings } from '@/lib/api/buildings';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/forms/FormField';
+import { BarChart3, Calendar, PhilippinePeso, Plus, Receipt } from 'lucide-react';
 
 interface SearchParams {
   page?: string;
@@ -147,180 +155,70 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   const totalPages = Math.ceil(expensesData.total / 20);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/financial"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Expense Management</h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link
-                href="/admin/financial/expenses/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Record Expense
-              </Link>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Expense Management"
+        description="Track operating costs across properties"
+        actions={
+          <Link href="/admin/financial/expenses/new">
+            <Button leftIcon={<Plus className="h-4 w-4" />}>Record Expense</Button>
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Expenses"
+          value={formatCurrency(summary.totalAmount)}
+          subtitle={`${summary.totalExpenses} expenses`}
+          tone="red"
+          icon={<PhilippinePeso className="h-5 w-5" />}
+        />
+        <StatCard
+          title="This Month"
+          value={formatCurrency(summary.monthlyAmount)}
+          subtitle={`${summary.monthlyExpenses} expenses`}
+          tone="blue"
+          icon={<Calendar className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Top Category"
+          value={
+            summary.categoryBreakdown && summary.categoryBreakdown.length > 0
+              ? summary.categoryBreakdown[0].category
+              : 'N/A'
+          }
+          subtitle={`${summary.categoryBreakdown ? summary.categoryBreakdown.length : 0} categories`}
+          tone="green"
+          icon={<BarChart3 className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Average Expense"
+          value={
+            summary.totalExpenses > 0
+              ? formatCurrency(summary.totalAmount / summary.totalExpenses)
+              : formatCurrency(0)
+          }
+          subtitle="per expense"
+          tone="yellow"
+          icon={<Receipt className="h-5 w-5" />}
+        />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Total Expenses</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.totalAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.totalExpenses} expenses</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4h-8z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v13a2 2 0 002 2h4a2 2 0 002-2V7H8z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">This Month</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.monthlyAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.monthlyExpenses} expenses</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Top Category</dt>
-                    <dd className="text-lg font-medium text-gray-900">
-                      {summary.categoryBreakdown && summary.categoryBreakdown.length > 0 
-                        ? summary.categoryBreakdown[0].category 
-                        : 'N/A'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">
-                  {summary.categoryBreakdown && summary.categoryBreakdown.length} categories
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Average Expense</dt>
-                    <dd className="text-lg font-medium text-gray-900">
-                      {summary.totalExpenses > 0 
-                        ? formatCurrency(summary.totalAmount / summary.totalExpenses)
-                        : formatCurrency(0)}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">per expense</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="px-6 py-4">
+        <Card className="mb-6">
             <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-900 mb-1">
-                  Search
-                </label>
-                <input
+              <FormField label="Search" htmlFor="search">
+                <Input
                   type="text"
                   name="search"
                   id="search"
                   defaultValue={search}
                   placeholder="Search expenses..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-900 mb-1">
-                  Category
-                </label>
-                <select
-                  name="category"
-                  id="category"
-                  defaultValue={category}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Category" htmlFor="category">
+                <Select name="category" id="category" defaultValue={category}>
                   <option value="">All Categories</option>
                   <option value="maintenance">Maintenance</option>
                   <option value="utilities">Utilities</option>
@@ -329,53 +227,37 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
                   <option value="insurance">Insurance</option>
                   <option value="taxes">Taxes</option>
                   <option value="other">Other</option>
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="building" className="block text-sm font-medium text-gray-900 mb-1">
-                  Building
-                </label>
-                <select
-                  name="building"
-                  id="building"
-                  defaultValue={buildingId}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-                >
+              <FormField label="Building" htmlFor="building">
+                <Select name="building" id="building" defaultValue={buildingId}>
                   <option value="">All Buildings</option>
                   {buildings.map((building) => (
                     <option key={building.id} value={building.id}>
                       {building.name}
                     </option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              <div>
-                <label htmlFor="vendor" className="block text-sm font-medium text-gray-900 mb-1">
-                  Vendor
-                </label>
-                <input
+              <FormField label="Vendor" htmlFor="vendor">
+                <Input
                   type="text"
                   name="vendor"
                   id="vendor"
                   defaultValue={vendor}
                   placeholder="Filter by vendor..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
                 />
-              </div>
+              </FormField>
 
               <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
+                <Button type="submit" className="w-full">
                   Filter
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </Card>
 
         {/* Expenses Table */}
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
@@ -546,7 +428,6 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 } 

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Document as DocumentType } from '@/types/database';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 
 interface PDFPreviewProps {
   document: DocumentType;
@@ -75,59 +77,45 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
             {/* Zoom Controls for Images */}
             {isImage && (
               <>
-                <button
-                  onClick={handleZoomOut}
-                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
-                  title="Zoom Out"
-                >
+                <IconButton label="Zoom Out" onClick={handleZoomOut}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
                   </svg>
-                </button>
+                </IconButton>
                 <span className="text-sm text-gray-900 px-2">
                   {Math.round(scale * 100)}%
                 </span>
-                <button
-                  onClick={handleZoomIn}
-                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
-                  title="Zoom In"
-                >
+                <IconButton label="Zoom In" onClick={handleZoomIn}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                   </svg>
-                </button>
-                <button
-                  onClick={handleResetZoom}
-                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
-                  title="Reset Zoom"
-                >
+                </IconButton>
+                <IconButton label="Reset Zoom" onClick={handleResetZoom}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                </button>
+                </IconButton>
               </>
             )}
-            
-            {/* Download Button */}
-            <button
+
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleDownload}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              leftIcon={
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              }
             >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
               Download
-            </button>
-            
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
-            >
+            </Button>
+
+            <IconButton label="Close preview" onClick={onClose}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-            </button>
+            </IconButton>
           </div>
         </div>
 
@@ -151,12 +139,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
                 </svg>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Cannot Preview File</h3>
                 <p className="text-gray-900 mb-4">{error}</p>
-                <button
-                  onClick={handleDownload}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Download File
-                </button>
+                <Button onClick={handleDownload}>Download File</Button>
               </div>
             </div>
           ) : isPDF ? (
@@ -197,12 +180,7 @@ export default function PDFPreview({ document, isOpen, onClose }: PDFPreviewProp
                 </svg>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Preview Not Available</h3>
                 <p className="text-gray-900 mb-4">This file type cannot be previewed in the browser</p>
-                <button
-                  onClick={handleDownload}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Download File
-                </button>
+                <Button onClick={handleDownload}>Download File</Button>
               </div>
             </div>
           )}

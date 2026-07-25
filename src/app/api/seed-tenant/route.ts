@@ -1,12 +1,36 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
 /**
  * POST /api/seed-tenant
- * Seeds demo tenant data with proper user-tenant link
+ * Seeds demo tenant data with proper user-tenant link.
+ * Locked to development + SEED_SECRET (x-seed-secret header).
  */
-export async function POST() {
+function isSeedAllowed(request: NextRequest): boolean {
+  if (process.env.NODE_ENV === 'production') {
+    return false;
+  }
+  const expected = process.env.SEED_SECRET;
+  if (!expected) {
+    return false;
+  }
+  return request.headers.get('x-seed-secret') === expected;
+}
+
+export async function POST(request: NextRequest) {
+  if (!isSeedAllowed(request)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Seed endpoint disabled',
+        details:
+          'Only available in development when SEED_SECRET is set and sent as x-seed-secret header',
+      },
+      { status: 403 }
+    );
+  }
+
   const client = await pool.connect();
   
   try {

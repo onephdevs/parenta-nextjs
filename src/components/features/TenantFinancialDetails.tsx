@@ -4,15 +4,19 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 interface Invoice {
-  id: number;
-  tenantId: number;
-  roomId: number;
+  id: string | number;
+  tenantId: string | number;
+  roomId?: string | number;
   invoiceNumber: string;
   issueDate: string;
   dueDate: string;
-  amount: number;
-  remainingAmount: number;
-  status: 'pending' | 'partial' | 'completed' | 'overdue';
+  /** Legacy field — prefer totalAmount */
+  amount?: number;
+  totalAmount?: number;
+  paidAmount?: number;
+  remainingAmount?: number;
+  balanceDue?: number;
+  status: string;
   description?: string;
 }
 
@@ -77,7 +81,38 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
         if (invoicesRes?.ok) {
           try {
             const data = await invoicesRes.json();
-            setInvoices(data.invoices || data.data || []);
+            const raw = Array.isArray(data.invoices)
+              ? data.invoices
+              : Array.isArray(data.data)
+                ? data.data
+                : Array.isArray(data.data?.invoices)
+                  ? data.data.invoices
+                  : [];
+            // Normalize API field names (totalAmount/balanceDue) to what the table renders
+            setInvoices(
+              raw.map((inv: Record<string, unknown>) => {
+                const total = Number(inv.totalAmount ?? inv.amount ?? inv.total_amount ?? 0);
+                const paid = Number(inv.paidAmount ?? inv.amount_paid ?? 0);
+                const remaining = Number(
+                  inv.balanceDue ??
+                    inv.remainingAmount ??
+                    inv.balance_due ??
+                    total - paid
+                );
+                return {
+                  ...inv,
+                  id: inv.id,
+                  invoiceNumber: inv.invoiceNumber ?? inv.invoice_number,
+                  issueDate: inv.issueDate ?? inv.issue_date,
+                  dueDate: inv.dueDate ?? inv.due_date,
+                  amount: Number.isFinite(total) ? total : 0,
+                  totalAmount: Number.isFinite(total) ? total : 0,
+                  remainingAmount: Number.isFinite(remaining) ? remaining : 0,
+                  balanceDue: Number.isFinite(remaining) ? remaining : 0,
+                  status: String(inv.status ?? inv.invoice_status ?? 'draft'),
+                } as Invoice;
+              })
+            );
           } catch (e) {
             console.warn('Error parsing invoices response:', e);
           }
@@ -86,7 +121,26 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
         if (paymentsRes?.ok) {
           try {
             const data = await paymentsRes.json();
-            setPayments(data.payments || data.data || []);
+            const raw = Array.isArray(data.payments)
+              ? data.payments
+              : Array.isArray(data.data)
+                ? data.data
+                : Array.isArray(data.data?.payments)
+                  ? data.data.payments
+                  : [];
+            setPayments(
+              raw.map((p: Record<string, unknown>) => ({
+                ...p,
+                id: p.id,
+                amount: Number(p.amount ?? 0) || 0,
+                paymentDate: String(p.paymentDate ?? p.payment_date ?? ''),
+                paymentMethod: String(p.paymentMethod ?? p.payment_method ?? '-'),
+                paymentType: String(p.paymentType ?? p.payment_type ?? p.type ?? '-'),
+                paymentStatus: String(p.paymentStatus ?? p.payment_status ?? p.status ?? '-'),
+                description: (p.description ?? p.notes) as string | undefined,
+                notes: p.notes as string | undefined,
+              })) as Payment[]
+            );
           } catch (e) {
             console.warn('Error parsing payments response:', e);
           }
@@ -140,11 +194,12 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
     }
   }, [tenantId]);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null | undefined) => {
+    const n = Number(amount);
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
-    }).format(amount);
+    }).format(Number.isFinite(n) ? n : 0);
   };
 
   const formatDate = (date: string) => {
@@ -290,10 +345,10 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
                         {formatDate(invoice.dueDate)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(invoice.amount)}
+                        {formatCurrency(invoice.totalAmount ?? invoice.amount)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(invoice.remainingAmount)}
+                        {formatCurrency(invoice.balanceDue ?? invoice.remainingAmount)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getInvoiceStatusColor(invoice.status)}`}>
@@ -369,7 +424,7 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
                         {formatCurrency(payment.amount)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                        {payment.paymentMethod.replace('_', ' ')}
+                        {(payment.paymentMethod || '-').replace('_', ' ')}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
                         {(payment.paymentType ?? payment.type ?? '-').replace(/_/g, ' ')}

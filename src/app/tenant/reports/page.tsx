@@ -14,7 +14,13 @@ import {
   Loader2,
   CheckCircle2
 } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { Input } from '@/components/ui/Input';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
+import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function ReportsPage() {
@@ -34,6 +40,16 @@ export default function ReportsPage() {
     }
   }, [status, router]);
 
+  // Set default date range (last 3 months) — must run unconditionally (Rules of Hooks)
+  React.useEffect(() => {
+    const today = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+
+    setDateFrom(threeMonthsAgo.toISOString().split('T')[0]);
+    setDateTo(today.toISOString().split('T')[0]);
+  }, []);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -47,16 +63,6 @@ export default function ReportsPage() {
   if (!session || session.user.role !== 'tenant') {
     return null; // Will redirect via useEffect
   }
-
-  // Set default date range (last 3 months)
-  React.useEffect(() => {
-    const today = new Date();
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(today.getMonth() - 3);
-    
-    setDateFrom(threeMonthsAgo.toISOString().split('T')[0]);
-    setDateTo(today.toISOString().split('T')[0]);
-  }, []);
 
   const handleGenerateReport = async () => {
     setIsGenerating(true);
@@ -168,134 +174,93 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link
-                href="/tenant"
-                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back to Dashboard
-              </Link>
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <h1 className="text-xl font-semibold text-gray-900">Reports</h1>
-                <p className="text-sm text-gray-900">Generate and download your financial reports</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div className="space-y-6 p-6">
+      <Link
+        href="/tenant"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Dashboard
+      </Link>
+      <PageHeader
+        title="Reports"
+        description="Generate and download your financial reports"
+      />
           <div className="space-y-6">
             {/* Report Configuration */}
-            <div className="bg-white shadow rounded-lg p-6">
+            <Card>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Report Configuration</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Report Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Report Type
-                  </label>
-                  <select
+                <FormField label="Report Type" htmlFor="reportType">
+                  <Select
+                    id="reportType"
                     value={reportType}
                     onChange={(e) => {
                       setReportType(e.target.value as 'payments' | 'invoices' | 'summary');
                       setReportData(null);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="payments">Payment History</option>
                     <option value="invoices">Invoice History</option>
                     <option value="summary">Financial Summary</option>
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
 
-                {/* Date Range */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      From Date
-                    </label>
-                    <input
+                  <FormField label="From Date" htmlFor="dateFrom">
+                    <Input
                       type="date"
+                      id="dateFrom"
                       value={dateFrom}
                       onChange={(e) => setDateFrom(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      To Date
-                    </label>
-                    <input
+                  </FormField>
+                  <FormField label="To Date" htmlFor="dateTo">
+                    <Input
                       type="date"
+                      id="dateTo"
                       value={dateTo}
                       onChange={(e) => setDateTo(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
-                  </div>
+                  </FormField>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end space-x-3 mt-6">
-                <button
+              <div className="flex items-center justify-end mt-6">
+                <Button
+                  variant="success"
                   onClick={handleGenerateReport}
-                  disabled={isGenerating}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
+                  isLoading={isGenerating}
+                  leftIcon={!isGenerating ? <FileText className="h-4 w-4" /> : undefined}
                 >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Generate Report
-                    </>
-                  )}
-                </button>
+                  {isGenerating ? 'Generating...' : 'Generate Report'}
+                </Button>
               </div>
-            </div>
+            </Card>
 
             {/* Report Preview */}
             {reportData && (
-              <div className="bg-white shadow rounded-lg p-6">
+              <Card>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900">Report Preview</h3>
                   <div className="flex items-center space-x-2">
-                    <button
+                    <Button
+                      variant="outline"
                       onClick={() => handleExport('excel')}
-                      disabled={isExporting}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100"
+                      isLoading={isExporting}
+                      leftIcon={<FileSpreadsheet className="h-4 w-4" />}
                     >
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
                       Export Excel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="success"
                       onClick={() => handleExport('pdf')}
-                      disabled={isExporting}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400"
+                      isLoading={isExporting}
+                      leftIcon={<FileType className="h-4 w-4" />}
                     >
-                      <FileType className="h-4 w-4 mr-2" />
                       Export PDF
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -314,7 +279,7 @@ export default function ReportsPage() {
                             <p className="text-lg font-semibold text-gray-900">
                               {typeof value === 'number' && key.toLowerCase().includes('amount')
                                 ? formatCurrency(value)
-                                : value}
+                                : String(value ?? '')}
                             </p>
                           </div>
                         );
@@ -431,7 +396,7 @@ export default function ReportsPage() {
                     <p className="text-gray-500">No data available for the selected period</p>
                   </div>
                 )}
-              </div>
+              </Card>
             )}
 
             {/* Instructions */}
@@ -447,8 +412,6 @@ export default function ReportsPage() {
               </ul>
             </div>
           </div>
-        </div>
-      </main>
     </div>
   );
 }

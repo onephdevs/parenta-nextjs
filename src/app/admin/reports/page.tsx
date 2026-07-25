@@ -12,6 +12,8 @@ import {
   Package,
   Zap
 } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Card } from '@/components/ui/Card';
 
 export default async function ReportsPage() {
   const session = await getServerSession(authOptions);
@@ -235,31 +237,12 @@ export default async function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-                <p className="text-sm text-gray-900">Access all available reports and insights</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Reports & Analytics"
+        description="Access all available reports and insights"
+      />
 
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Stats */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Access</h2>
@@ -401,7 +384,6 @@ export default async function ReportsPage() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

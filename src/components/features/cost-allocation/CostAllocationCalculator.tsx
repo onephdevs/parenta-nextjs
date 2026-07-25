@@ -1,18 +1,23 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Calculator, 
-  DollarSign, 
-  Users, 
-  FileText, 
-  CheckCircle, 
-  Loader2,
-  Send
+import {
+  Calculator,
+  Users,
+  FileText,
+  CheckCircle,
+  Send,
 } from 'lucide-react';
-import { useNotifications } from '../../../hooks/useNotifications';
-import { UtilityBill, AllocationResult } from '../../../types/database';
+import { useNotifications } from '@/hooks/useNotifications';
+import { UtilityBill, AllocationResult } from '@/types/database';
 import { format } from 'date-fns';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 
 interface CostAllocationCalculatorProps {
   buildingId: string;
@@ -34,14 +39,14 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
     allocationMethod: 'equal',
     includeCommonAreas: true,
     commonAreaPercentage: 20,
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
   const [allocations, setAllocations] = useState<AllocationResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const { addNotification } = useNotifications();
+  const { showNotification } = useNotifications();
 
   useEffect(() => {
     fetchUtilityBills();
@@ -63,7 +68,6 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
       const data = await response.json();
 
       if (data.success) {
-        // Filter bills that haven't been allocated yet
         const unallocatedBills = data.data.bills.filter((bill: UtilityBill) => !bill.isAllocated);
         setUtilityBills(unallocatedBills);
       } else {
@@ -71,10 +75,10 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
       }
     } catch (error) {
       console.error('Error fetching utility bills:', error);
-      addNotification({
+      showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to load utility bills'
+        message: 'Failed to load utility bills',
       });
     } finally {
       setIsLoading(false);
@@ -95,7 +99,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
           utilityBillId: selectedBillId,
           allocationMethod: allocationSettings.allocationMethod,
           includeCommonAreas: allocationSettings.includeCommonAreas,
-          commonAreaPercentage: allocationSettings.commonAreaPercentage
+          commonAreaPercentage: allocationSettings.commonAreaPercentage,
         }),
       });
 
@@ -103,20 +107,20 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
       if (data.success) {
         setAllocations(data.data.allocations);
-        addNotification({
+        showNotification({
           type: 'success',
           title: 'Allocation Calculated',
-          message: `Cost allocated among ${data.data.allocations.length} tenants`
+          message: `Cost allocated among ${data.data.allocations.length} tenants`,
         });
       } else {
         throw new Error(data.error || 'Failed to calculate allocation');
       }
     } catch (error) {
       console.error('Error calculating allocation:', error);
-      addNotification({
+      showNotification({
         type: 'error',
         title: 'Calculation Error',
-        message: error instanceof Error ? error.message : 'Failed to calculate allocation'
+        message: error instanceof Error ? error.message : 'Failed to calculate allocation',
       });
     } finally {
       setIsCalculating(false);
@@ -138,7 +142,7 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
           allocationMethod: allocationSettings.allocationMethod,
           includeCommonAreas: allocationSettings.includeCommonAreas,
           commonAreaPercentage: allocationSettings.commonAreaPercentage,
-          dueDate: allocationSettings.dueDate?.toISOString()
+          dueDate: allocationSettings.dueDate?.toISOString(),
         }),
       });
 
@@ -146,13 +150,12 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
       if (data.success) {
         setHasGenerated(true);
-        addNotification({
+        showNotification({
           type: 'success',
           title: 'Bills Generated',
-          message: `${data.data.tenantBills.length} tenant utility bills created successfully`
+          message: `${data.data.tenantBills.length} tenant utility bills created successfully`,
         });
-        
-        // Refresh utility bills to remove the allocated one
+
         await fetchUtilityBills();
         setSelectedBillId('');
         setAllocations([]);
@@ -161,10 +164,10 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
       }
     } catch (error) {
       console.error('Error generating tenant bills:', error);
-      addNotification({
+      showNotification({
         type: 'error',
         title: 'Generation Error',
-        message: error instanceof Error ? error.message : 'Failed to generate tenant bills'
+        message: error instanceof Error ? error.message : 'Failed to generate tenant bills',
       });
     } finally {
       setIsGenerating(false);
@@ -193,34 +196,33 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow border p-6">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+      <Card>
+        <div className="flex items-center justify-center py-8 text-gray-900">
           Loading utility bills...
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Bill Selection */}
-      <div className="bg-white rounded-lg shadow border p-6">
-        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-          <Calculator className="h-5 w-5" />
-          Cost Allocation Calculator - {buildingName}
-        </h3>
-        <p className="text-sm text-gray-900 mb-6">
-          Select a utility bill and calculate how costs should be split among tenants.
-        </p>
-        
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-900">Select Utility Bill</label>
-            <select
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            Cost Allocation Calculator - {buildingName}
+          </h3>
+          <p className="text-sm text-gray-900">
+            Select a utility bill and calculate how costs should be split among tenants.
+          </p>
+        </CardHeader>
+
+        <CardBody className="space-y-4">
+          <FormField label="Select Utility Bill" htmlFor="utility-bill-select">
+            <Select
+              id="utility-bill-select"
               value={selectedBillId}
               onChange={(e) => setSelectedBillId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Choose a utility bill to allocate</option>
               {utilityBills.map(bill => (
@@ -228,20 +230,16 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                   {bill.utilityType} - {format(new Date(bill.billingPeriodStart), 'MMM yyyy')} - ${bill.amount.toFixed(2)}
                 </option>
               ))}
-            </select>
+            </Select>
             {utilityBills.length === 0 && (
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-gray-900 mt-1">
                 No utility bills available for allocation. Make sure there are unallocated bills for this building.
               </p>
             )}
-          </div>
+          </FormField>
 
           {selectedBill && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <span className="text-blue-800 font-medium">Selected Bill Details</span>
-              </div>
+            <Alert variant="info" title="Selected Bill Details">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <strong>Utility Type:</strong> {selectedBill.utilityType}
@@ -256,122 +254,113 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
                   <strong>Due Date:</strong> {format(new Date(selectedBill.dueDate), 'MMM d, yyyy')}
                 </div>
               </div>
-            </div>
+            </Alert>
           )}
-        </div>
-      </div>
+        </CardBody>
+      </Card>
 
-      {/* Allocation Settings */}
       {selectedBill && (
-        <div className="bg-white rounded-lg shadow border p-6">
-          <h3 className="text-lg font-semibold mb-4">Allocation Settings</h3>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900">Allocation Method</label>
-              <select
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Allocation Settings</h3>
+          </CardHeader>
+
+          <CardBody className="space-y-4">
+            <FormField label="Allocation Method" htmlFor="allocation-method">
+              <Select
+                id="allocation-method"
                 value={allocationSettings.allocationMethod}
                 onChange={(e) => setAllocationSettings({
                   ...allocationSettings,
-                  allocationMethod: e.target.value as any
+                  allocationMethod: e.target.value as AllocationSettings['allocationMethod'],
                 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="equal">Equal Split - Split equally among all tenants</option>
                 <option value="usage">Usage-Based - Based on meter readings</option>
                 <option value="room_size">Room Size - Based on square footage</option>
                 <option value="custom">Custom Rules - Use predefined percentages</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-900">Include Common Area Costs</label>
-                <p className="text-sm text-gray-900">
-                  Include shared space utilities in allocation
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allocationSettings.includeCommonAreas}
-                  onChange={(e) => setAllocationSettings({
-                    ...allocationSettings,
-                    includeCommonAreas: e.target.checked
-                  })}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+            <div className="space-y-1">
+              <Checkbox
+                id="include-common-areas"
+                checked={allocationSettings.includeCommonAreas}
+                onChange={(e) => setAllocationSettings({
+                  ...allocationSettings,
+                  includeCommonAreas: e.target.checked,
+                })}
+                label="Include Common Area Costs"
+              />
+              <p className="text-sm text-gray-900 pl-6">
+                Include shared space utilities in allocation
+              </p>
             </div>
 
             {allocationSettings.includeCommonAreas && (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900">Common Area Percentage</label>
+              <FormField label="Common Area Percentage" htmlFor="common-area-percentage">
                 <div className="flex items-center gap-2">
-                  <input
+                  <Input
+                    id="common-area-percentage"
                     type="number"
                     min="0"
                     max="100"
                     value={allocationSettings.commonAreaPercentage}
                     onChange={(e) => setAllocationSettings({
                       ...allocationSettings,
-                      commonAreaPercentage: parseFloat(e.target.value) || 0
+                      commonAreaPercentage: parseFloat(e.target.value) || 0,
                     })}
-                    className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-20"
                   />
                   <span className="text-sm text-gray-900">% of total cost</span>
                 </div>
-              </div>
+              </FormField>
             )}
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900">Tenant Bill Due Date</label>
-              <input
+            <FormField label="Tenant Bill Due Date" htmlFor="tenant-bill-due-date">
+              <Input
+                id="tenant-bill-due-date"
                 type="date"
                 value={allocationSettings.dueDate ? allocationSettings.dueDate.toISOString().split('T')[0] : ''}
-                onChange={(e) => setAllocationSettings({ 
-                  ...allocationSettings, 
-                  dueDate: e.target.value ? new Date(e.target.value) : undefined 
+                onChange={(e) => setAllocationSettings({
+                  ...allocationSettings,
+                  dueDate: e.target.value ? new Date(e.target.value) : undefined,
                 })}
                 min={new Date().toISOString().split('T')[0]}
                 max="2099-12-31"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                style={{
-                  colorScheme: 'light',
-                }}
+                style={{ colorScheme: 'light' }}
               />
-            </div>
+            </FormField>
 
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="primary"
                 onClick={calculateAllocation}
-                disabled={isCalculating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center gap-2"
+                isLoading={isCalculating}
+                leftIcon={<Calculator className="h-4 w-4" />}
               >
-                {isCalculating && <Loader2 className="h-4 w-4 animate-spin" />}
-                <Calculator className="h-4 w-4" />
                 Calculate Allocation
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       )}
 
-      {/* Allocation Results */}
       {allocations.length > 0 && (
-        <div className="bg-white rounded-lg shadow border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Allocation Results
-            </h3>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMethodColor(allocationSettings.allocationMethod)}`}>
-              {getMethodLabel(allocationSettings.allocationMethod)}
-            </span>
-          </div>
-          
-          <div className="space-y-4">
-            {/* Summary */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Allocation Results
+              </h3>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMethodColor(allocationSettings.allocationMethod)}`}>
+                {getMethodLabel(allocationSettings.allocationMethod)}
+              </span>
+            </div>
+          </CardHeader>
+
+          <CardBody className="space-y-4">
             <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
@@ -395,7 +384,6 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
             <hr />
 
-            {/* Tenant Allocations */}
             <div className="space-y-2">
               <h4 className="font-medium">Individual Allocations</h4>
               <div className="space-y-2">
@@ -438,49 +426,33 @@ export default function CostAllocationCalculator({ buildingId, buildingName }: C
 
             <hr />
 
-            {/* Actions */}
             <div className="flex justify-end gap-2">
-              <button
+              <Button
+                variant="outline"
                 onClick={calculateAllocation}
-                disabled={isCalculating}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                isLoading={isCalculating}
               >
                 Recalculate
-              </button>
-              <button 
-                onClick={generateTenantBills} 
-                disabled={isGenerating || hasGenerated}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 flex items-center gap-2"
+              </Button>
+              <Button
+                variant="primary"
+                onClick={generateTenantBills}
+                isLoading={isGenerating}
+                isDisabled={hasGenerated}
+                leftIcon={hasGenerated ? <CheckCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
               >
-                {isGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
-                {hasGenerated ? (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Bills Generated
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    Generate Tenant Bills
-                  </>
-                )}
-              </button>
+                {hasGenerated ? 'Bills Generated' : 'Generate Tenant Bills'}
+              </Button>
             </div>
 
             {hasGenerated && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-green-800 font-medium">Bills Generated Successfully</span>
-                </div>
-                <p className="text-green-700 text-sm mt-1">
-                  Tenant utility bills have been generated successfully. You can view them in the Tenant Bills section.
-                </p>
-              </div>
+              <Alert variant="success" title="Bills Generated Successfully">
+                Tenant utility bills have been generated successfully. You can view them in the Tenant Bills section.
+              </Alert>
             )}
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       )}
     </div>
   );
-} 
+}

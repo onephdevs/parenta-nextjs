@@ -4,9 +4,17 @@ import { formatDateForDatabase, parseDate } from '@/lib/utils';
 
 // Database transformation helpers
 function mapDatabaseAssetToAsset(dbAsset: DatabaseAsset): Asset {
+  const row = dbAsset as DatabaseAsset & {
+    building_name?: string;
+    assigned_room?: string;
+    assigned_tenant_name?: string;
+    assignment_date?: string;
+  };
+
   return {
     id: dbAsset.id,
     buildingId: dbAsset.building_id,
+    buildingName: row.building_name || undefined,
     assetName: dbAsset.asset_name,
     assetType: dbAsset.asset_type,
     brand: dbAsset.brand,
@@ -26,9 +34,11 @@ function mapDatabaseAssetToAsset(dbAsset: DatabaseAsset): Asset {
     description: dbAsset.description,
     notes: dbAsset.notes,
     isActive: dbAsset.is_active,
-    assignedRoom: (dbAsset as { assigned_room?: string }).assigned_room || undefined,
-    assignedTenant: (dbAsset as { assigned_tenant_name?: string }).assigned_tenant_name || undefined,
-    assignmentDate: (dbAsset as { assignment_date?: string }).assignment_date ? parseDate((dbAsset as { assignment_date: string }).assignment_date) : undefined,
+    assignedRoom: row.assigned_room || undefined,
+    assignedTenant: row.assigned_tenant_name || undefined,
+    assignmentDate: row.assignment_date ? parseDate(row.assignment_date) : undefined,
+    trackingEnabled: true,
+    assetTags: [],
     createdAt: parseDate(dbAsset.created_at),
     updatedAt: parseDate(dbAsset.updated_at)
   };

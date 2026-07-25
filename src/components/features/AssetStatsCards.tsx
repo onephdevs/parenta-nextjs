@@ -17,18 +17,24 @@ interface AssetStatsCardsProps {
 
 export function AssetStatsCards({ stats }: AssetStatsCardsProps) {
   const formatCurrency = (amount: number) => {
+    const n = Number(amount);
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(Number.isFinite(n) ? n : 0);
+  };
+
+  const pct = (part: number, whole: number) => {
+    if (!whole || !Number.isFinite(whole) || !Number.isFinite(part)) return '0.0';
+    return ((part / whole) * 100).toFixed(1);
   };
 
   const cards = [
     {
       title: 'Total Assets',
-      value: stats.totalAssets.toLocaleString(),
+      value: (stats.totalAssets || 0).toLocaleString(),
       icon: Package,
       color: 'bg-blue-500',
       bgColor: 'bg-blue-50',
@@ -44,21 +50,21 @@ export function AssetStatsCards({ stats }: AssetStatsCardsProps) {
     },
     {
       title: 'Available Assets',
-      value: stats.availableAssets.toLocaleString(),
+      value: (stats.availableAssets || 0).toLocaleString(),
       icon: CheckCircle,
       color: 'bg-emerald-500',
       bgColor: 'bg-emerald-50',
       textColor: 'text-emerald-600',
-      subtitle: `${((stats.availableAssets / stats.totalAssets) * 100).toFixed(1)}% available`
+      subtitle: `${pct(stats.availableAssets, stats.totalAssets)}% available`
     },
     {
       title: 'Assigned Assets',
-      value: stats.assignedAssets.toLocaleString(),
+      value: (stats.assignedAssets || 0).toLocaleString(),
       icon: Package,
       color: 'bg-blue-500',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
-      subtitle: `${((stats.assignedAssets / stats.totalAssets) * 100).toFixed(1)}% assigned`
+      subtitle: `${pct(stats.assignedAssets, stats.totalAssets)}% assigned`
     },
     {
       title: 'Maintenance Required',

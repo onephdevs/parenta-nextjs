@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAllTenants, createTenant } from '../../../lib/api/tenants';
 import { createTenantWithUser } from '@/lib/api/tenant-user-link';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET() {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const tenantsData = await getAllTenants({ limit: 1000 }); // Get all tenants for API
     
     return NextResponse.json({
@@ -29,6 +33,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const tenantData = await request.json();
     
     // Basic validation
@@ -74,7 +81,9 @@ export async function POST(request: Request) {
         data: {
           id: result.tenantId, // Add id field for frontend compatibility
           tenantId: result.tenantId,
-          userId: result.userId
+          userId: result.userId,
+          // One-time handoff — not stored after this response
+          temporaryPassword: result.temporaryPassword,
         },
         message: 'Tenant and user account created successfully'
       });

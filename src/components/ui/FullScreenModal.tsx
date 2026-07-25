@@ -14,6 +14,10 @@ interface FullScreenModalProps {
   actionButtons?: React.ReactNode;
 }
 
+/**
+ * Full-viewport admin form modal that sits beside the desktop sidebar
+ * (does not slide under it). On mobile it covers the full screen.
+ */
 export default function FullScreenModal({
   isOpen,
   onClose,
@@ -28,50 +32,52 @@ export default function FullScreenModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="h-screen w-screen bg-white text-gray-900 flex flex-col">
+      {/* Dim overlay — only over the main content area on desktop */}
+      <div
+        className="absolute inset-0 lg:left-64 bg-gray-900/50"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Panel: full width on mobile, inset past sidebar (w-64) on lg+ */}
+      <div className="absolute inset-y-0 right-0 left-0 lg:left-64 bg-white text-gray-900 flex flex-col shadow-xl">
         {/* Header */}
         <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
               <button
+                type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-900 transition-colors"
+                className="text-gray-400 hover:text-gray-900 transition-colors flex-shrink-0"
+                aria-label="Back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold text-gray-900 truncate">{title}</h1>
                 {subtitle && (
-                  <p className="text-sm text-gray-900 mt-1">{subtitle}</p>
+                  <p className="text-sm text-gray-600 mt-1 truncate">{subtitle}</p>
                 )}
               </div>
             </div>
-            {actionButtons ? (
-              <>
-                {actionButtons}
-                {/* Close X button */}
-                <button
-                  onClick={onClose}
-                  className="ml-4 text-gray-400 hover:text-gray-900 transition-colors flex-shrink-0"
-                  aria-label="Close modal"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </>
-            ) : (
-              <div className="flex items-center gap-3">
-                {secondaryButton}
-                {primaryButton}
-                {/* Close X button */}
-                <button
-                  onClick={onClose}
-                  className="ml-4 text-gray-400 hover:text-gray-900 transition-colors flex-shrink-0"
-                  aria-label="Close modal"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {actionButtons ? (
+                actionButtons
+              ) : (
+                <>
+                  {secondaryButton}
+                  {primaryButton}
+                </>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-900 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -84,4 +90,4 @@ export default function FullScreenModal({
       </div>
     </div>
   );
-} 
+}

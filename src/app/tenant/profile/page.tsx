@@ -5,10 +5,13 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, User, Home, Calendar, DollarSign, FileText } from 'lucide-react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import ProfileForm from '@/components/features/tenant/ProfileForm';
 import OccupantList from '@/components/features/tenant/OccupantList';
 import DocumentUpload from '@/components/features/DocumentUpload';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { StatCard } from '@/components/ui/StatCard';
 import SkeletonCard from '@/components/ui/SkeletonCard';
 
 interface ProfileData {
@@ -149,36 +152,18 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link
-                href="/tenant"
-                className="flex items-center text-gray-900 hover:text-gray-900 mr-4"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back to Dashboard
-              </Link>
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <User className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <h1 className="text-xl font-semibold text-gray-900">My Profile</h1>
-                <p className="text-sm text-gray-900">Manage your personal information and occupants</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <div className="space-y-6 p-6">
+      <Link
+        href="/tenant"
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to Dashboard
+      </Link>
+      <PageHeader
+        title="My Profile"
+        description="Manage your personal information and occupants"
+      />
           {profileData && (
             <div className="space-y-6">
               {/* Room Assignment Info */}
@@ -320,8 +305,6 @@ export default function ProfilePage() {
               />
             </div>
           )}
-        </div>
-      </main>
     </div>
   );
 }

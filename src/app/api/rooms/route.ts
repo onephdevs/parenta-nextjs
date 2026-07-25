@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAllRooms, createRoom } from '../../../lib/api/rooms';
+import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(request: Request) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { searchParams } = new URL(request.url);
     
     // Extract query parameters for filtering
@@ -42,6 +46,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const roomData = await request.json();
     
     // Basic validation

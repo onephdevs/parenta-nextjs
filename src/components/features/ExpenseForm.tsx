@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/forms/FormField';
 
 interface Building {
   id: string | number;
@@ -41,7 +47,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
-  
+
   const [formData, setFormData] = useState<ExpenseFormData>({
     buildingId: initialData?.buildingId || '',
     roomId: initialData?.roomId || '',
@@ -55,18 +61,16 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
   const [errors, setErrors] = useState<Partial<ExpenseFormData>>({});
 
-  // Load buildings and rooms on mount
   useEffect(() => {
     const loadData = async () => {
       try {
         const [buildingsRes, roomsRes] = await Promise.all([
           fetch('/api/buildings', { credentials: 'include' }),
-          fetch('/api/rooms', { credentials: 'include' })
+          fetch('/api/rooms', { credentials: 'include' }),
         ]);
 
         if (buildingsRes.ok) {
           const buildingsData = await buildingsRes.json();
-          // API returns { success: true, data: { buildings: [...], pagination: {...} } }
           setBuildings(buildingsData.data?.buildings || buildingsData.buildings || []);
         } else {
           console.error('Failed to load buildings:', buildingsRes.status);
@@ -74,17 +78,15 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
         if (roomsRes.ok) {
           const roomsData = await roomsRes.json();
-          // API returns { success: true, data: [...], pagination: {...} }
           const roomsList = roomsData.data || roomsData.rooms || [];
-          
-          // Map rooms to ensure consistent structure
-          const mappedRooms: Room[] = roomsList.map((room: any) => ({
-            id: room.id,
-            roomNumber: room.roomNumber || room.room_number || '',
-            buildingName: room.buildingName || room.building_name || '',
-            buildingId: room.buildingId || room.building_id || '',
+
+          const mappedRooms: Room[] = roomsList.map((room: Record<string, unknown>) => ({
+            id: room.id as string | number,
+            roomNumber: (room.roomNumber || room.room_number || '') as string,
+            buildingName: (room.buildingName || room.building_name || '') as string,
+            buildingId: (room.buildingId || room.building_id || '') as string | number,
           }));
-          
+
           setRooms(mappedRooms);
         } else {
           console.error('Failed to load rooms:', roomsRes.status);
@@ -98,21 +100,16 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
     loadData();
   }, [addNotification]);
 
-  // Filter rooms based on selected building
   useEffect(() => {
     if (formData.buildingId) {
-      // Convert both to strings for comparison (handles UUIDs and numbers)
       const selectedBuildingId = String(formData.buildingId);
-      const buildingRooms = rooms.filter(room => 
-        String(room.buildingId) === selectedBuildingId
-      );
+      const buildingRooms = rooms.filter((room) => String(room.buildingId) === selectedBuildingId);
       setFilteredRooms(buildingRooms);
-      
-      // Clear room selection if it doesn't belong to the selected building
+
       if (formData.roomId) {
-        const selectedRoom = rooms.find(r => String(r.id) === String(formData.roomId));
+        const selectedRoom = rooms.find((r) => String(r.id) === String(formData.roomId));
         if (!selectedRoom || String(selectedRoom.buildingId) !== selectedBuildingId) {
-          setFormData(prev => ({ ...prev, roomId: '' }));
+          setFormData((prev) => ({ ...prev, roomId: '' }));
         }
       }
     } else {
@@ -139,7 +136,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       addNotification('Please fix the form errors', 'error');
       return;
@@ -151,7 +148,6 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
       if (onSubmit) {
         await onSubmit(formData);
       } else {
-        // Default submission to API
         const response = await fetch('/api/expenses', {
           method: 'POST',
           headers: {
@@ -190,9 +186,9 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
   };
 
   const handleInputChange = (field: keyof ExpenseFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -204,11 +200,9 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
     }
   };
 
-
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      <div className="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6">
+      <Card>
         <div className="md:grid md:grid-cols-3 md:gap-6">
           <div className="md:col-span-1">
             <h3 className="text-lg font-medium leading-6 text-gray-900">Expense Information</h3>
@@ -218,47 +212,39 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
           </div>
           <div className="mt-5 md:mt-0 md:col-span-2">
             <div className="grid grid-cols-6 gap-6">
-              {/* Amount */}
-              <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
-                  Amount *
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-900 text-base"></span>
-                  </div>
-                  <input
-                    type="number"
-                    id="amount"
-                    name="amount"
-                    value={formData.amount}
-                    onChange={(e) => handleInputChange('amount', e.target.value)}
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    className={`block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-base ${
-                      errors.amount ? 'border-red-300' : ''
-                    }`}
-                  />
-                </div>
-                {errors.amount && (
-                  <p className="mt-2 text-sm text-red-600">{errors.amount}</p>
-                )}
-              </div>
+              <FormField
+                label="Amount"
+                htmlFor="amount"
+                required
+                error={errors.amount}
+                className="col-span-6 sm:col-span-2"
+              >
+                <Input
+                  type="number"
+                  id="amount"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={(e) => handleInputChange('amount', e.target.value)}
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  isInvalid={Boolean(errors.amount)}
+                />
+              </FormField>
 
-              {/* Category */}
-              <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-900">
-                  Category *
-                </label>
-                <select
+              <FormField
+                label="Category"
+                htmlFor="category"
+                required
+                error={errors.category}
+                className="col-span-6 sm:col-span-2"
+              >
+                <Select
                   id="category"
                   name="category"
                   value={formData.category}
                   onChange={(e) => handleInputChange('category', e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                    errors.category ? 'border-red-300' : ''
-                  }`}
+                  isInvalid={Boolean(errors.category)}
                 >
                   <option value="cleaning">Cleaning</option>
                   <option value="maintenance">Maintenance</option>
@@ -272,18 +258,17 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   <option value="insurance">Insurance</option>
                   <option value="taxes">Taxes</option>
                   <option value="other">Other</option>
-                </select>
-                {errors.category && (
-                  <p className="mt-2 text-sm text-red-600">{errors.category}</p>
-                )}
-              </div>
+                </Select>
+              </FormField>
 
-              {/* Expense Date */}
-              <div className="col-span-6 sm:col-span-2">
-                <label htmlFor="expenseDate" className="block text-sm font-medium text-gray-900">
-                  Expense Date *
-                </label>
-                <input
+              <FormField
+                label="Expense Date"
+                htmlFor="expenseDate"
+                required
+                error={errors.expenseDate}
+                className="col-span-6 sm:col-span-2"
+              >
+                <Input
                   type="date"
                   id="expenseDate"
                   name="expenseDate"
@@ -291,29 +276,21 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                   onChange={(e) => handleInputChange('expenseDate', e.target.value)}
                   min="2000-01-01"
                   max="2099-12-31"
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                    errors.expenseDate ? 'border-red-300' : ''
-                  }`}
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  style={{ colorScheme: 'light' }}
+                  isInvalid={Boolean(errors.expenseDate)}
                 />
-                {errors.expenseDate && (
-                  <p className="mt-2 text-sm text-red-600">{errors.expenseDate}</p>
-                )}
-              </div>
+              </FormField>
 
-              {/* Building Selection */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="buildingId" className="block text-sm font-medium text-gray-900">
-                  Building (Optional)
-                </label>
-                <select
+              <FormField
+                label="Building (Optional)"
+                htmlFor="buildingId"
+                className="col-span-6 sm:col-span-3"
+              >
+                <Select
                   id="buildingId"
                   name="buildingId"
                   value={formData.buildingId}
                   onChange={(e) => handleInputChange('buildingId', e.target.value)}
-                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 >
                   <option value="">Select a building</option>
                   {buildings.map((building) => (
@@ -321,21 +298,21 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                       {building.name}
                     </option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
-              {/* Room Selection */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="roomId" className="block text-sm font-medium text-gray-900">
-                  Room (Optional)
-                </label>
-                <select
+              <FormField
+                label="Room (Optional)"
+                htmlFor="roomId"
+                hint={!formData.buildingId ? 'Select a building first to choose a room' : undefined}
+                className="col-span-6 sm:col-span-3"
+              >
+                <Select
                   id="roomId"
                   name="roomId"
                   value={formData.roomId}
                   onChange={(e) => handleInputChange('roomId', e.target.value)}
-                  disabled={!formData.buildingId}
-                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base disabled:bg-gray-100"
+                  isDisabled={!formData.buildingId}
                 >
                   <option value="">Select a room</option>
                   {filteredRooms.map((room) => (
@@ -343,86 +320,65 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                       {room.buildingName ? `${room.buildingName} - ` : ''}Room {room.roomNumber}
                     </option>
                   ))}
-                </select>
-                {!formData.buildingId && (
-                  <p className="mt-1 text-sm text-gray-900">Select a building first to choose a room</p>
-                )}
-              </div>
+                </Select>
+              </FormField>
 
-              {/* Vendor */}
-              <div className="col-span-6 sm:col-span-3">
-                <label htmlFor="vendor" className="block text-sm font-medium text-gray-900">
-                  Vendor
-                </label>
-                <input
+              <FormField
+                label="Vendor"
+                htmlFor="vendor"
+                className="col-span-6 sm:col-span-3"
+              >
+                <Input
                   type="text"
                   id="vendor"
                   name="vendor"
                   value={formData.vendor}
                   onChange={(e) => handleInputChange('vendor', e.target.value)}
                   placeholder="Vendor or service provider name"
-                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 />
-              </div>
+              </FormField>
 
-              {/* Description */}
-              <div className="col-span-6">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
-                  Description *
-                </label>
-                <input
+              <FormField
+                label="Description"
+                htmlFor="description"
+                required
+                error={errors.description}
+                className="col-span-6"
+              >
+                <Input
                   type="text"
                   id="description"
                   name="description"
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Brief description of the expense"
-                  className={`mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base ${
-                    errors.description ? 'border-red-300' : ''
-                  }`}
+                  isInvalid={Boolean(errors.description)}
                 />
-                {errors.description && (
-                  <p className="mt-2 text-sm text-red-600">{errors.description}</p>
-                )}
-              </div>
+              </FormField>
 
-              {/* Notes */}
-              <div className="col-span-6">
-                <label htmlFor="notes" className="block text-sm font-medium text-gray-900">
-                  Notes
-                </label>
-                <textarea
+              <FormField label="Notes" htmlFor="notes" className="col-span-6">
+                <Textarea
                   id="notes"
                   name="notes"
                   rows={4}
                   value={formData.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Additional notes or details about the expense"
-                  className="mt-1 block w-full px-4 py-3 text-base rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-base"
                 />
-              </div>
+              </FormField>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Form Actions */}
       <div className="flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="bg-white py-3 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-        >
+        <Button type="button" variant="outline" size="lg" onClick={handleCancel}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-        >
+        </Button>
+        <Button type="submit" variant="primary" size="lg" isLoading={isLoading}>
           {isLoading ? 'Recording...' : 'Record Expense'}
-        </button>
+        </Button>
       </div>
     </form>
   );
-} 
+}

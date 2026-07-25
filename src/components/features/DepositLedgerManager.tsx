@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Card } from '@/components/ui/Card';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
+import { FileText, Undo2 } from 'lucide-react';
 
 interface DepositTransaction {
   id: number;
@@ -33,29 +40,31 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
     description: '',
     invoiceId: '',
     paymentMethod: 'bank_transfer',
-    referenceNumber: ''
+    referenceNumber: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
   const loadDepositData = async () => {
     try {
-      // Fetch balance (aggregated total) and history separately
       const [balanceRes, historyRes] = await Promise.all([
         fetch(`/api/deposit-ledger/${tenantId}?type=balance`),
-        fetch(`/api/deposit-ledger/${tenantId}?type=history`)
+        fetch(`/api/deposit-ledger/${tenantId}?type=history`),
       ]);
-      
+
       if (balanceRes.ok) {
         const balanceData = await balanceRes.json();
-        // API returns { success: true, data: <number> } for balance
-        const balance = typeof balanceData.data === 'number' ? balanceData.data : (balanceData.data?.balance || balanceData.balance || 0);
+        const balance =
+          typeof balanceData.data === 'number'
+            ? balanceData.data
+            : balanceData.data?.balance || balanceData.balance || 0;
         setBalance(balance);
       }
-      
+
       if (historyRes.ok) {
         const historyData = await historyRes.json();
-        // API returns { success: true, data: <array> } for history
-        const history = Array.isArray(historyData.data) ? historyData.data : (historyData.history || []);
+        const history = Array.isArray(historyData.data)
+          ? historyData.data
+          : historyData.history || [];
         setHistory(history);
       }
     } catch (error) {
@@ -72,7 +81,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       addNotification('Please enter a valid amount', 'error');
       return;
@@ -98,7 +107,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
           description: formData.description || `Manual ${actionType} by admin`,
           relatedInvoiceId: actionType === 'apply' ? parseInt(formData.invoiceId) : null,
           paymentMethod: actionType === 'refund' ? formData.paymentMethod : null,
-          referenceNumber: formData.referenceNumber || null
+          referenceNumber: formData.referenceNumber || null,
         }),
       });
 
@@ -112,8 +121,13 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
         'success'
       );
 
-      // Reset form and reload data
-      setFormData({ amount: '', description: '', invoiceId: '', paymentMethod: 'bank_transfer', referenceNumber: '' });
+      setFormData({
+        amount: '',
+        description: '',
+        invoiceId: '',
+        paymentMethod: 'bank_transfer',
+        referenceNumber: '',
+      });
       setShowActionForm(false);
       setActionType(null);
       await loadDepositData();
@@ -134,7 +148,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -176,9 +190,21 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
     }
   };
 
+  const resetForm = () => {
+    setShowActionForm(false);
+    setActionType(null);
+    setFormData({
+      amount: '',
+      description: '',
+      invoiceId: '',
+      paymentMethod: 'bank_transfer',
+      referenceNumber: '',
+    });
+  };
+
   if (loading) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <Card>
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-gray-200 rounded w-1/3"></div>
           <div className="h-10 bg-gray-200 rounded"></div>
@@ -187,13 +213,12 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
             <div className="h-4 bg-gray-200 rounded"></div>
           </div>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      {/* Header with Balance */}
+    <Card padding="none" className="overflow-hidden">
       <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
         <div className="flex items-center justify-between">
           <div>
@@ -207,60 +232,53 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
         {!showActionForm ? (
           <div className="flex items-center space-x-3">
-            <button
+            <Button
+              variant="primary"
               onClick={() => {
                 setActionType('apply');
                 setShowActionForm(true);
               }}
-              disabled={balance <= 0}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              isDisabled={balance <= 0}
+              leftIcon={<FileText className="h-4 w-4" />}
             >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
               Apply to Invoice
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => {
                 setActionType('refund');
                 setShowActionForm(true);
               }}
-              disabled={balance <= 0}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              isDisabled={balance <= 0}
+              leftIcon={<Undo2 className="h-4 w-4" />}
             >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
               Refund to Tenant
-            </button>
+            </Button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>{actionType === 'refund' ? 'Refunding Deposit' : 'Applying Deposit to Invoice'}</strong>
-                {actionType === 'refund' 
-                  ? ' - This will decrease the deposit balance and refund the tenant.' 
-                  : ' - This will apply the deposit amount to pay an outstanding invoice.'}
-              </p>
-            </div>
+            <Alert variant="info">
+              <strong>{actionType === 'refund' ? 'Refunding Deposit' : 'Applying Deposit to Invoice'}</strong>
+              {actionType === 'refund'
+                ? ' - This will decrease the deposit balance and refund the tenant.'
+                : ' - This will apply the deposit amount to pay an outstanding invoice.'}
+            </Alert>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-900">
-                  Amount * (Max: {formatCurrency(balance)})
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-900 sm:text-sm">₱</span>
-                  </div>
-                  <input
-                    type="number"
+              <FormField
+                htmlFor="amount"
+                label={`Amount * (Max: ${formatCurrency(balance)})`}
+              >
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-900 text-sm">
+                    ₱
+                  </span>
+                  <Input
                     id="amount"
+                    type="number"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                     step="0.01"
@@ -268,101 +286,71 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                     max={balance}
                     placeholder="0.00"
                     required
-                    className="block w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    className="pl-8"
                   />
                 </div>
-              </div>
+              </FormField>
 
               {actionType === 'apply' ? (
-                <div>
-                  <label htmlFor="invoiceId" className="block text-sm font-medium text-gray-900">
-                    Invoice ID *
-                  </label>
-                  <input
-                    type="number"
+                <FormField htmlFor="invoiceId" label="Invoice ID" required>
+                  <Input
                     id="invoiceId"
+                    type="number"
                     value={formData.invoiceId}
                     onChange={(e) => setFormData({ ...formData, invoiceId: e.target.value })}
                     placeholder="Enter invoice ID"
                     required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                   />
-                </div>
+                </FormField>
               ) : (
-                <div>
-                  <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-900">
-                    Refund Method *
-                  </label>
-                  <select
+                <FormField htmlFor="paymentMethod" label="Refund Method" required>
+                  <Select
                     id="paymentMethod"
                     value={formData.paymentMethod}
                     onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
                     required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="bank_transfer">Bank Transfer</option>
                     <option value="cash">Cash</option>
                     <option value="check">Check</option>
                     <option value="online">Online Payment</option>
-                  </select>
-                </div>
+                  </Select>
+                </FormField>
               )}
 
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-900">
-                  Description (Optional)
-                </label>
-                <input
-                  type="text"
+              <FormField htmlFor="description" label="Description (Optional)">
+                <Input
                   id="description"
+                  type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="e.g., Final refund, Partial application"
-                  className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="referenceNumber" className="block text-sm font-medium text-gray-900">
-                  Reference Number (Optional)
-                </label>
-                <input
-                  type="text"
+              <FormField htmlFor="referenceNumber" label="Reference Number (Optional)">
+                <Input
                   id="referenceNumber"
+                  type="text"
                   value={formData.referenceNumber}
                   onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
                   placeholder="Transaction reference"
-                  className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                 />
-              </div>
+              </FormField>
             </div>
 
             <div className="flex items-center justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowActionForm(false);
-                  setActionType(null);
-                  setFormData({ amount: '', description: '', invoiceId: '', paymentMethod: 'bank_transfer', referenceNumber: '' });
-                }}
-                disabled={submitting}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
+              <Button type="button" variant="outline" onClick={resetForm} isDisabled={submitting}>
                 Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-              >
-                {submitting ? 'Processing...' : `Confirm ${actionType === 'refund' ? 'Refund' : 'Application'}`}
-              </button>
+              </Button>
+              <Button type="submit" variant="primary" isLoading={submitting}>
+                Confirm {actionType === 'refund' ? 'Refund' : 'Application'}
+              </Button>
             </div>
           </form>
         )}
       </div>
 
-      {/* Transaction History */}
       <div className="px-6 py-5">
         <h4 className="text-sm font-medium text-gray-900 mb-4">Transaction History</h4>
         {history.length > 0 ? (
@@ -372,9 +360,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                 key={transaction.id}
                 className={`flex items-start space-x-3 p-4 rounded-lg border ${getTransactionColor(transaction.transactionType)}`}
               >
-                <div className="flex-shrink-0 mt-0.5">
-                  {getTransactionIcon(transaction.transactionType)}
-                </div>
+                <div className="flex-shrink-0 mt-0.5">{getTransactionIcon(transaction.transactionType)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div>
@@ -393,9 +379,11 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                       <p className="text-xs text-gray-900 mt-1">{formatDate(transaction.createdAt)}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-lg font-bold ${
-                        transaction.transactionType === 'deposit' ? 'text-green-600' : 'text-red-600'
-                      }`}>
+                      <p
+                        className={`text-lg font-bold ${
+                          transaction.transactionType === 'deposit' ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
                         {transaction.transactionType === 'deposit' ? '+' : '-'}
                         {formatCurrency(Math.abs(transaction.amount))}
                       </p>
@@ -415,15 +403,14 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
           </div>
         ) : (
           <div className="text-center py-8">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <FileText className="mx-auto h-12 w-12 text-gray-400" aria-hidden="true" />
             <p className="mt-2 text-sm text-gray-900">No deposit transactions yet</p>
-            <p className="text-xs text-gray-400">Deposits are refundable security funds that are not automatically applied to invoices</p>
+            <p className="text-xs text-gray-400">
+              Deposits are refundable security funds that are not automatically applied to invoices
+            </p>
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
-

@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Alert } from '@/components/ui/Alert';
+import { FormField } from '@/components/forms/FormField';
 import type { UserRole } from '@/types/auth.types';
 
 interface AuthFormProps {
@@ -17,7 +20,6 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  // Normalize defaultRole to lowercase to match option values
   const normalizedRole = (defaultRole?.toLowerCase() === 'admin' ? 'admin' : 'tenant') as UserRole;
   const [formData, setFormData] = useState({
     email: '',
@@ -35,7 +37,6 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
 
     try {
       if (mode === 'signup') {
-        // Handle signup
         const response = await fetch('/api/auth/signup', {
           method: 'POST',
           headers: {
@@ -48,8 +49,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
 
         if (data.success) {
           setSuccess('Account created successfully! Signing you in...');
-          
-          // Automatically sign in the user after successful signup
+
           const signInResult = await signIn('credentials', {
             email: formData.email,
             password: formData.password,
@@ -58,12 +58,10 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
           });
 
           if (signInResult?.ok) {
-            // Redirect based on role
             const redirectUrl = formData.role === 'admin' ? '/admin' : '/tenant';
             router.push(redirectUrl);
             router.refresh();
           } else {
-            // If auto-signin fails, redirect to signin page
             setSuccess('Account created successfully! Please sign in.');
             setTimeout(() => {
               router.push(`/auth/signin?role=${formData.role}`);
@@ -73,7 +71,6 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
           setError(data.message || 'Failed to create account');
         }
       } else {
-        // Handle signin
         const result = await signIn('credentials', {
           email: formData.email,
           password: formData.password,
@@ -84,15 +81,14 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
         if (result?.error) {
           setError('Invalid credentials. Please check your email, password, and role.');
         } else if (result?.ok) {
-          // Redirect based on role
           const redirectUrl = formData.role === 'admin' ? '/admin' : '/tenant';
           router.push(redirectUrl);
           router.refresh();
         }
       }
-    } catch (error) {
+    } catch (err) {
       setError('An unexpected error occurred. Please try again.');
-      console.error('Auth error:', error);
+      console.error('Auth error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +96,7 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -109,144 +105,106 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Role Selection */}
-        <div>
-          <label htmlFor="role" className="block text-sm font-medium text-gray-900 mb-2">
-            Role
-          </label>
-          <select
+        <FormField label="Role" htmlFor="role" required>
+          <Select
             id="role"
             name="role"
             value={formData.role}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={isLoading}
+            isDisabled={isLoading}
           >
             <option value="tenant">Tenant</option>
             <option value="admin">Admin</option>
-          </select>
-        </div>
+          </Select>
+        </FormField>
 
-        {/* First Name (signup only) */}
         {mode === 'signup' && (
-          <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-gray-900 mb-2">
-              First Name
-            </label>
-            <input
+          <FormField label="First Name" htmlFor="firstName" required>
+            <Input
               id="firstName"
               name="firstName"
               type="text"
               required
               value={formData.firstName}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter your first name"
-              disabled={isLoading}
+              isDisabled={isLoading}
             />
-          </div>
+          </FormField>
         )}
 
-        {/* Last Name (signup only) */}
         {mode === 'signup' && (
-          <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-gray-900 mb-2">
-              Last Name
-            </label>
-            <input
+          <FormField label="Last Name" htmlFor="lastName" required>
+            <Input
               id="lastName"
               name="lastName"
               type="text"
               required
               value={formData.lastName}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter your last name"
-              disabled={isLoading}
+              isDisabled={isLoading}
             />
-          </div>
+          </FormField>
         )}
 
-        {/* Email */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
-            Email
-          </label>
-          <input
+        <FormField label="Email" htmlFor="email" required>
+          <Input
             id="email"
             name="email"
             type="email"
             required
             value={formData.email}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter your email"
-            disabled={isLoading}
+            isDisabled={isLoading}
           />
-        </div>
+        </FormField>
 
-        {/* Password */}
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
-            Password
-          </label>
-          <input
+        <FormField
+          label="Password"
+          htmlFor="password"
+          required
+          hint={mode === 'signup' ? 'Password must be at least 6 characters long' : undefined}
+        >
+          <Input
             id="password"
             name="password"
             type="password"
             required
             value={formData.password}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter your password"
-            disabled={isLoading}
+            isDisabled={isLoading}
             minLength={6}
           />
-          {mode === 'signup' && (
-            <p className="text-sm text-gray-900 mt-1">
-              Password must be at least 6 characters long
-            </p>
-          )}
-        </div>
+        </FormField>
 
-        {/* Error Message */}
         {error && (
-          <div className="p-3 rounded-md bg-red-50 border border-red-200">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
+          <Alert variant="danger">{error}</Alert>
         )}
 
-        {/* Success Message */}
         {success && (
-          <div className="p-3 rounded-md bg-green-50 border border-green-200">
-            <p className="text-sm text-green-700">{success}</p>
-          </div>
+          <Alert variant="success">{success}</Alert>
         )}
 
-        {/* Submit Button */}
-        <Button
-          type="submit"
-          className="w-full"
-          loading={isLoading}
-          disabled={isLoading}
-        >
+        <Button type="submit" className="w-full" isLoading={isLoading}>
           {mode === 'signin' ? 'Sign In' : 'Create Account'}
         </Button>
 
-        {/* Toggle Mode Link */}
         <div className="text-center">
-          <p className="text-sm text-gray-900">
-            {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
-            {' '}
+          <p className="text-sm text-gray-600">
+            {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}{' '}
             <button
               type="button"
               onClick={() => {
-                const newPath = mode === 'signin' 
-                  ? `/auth/signup?role=${formData.role}` 
-                  : `/auth/signin?role=${formData.role}`;
+                const newPath =
+                  mode === 'signin'
+                    ? `/auth/signup?role=${formData.role}`
+                    : `/auth/signin?role=${formData.role}`;
                 router.push(newPath);
               }}
-              className="text-blue-600 hover:text-blue-500 font-medium"
+              className="text-purple-600 hover:text-purple-500 font-medium"
               disabled={isLoading}
             >
               {mode === 'signin' ? 'Sign up' : 'Sign in'}
@@ -256,4 +214,4 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
       </form>
     </div>
   );
-} 
+}

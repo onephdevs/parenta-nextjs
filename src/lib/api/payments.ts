@@ -176,7 +176,7 @@ export async function getPayments(
   }
   if (filters.paymentStatus) {
     whereConditions.push(`p.payment_status = $${paramIndex++}`);
-    queryParams.push(filters.paymentStatus);
+    queryParams.push(mapPaymentStatusToDb(filters.paymentStatus));
   }
   if (filters.paymentMethod) {
     whereConditions.push(`p.payment_method = $${paramIndex++}`);
@@ -468,8 +468,8 @@ export async function getPaymentSummary(
       COALESCE(SUM(amount), 0) as total_amount,
       COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as pending_payments,
       COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount,
-      COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as completed_payments,
-      COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN amount ELSE 0 END), 0) as completed_amount,
+      COUNT(CASE WHEN payment_status IN ('paid', 'completed') THEN 1 END) as completed_payments,
+      COALESCE(SUM(CASE WHEN payment_status IN ('paid', 'completed') THEN amount ELSE 0 END), 0) as completed_amount,
       COUNT(CASE WHEN payment_status = 'pending' AND due_date < CURRENT_DATE THEN 1 END) as overdue_payments,
       COALESCE(SUM(CASE WHEN payment_status = 'pending' AND due_date < CURRENT_DATE THEN amount ELSE 0 END), 0) as overdue_amount
     FROM payments

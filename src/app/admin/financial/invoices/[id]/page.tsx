@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
+import PrintInvoiceButton from '@/components/features/PrintInvoiceButton';
 
 interface InvoiceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -10,17 +11,17 @@ interface InvoiceDetailPageProps {
 
 export default async function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/signin');
   }
 
   const { id } = await params;
-  
+
   try {
-    // Fetch invoice details
+    // invoices has no room_id — resolve room via tenant's active assignment
     const invoiceResult = await pool.query(
-      `SELECT 
+      `SELECT
         i.*,
         t.first_name,
         t.last_name,
@@ -29,7 +30,9 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
         b.name as building_name
       FROM invoices i
       LEFT JOIN tenants t ON i.tenant_id = t.id
-      LEFT JOIN rooms r ON i.room_id = r.id
+      LEFT JOIN tenant_room_assignments tra
+        ON tra.tenant_id = i.tenant_id AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON tra.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       WHERE i.id = $1`,
       [id]
@@ -41,14 +44,24 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
 
     const invoice = invoiceResult.rows[0];
 
-    // Fetch payment allocations for this invoice
+    // Line items
+    const itemsResult = await pool.query(
+      `SELECT *
+       FROM invoice_line_items
+       WHERE invoice_id = $1
+       ORDER BY created_at ASC, id ASC`,
+      [id]
+    );
+    const lineItems = itemsResult.rows;
+
+    // Payment allocations (payments.notes, not description)
     const allocationsResult = await pool.query(
-      `SELECT 
+      `SELECT
         pa.*,
         p.amount as payment_amount,
         p.payment_date,
         p.payment_method,
-        p.description as payment_description
+        p.notes as payment_description
       FROM payment_allocations pa
       LEFT JOIN payments p ON pa.payment_id = p.id
       WHERE pa.invoice_id = $1
@@ -58,36 +71,44 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
 
     const allocations = allocationsResult.rows;
 
-    const formatCurrency = (amount: string | number) => {
+    const formatCurrency = (amount: string | number | null | undefined) => {
       return new Intl.NumberFormat('en-PH', {
         style: 'currency',
         currency: 'PHP',
-      }).format(Number(amount));
+      }).format(Number(amount || 0));
     };
 
-    const formatDate = (date: Date | string) => {
+    const formatDate = (date: Date | string | null | undefined) => {
+      if (!date) return '—';
       return new Date(date).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
       });
     };
 
     const getStatusColor = (status: string) => {
       switch (status) {
+        case 'paid':
         case 'completed':
           return 'bg-green-100 text-green-800';
         case 'partial':
+        case 'sent':
           return 'bg-yellow-100 text-yellow-800';
         case 'overdue':
           return 'bg-red-100 text-red-800';
+        case 'cancelled':
+          return 'bg-gray-100 text-gray-500';
         default:
           return 'bg-gray-100 text-gray-800';
       }
     };
 
-    const paidAmount = Number(invoice.amount) - Number(invoice.remaining_amount);
-    const progressPercentage = (paidAmount / Number(invoice.amount)) * 100;
+    const totalAmount = Number(invoice.total_amount || 0);
+    const amountPaid = Number(invoice.amount_paid || 0);
+    const balanceDue = Number(invoice.balance_due ?? totalAmount - amountPaid);
+    const progressPercentage = totalAmount > 0 ? (amountPaid / totalAmount) * 100 : 0;
+    const status = invoice.invoice_status || 'draft';
 
     return (
       <div className="min-h-screen bg-gray-50">
@@ -96,8 +117,8 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex h-16 justify-between items-center">
               <div className="flex items-center space-x-4">
-                <Link 
-                  href="/admin/financial/invoices" 
+                <Link
+                  href="/admin/financial/invoices"
                   className="flex items-center text-gray-900 hover:text-gray-900"
                 >
                   <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,8 +130,10 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                 <h1 className="text-2xl font-bold text-gray-900">
                   Invoice {invoice.invoice_number}
                 </h1>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
-                  {invoice.status}
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(status)}`}
+                >
+                  {status}
                 </span>
               </div>
             </div>
@@ -135,7 +158,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                     <div>
                       <dt className="text-sm font-medium text-gray-900">Tenant</dt>
                       <dd className="mt-1 text-sm text-gray-900">
-                        <Link 
+                        <Link
                           href={`/admin/tenants/${invoice.tenant_id}`}
                           className="text-purple-600 hover:text-purple-900 font-medium"
                         >
@@ -146,7 +169,9 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                     <div>
                       <dt className="text-sm font-medium text-gray-900">Room</dt>
                       <dd className="mt-1 text-sm text-gray-900">
-                        {invoice.building_name} - Room {invoice.room_number}
+                        {invoice.building_name && invoice.room_number
+                          ? `${invoice.building_name} - Room ${invoice.room_number}`
+                          : 'No active room assignment'}
                       </dd>
                     </div>
                     <div>
@@ -160,16 +185,53 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                     <div>
                       <dt className="text-sm font-medium text-gray-900">Period</dt>
                       <dd className="mt-1 text-sm text-gray-900">
-                        {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}
+                        {formatDate(invoice.billing_period_start)} - {formatDate(invoice.billing_period_end)}
                       </dd>
                     </div>
                   </div>
 
-                  {invoice.description && (
+                  {invoice.notes && (
                     <div className="mt-6">
-                      <dt className="text-sm font-medium text-gray-900">Description</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{invoice.description}</dd>
+                      <dt className="text-sm font-medium text-gray-900">Notes</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{invoice.notes}</dd>
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Line Items */}
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Line Items</h3>
+                </div>
+                <div className="px-6 py-5">
+                  {lineItems.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead>
+                          <tr>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                            <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+                            <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Unit</th>
+                            <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {lineItems.map((item) => (
+                            <tr key={item.id}>
+                              <td className="px-2 py-3 text-sm text-gray-900">{item.description}</td>
+                              <td className="px-2 py-3 text-sm text-gray-900 capitalize">{item.item_type}</td>
+                              <td className="px-2 py-3 text-sm text-gray-900 text-right">{Number(item.quantity)}</td>
+                              <td className="px-2 py-3 text-sm text-gray-900 text-right">{formatCurrency(item.unit_price)}</td>
+                              <td className="px-2 py-3 text-sm font-medium text-gray-900 text-right">{formatCurrency(item.line_total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900">No line items on this invoice.</p>
                   )}
                 </div>
               </div>
@@ -210,9 +272,11 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                                     </Link>
                                   </div>
                                   <div className="mt-1 flex items-center space-x-4 text-xs text-gray-900">
-                                    <span>Date: {formatDate(allocation.payment_date)}</span>
+                                    <span>Date: {formatDate(allocation.payment_date || allocation.allocation_date)}</span>
                                     <span>•</span>
-                                    <span className="capitalize">Method: {allocation.payment_method.replace('_', ' ')}</span>
+                                    <span className="capitalize">
+                                      Method: {(allocation.payment_method || 'unknown').replace(/_/g, ' ')}
+                                    </span>
                                     <span>•</span>
                                     <span>Total Payment: {formatCurrency(allocation.payment_amount)}</span>
                                   </div>
@@ -248,16 +312,32 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                 </div>
                 <div className="px-6 py-5 space-y-4">
                   <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-900">Subtotal</span>
+                    <span className="text-sm text-gray-900">{formatCurrency(invoice.subtotal)}</span>
+                  </div>
+                  {Number(invoice.tax_amount) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-900">Tax</span>
+                      <span className="text-sm text-gray-900">{formatCurrency(invoice.tax_amount)}</span>
+                    </div>
+                  )}
+                  {Number(invoice.discount_amount) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-900">Discount</span>
+                      <span className="text-sm text-gray-900">-{formatCurrency(invoice.discount_amount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                     <span className="text-sm font-medium text-gray-900">Total Amount</span>
-                    <span className="text-lg font-bold text-gray-900">{formatCurrency(invoice.amount)}</span>
+                    <span className="text-lg font-bold text-gray-900">{formatCurrency(totalAmount)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-900">Amount Paid</span>
-                    <span className="text-lg font-semibold text-green-600">{formatCurrency(paidAmount)}</span>
+                    <span className="text-lg font-semibold text-green-600">{formatCurrency(amountPaid)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                     <span className="text-sm font-medium text-gray-900">Remaining</span>
-                    <span className="text-xl font-bold text-purple-600">{formatCurrency(invoice.remaining_amount)}</span>
+                    <span className="text-xl font-bold text-purple-600">{formatCurrency(balanceDue)}</span>
                   </div>
 
                   {/* Progress Bar */}
@@ -267,9 +347,9 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                       <span className="text-xs font-semibold text-gray-900">{progressPercentage.toFixed(0)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${progressPercentage}%` }}
+                        style={{ width: `${Math.min(100, Math.max(0, progressPercentage))}%` }}
                       ></div>
                     </div>
                   </div>
@@ -297,15 +377,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                   >
                     View Tenant Profile
                   </Link>
-                  <button
-                    onClick={() => window.print()}
-                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50"
-                  >
-                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    Print Invoice
-                  </button>
+                  <PrintInvoiceButton />
                 </div>
               </div>
 
@@ -321,15 +393,25 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-900">Days Since Issue</span>
                       <span className="text-sm font-semibold text-gray-900">
-                        {Math.floor((new Date().getTime() - new Date(invoice.issue_date).getTime()) / (1000 * 60 * 60 * 24))} days
+                        {Math.floor(
+                          (new Date().getTime() - new Date(invoice.issue_date).getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        )}{' '}
+                        days
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-900">Days Until Due</span>
-                      <span className={`text-sm font-semibold ${
-                        new Date(invoice.due_date) < new Date() ? 'text-red-600' : 'text-gray-900'
-                      }`}>
-                        {Math.floor((new Date(invoice.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                      <span
+                        className={`text-sm font-semibold ${
+                          new Date(invoice.due_date) < new Date() ? 'text-red-600' : 'text-gray-900'
+                        }`}
+                      >
+                        {Math.floor(
+                          (new Date(invoice.due_date).getTime() - new Date().getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        )}{' '}
+                        days
                       </span>
                     </div>
                   </div>
@@ -345,4 +427,3 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
     notFound();
   }
 }
-
