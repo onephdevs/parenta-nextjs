@@ -162,61 +162,70 @@ export async function getDocuments(
 }
 
 // Get single document by ID
-export async function getDocumentById(id: string): Promise<Document | null> {
-  const query = `
-    SELECT 
-      d.*,
-      dc.name as category_name,
-      b.name as building_name,
-      r.room_number,
-      CONCAT(t.first_name, ' ', t.last_name) as tenant_name,
-      CONCAT(u.first_name, ' ', u.last_name) as uploader_name
-    FROM documents d
-    LEFT JOIN document_categories dc ON d.category_id = dc.id
-    LEFT JOIN buildings b ON d.building_id = b.id
-    LEFT JOIN rooms r ON d.room_id = r.id
-    LEFT JOIN tenants t ON d.tenant_id = t.id
-    LEFT JOIN users u ON d.uploaded_by = u.id
-    WHERE d.id = $1
-  `;
-
-  const result = await pool.query(query, [id]);
-  
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  const row = result.rows[0];
-  
+function mapDocumentRow(row: Record<string, unknown>): Document {
   return {
-    id: row.id,
-    categoryId: row.category_id,
-    buildingId: row.building_id,
-    roomId: row.room_id,
-    tenantId: row.tenant_id,
-    assetId: row.asset_id,
-    documentName: row.document_name,
-    fileName: row.file_name,
-    filePath: row.file_path,
-    fileSize: row.file_size,
-    mimeType: row.mime_type,
-    documentType: row.document_type,
-    description: row.description,
-    tags: row.tags || [],
-    isPublic: row.is_public,
-    expiryDate: row.expiry_date,
-    versionNumber: row.version_number,
-    previousVersionId: row.previous_version_id,
-    uploadedBy: row.uploaded_by,
-    accessLevel: row.access_level,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    categoryName: row.category_name,
-    buildingName: row.building_name,
-    roomNumber: row.room_number,
-    tenantName: row.tenant_name,
-    uploaderName: row.uploader_name,
+    id: row.id as string,
+    categoryId: row.category_id as string,
+    buildingId: row.building_id as string,
+    roomId: row.room_id as string,
+    tenantId: row.tenant_id as string,
+    assetId: row.asset_id as string,
+    documentName: row.document_name as string,
+    fileName: row.file_name as string,
+    filePath: row.file_path as string,
+    fileSize: row.file_size as number,
+    mimeType: row.mime_type as string,
+    documentType: row.document_type as string,
+    description: row.description as string,
+    tags: (row.tags as string[]) || [],
+    isPublic: row.is_public as boolean,
+    expiryDate: row.expiry_date as string,
+    versionNumber: row.version_number as number,
+    previousVersionId: row.previous_version_id as string,
+    uploadedBy: row.uploaded_by as string,
+    accessLevel: row.access_level as Document['accessLevel'],
+    createdAt: row.created_at as Date,
+    updatedAt: row.updated_at as Date,
+    categoryName: row.category_name as string,
+    buildingName: row.building_name as string,
+    roomNumber: row.room_number as string,
+    tenantName: row.tenant_name as string,
+    uploaderName: row.uploader_name as string,
   };
+}
+
+const DOCUMENT_SELECT = `
+  SELECT 
+    d.*,
+    dc.name as category_name,
+    b.name as building_name,
+    r.room_number,
+    CONCAT(t.first_name, ' ', t.last_name) as tenant_name,
+    CONCAT(u.first_name, ' ', u.last_name) as uploader_name
+  FROM documents d
+  LEFT JOIN document_categories dc ON d.category_id = dc.id
+  LEFT JOIN buildings b ON d.building_id = b.id
+  LEFT JOIN rooms r ON d.room_id = r.id
+  LEFT JOIN tenants t ON d.tenant_id = t.id
+  LEFT JOIN users u ON d.uploaded_by = u.id
+`;
+
+export async function getDocumentById(id: string): Promise<Document | null> {
+  const result = await pool.query(`${DOCUMENT_SELECT} WHERE d.id = $1`, [id]);
+  if (result.rows.length === 0) return null;
+  return mapDocumentRow(result.rows[0]);
+}
+
+/** Batched fetch — use instead of Promise.all(ids.map(getDocumentById)). */
+export async function getDocumentsByIds(ids: string[]): Promise<Document[]> {
+  if (ids.length === 0) return [];
+  const result = await pool.query(
+    `${DOCUMENT_SELECT} WHERE d.id = ANY($1::uuid[])`,
+    [ids]
+  );
+  const byId = new Map(result.rows.map((row) => [row.id as string, mapDocumentRow(row)]));
+  // Preserve request order; drop missing ids
+  return ids.map((id) => byId.get(id)).filter((d): d is Document => Boolean(d));
 }
 
 // Create new document

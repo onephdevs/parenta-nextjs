@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getAllDashboardMetrics } from '@/lib/services/dashboard-service';
+import {
+  cacheGet,
+  cacheSet,
+  DASHBOARD_METRICS_KEY,
+  DASHBOARD_TTL_MS,
+} from '@/lib/cache/memory-cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,11 +20,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const cached = cacheGet<Awaited<ReturnType<typeof getAllDashboardMetrics>>>(
+      DASHBOARD_METRICS_KEY
+    );
+    if (cached) {
+      return NextResponse.json({
+        success: true,
+        data: cached,
+        cached: true,
+      });
+    }
+
     const metrics = await getAllDashboardMetrics();
+    cacheSet(DASHBOARD_METRICS_KEY, metrics, DASHBOARD_TTL_MS);
 
     return NextResponse.json({
       success: true,
-      data: metrics
+      data: metrics,
+      cached: false,
     });
   } catch (error) {
     console.error('Error fetching dashboard metrics:', error);

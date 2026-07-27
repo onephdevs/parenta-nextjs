@@ -84,23 +84,44 @@ export async function generateMonthlyInvoicesForAllTenants(
     
     const tenantsResult = await client.query(query, params);
     const tenants = tenantsResult.rows;
-    
-    const results: BulkInvoiceResult[] = [];
-    let successful = 0;
-    let failed = 0;
-    
-    for (const tenant of tenants) {
-      try {
-        // Check if invoice for this month already exists
-        const existingInvoice = await client.query(
-          `SELECT id FROM invoices 
-           WHERE tenant_id = $1 
-           AND TO_CHAR(due_date, 'YYYY-MM') = $2
-           LIMIT 1`,
-          [tenant.tenant_id, targetMonth]
-        );
-        
-        if (existingInvoice.rows.length > 0) {
+
+    if (tenants.length === 0) {
+      return {
+        success: true,
+        total_tenants: 0,
+        successful: 0,
+        failed: 0,
+        results: [],
+      };
+    }
+
+    await client.query('BEGIN');
+
+    try {
+      const tenantIds = tenants.map((t: { tenant_id: string }) => t.tenant_id);
+
+      // One query: which tenants already have an invoice for target month
+      const existingResult = await client.query(
+        `SELECT DISTINCT tenant_id
+         FROM invoices
+         WHERE tenant_id = ANY($1::uuid[])
+           AND TO_CHAR(due_date, 'YYYY-MM') = $2`,
+        [tenantIds, targetMonth]
+      );
+      const alreadyInvoiced = new Set(
+        existingResult.rows.map((r: { tenant_id: string }) => r.tenant_id)
+      );
+
+      const toCreate = tenants.filter(
+        (t: { tenant_id: string }) => !alreadyInvoiced.has(t.tenant_id)
+      );
+
+      const results: BulkInvoiceResult[] = [];
+      let successful = 0;
+      let failed = 0;
+
+      for (const tenant of tenants) {
+        if (alreadyInvoiced.has(tenant.tenant_id)) {
           results.push({
             tenant_id: tenant.tenant_id,
             tenant_name: tenant.tenant_name,
@@ -110,64 +131,92 @@ export async function generateMonthlyInvoicesForAllTenants(
             error: `Invoice for ${targetMonth} already exists`,
           });
           failed++;
-          continue;
         }
-        
-        // Generate invoice number
-        const invoiceNumberResult = await client.query(
-          `SELECT 'INV-' || LPAD(CAST(COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) + 1 AS TEXT), 6, '0') AS next_number
+      }
+
+      if (toCreate.length > 0) {
+        // Reserve a contiguous block of invoice numbers in one query
+        const numberResult = await client.query(
+          `SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 5) AS INTEGER)), 0) AS max_num
            FROM invoices WHERE invoice_number LIKE 'INV-%'`
         );
-        const invoiceNumber = invoiceNumberResult.rows[0].next_number;
-        
-        // Calculate due date (first day of target month + 5 days)
+        let nextNum = parseInt(numberResult.rows[0].max_num, 10) || 0;
+
         const dueDate = new Date(targetDate);
         dueDate.setDate(5);
-        
-        // Create the invoice
-        const invoiceResult = await client.query(
+        const dueDateStr = dueDate.toISOString().slice(0, 10);
+
+        const insertValues: unknown[] = [];
+        const placeholders: string[] = [];
+        let p = 1;
+
+        for (const tenant of toCreate) {
+          nextNum += 1;
+          const invoiceNumber = `INV-${String(nextNum).padStart(6, '0')}`;
+          placeholders.push(
+            `($${p++}, $${p++}, 'sent', CURRENT_DATE, $${p++}, $${p++}, 0, $${p++})`
+          );
+          insertValues.push(
+            tenant.tenant_id,
+            invoiceNumber,
+            dueDateStr,
+            tenant.monthly_rent,
+            `Monthly rent for ${targetMonth}`
+          );
+        }
+
+        const insertResult = await client.query(
           `INSERT INTO invoices (
             tenant_id, invoice_number, invoice_status, issue_date, due_date,
             total_amount, amount_paid, description
-          ) VALUES ($1, $2, 'sent', CURRENT_DATE, $3, $4, 0, $5)
-          RETURNING id`,
-          [
-            tenant.tenant_id,
-            invoiceNumber,
-            dueDate.toISOString().slice(0, 10),
-            tenant.monthly_rent,
-            `Monthly rent for ${targetMonth}`,
-          ]
+          ) VALUES ${placeholders.join(', ')}
+          RETURNING id, tenant_id`,
+          insertValues
         );
-        
-        results.push({
-          tenant_id: tenant.tenant_id,
-          tenant_name: tenant.tenant_name,
-          success: true,
-          invoices_created: 1,
-          invoice_ids: [invoiceResult.rows[0].id],
-        });
-        successful++;
-      } catch (error) {
-        results.push({
-          tenant_id: tenant.tenant_id,
-          tenant_name: tenant.tenant_name,
-          success: false,
-          invoices_created: 0,
-          invoice_ids: [],
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        failed++;
+
+        const idsByTenant = new Map<string, string>();
+        for (const row of insertResult.rows) {
+          idsByTenant.set(row.tenant_id, row.id);
+        }
+
+        for (const tenant of toCreate) {
+          const id = idsByTenant.get(tenant.tenant_id);
+          if (id) {
+            results.push({
+              tenant_id: tenant.tenant_id,
+              tenant_name: tenant.tenant_name,
+              success: true,
+              invoices_created: 1,
+              invoice_ids: [id],
+            });
+            successful++;
+          } else {
+            results.push({
+              tenant_id: tenant.tenant_id,
+              tenant_name: tenant.tenant_name,
+              success: false,
+              invoices_created: 0,
+              invoice_ids: [],
+              error: 'Insert did not return id',
+            });
+            failed++;
+          }
+        }
       }
+
+      await client.query('COMMIT');
+
+      return {
+        success: failed === 0,
+        total_tenants: tenants.length,
+        successful,
+        failed,
+        results,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
     }
-    
-    return {
-      success: failed === 0,
-      total_tenants: tenants.length,
-      successful,
-      failed,
-      results,
-    };
   } finally {
     client.release();
   }

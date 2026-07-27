@@ -4,8 +4,6 @@
  */
 
 import pool from '@/lib/db';
-import { createUser } from '@/lib/db';
-import type { CreateUserData } from '@/types/auth.types';
 import bcrypt from 'bcryptjs';
 
 export interface CreateTenantWithUserData {
@@ -47,17 +45,26 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     
     // Generate password if not provided
     const password = data.password || generateRandomPassword();
-    
-    // Create user account
-    const userData: CreateUserData = {
-      email: data.email.toLowerCase().trim(),
-      password,
-      role: 'tenant',
-      firstName: data.firstName.trim(),
-      lastName: data.lastName.trim(),
-    };
-    
-    const user = await createUser(userData);
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const email = data.email.toLowerCase().trim();
+
+    // User INSERT on the same client so ROLLBACK undoes both user + tenant
+    let userId: string;
+    try {
+      const userResult = await client.query(
+        `INSERT INTO users (email, password_hash, role, first_name, last_name)
+         VALUES ($1, $2, 'tenant', $3, $4)
+         RETURNING id`,
+        [email, passwordHash, data.firstName.trim(), data.lastName.trim()]
+      );
+      userId = String(userResult.rows[0].id);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('duplicate key')) {
+        throw new Error('User with this email already exists');
+      }
+      throw error;
+    }
     
     // Create tenant profile linked to user
     const tenantQuery = `
@@ -87,10 +94,10 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     `;
     
     const tenantValues = [
-      user.id, // user_id
+      userId,
       data.firstName.trim(),
       data.lastName.trim(),
-      data.email.toLowerCase().trim(),
+      email,
       data.phone || null,
       data.dateOfBirth || null,
       data.emergencyContactName || null,
@@ -103,7 +110,7 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
       data.securityDeposit || null,
       data.leaseStartDate || null,
       data.leaseEndDate || null,
-      'pending', // Default status
+      'pending',
       data.notes || null,
       true,
     ];
@@ -113,16 +120,13 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     
     await client.query('COMMIT');
     
-    // TODO: Send invitation email if requested
     if (data.sendInvitation) {
-      // Implementation for sending invitation email
       console.log(`Invitation email would be sent to ${data.email} with password: ${password}`);
     }
     
     return {
-      userId: user.id,
+      userId,
       tenantId,
-      // Only return when we generated it so admins can hand it off once
       temporaryPassword: data.password ? undefined : password,
     };
     
@@ -191,8 +195,9 @@ export async function getTenantCompleteData(userId: string) {
       t.security_deposit,
       t.lease_start_date,
       t.lease_end_date,
+      t.move_in_date,
       
-      -- Current assignment
+      -- Current assignment (active and not past end date)
       tra.id as assignment_id,
       tra.start_date as assignment_start,
       tra.end_date as assignment_end,
@@ -202,6 +207,7 @@ export async function getTenantCompleteData(userId: string) {
       tra.utility_deposit_paid,
       tra.deposit_valid_until,
       tra.deposit_refundable,
+      tra.assignment_status,
       
       -- Room details
       r.id as room_id,
@@ -219,7 +225,15 @@ export async function getTenantCompleteData(userId: string) {
       b.postal_code
       
     FROM tenants t
-    LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id AND tra.assignment_status = 'active'
+    LEFT JOIN LATERAL (
+      SELECT *
+      FROM tenant_room_assignments tra2
+      WHERE tra2.tenant_id = t.id
+        AND tra2.assignment_status = 'active'
+        AND (tra2.end_date IS NULL OR tra2.end_date::date >= CURRENT_DATE)
+      ORDER BY tra2.start_date DESC
+      LIMIT 1
+    ) tra ON true
     LEFT JOIN rooms r ON tra.room_id = r.id
     LEFT JOIN buildings b ON r.building_id = b.id
     WHERE t.user_id = $1 AND t.is_active = true
@@ -231,6 +245,69 @@ export async function getTenantCompleteData(userId: string) {
   } catch (error) {
     console.error('Error fetching complete tenant data:', error);
     throw new Error(`Failed to fetch tenant data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Same payload as getTenantCompleteData, keyed by tenant profile id (for admin preview).
+ */
+export async function getTenantCompleteDataByTenantId(tenantId: string) {
+  const query = `
+    SELECT 
+      t.id as tenant_id,
+      t.first_name,
+      t.last_name,
+      t.email as tenant_email,
+      t.phone,
+      t.tenant_status,
+      t.security_deposit,
+      t.lease_start_date,
+      t.lease_end_date,
+      t.move_in_date,
+      tra.id as assignment_id,
+      tra.start_date as assignment_start,
+      tra.end_date as assignment_end,
+      tra.monthly_rate,
+      tra.deposit_paid,
+      tra.advance_paid,
+      tra.utility_deposit_paid,
+      tra.deposit_valid_until,
+      tra.deposit_refundable,
+      tra.assignment_status,
+      r.id as room_id,
+      r.room_number,
+      r.floor_number,
+      r.room_type,
+      b.id as building_id,
+      b.name as building_name,
+      b.address_line1,
+      b.address_line2,
+      b.city,
+      b.state,
+      b.postal_code
+    FROM tenants t
+    LEFT JOIN LATERAL (
+      SELECT *
+      FROM tenant_room_assignments tra2
+      WHERE tra2.tenant_id = t.id
+        AND tra2.assignment_status = 'active'
+        AND (tra2.end_date IS NULL OR tra2.end_date::date >= CURRENT_DATE)
+      ORDER BY tra2.start_date DESC
+      LIMIT 1
+    ) tra ON true
+    LEFT JOIN rooms r ON tra.room_id = r.id
+    LEFT JOIN buildings b ON r.building_id = b.id
+    WHERE t.id = $1 AND t.is_active = true
+  `;
+
+  try {
+    const result = await pool.query(query, [tenantId]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (error) {
+    console.error('Error fetching complete tenant data by tenant id:', error);
+    throw new Error(
+      `Failed to fetch tenant data: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 

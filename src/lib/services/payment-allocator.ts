@@ -5,21 +5,32 @@
  */
 
 import pool from '@/lib/db';
+import type { PoolClient } from 'pg';
 import { PaymentAllocationRequest, PaymentAllocationResult } from '@/types/financial';
 import { getUnpaidInvoicesForTenant, getUnpaidRentInvoicesForTenant } from './invoice-generator';
+import {
+  getTenantCreditBalance as getCreditBalanceFromApi,
+} from '@/lib/api/tenant-credits';
+import { getTenantDepositBalance as getDepositBalanceFromApi } from '@/lib/api/deposit-ledger';
 
 /**
  * Allocate a payment across unpaid invoices
  * Priority: Oldest invoices first (by due date)
  * Creates tenant credit for any excess amount
+ *
+ * Pass `externalClient` to join an outer transaction (caller owns BEGIN/COMMIT).
  */
 export async function allocatePaymentToInvoices(
-  request: PaymentAllocationRequest
+  request: PaymentAllocationRequest,
+  externalClient?: PoolClient
 ): Promise<PaymentAllocationResult> {
-  const client = await pool.connect();
+  const ownsClient = !externalClient;
+  const client = externalClient ?? (await pool.connect());
   
   try {
-    await client.query('BEGIN');
+    if (ownsClient) {
+      await client.query('BEGIN');
+    }
     
     const {
       paymentId,
@@ -211,7 +222,9 @@ export async function allocatePaymentToInvoices(
       [paymentId]
     );
 
-    await client.query('COMMIT');
+    if (ownsClient) {
+      await client.query('COMMIT');
+    }
 
     const totalAllocated = paymentAmount - remainingAmount;
 
@@ -226,11 +239,15 @@ export async function allocatePaymentToInvoices(
     };
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (ownsClient) {
+      await client.query('ROLLBACK');
+    }
     console.error('Error allocating payment:', error);
     throw error;
   } finally {
-    client.release();
+    if (ownsClient) {
+      client.release();
+    }
   }
 }
 
@@ -503,35 +520,17 @@ export async function applyDepositToInvoice(
 }
 
 /**
- * Get tenant's current credit balance
+ * Get tenant's current credit balance (delegates to tenant-credits API module)
  */
 export async function getTenantCreditBalance(tenantId: string): Promise<number> {
-  try {
-    const result = await pool.query(
-      'SELECT get_tenant_credit_balance($1) as balance',
-      [tenantId]
-    );
-    return parseFloat(result.rows[0].balance) || 0;
-  } catch (error) {
-    console.error('Error getting tenant credit balance:', error);
-    return 0;
-  }
+  return getCreditBalanceFromApi(tenantId);
 }
 
 /**
- * Get tenant's current deposit balance
+ * Get tenant's current deposit balance (delegates to deposit-ledger API module)
  */
 export async function getTenantDepositBalance(tenantId: string): Promise<number> {
-  try {
-    const result = await pool.query(
-      'SELECT get_tenant_deposit_balance($1) as balance',
-      [tenantId]
-    );
-    return parseFloat(result.rows[0].balance) || 0;
-  } catch (error) {
-    console.error('Error getting tenant deposit balance:', error);
-    return 0;
-  }
+  return getDepositBalanceFromApi(tenantId);
 }
 
 /**

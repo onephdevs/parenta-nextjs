@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { getDocumentById } from '@/lib/api/documents';
+import { getDocumentsByIds } from '@/lib/api/documents';
 import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
@@ -26,19 +26,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Fetch document details
-    const documents = await Promise.all(
-      documentIds.map(async (id: string) => {
-        try {
-          return await getDocumentById(id);
-        } catch (error) {
-          console.error(`Error fetching document ${id}:`, error);
-          return null;
-        }
-      })
-    );
-
-    const validDocuments = documents.filter(doc => doc !== null);
+    const validDocuments = await getDocumentsByIds(documentIds);
 
     if (validDocuments.length === 0) {
       return NextResponse.json({ 

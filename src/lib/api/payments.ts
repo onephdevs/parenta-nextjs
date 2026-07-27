@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import type { PoolClient } from 'pg';
 
 export interface Payment {
   id: string;
@@ -12,6 +13,8 @@ export interface Payment {
   dueDate?: Date;
   referenceNumber?: string;
   notes?: string;
+  receiptFilePath?: string;
+  receiptFileName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,7 +98,10 @@ const mapPaymentTypeToDb = (type: string): string => {
 };
 
 // Create a new payment
-export async function createPayment(paymentData: CreatePaymentData): Promise<Payment> {
+export async function createPayment(
+  paymentData: CreatePaymentData,
+  client?: PoolClient
+): Promise<Payment> {
   const query = `
     INSERT INTO payments (
       tenant_id, assignment_id, amount, payment_type, payment_method,
@@ -129,7 +135,8 @@ export async function createPayment(paymentData: CreatePaymentData): Promise<Pay
   ];
 
   try {
-    const result = await pool.query(query, values);
+    const executor = client ?? pool;
+    const result = await executor.query(query, values);
     const row = result.rows[0];
     const dbStatus = row.payment_status as string;
     const appStatus = dbStatus === 'paid' ? 'completed' : dbStatus === 'cancelled' ? 'failed' : dbStatus;
@@ -332,6 +339,8 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
       referenceNumber: row.reference_number,
       notes: row.notes,
+      receiptFilePath: row.receipt_file_path || undefined,
+      receiptFileName: row.receipt_file_name || undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       tenantName: `${row.first_name} ${row.last_name}`,

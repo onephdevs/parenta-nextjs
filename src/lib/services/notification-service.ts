@@ -148,15 +148,19 @@ export async function processNotificationQueue(
     );
     
     const notifications = result.rows;
+
+    if (notifications.length > 0) {
+      // Batch-claim as sending (one update instead of N)
+      await client.query(
+        `UPDATE notification_queue
+         SET status = 'sending', updated_at = CURRENT_TIMESTAMP
+         WHERE id = ANY($1::uuid[])`,
+        [notifications.map((n) => n.id)]
+      );
+    }
     
     for (const notification of notifications) {
       try {
-        // Update status to sending
-        await client.query(
-          'UPDATE notification_queue SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-          ['sending', notification.id]
-        );
-        
         // Send email
         const emailResult = await sendEmail({
           to: notification.recipient_email,
@@ -186,13 +190,9 @@ export async function processNotificationQueue(
           
           sent++;
         } else {
-          // Check retry count
-          const retryResult = await client.query(
-            'SELECT retry_count, max_retries FROM notification_queue WHERE id = $1',
-            [notification.id]
-          );
-          
-          const { retry_count, max_retries } = retryResult.rows[0];
+          // Check retry count — use row already loaded when possible
+          const retry_count = notification.retry_count ?? 0;
+          const max_retries = notification.max_retries ?? 3;
           
           if (retry_count >= max_retries) {
             // Max retries reached, mark as failed

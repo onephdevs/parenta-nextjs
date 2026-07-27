@@ -45,40 +45,59 @@ export async function getOverdueInvoicesForLateFees(
 }
 
 /**
- * Calculate late fees for all eligible invoices
+ * Calculate late fees for all eligible invoices (batched settings lookup)
  */
 export async function calculateAllLateFees(
   dbPool: Pool = pool
 ): Promise<LateFeeCalculationResult[]> {
   const overdueInvoices = await getOverdueInvoicesForLateFees(dbPool);
+  if (overdueInvoices.length === 0) return [];
+
+  const settingIds = [
+    ...new Set(
+      overdueInvoices
+        .map((i) => i.applicable_setting_id)
+        .filter(Boolean)
+    ),
+  ];
+
+  const settingsResult = await dbPool.query<LateFeeSettings>(
+    `SELECT * FROM late_fee_settings WHERE id = ANY($1::uuid[])`,
+    [settingIds]
+  );
+  const settingsById = new Map(
+    settingsResult.rows.map((s) => [String(s.id), s])
+  );
+
+  // Batch fee amounts: one DB function call still required per invoice
+  // (Postgres function calculate_late_fee), but settings are no longer N+1.
   const calculations: LateFeeCalculationResult[] = [];
-  
-  for (const invoice of overdueInvoices) {
-    const feeAmount = await calculateLateFeeForInvoice(
-      invoice.invoice_id,
-      invoice.applicable_setting_id,
-      dbPool
-    );
-    
-    if (feeAmount > 0) {
-      // Get the setting details
-      const settingResult = await dbPool.query<LateFeeSettings>(
-        'SELECT * FROM late_fee_settings WHERE id = $1',
-        [invoice.applicable_setting_id]
+
+  const feeResults = await Promise.all(
+    overdueInvoices.map(async (invoice) => {
+      const feeAmount = await calculateLateFeeForInvoice(
+        invoice.invoice_id,
+        invoice.applicable_setting_id,
+        dbPool
       );
-      
-      calculations.push({
-        invoice_id: invoice.invoice_id,
-        tenant_id: invoice.tenant_id,
-        fee_amount: feeAmount,
-        days_overdue: invoice.days_overdue,
-        original_amount: invoice.outstanding_amount,
-        calculation_method: settingResult.rows[0]?.fee_type || 'unknown',
-        setting_used: settingResult.rows[0],
-      });
-    }
+      return { invoice, feeAmount };
+    })
+  );
+
+  for (const { invoice, feeAmount } of feeResults) {
+    if (feeAmount <= 0) continue;
+    const setting = settingsById.get(String(invoice.applicable_setting_id));
+    calculations.push({
+      invoice_id: invoice.invoice_id,
+      tenant_id: invoice.tenant_id,
+      fee_amount: feeAmount,
+      days_overdue: invoice.days_overdue,
+      original_amount: invoice.outstanding_amount,
+      calculation_method: setting?.fee_type || 'unknown',
+      setting_used: setting,
+    });
   }
-  
+
   return calculations;
 }
 
