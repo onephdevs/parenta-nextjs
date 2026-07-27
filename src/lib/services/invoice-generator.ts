@@ -3,12 +3,8 @@
  * Automatically generates invoices for tenants based on lease terms
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { InvoiceGenerationRequest, InvoiceGenerationResult } from '@/types/financial';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * Generate invoices for a tenant based on their lease period
@@ -73,6 +69,7 @@ export async function generateInvoicesForTenant(
     
     // Generate invoices - ONLY rent invoices (deposits are never invoiced)
     const invoiceIds: string[] = [];
+    const invoices: Array<{ id: string; invoiceNumber: string; totalAmount: number }> = [];
     let invoiceCounter = 0;
 
     // Create advance as tenant credit if provided (advance is prepaid rent, not an invoice)
@@ -168,6 +165,11 @@ export async function generateInvoicesForTenant(
 
       const invoiceId = invoiceResult.rows[0].id;
       invoiceIds.push(invoiceId);
+      invoices.push({
+        id: invoiceId,
+        invoiceNumber,
+        totalAmount: invoiceAmount,
+      });
 
       // Create invoice line item (rent only)
       await client.query(
@@ -232,10 +234,16 @@ export async function generateInvoicesForTenant(
 
     await client.query('COMMIT');
 
+    const totalAmount = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+
     return {
       success: true,
       invoicesCreated: invoiceIds.length,
       invoiceIds,
+      invoices,
+      totalAmount,
+      firstInvoiceNumber: invoices[0]?.invoiceNumber,
+      lastInvoiceNumber: invoices[invoices.length - 1]?.invoiceNumber,
       depositRecorded,
       depositAmount: depositRecorded ? depositAmount : undefined,
       message: `Successfully generated ${invoiceIds.length} rent invoice(s) for ${tenant.first_name} ${tenant.last_name}${depositRecorded ? ` and recorded deposit of ₱${depositAmount}` : ''}`

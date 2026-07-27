@@ -3,12 +3,8 @@
  * Handles all deposit transaction operations
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { DepositTransaction, DepositLedgerSummary, CreateDepositTransactionData } from '@/types/financial';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * Get all deposit transactions for a tenant

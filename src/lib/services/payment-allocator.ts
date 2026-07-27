@@ -4,13 +4,9 @@
  * Handles excess payments as tenant credits
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { PaymentAllocationRequest, PaymentAllocationResult } from '@/types/financial';
 import { getUnpaidInvoicesForTenant, getUnpaidRentInvoicesForTenant } from './invoice-generator';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * Allocate a payment across unpaid invoices

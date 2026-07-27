@@ -3,14 +3,10 @@
  * One-time demo backfill to generate rent invoices for tenants with active leases but no existing rent invoices
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { generateInvoicesForTenant } from './invoice-generator';
 import { autoApplyAdvanceToUnpaidRentInvoices } from './payment-allocator';
 import { recalculateAllInvoiceStatusesForTenant } from './invoice-status-recalculator';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 export interface BackfillResult {
   tenantId: string;

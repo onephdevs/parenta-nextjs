@@ -2,11 +2,32 @@ import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import type { CreateUserData, User, DatabaseUser, UserRole } from '@/types/auth.types';
 
-// Create PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+/**
+ * Shared PostgreSQL pool (singleton).
+ * All runtime modules must import this — never create a second Pool.
+ * globalThis guard prevents duplicate pools under Next.js HMR.
+ */
+const connectionString = process.env.DATABASE_URL;
+const useSsl =
+  process.env.NODE_ENV === 'production' ||
+  Boolean(connectionString?.includes('supabase')) ||
+  Boolean(connectionString?.includes('vercel'));
+
+const globalForPg = globalThis as typeof globalThis & { __parentaPgPool?: Pool };
+
+const pool =
+  globalForPg.__parentaPgPool ??
+  new Pool({
+    connectionString,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    max: 10, // single PM2 process; keep conservative vs Supabase pooler limits
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000, // fail fast under exhaustion (default 0 waits forever)
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPg.__parentaPgPool = pool;
+}
 
 // Convert database user to app user format
 function mapDatabaseUserToUser(dbUser: DatabaseUser): User {
@@ -141,4 +162,6 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-export default pool; 
+export { pool };
+export default pool;
+ 

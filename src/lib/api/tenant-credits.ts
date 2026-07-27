@@ -3,12 +3,8 @@
  * Handles all tenant credit operations
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { TenantCredit, TenantCreditSummary, CreateTenantCreditData } from '@/types/financial';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * Get all credits for a tenant

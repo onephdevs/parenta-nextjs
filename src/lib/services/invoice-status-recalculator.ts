@@ -4,11 +4,7 @@
  * Ensures status is always system-derived (paid/partial/sent/overdue)
  */
 
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+import pool from '@/lib/db';
 
 export interface RecalculationResult {
   invoiceId: string;

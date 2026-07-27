@@ -4,13 +4,9 @@
  * Automatically applies available advance to newly created invoices
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { generateInvoicesForTenant } from './invoice-generator';
 import { autoApplyAdvanceToUnpaidRentInvoices } from './payment-allocator';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * Generate next month's rent invoice for a tenant with an active lease
