@@ -2,9 +2,13 @@
  * Invoice Status Recalculation Service
  * Recalculates invoice statuses based on payments and advance balances
  * Ensures status is always system-derived (paid/partial/sent/overdue)
+ *
+ * Batch-oriented: tenant/all-tenant paths load allocations/credits/deposits
+ * in set-based queries instead of per-invoice N+1 loops.
  */
 
 import pool from '@/lib/db';
+import type { PoolClient } from 'pg';
 
 export interface RecalculationResult {
   invoiceId: string;
@@ -22,111 +26,203 @@ export interface TenantRecalculationResult {
   results: RecalculationResult[];
 }
 
+interface InvoicePaymentTotalsRow {
+  id: string;
+  tenant_id: string;
+  invoice_number: string;
+  total_amount: string | number;
+  amount_paid: string | number;
+  balance_due: string | number;
+  invoice_status: string;
+  due_date: Date | string | null;
+  total_allocated: string | number;
+  total_advance: string | number;
+  total_deposit: string | number;
+}
+
+/** Pure status derivation — shared by single + batch paths for identical outcomes. */
+export function deriveInvoiceStatus(params: {
+  totalAmount: number;
+  totalPaid: number;
+  dueDate: Date | string | null;
+  now?: Date;
+}): { newStatus: string; balanceDue: number } {
+  const { totalAmount, totalPaid, dueDate, now = new Date() } = params;
+  const balanceDue = totalAmount - totalPaid;
+  const due = dueDate ? new Date(dueDate) : null;
+  const isOverdue = Boolean(due && due < now && balanceDue > 0);
+
+  let newStatus: string;
+  if (balanceDue <= 0) {
+    newStatus = 'paid';
+  } else if (totalPaid > 0) {
+    newStatus = isOverdue ? 'overdue' : 'partial';
+  } else {
+    newStatus = isOverdue ? 'overdue' : 'sent';
+  }
+
+  return { newStatus, balanceDue };
+}
+
+function rowToResult(row: InvoicePaymentTotalsRow, now: Date): RecalculationResult {
+  const totalPaid =
+    parseFloat(String(row.total_allocated || 0)) +
+    parseFloat(String(row.total_advance || 0)) +
+    parseFloat(String(row.total_deposit || 0));
+  const totalAmount = parseFloat(String(row.total_amount));
+  const oldStatus = row.invoice_status;
+  const { newStatus, balanceDue } = deriveInvoiceStatus({
+    totalAmount,
+    totalPaid,
+    dueDate: row.due_date,
+    now,
+  });
+  const updated =
+    oldStatus !== newStatus ||
+    Math.abs(parseFloat(String(row.amount_paid)) - totalPaid) > 0.01;
+
+  return {
+    invoiceId: row.id,
+    invoiceNumber: row.invoice_number,
+    oldStatus,
+    newStatus,
+    amountPaid: totalPaid,
+    balanceDue,
+    updated,
+  };
+}
+
 /**
- * Recalculate invoice status for a single invoice
+ * Load invoices + aggregated payment sources in one round-trip.
+ * When invoiceIds is provided, filters to those IDs; otherwise filters by tenantId.
  */
-export async function recalculateInvoiceStatus(invoiceId: string): Promise<RecalculationResult> {
+async function fetchInvoicePaymentTotals(
+  client: PoolClient,
+  filter: { invoiceIds?: string[]; tenantId?: string }
+): Promise<InvoicePaymentTotalsRow[]> {
+  const params: unknown[] = [];
+  let whereClause: string;
+  let allocFilter: string;
+  let creditFilter: string;
+  let depositFilter: string;
+
+  if (filter.invoiceIds && filter.invoiceIds.length > 0) {
+    params.push(filter.invoiceIds);
+    whereClause = `i.id = ANY($1::uuid[])`;
+    allocFilter = `WHERE invoice_id = ANY($1::uuid[])`;
+    creditFilter = `WHERE status = 'applied' AND applied_to_invoice_id = ANY($1::uuid[])`;
+    depositFilter = `WHERE transaction_type = 'applied' AND applied_to_invoice_id = ANY($1::uuid[])`;
+  } else if (filter.tenantId) {
+    params.push(filter.tenantId);
+    whereClause = `i.tenant_id = $1`;
+    allocFilter = `WHERE invoice_id IN (SELECT id FROM invoices WHERE tenant_id = $1)`;
+    creditFilter = `WHERE status = 'applied' AND applied_to_invoice_id IN (SELECT id FROM invoices WHERE tenant_id = $1)`;
+    depositFilter = `WHERE transaction_type = 'applied' AND applied_to_invoice_id IN (SELECT id FROM invoices WHERE tenant_id = $1)`;
+  } else {
+    whereClause = 'TRUE';
+    allocFilter = '';
+    creditFilter = `WHERE status = 'applied'`;
+    depositFilter = `WHERE transaction_type = 'applied'`;
+  }
+
+  const result = await client.query(
+    `
+    SELECT
+      i.id,
+      i.tenant_id,
+      i.invoice_number,
+      i.total_amount,
+      i.amount_paid,
+      i.balance_due,
+      i.invoice_status,
+      i.due_date,
+      COALESCE(pa.total_allocated, 0) AS total_allocated,
+      COALESCE(tc.total_advance, 0) AS total_advance,
+      COALESCE(dl.total_deposit, 0) AS total_deposit
+    FROM invoices i
+    LEFT JOIN (
+      SELECT invoice_id, SUM(allocated_amount) AS total_allocated
+      FROM payment_allocations
+      ${allocFilter}
+      GROUP BY invoice_id
+    ) pa ON pa.invoice_id = i.id
+    LEFT JOIN (
+      SELECT applied_to_invoice_id, SUM(amount) AS total_advance
+      FROM tenant_credits
+      ${creditFilter}
+      GROUP BY applied_to_invoice_id
+    ) tc ON tc.applied_to_invoice_id = i.id
+    LEFT JOIN (
+      SELECT applied_to_invoice_id, SUM(amount) AS total_deposit
+      FROM deposit_ledger
+      ${depositFilter}
+      GROUP BY applied_to_invoice_id
+    ) dl ON dl.applied_to_invoice_id = i.id
+    WHERE ${whereClause}
+    ORDER BY i.due_date ASC NULLS LAST, i.created_at ASC
+    `,
+    params
+  );
+
+  return result.rows as InvoicePaymentTotalsRow[];
+}
+
+async function applyRecalculationUpdates(
+  client: PoolClient,
+  results: RecalculationResult[]
+): Promise<void> {
+  const toUpdate = results.filter((r) => r.updated);
+  if (toUpdate.length === 0) return;
+
+  const ids = toUpdate.map((r) => r.invoiceId);
+  const amounts = toUpdate.map((r) => r.amountPaid);
+  const statuses = toUpdate.map((r) => r.newStatus);
+
+  await client.query(
+    `
+    UPDATE invoices AS i
+    SET
+      amount_paid = v.amount_paid,
+      invoice_status = v.invoice_status,
+      updated_at = CURRENT_TIMESTAMP
+    FROM (
+      SELECT *
+      FROM UNNEST($1::uuid[], $2::numeric[], $3::text[])
+        AS t(id, amount_paid, invoice_status)
+    ) AS v
+    WHERE i.id = v.id
+    `,
+    [ids, amounts, statuses]
+  );
+}
+
+/**
+ * Recalculate a set of invoices in one TX (batched reads + batched writes).
+ */
+export async function recalculateInvoiceStatusesForIds(
+  invoiceIds: string[]
+): Promise<RecalculationResult[]> {
+  if (invoiceIds.length === 0) return [];
+
   const client = await pool.connect();
-  
+  const now = new Date();
+
   try {
     await client.query('BEGIN');
-
-    // Get invoice details
-    const invoiceResult = await client.query(
-      `SELECT 
-        i.id,
-        i.invoice_number,
-        i.total_amount,
-        i.amount_paid,
-        i.balance_due,
-        i.invoice_status,
-        i.due_date
-      FROM invoices i
-      WHERE i.id = $1`,
-      [invoiceId]
-    );
-
-    if (invoiceResult.rows.length === 0) {
-      throw new Error(`Invoice not found: ${invoiceId}`);
+    const rows = await fetchInvoicePaymentTotals(client, { invoiceIds });
+    const foundIds = new Set(rows.map((r) => r.id));
+    for (const id of invoiceIds) {
+      if (!foundIds.has(id)) {
+        throw new Error(`Invoice not found: ${id}`);
+      }
     }
-
-    const invoice = invoiceResult.rows[0];
-    const oldStatus = invoice.invoice_status;
-
-    // Calculate actual amount_paid from payment allocations and advance applications
-    const paymentAllocationsResult = await client.query(
-      `SELECT COALESCE(SUM(allocated_amount), 0) as total_allocated
-       FROM payment_allocations
-       WHERE invoice_id = $1`,
-      [invoiceId]
-    );
-
-    const advanceApplicationsResult = await client.query(
-      `SELECT COALESCE(SUM(amount), 0) as total_advance
-       FROM tenant_credits
-       WHERE applied_to_invoice_id = $1
-         AND status = 'applied'`,
-      [invoiceId]
-    );
-
-    const depositApplicationsResult = await client.query(
-      `SELECT COALESCE(SUM(amount), 0) as total_deposit
-       FROM deposit_ledger
-       WHERE applied_to_invoice_id = $1
-         AND transaction_type = 'applied'`,
-      [invoiceId]
-    );
-
-    const totalPaid = 
-      parseFloat(paymentAllocationsResult.rows[0].total_allocated || 0) +
-      parseFloat(advanceApplicationsResult.rows[0].total_advance || 0) +
-      parseFloat(depositApplicationsResult.rows[0].total_deposit || 0);
-
-    const totalAmount = parseFloat(invoice.total_amount);
-    const balanceDue = totalAmount - totalPaid;
-
-    // Determine new status based on payment and due date
-    let newStatus: string;
-    const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-    const isOverdue = dueDate && dueDate < new Date() && balanceDue > 0;
-
-    if (balanceDue <= 0) {
-      newStatus = 'paid';
-    } else if (totalPaid > 0) {
-      newStatus = isOverdue ? 'overdue' : 'partial';
-    } else {
-      newStatus = isOverdue ? 'overdue' : 'sent';
-    }
-
-    // Update invoice if status or amount_paid changed
-    const updated = oldStatus !== newStatus || Math.abs(parseFloat(invoice.amount_paid) - totalPaid) > 0.01;
-
-    if (updated) {
-      await client.query(
-        `UPDATE invoices 
-         SET amount_paid = $1,
-             invoice_status = $2,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [totalPaid, newStatus, invoiceId]
-      );
-    }
-
+    const results = rows.map((row) => rowToResult(row, now));
+    await applyRecalculationUpdates(client, results);
     await client.query('COMMIT');
-
-    return {
-      invoiceId: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      oldStatus,
-      newStatus,
-      amountPaid: totalPaid,
-      balanceDue,
-      updated
-    };
-
+    return results;
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error recalculating invoice status:', error);
+    console.error('Error recalculating invoice statuses for ids:', error);
     throw error;
   } finally {
     client.release();
@@ -134,41 +230,36 @@ export async function recalculateInvoiceStatus(invoiceId: string): Promise<Recal
 }
 
 /**
- * Recalculate all invoice statuses for a tenant
+ * Recalculate invoice status for a single invoice
  */
-export async function recalculateAllInvoiceStatusesForTenant(tenantId: string): Promise<TenantRecalculationResult> {
+export async function recalculateInvoiceStatus(invoiceId: string): Promise<RecalculationResult> {
+  const results = await recalculateInvoiceStatusesForIds([invoiceId]);
+  return results[0];
+}
+
+/**
+ * Recalculate all invoice statuses for a tenant (single set-based query, not N+1)
+ */
+export async function recalculateAllInvoiceStatusesForTenant(
+  tenantId: string
+): Promise<TenantRecalculationResult> {
   const client = await pool.connect();
-  
+  const now = new Date();
+
   try {
-    // Get all invoices for tenant
-    const invoicesResult = await client.query(
-      `SELECT id FROM invoices WHERE tenant_id = $1 ORDER BY due_date ASC, created_at ASC`,
-      [tenantId]
-    );
-
-    const results: RecalculationResult[] = [];
-    let invoicesUpdated = 0;
-
-    for (const row of invoicesResult.rows) {
-      try {
-        const result = await recalculateInvoiceStatus(row.id);
-        results.push(result);
-        if (result.updated) {
-          invoicesUpdated++;
-        }
-      } catch (error) {
-        console.error(`Error recalculating invoice ${row.id}:`, error);
-        // Continue with other invoices
-      }
-    }
+    await client.query('BEGIN');
+    const rows = await fetchInvoicePaymentTotals(client, { tenantId });
+    const results = rows.map((row) => rowToResult(row, now));
+    await applyRecalculationUpdates(client, results);
+    await client.query('COMMIT');
 
     return {
       tenantId,
-      invoicesUpdated,
-      results
+      invoicesUpdated: results.filter((r) => r.updated).length,
+      results,
     };
-
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error recalculating invoice statuses for tenant:', error);
     throw error;
   } finally {
@@ -177,7 +268,7 @@ export async function recalculateAllInvoiceStatusesForTenant(tenantId: string): 
 }
 
 /**
- * Recalculate invoice statuses for all tenants (batch operation)
+ * Recalculate invoice statuses for all tenants (one set-based pass, not N×M)
  */
 export async function recalculateInvoiceStatusesForAllTenants(): Promise<{
   success: boolean;
@@ -186,37 +277,25 @@ export async function recalculateInvoiceStatusesForAllTenants(): Promise<{
   errors: Array<{ tenantId: string; error: string }>;
 }> {
   const client = await pool.connect();
-  
+  const now = new Date();
+
   try {
-    // Get all unique tenant IDs with invoices
-    const tenantsResult = await client.query(
-      `SELECT DISTINCT tenant_id FROM invoices ORDER BY tenant_id`
-    );
+    await client.query('BEGIN');
+    const rows = await fetchInvoicePaymentTotals(client, {});
+    const results = rows.map((row) => rowToResult(row, now));
+    await applyRecalculationUpdates(client, results);
+    await client.query('COMMIT');
 
-    const tenantIds = tenantsResult.rows.map(row => row.tenant_id);
-    let totalInvoicesUpdated = 0;
-    const errors: Array<{ tenantId: string; error: string }> = [];
-
-    for (const tenantId of tenantIds) {
-      try {
-        const result = await recalculateAllInvoiceStatusesForTenant(tenantId);
-        totalInvoicesUpdated += result.invoicesUpdated;
-      } catch (error) {
-        errors.push({
-          tenantId,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    }
+    const tenantIds = new Set(rows.map((r) => r.tenant_id));
 
     return {
       success: true,
-      totalTenants: tenantIds.length,
-      totalInvoicesUpdated,
-      errors
+      totalTenants: tenantIds.size,
+      totalInvoicesUpdated: results.filter((r) => r.updated).length,
+      errors: [],
     };
-
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error recalculating invoice statuses for all tenants:', error);
     throw error;
   } finally {

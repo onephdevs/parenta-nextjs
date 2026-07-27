@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-28  
 **Based on:** `SCALABILITY_AUDIT.md`  
-**Status:** APPROVED 2026-07-28 — Phase 3 Step 2 COMPLETE (single shared pool)  
+**Status:** APPROVED 2026-07-28 — Phase 3 Step 3a COMPLETE (invoice status recalc batched)  
 **Constraint:** Single Next.js deployable app. No microservices, API gateway, or service mesh.
 
 ---
