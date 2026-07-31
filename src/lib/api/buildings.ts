@@ -74,7 +74,14 @@ export async function getAllBuildings(options?: {
         b.*,
         COUNT(r.id) as total_units,
         SUM(CASE WHEN r.room_status = 'occupied' THEN 1 ELSE 0 END) as occupied_units,
-        SUM(CASE WHEN r.room_status = 'vacant' THEN 1 ELSE 0 END) as vacant_units
+        SUM(CASE WHEN r.room_status = 'vacant' THEN 1 ELSE 0 END) as vacant_units,
+        (
+          SELECT i.file_path
+          FROM images i
+          WHERE i.entity_type = 'building' AND i.entity_id = b.id
+          ORDER BY i.is_primary DESC, i.created_at ASC
+          LIMIT 1
+        ) AS primary_image_path
       FROM buildings b
       LEFT JOIN rooms r ON r.building_id = b.id AND r.is_active = true
       ${whereClause}
@@ -91,7 +98,8 @@ export async function getAllBuildings(options?: {
         ...building,
         totalUnits: parseInt(row.total_units) || 0,
         occupiedUnits: parseInt(row.occupied_units) || 0,
-        vacantUnits: parseInt(row.vacant_units) || 0
+        vacantUnits: parseInt(row.vacant_units) || 0,
+        primaryImagePath: (row.primary_image_path as string | null) || null,
       };
     });
 

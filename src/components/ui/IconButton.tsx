@@ -20,7 +20,7 @@ const variantStyles: Record<IconButtonVariant, string> = {
   ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
   outline: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
   danger: 'text-red-600 hover:bg-red-50 hover:text-red-800',
-  primary: 'text-purple-600 hover:bg-purple-50 hover:text-purple-800',
+  primary: 'text-[#111827] hover:bg-gray-100 hover:text-black',
 };
 
 const sizeStyles: Record<IconButtonSize, string> = {
@@ -56,7 +56,7 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         aria-busy={isLoading || undefined}
         className={cn(
           'inline-flex items-center justify-center rounded-md transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2',
           'disabled:pointer-events-none disabled:opacity-50',
           variantStyles[variant],
           sizeStyles[size],

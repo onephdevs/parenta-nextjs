@@ -15,7 +15,7 @@ import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
 interface AddBuildingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onBuildingAdded: () => void;
+  onBuildingAdded: (buildingId?: string) => void;
 }
 
 export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: AddBuildingModalProps) {
@@ -110,10 +110,12 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
       });
 
       onClose();
+      onBuildingAdded(result.data.id);
 
       setTimeout(() => {
-        router.push(`/admin/buildings/${result.data.id}`);
-      }, 1000);
+        router.push(`/admin/buildings?buildingId=${result.data.id}`);
+        router.refresh();
+      }, 400);
     } catch (err) {
       updateNotification(loadingNotificationId, {
         type: 'error',

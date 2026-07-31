@@ -18,6 +18,7 @@ interface AddRoomModalProps {
   buildings?: Building[];
   building?: Building;
   buildingId?: string;
+  onRoomAdded?: (roomId?: string) => void;
 }
 
 export default function AddRoomModal({
@@ -26,6 +27,7 @@ export default function AddRoomModal({
   buildings,
   building,
   buildingId,
+  onRoomAdded,
 }: AddRoomModalProps) {
   const buildingOptions = buildings || (building ? [building] : []);
   const router = useRouter();
@@ -111,10 +113,12 @@ export default function AddRoomModal({
       setAmenitiesInput('');
 
       onClose();
+      onRoomAdded?.(result.data.id);
 
       setTimeout(() => {
-        router.push(`/admin/rooms/${result.data.id}`);
-      }, 1000);
+        router.push(`/admin/rooms?roomId=${result.data.id}`);
+        router.refresh();
+      }, 400);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
 

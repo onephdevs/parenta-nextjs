@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -16,22 +16,7 @@ interface MenuItem {
 export default function AdminSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const [expandedSections, setExpandedSections] = useState<string[]>([
-    'Dashboard',
-    'Properties',
-    'Tenants',
-    'Financial',
-    'Bills & Expenses',
-    'Utilities'
-  ]);
-
-  const toggleSection = (sectionName: string) => {
-    setExpandedSections(prev =>
-      prev.includes(sectionName)
-        ? prev.filter(s => s !== sectionName)
-        : [...prev, sectionName]
-    );
-  };
+  const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
   const displayName =
     [session?.user?.firstName, session?.user?.lastName].filter(Boolean).join(' ') ||
@@ -334,19 +319,49 @@ export default function AdminSidebar() {
     },
   ];
 
+  // Expand only the section that owns the current route; everything else stays collapsed
+  useEffect(() => {
+    const activeParents = menuItems
+      .filter((item) =>
+        item.children?.some(
+          (child) => child.href && (pathname === child.href || pathname.startsWith(`${child.href}/`))
+        )
+      )
+      .map((item) => item.name);
+    setExpandedSections(activeParents);
+    // menuItems is stable module-level structure in this component render; pathname drives updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const toggleSection = (sectionName: string) => {
+    setExpandedSections((prev) =>
+      prev.includes(sectionName)
+        ? prev.filter((s) => s !== sectionName)
+        : [...prev, sectionName]
+    );
+  };
+
+  const sectionContainsActive = (item: MenuItem) =>
+    Boolean(
+      item.children?.some(
+        (child) => child.href && (pathname === child.href || pathname.startsWith(`${child.href}/`))
+      )
+    );
+
   const renderMenuItem = (item: MenuItem, depth: number = 0) => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedSections.includes(item.name);
     const active = item.href ? isActive(item.href) : false;
+    const parentActive = hasChildren ? sectionContainsActive(item) : false;
 
     if (hasChildren) {
       return (
         <div key={item.name}>
           <button
             onClick={() => toggleSection(item.name)}
-            className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              active
-                ? 'bg-purple-100 text-purple-900'
+            className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              parentActive
+                ? 'bg-gray-100 text-[#111827]'
                 : 'text-gray-900 hover:bg-gray-100 hover:text-gray-900'
             }`}
           >
@@ -355,7 +370,7 @@ export default function AdminSidebar() {
               <span>{item.name}</span>
             </span>
             <svg
-              className={`h-4 w-4 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
+              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -365,7 +380,7 @@ export default function AdminSidebar() {
           </button>
           {isExpanded && (
             <div className="mt-1 ml-4 space-y-1">
-              {item.children?.map(child => renderMenuItem(child, depth + 1))}
+              {item.children?.map((child) => renderMenuItem(child, depth + 1))}
             </div>
           )}
         </div>
@@ -376,11 +391,11 @@ export default function AdminSidebar() {
       <Link
         key={item.name}
         href={item.href!}
-        className={`flex items-center space-x-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+        className={`flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
           depth > 0 ? 'pl-8' : ''
         } ${
           active
-            ? 'bg-purple-100 text-purple-900'
+            ? 'bg-gray-100 text-[#111827]'
             : 'text-gray-900 hover:bg-gray-100 hover:text-gray-900'
         }`}
       >
@@ -410,11 +425,11 @@ export default function AdminSidebar() {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-sm font-semibold text-purple-600 uppercase">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold uppercase text-[#111827]">
               {session?.user?.firstName || session?.user?.lastName ? (
                 `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
               ) : (
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-6 w-6 text-[#111827]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               )}
