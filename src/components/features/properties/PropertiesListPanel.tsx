@@ -18,6 +18,7 @@ interface PropertiesListPanelProps {
   onSelectBuilding: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onSelectRoom: (buildingId: string, roomId: string) => void;
+  onViewRoom: (buildingId: string, roomId: string) => void;
   onBuildingAdded: (buildingId?: string) => void;
 }
 
@@ -31,6 +32,7 @@ export default function PropertiesListPanel({
   onSelectBuilding,
   onToggleExpand,
   onSelectRoom,
+  onViewRoom,
   onBuildingAdded,
 }: PropertiesListPanelProps) {
   const [search, setSearch] = useState('');
@@ -116,6 +118,7 @@ export default function PropertiesListPanel({
               onSelect={() => onSelectBuilding(building.id)}
               onToggleExpand={() => onToggleExpand(building.id)}
               onSelectRoom={(roomId) => onSelectRoom(building.id, roomId)}
+              onViewRoom={(roomId) => onViewRoom(building.id, roomId)}
             />
           ))
         )}

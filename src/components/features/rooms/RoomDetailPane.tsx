@@ -17,9 +17,15 @@ interface RoomDetailPaneProps {
   detail: RoomPageDetail | null;
   loading: boolean;
   error: string | null;
+  onViewRoomDetails?: (roomId: string) => void;
 }
 
-export default function RoomDetailPane({ detail, loading, error }: RoomDetailPaneProps) {
+export default function RoomDetailPane({
+  detail,
+  loading,
+  error,
+  onViewRoomDetails,
+}: RoomDetailPaneProps) {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-[#E2E5F7]" style={{ fontFamily: LATO }}>
       <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -39,19 +45,34 @@ export default function RoomDetailPane({ detail, loading, error }: RoomDetailPan
           <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white/60 text-center">
             <p className="text-base font-medium text-gray-800">Select a room</p>
             <p className="mt-1 max-w-sm text-sm text-gray-500">
-              Choose a room from the list to see its details and occupancy.
+              Choose a room from the list to open its details.
             </p>
           </div>
         )}
 
         {!loading && detail && (
           <div className="mx-auto max-w-[720px] space-y-6">
-            <BuildingSummaryCard detail={detail} />
-
             <div>
-              <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Room</p>
-              <PropertyRoomCard room={detail.room} isActive />
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-[16px] font-bold leading-none text-gray-900">Room</p>
+                {onViewRoomDetails && (
+                  <button
+                    type="button"
+                    onClick={() => onViewRoomDetails(detail.room.id)}
+                    className="text-[12px] font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    View full details
+                  </button>
+                )}
+              </div>
+              <PropertyRoomCard
+                room={detail.room}
+                isActive
+                onViewDetails={onViewRoomDetails}
+              />
             </div>
+
+            <BuildingSummaryCard detail={detail} />
           </div>
         )}
       </div>
@@ -69,14 +90,14 @@ function BuildingSummaryCard({ detail }: { detail: RoomPageDetail }) {
     <div>
       <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Property</p>
       <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-col md:flex-row">
-          <div className="relative h-36 w-full flex-shrink-0 bg-gray-100 md:h-auto md:w-[200px]">
+        <div className="flex flex-col sm:flex-row">
+          <div className="relative h-28 w-full flex-shrink-0 bg-gray-100 sm:h-auto sm:w-[160px]">
             {hero ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={hero} alt={building.name} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full min-h-[9rem] items-center justify-center text-gray-400">
-                <Building2 className="h-8 w-8" />
+              <div className="flex h-full min-h-[7rem] items-center justify-center text-gray-400">
+                <Building2 className="h-7 w-7" />
               </div>
             )}
           </div>
@@ -84,16 +105,11 @@ function BuildingSummaryCard({ detail }: { detail: RoomPageDetail }) {
           <div className="flex flex-1 flex-col gap-2 p-4">
             <Link
               href={`/admin/buildings?buildingId=${building.id}`}
-              className="text-[20px] font-bold leading-none text-gray-900 hover:underline"
+              className="text-[16px] font-bold leading-none text-gray-900 hover:underline"
             >
-              {building.name}, {address}
+              {building.name}
             </Link>
-
-            {building.description && (
-              <p className="line-clamp-2 text-[12px] font-normal leading-none text-gray-500">
-                {building.description}
-              </p>
-            )}
+            <p className="text-[12px] font-normal leading-snug text-gray-500">{address}</p>
 
             <a
               href={mapsHref}

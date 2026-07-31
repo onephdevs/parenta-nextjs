@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import AddRoomModal from '@/components/features/AddRoomModal';
 import type { Building } from '@/types/database';
@@ -51,6 +51,11 @@ export default function RoomsListPanel({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [buildingFilter, setBuildingFilter] = useState('all');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const selectedRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedRoomId]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -141,6 +146,7 @@ export default function RoomsListPanel({
               return (
                 <button
                   key={room.id}
+                  ref={isSelected ? selectedRef : undefined}
                   type="button"
                   onClick={() => onSelectRoom(room.id)}
                   className={cn(

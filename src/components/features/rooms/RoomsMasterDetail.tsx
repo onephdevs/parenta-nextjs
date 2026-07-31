@@ -6,6 +6,7 @@ import type { Building } from '@/types/database';
 import type { RoomPageDetail, RoomsPageListItem } from '@/lib/api/properties';
 import RoomsListPanel from './RoomsListPanel';
 import RoomDetailPane from './RoomDetailPane';
+import RoomDetailsModal from './RoomDetailsModal';
 
 interface RoomsMasterDetailProps {
   initialRooms: RoomsPageListItem[];
@@ -28,6 +29,8 @@ export default function RoomsMasterDetail({
   const [detail, setDetail] = useState<RoomPageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [modalRoomId, setModalRoomId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const syncUrl = useCallback(
     (roomId: string | null) => {
@@ -63,26 +66,35 @@ export default function RoomsMasterDetail({
     }
   }, []);
 
+  const openRoomModal = useCallback((roomId: string) => {
+    setModalRoomId(roomId);
+    setModalOpen(true);
+  }, []);
+
+  const closeRoomModal = useCallback(() => {
+    setModalOpen(false);
+  }, []);
+
   const refreshRoomsList = useCallback(async () => {
     try {
-      // Reuse buildings properties list via full page refresh for freshest list data
       router.refresh();
       const response = await fetch('/api/rooms?limit=1000', { credentials: 'include' });
       const json = await response.json();
       if (response.ok && json.success && Array.isArray(json.data)) {
-        // Fallback shape from /api/rooms may lack tenantName — keep existing enrichment when possible
         setRooms((prev) => {
           const byId = new Map(prev.map((r) => [r.id, r]));
-          return (json.data as Array<{
-            id: string;
-            buildingId: string;
-            buildingName?: string;
-            roomNumber: string;
-            roomType: string;
-            roomStatus: string;
-            squareFootage?: number;
-            monthlyRate: number;
-          }>).map((r) => {
+          return (
+            json.data as Array<{
+              id: string;
+              buildingId: string;
+              buildingName?: string;
+              roomNumber: string;
+              roomType: string;
+              roomStatus: string;
+              squareFootage?: number;
+              monthlyRate: number;
+            }>
+          ).map((r) => {
             const existing = byId.get(r.id);
             return {
               id: r.id,
@@ -119,9 +131,19 @@ export default function RoomsMasterDetail({
     void loadDetail(selectedRoomId);
   }, [selectedRoomId, loadDetail]);
 
+  // Deep-link: open modal once when landing with ?roomId=
+  useEffect(() => {
+    if (initialRoomId) {
+      openRoomModal(initialRoomId);
+    }
+    // Only on mount for the initial deep link
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSelectRoom = (roomId: string) => {
     setSelectedRoomId(roomId);
     syncUrl(roomId);
+    openRoomModal(roomId);
   };
 
   const handleRoomAdded = async (roomId?: string) => {
@@ -129,6 +151,7 @@ export default function RoomsMasterDetail({
     if (roomId) {
       setSelectedRoomId(roomId);
       syncUrl(roomId);
+      openRoomModal(roomId);
     }
   };
 
@@ -144,7 +167,21 @@ export default function RoomsMasterDetail({
         />
       </div>
 
-      <RoomDetailPane detail={detail} loading={detailLoading} error={detailError} />
+      <RoomDetailPane
+        detail={detail}
+        loading={detailLoading}
+        error={detailError}
+        onViewRoomDetails={openRoomModal}
+      />
+
+      <RoomDetailsModal
+        isOpen={modalOpen}
+        roomId={modalRoomId}
+        onClose={closeRoomModal}
+        initialDetail={
+          detail && modalRoomId && detail.room.id === modalRoomId ? detail : null
+        }
+      />
     </div>
   );
 }

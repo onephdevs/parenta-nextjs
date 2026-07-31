@@ -16,6 +16,7 @@ interface PropertyDetailPaneProps {
   scrollNonce?: number | null;
   onBuildingUpdated: () => void;
   onBuildingDeleted: () => void;
+  onViewRoomDetails?: (roomId: string) => void;
 }
 
 export default function PropertyDetailPane({
@@ -27,6 +28,7 @@ export default function PropertyDetailPane({
   scrollNonce = null,
   onBuildingUpdated,
   onBuildingDeleted,
+  onViewRoomDetails,
 }: PropertyDetailPaneProps) {
   useEffect(() => {
     if (!scrollToRoomId || loading || !detail) return;
@@ -85,6 +87,7 @@ export default function PropertyDetailPane({
                       key={room.id}
                       room={room}
                       isActive={activeRoomId === room.id}
+                      onViewDetails={onViewRoomDetails}
                     />
                   ))}
                 </div>

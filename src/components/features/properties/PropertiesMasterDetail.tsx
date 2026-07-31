@@ -9,6 +9,7 @@ import type {
 } from '@/lib/api/properties';
 import PropertiesListPanel from './PropertiesListPanel';
 import PropertyDetailPane from './PropertyDetailPane';
+import RoomDetailsModal from '@/components/features/rooms/RoomDetailsModal';
 
 interface PropertiesMasterDetailProps {
   initialBuildings: PropertyListBuilding[];
@@ -38,6 +39,8 @@ export default function PropertiesMasterDetail({
   const [scrollRequest, setScrollRequest] = useState<{ roomId: string; nonce: number } | null>(
     null
   );
+  const [modalRoomId, setModalRoomId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const syncUrl = useCallback(
     (buildingId: string | null) => {
@@ -141,6 +144,17 @@ export default function PropertiesMasterDetail({
     }
   };
 
+  const openRoomModal = (roomId: string) => {
+    setActiveRoomId(roomId);
+    setModalRoomId(roomId);
+    setModalOpen(true);
+  };
+
+  const handleViewRoom = (buildingId: string, roomId: string) => {
+    handleSelectRoom(buildingId, roomId);
+    openRoomModal(roomId);
+  };
+
   const handleToggleExpand = (id: string) => {
     setExpandedBuildingId((prev) => (prev === id ? null : id));
     if (!roomsByBuilding[id] && id !== selectedBuildingId) {
@@ -210,6 +224,7 @@ export default function PropertiesMasterDetail({
           onSelectBuilding={handleSelectBuilding}
           onToggleExpand={handleToggleExpand}
           onSelectRoom={handleSelectRoom}
+          onViewRoom={handleViewRoom}
           onBuildingAdded={handleBuildingAdded}
         />
       </div>
@@ -223,6 +238,13 @@ export default function PropertiesMasterDetail({
         scrollNonce={scrollRequest?.nonce ?? null}
         onBuildingUpdated={handleBuildingUpdated}
         onBuildingDeleted={handleBuildingDeleted}
+        onViewRoomDetails={openRoomModal}
+      />
+
+      <RoomDetailsModal
+        isOpen={modalOpen}
+        roomId={modalRoomId}
+        onClose={() => setModalOpen(false)}
       />
     </div>
   );

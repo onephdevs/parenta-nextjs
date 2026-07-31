@@ -7,7 +7,6 @@ import {
   Download,
   FileText,
   Maximize2,
-  Pencil,
   UserRoundSearch,
 } from 'lucide-react';
 import type { PropertyRoomDetail, PropertyRoomDocument } from '@/lib/api/properties';
@@ -28,6 +27,10 @@ const PANEL_BG = '#252A45';
 interface PropertyRoomCardProps {
   room: PropertyRoomDetail;
   isActive?: boolean;
+  /** Hide the pencil control (e.g. when already inside a details modal). */
+  hideEdit?: boolean;
+  /** Open room details without navigating away. */
+  onViewDetails?: (roomId: string) => void;
 }
 
 function formatFileSize(bytes?: number): string {
@@ -88,6 +91,7 @@ function RoomDocumentsList({ documents }: { documents: PropertyRoomDocument[] })
             <a
               href={`/api/documents/${doc.id}/download`}
               download
+              onClick={(e) => e.stopPropagation()}
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-50 hover:text-gray-700"
               title={`Download ${doc.documentName || doc.fileName}`}
             >
@@ -100,7 +104,12 @@ function RoomDocumentsList({ documents }: { documents: PropertyRoomDocument[] })
   );
 }
 
-export default function PropertyRoomCard({ room, isActive = false }: PropertyRoomCardProps) {
+export default function PropertyRoomCard({
+  room,
+  isActive = false,
+  hideEdit = false,
+  onViewDetails,
+}: PropertyRoomCardProps) {
   const displayStatus = toDisplayRoomStatus(room.roomStatus);
   const isOccupied = displayStatus === 'occupied' && room.tenant;
   const { bedroomsLabel, bathroomsLabel } = getRoomTypeStats(room.roomType);
@@ -122,9 +131,23 @@ export default function PropertyRoomCard({ room, isActive = false }: PropertyRoo
   return (
     <div
       id={`property-room-${room.id}`}
+      role={onViewDetails ? 'button' : undefined}
+      tabIndex={onViewDetails ? 0 : undefined}
+      onClick={onViewDetails ? () => onViewDetails(room.id) : undefined}
+      onKeyDown={
+        onViewDetails
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onViewDetails(room.id);
+              }
+            }
+          : undefined
+      }
       className={cn(
         'scroll-mt-4 overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)] transition-shadow',
-        isActive && 'ring-2 ring-blue-400'
+        isActive && 'ring-2 ring-blue-400',
+        onViewDetails && 'cursor-pointer hover:shadow-[0_6px_28px_rgba(15,23,42,0.12)]'
       )}
       style={{ fontFamily: LATO }}
     >
@@ -133,13 +156,19 @@ export default function PropertyRoomCard({ room, isActive = false }: PropertyRoo
         <div className="flex flex-1 flex-col p-4">
           <div className="flex items-start justify-between gap-2">
             <h4 className="text-[24px] font-bold leading-none text-gray-900">{room.roomNumber}</h4>
-            <Link
-              href={`/admin/rooms/${room.id}`}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-              title="Edit room"
-            >
-              <Pencil className="h-4 w-4" />
-            </Link>
+            {!hideEdit && onViewDetails && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewDetails(room.id);
+                }}
+                className="rounded px-2.5 py-1.5 text-[12px] font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                title="View room details"
+              >
+                View room
+              </button>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] font-normal leading-none text-gray-600">
@@ -251,6 +280,7 @@ export default function PropertyRoomCard({ room, isActive = false }: PropertyRoo
 
                 <Link
                   href={`/admin/tenants/${room.tenant.tenantId}`}
+                  onClick={(e) => e.stopPropagation()}
                   className="mx-auto flex h-[38px] w-[176px] items-center justify-center rounded bg-[#F5C518] px-4 text-center text-[12px] font-bold leading-none text-gray-900 hover:bg-[#e6b800]"
                 >
                   View Tenant Profile
@@ -285,7 +315,7 @@ export default function PropertyRoomCard({ room, isActive = false }: PropertyRoo
             ) : (
               <div className="relative flex min-h-[11rem] flex-col items-center justify-center gap-3 p-6 text-center">
                 <UserRoundSearch className="h-12 w-12 text-white/80" strokeWidth={1.5} />
-                <p className="text-[24px] font-bold leading-none tracking-wide">VACANT</p>
+                <p className="text-[16px] font-bold leading-none tracking-wide">VACANT</p>
                 <div className="absolute bottom-4 left-3 right-3 rounded bg-[#C4A35A] px-3 py-2 text-[12px] font-normal leading-none text-[#3a2f12]">
                   No pending applications
                 </div>

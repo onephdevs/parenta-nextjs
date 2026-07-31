@@ -2,6 +2,11 @@ import pool from '@/lib/db';
 import type { Building, DatabaseBuilding } from '@/types/database';
 import { normalizeAmenities } from '@/lib/format/amenities';
 import { getImagesByEntity } from '@/lib/api/images';
+import {
+  getRoomAssignmentHistory,
+  getRoomFinancialSummary,
+  getRoomOccupancyMetrics,
+} from '@/lib/api/rooms';
 
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
@@ -70,15 +75,46 @@ export interface PropertyRoomDetail {
   id: string;
   roomNumber: string;
   roomType: string;
+  floorNumber?: number;
   squareFootage?: number;
   monthlyRate: number;
+  depositAmount?: number;
   roomStatus: string;
   amenities: string[];
   description?: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   tenant: PropertyRoomTenant | null;
   occupants: PropertyRoomOccupant[];
   images: PropertyRoomImage[];
   documents: PropertyRoomDocument[];
+}
+
+export interface RoomFinancialSummary {
+  totalPayments: number;
+  overdueAmount: number;
+  pendingAmount: number;
+  currentMonthlyRate: number;
+  currentAssignmentStart: string | Date | null;
+  depositReceived: number;
+}
+
+export interface RoomOccupancyMetrics {
+  totalAssignments: number;
+  totalOccupiedDays: number;
+  avgAssignmentLength: number;
+  occupancyRatePercent: number;
+}
+
+export interface RoomAssignmentHistoryItem {
+  id: string;
+  tenantId: string | null;
+  tenantName: string;
+  tenantEmail?: string | null;
+  startDate: string | Date;
+  endDate?: string | Date | null;
+  monthlyRate: number;
+  assignmentStatus: string;
 }
 
 export interface PropertyBuildingDetail {
@@ -333,11 +369,16 @@ export async function getPropertyBuildingDetail(
       id: r.id,
       roomNumber: r.room_number,
       roomType: r.room_type,
+      floorNumber: r.floor_number ?? undefined,
       squareFootage: r.square_footage ?? undefined,
       monthlyRate: parseFloat(r.monthly_rate) || 0,
+      depositAmount:
+        r.deposit_amount != null ? parseFloat(r.deposit_amount) || 0 : undefined,
       roomStatus: r.room_status,
       amenities: normalizeAmenities(r.amenities),
       description: r.description ?? undefined,
+      createdAt: r.created_at ?? undefined,
+      updatedAt: r.updated_at ?? undefined,
       tenant,
       occupants: occupantsByRoom.get(r.id) || [],
       images: imagesByRoom.get(r.id) || [],
@@ -377,6 +418,9 @@ export interface RoomPageDetail {
     totalUnits: number;
   };
   buildingImages: PropertyRoomImage[];
+  financialSummary: RoomFinancialSummary;
+  occupancyMetrics: RoomOccupancyMetrics;
+  assignmentHistory: RoomAssignmentHistoryItem[];
 }
 
 function mapRoomRowToPropertyRoomDetail(
@@ -408,11 +452,16 @@ function mapRoomRowToPropertyRoomDetail(
     id: r.id as string,
     roomNumber: r.room_number as string,
     roomType: r.room_type as string,
+    floorNumber: (r.floor_number as number | null) ?? undefined,
     squareFootage: (r.square_footage as number | null) ?? undefined,
     monthlyRate: parseFloat(String(r.monthly_rate)) || 0,
+    depositAmount:
+      r.deposit_amount != null ? parseFloat(String(r.deposit_amount)) || 0 : undefined,
     roomStatus: r.room_status as string,
     amenities: normalizeAmenities(r.amenities),
     description: (r.description as string | null) ?? undefined,
+    createdAt: (r.created_at as string | Date | null) ?? undefined,
+    updatedAt: (r.updated_at as string | Date | null) ?? undefined,
     tenant,
     occupants,
     images,
@@ -540,7 +589,15 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
 
   const tenantId = (row.tenant_id as string | null) || null;
 
-  const [occupantsResult, roomImages, buildingImages, docsResult] = await Promise.all([
+  const [
+    occupantsResult,
+    roomImages,
+    buildingImages,
+    docsResult,
+    financialRaw,
+    occupancyRaw,
+    historyRaw,
+  ] = await Promise.all([
     pool.query(
       `
       SELECT id, room_id, first_name, last_name, relationship_to_tenant
@@ -571,6 +628,9 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       `,
       [roomId, tenantId]
     ),
+    getRoomFinancialSummary(roomId),
+    getRoomOccupancyMetrics(roomId),
+    getRoomAssignmentHistory(roomId),
   ]);
 
   const occupants: PropertyRoomOccupant[] = occupantsResult.rows.map((occ) => ({
@@ -627,6 +687,39 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     updatedAt: row.building_updated_at,
   };
 
+  const financialSummary: RoomFinancialSummary = {
+    totalPayments: parseFloat(String(financialRaw.total_payments)) || 0,
+    overdueAmount: parseFloat(String(financialRaw.overdue_amount)) || 0,
+    pendingAmount: parseFloat(String(financialRaw.pending_amount)) || 0,
+    currentMonthlyRate: parseFloat(String(financialRaw.current_monthly_rate)) || 0,
+    currentAssignmentStart: financialRaw.current_assignment_start ?? null,
+    depositReceived: parseFloat(String(financialRaw.deposit_received)) || 0,
+  };
+
+  const occupancyMetrics: RoomOccupancyMetrics = {
+    totalAssignments: occupancyRaw.total_assignments || 0,
+    totalOccupiedDays: occupancyRaw.total_occupied_days || 0,
+    avgAssignmentLength: occupancyRaw.avg_assignment_length || 0,
+    occupancyRatePercent: occupancyRaw.occupancy_rate_percent || 0,
+  };
+
+  const assignmentHistory: RoomAssignmentHistoryItem[] = (historyRaw || [])
+    .slice(0, 5)
+    .map((item: Record<string, unknown>) => {
+      const displayName = String(item.display_name || '').trim();
+      const fallbackName = `${item.first_name || ''} ${item.last_name || ''}`.trim();
+      return {
+        id: item.id as string,
+        tenantId: (item.live_tenant_id as string | null) ?? (item.tenant_id as string | null) ?? null,
+        tenantName: displayName || fallbackName || 'Unknown tenant',
+        tenantEmail: (item.display_email as string | null) ?? (item.email as string | null) ?? null,
+        startDate: item.start_date as string | Date,
+        endDate: (item.end_date as string | Date | null) ?? null,
+        monthlyRate: parseFloat(String(item.monthly_rate)) || 0,
+        assignmentStatus: String(item.assignment_status || ''),
+      };
+    });
+
   return {
     room,
     building,
@@ -635,5 +728,8 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       filePath: img.filePath,
       isPrimary: img.isPrimary,
     })),
+    financialSummary,
+    occupancyMetrics,
+    assignmentHistory,
   };
 }

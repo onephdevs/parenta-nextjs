@@ -26,6 +26,7 @@ interface PropertyListCardProps {
   onSelect: () => void;
   onToggleExpand: () => void;
   onSelectRoom: (roomId: string) => void;
+  onViewRoom: (roomId: string) => void;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -54,6 +55,7 @@ export default function PropertyListCard({
   onSelect,
   onToggleExpand,
   onSelectRoom,
+  onViewRoom,
 }: PropertyListCardProps) {
   const address = formatBuildingAddress(building);
   const thumb = building.primaryImagePath
@@ -150,34 +152,49 @@ export default function PropertyListCard({
               const area = formatArea(room.squareFootage) ?? '—';
 
               return (
-                <button
+                <div
                   key={room.id}
-                  type="button"
-                  onClick={() => {
-                    onSelect();
-                    onSelectRoom(room.id);
-                  }}
                   className={cn(
-                    'flex w-full items-start justify-between gap-3 border-b border-gray-100 py-3 text-left last:border-b-0 transition-colors',
+                    'flex w-full items-start gap-2 border-b border-gray-100 py-3 last:border-b-0 transition-colors',
                     activeRoomId === room.id ? 'bg-[#E2E5F7]/70' : 'hover:bg-gray-50'
                   )}
                   style={{ fontFamily: LATO }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-bold leading-none text-gray-900">
-                      {room.roomNumber}
-                    </p>
-                    <p className="mt-1.5 truncate text-[12px] font-normal leading-none text-gray-500">
-                      {tenantName}
-                    </p>
-                  </div>
-                  <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                    <StatusBadge status={room.roomStatus} />
-                    <span className="text-[12px] font-normal leading-none text-gray-500">
-                      {area}
-                    </span>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect();
+                      onSelectRoom(room.id);
+                    }}
+                    className="flex min-w-0 flex-1 items-start justify-between gap-3 px-0 text-left"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-bold leading-none text-gray-900">
+                        {room.roomNumber}
+                      </p>
+                      <p className="mt-1.5 truncate text-[12px] font-normal leading-none text-gray-500">
+                        {tenantName}
+                      </p>
+                    </div>
+                    <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                      <StatusBadge status={room.roomStatus} />
+                      <span className="text-[12px] font-normal leading-none text-gray-500">
+                        {area}
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect();
+                      onViewRoom(room.id);
+                    }}
+                    className="mt-0.5 flex-shrink-0 rounded px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    View
+                  </button>
+                </div>
               );
             })}
         </div>
