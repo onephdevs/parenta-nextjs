@@ -5,7 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import pool from '@/lib/db';
-import { formatActivityDescription, isActivityCategory } from '@/lib/services/activity-taxonomy';
+import {
+  formatActivityDescription,
+  formatActorName,
+  isActivityCategory,
+} from '@/lib/services/activity-taxonomy';
 
 export async function GET(request: NextRequest) {
   try {
@@ -97,9 +101,12 @@ export async function GET(request: NextRequest) {
 
     const items = listResult.rows.map((row) => {
       const actorName =
-        row.first_name || row.last_name
-          ? `${row.first_name || ''} ${row.last_name || ''}`.trim()
-          : row.email || (row.actor_role === 'system' ? 'System' : 'Unknown');
+        formatActorName({
+          firstName: row.first_name,
+          lastName: row.last_name,
+          email: row.email,
+          actorRole: row.actor_role,
+        }) || 'Unknown';
       return {
         id: row.id,
         actorUserId: row.actor_user_id,

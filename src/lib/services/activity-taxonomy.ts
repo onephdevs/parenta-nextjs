@@ -158,6 +158,23 @@ export function getActionTitle(actionType: string): string {
   return `${entity.replace(/_/g, ' ')} ${verb.replace(/_/g, ' ')}`;
 }
 
+/**
+ * Build an actor display name from a users row. Always resolve this at read
+ * time so renamed users are reflected in historical activity and notifications.
+ */
+export function formatActorName(params: {
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  actorRole?: string | null;
+}): string | null {
+  const name = `${params.firstName || ''} ${params.lastName || ''}`.trim();
+  if (name) return name;
+  if (params.email) return params.email;
+  if (params.actorRole === 'system') return 'System';
+  return null;
+}
+
 export function formatActivityDescription(params: {
   actionType: string;
   entityLabel?: string | null;

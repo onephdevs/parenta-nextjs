@@ -1,19 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { signOut } from 'next-auth/react';
+import React, { useState } from 'react';
+import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 interface MenuItem {
   name: string;
   href?: string;
-  icon: JSX.Element;
+  icon: React.ReactElement;
   children?: MenuItem[];
 }
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [expandedSections, setExpandedSections] = useState<string[]>([
     'Dashboard',
     'Properties',
@@ -30,6 +31,11 @@ export default function AdminSidebar() {
         : [...prev, sectionName]
     );
   };
+
+  const displayName =
+    [session?.user?.firstName, session?.user?.lastName].filter(Boolean).join(' ') ||
+    session?.user?.email ||
+    'Admin';
 
   const isActive = (href: string) => {
     // Exact match for dashboard root so /admin does not light up on every admin page
@@ -410,15 +416,19 @@ export default function AdminSidebar() {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-sm font-semibold text-purple-600 uppercase">
+              {session?.user?.firstName || session?.user?.lastName ? (
+                `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
+              ) : (
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">Admin User</p>
-            <p className="text-xs text-gray-900 truncate">admin@parenta.com</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+            <p className="text-xs text-gray-900 truncate">{session?.user?.email || ''}</p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/auth/admin/signin' })}

@@ -51,8 +51,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Get room and building information
     const roomResult = await client.query(
       `SELECT r.deposit_required, r.deposit_type, r.deposit_amount, r.deposit_percentage, 
-              r.monthly_rate, r.building_id
+              r.monthly_rate, r.building_id, r.room_number, b.name AS building_name
        FROM rooms r
+       LEFT JOIN buildings b ON b.id = r.building_id
        WHERE r.id = $1`,
       [roomId]
     );
@@ -261,7 +262,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       category: 'tenants',
       entityType: 'tenant',
       entityId: tenantId,
-      entityLabel: `Room ${roomId}`,
+      entityLabel: room.room_number
+        ? `Room ${room.room_number}${room.building_name ? ` · ${room.building_name}` : ''}`
+        : `Room ${roomId}`,
       afterData: {
         assignment: assignmentResult.rows[0],
         roomId,

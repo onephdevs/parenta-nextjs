@@ -4,6 +4,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/api-auth';
 import pool from '@/lib/db';
+import {
+  formatActivityDescription,
+  formatActorName,
+} from '@/lib/services/activity-taxonomy';
+
+interface NotificationRow {
+  body: string | null;
+  actor_action_type: string | null;
+  actor_entity_label: string | null;
+  actor_role: string | null;
+  actor_first_name: string | null;
+  actor_last_name: string | null;
+  actor_email: string | null;
+}
+
+function buildBody(row: NotificationRow): string {
+  if (!row.actor_action_type) return row.body || '';
+
+  const actorName = formatActorName({
+    firstName: row.actor_first_name,
+    lastName: row.actor_last_name,
+    email: row.actor_email,
+    actorRole: row.actor_role,
+  });
+
+  // Without a resolvable actor the rebuilt text degrades to "Someone …",
+  // which is less useful than whatever was stored at creation time.
+  if (!actorName) return row.body || '';
+
+  return formatActivityDescription({
+    actionType: row.actor_action_type,
+    entityLabel: row.actor_entity_label,
+    actorName,
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,18 +60,30 @@ export async function GET(request: NextRequest) {
       [userId]
     );
 
+    // The stored message is a snapshot taken when the notification was created,
+    // so it goes stale when the actor renames themselves. Join back to the
+    // originating activity log to rebuild the text from current user data.
+    const selectSql = `
+      SELECT n.id, n.category, n.notification_type, n.title, n.message AS body,
+             n.link, n.related_activity_log_id, n.is_read, n.created_at, n.priority,
+             al.action_type AS actor_action_type,
+             al.entity_label AS actor_entity_label,
+             al.actor_role AS actor_role,
+             u.first_name AS actor_first_name,
+             u.last_name AS actor_last_name,
+             u.email AS actor_email
+      FROM notifications n
+      LEFT JOIN activity_log al ON al.id = n.related_activity_log_id
+      LEFT JOIN users u ON u.id = al.actor_user_id`;
+
     const listSql = unreadOnly
-      ? `SELECT id, category, notification_type, title, message AS body,
-                link, related_activity_log_id, is_read, created_at, priority
-         FROM notifications
-         WHERE user_id = $1 AND is_read = false
-         ORDER BY created_at DESC
+      ? `${selectSql}
+         WHERE n.user_id = $1 AND n.is_read = false
+         ORDER BY n.created_at DESC
          LIMIT $2 OFFSET $3`
-      : `SELECT id, category, notification_type, title, message AS body,
-                link, related_activity_log_id, is_read, created_at, priority
-         FROM notifications
-         WHERE user_id = $1
-         ORDER BY is_read ASC, created_at DESC
+      : `${selectSql}
+         WHERE n.user_id = $1
+         ORDER BY n.is_read ASC, n.created_at DESC
          LIMIT $2 OFFSET $3`;
 
     const rows = (await pool.query(listSql, [userId, limit, offset])).rows;
@@ -52,7 +99,7 @@ export async function GET(request: NextRequest) {
           category: r.category,
           actionType: r.notification_type,
           title: r.title,
-          body: r.body,
+          body: buildBody(r),
           link: r.link,
           relatedActivityLogId: r.related_activity_log_id,
           isRead: r.is_read,

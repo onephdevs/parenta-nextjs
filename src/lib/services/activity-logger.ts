@@ -8,6 +8,7 @@ import {
   ACTIVITY_CATEGORIES,
   CATEGORY_DEFAULTS,
   formatActivityDescription,
+  formatActorName,
   getActionTitle,
   sanitizeActivityData,
   type ActivityCategory,
@@ -79,8 +80,11 @@ async function resolveActorName(actorUserId: string | null): Promise<string | nu
   );
   if (result.rows.length === 0) return null;
   const row = result.rows[0];
-  const name = `${row.first_name || ''} ${row.last_name || ''}`.trim();
-  return name || row.email || null;
+  return formatActorName({
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+  });
 }
 
 /**

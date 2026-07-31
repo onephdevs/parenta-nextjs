@@ -1,4 +1,4 @@
-import { NextAuthOptions } from 'next-auth';
+import type { NextAuthOptions, Session } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { verifyPassword, findUserById } from './db';
 import type { LoginCredentials, UserRole } from '@/types/auth.types';
@@ -132,7 +132,7 @@ export const authOptions: NextAuthOptions = {
 };
 
 // Helper function to get user session with proper typing
-export async function getCurrentUser(session: unknown) {
+export async function getCurrentUser(session: Session | null) {
   if (!session?.user?.id) {
     return null;
   }
