@@ -16,7 +16,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   const expense = await getExpenseById(id);

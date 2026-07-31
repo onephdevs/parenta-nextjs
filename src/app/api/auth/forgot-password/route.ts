@@ -84,11 +84,11 @@ export async function POST(request: NextRequest) {
 
     const emailResult = await sendEmail({
       to: user.email,
-      subject: 'Reset your Parenta password',
+      subject: 'Reset your Alfonso Property Management System password',
       text: `Hi ${user.first_name || 'there'},\n\nUse this link to reset your password (expires in 1 hour):\n${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
       html: `
         <p>Hi ${user.first_name || 'there'},</p>
-        <p>We received a request to reset your Parenta password.</p>
+        <p>We received a request to reset your Alfonso Property Management System password.</p>
         <p><a href="${resetUrl}">Reset your password</a></p>
         <p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>
       `,

@@ -12,7 +12,7 @@ export async function generateRevenueReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
   // Set metadata
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   workbook.modified = new Date();
   
@@ -157,7 +157,7 @@ export async function generateRevenueReportExcel(data: any): Promise<Buffer> {
 export async function generateTenantListReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   const sheet = workbook.addWorksheet('Tenant List');
@@ -271,7 +271,7 @@ export async function generateTenantListReportExcel(data: any): Promise<Buffer> 
 export async function generatePaymentHistoryReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   const sheet = workbook.addWorksheet('Payment History');
@@ -347,7 +347,7 @@ export async function generatePaymentHistoryReportExcel(data: any): Promise<Buff
 export async function generateOccupancyReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   // Summary Sheet
@@ -443,7 +443,7 @@ export async function generateOccupancyReportExcel(data: any): Promise<Buffer> {
 export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   // Summary Sheet
@@ -677,7 +677,7 @@ export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
 export async function generateCollectedAmountReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   const sheet = workbook.addWorksheet('Collected Amount');
@@ -803,7 +803,7 @@ export async function generateCollectedAmountReportExcel(data: any): Promise<Buf
 export async function generateDepositReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   const sheet = workbook.addWorksheet('Deposit Report');
@@ -876,7 +876,7 @@ export async function generateDepositReportExcel(data: any): Promise<Buffer> {
 export async function generateVacantRoomsReportExcel(data: any): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
   
   const sheet = workbook.addWorksheet('Vacant Rooms');
@@ -977,7 +977,7 @@ export async function generateFinancialReportExcel(data: {
   const periodStart = r.period?.start ? new Date(r.period.start).toLocaleDateString('en-US') : '';
   const periodEnd = r.period?.end ? new Date(r.period.end).toLocaleDateString('en-US') : '';
 
-  workbook.creator = 'Parenta Property Management';
+  workbook.creator = 'Alfonso Property Management System';
   workbook.created = new Date();
 
   // Summary sheet

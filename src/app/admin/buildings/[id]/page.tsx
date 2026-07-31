@@ -21,7 +21,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
 
   // Redirect if not authenticated or not admin
   if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/signin?role=admin');
+    redirect('/auth/admin/signin');
   }
 
   let buildingWithStats: (Building & { roomStats: any }) | null = null;

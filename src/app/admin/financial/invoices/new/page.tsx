@@ -14,7 +14,7 @@ export default async function NewInvoicePage({ searchParams }: NewInvoicePagePro
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   const params = await searchParams;

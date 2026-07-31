@@ -1,4 +1,4 @@
--- Parenta Property Management System - Complete Database Schema
+-- Alfonso Property Management System - Complete Database Schema
 -- This file contains all tables and relationships for the full system
 
 -- Enable UUID extension

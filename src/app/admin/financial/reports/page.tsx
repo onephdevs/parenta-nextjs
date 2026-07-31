@@ -32,7 +32,7 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   // Default to current month if no dates provided

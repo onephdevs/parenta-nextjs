@@ -9,7 +9,7 @@ export default async function DocumentCategoriesPage() {
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   try {

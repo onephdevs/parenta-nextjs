@@ -55,7 +55,7 @@ export default async function RoomDetailPage({ params }: RoomDetailPageProps) {
 
   // Redirect if not authenticated or not admin
   if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/signin?role=admin');
+    redirect('/auth/admin/signin');
   }
 
   const roomDetails = await getRoomDetails(id);

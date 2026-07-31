@@ -117,7 +117,7 @@ export async function GET(
       buildingName: payment.building_name,
       roomNumber: payment.room_number,
       address: address || undefined,
-      companyName: 'Parenta Property Management',
+      companyName: 'Alfonso Property Management System',
       companyAddress: 'Manila, Philippines',
       notes: payment.notes,
     };

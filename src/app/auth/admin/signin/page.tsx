@@ -159,7 +159,7 @@ export default function AdminSignIn() {
         <div className="max-w-md">
           <div className="flex items-center space-x-3 mb-8">
             <Building2 className="h-12 w-12" />
-            <span className="text-4xl font-bold">Parenta</span>
+            <span className="text-2xl font-bold leading-tight">Alfonso Property Management System</span>
           </div>
           <h3 className="text-3xl font-bold mb-4">
             Property Management Made Simple

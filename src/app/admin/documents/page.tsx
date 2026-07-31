@@ -86,7 +86,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   const resolvedSearchParams = await searchParams;

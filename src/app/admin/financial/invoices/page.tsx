@@ -30,7 +30,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   const page = parseInt(params.page || '1');

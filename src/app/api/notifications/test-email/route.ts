@@ -38,21 +38,21 @@ export async function POST(request: NextRequest) {
     if (sendTestEmail && testRecipient) {
       emailTest = await sendEmail({
         to: testRecipient,
-        subject: '✅ Test Email from Parenta Property Management',
+        subject: '✅ Test Email from Alfonso Property Management System',
         html: `
           <div style="font-family: Arial, sans-serif; padding: 20px;">
             <h2 style="color: #4F46E5;">🎉 Email Configuration Successful!</h2>
-            <p>This is a test email from your Parenta Property Management System.</p>
+            <p>This is a test email from your Alfonso Property Management System.</p>
             <p><strong>Gmail SMTP is working correctly!</strong></p>
             <hr style="border: 1px solid #E5E7EB; margin: 20px 0;">
             <p style="color: #6B7280; font-size: 12px;">
               Sent at: ${new Date().toLocaleString()}<br>
               From: ${process.env.GMAIL_USER}<br>
-              System: Parenta Property Management
+              System: Alfonso Property Management System
             </p>
           </div>
         `,
-        text: 'This is a test email from Parenta Property Management System. Gmail SMTP is working correctly!',
+        text: 'This is a test email from Alfonso Property Management System. Gmail SMTP is working correctly!',
       });
     }
 
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       configuration: {
         gmailUser: process.env.GMAIL_USER,
         hasAppPassword: !!process.env.GMAIL_APP_PASSWORD,
-        emailFrom: process.env.EMAIL_FROM || `Parenta <${process.env.GMAIL_USER}>`,
+        emailFrom: process.env.EMAIL_FROM || `Alfonso Property Management System <${process.env.GMAIL_USER}>`,
       },
       message: 'Gmail SMTP is configured and working!',
     });
@@ -96,7 +96,7 @@ export async function GET() {
       configuration: {
         gmailUser: process.env.GMAIL_USER || 'Not set',
         hasAppPassword,
-        emailFrom: process.env.EMAIL_FROM || `Parenta <${process.env.GMAIL_USER}>`,
+        emailFrom: process.env.EMAIL_FROM || `Alfonso Property Management System <${process.env.GMAIL_USER}>`,
       },
       message: isConfigured
         ? 'Gmail is configured'

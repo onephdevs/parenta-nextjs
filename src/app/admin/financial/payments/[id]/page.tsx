@@ -16,7 +16,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   // Payment IDs are UUIDs (strings), not integers

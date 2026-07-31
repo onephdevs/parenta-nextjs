@@ -122,7 +122,7 @@ const ReceiptPDF = ({ data }: { data: ReceiptData }) => (
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.companyName}>
-          {data.companyName || 'Parenta Property Management'}
+          {data.companyName || 'Alfonso Property Management System'}
         </Text>
         {data.companyAddress && (
           <Text style={styles.companyAddress}>{data.companyAddress}</Text>

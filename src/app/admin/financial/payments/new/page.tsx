@@ -8,7 +8,7 @@ export default async function NewPaymentPage() {
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   return (

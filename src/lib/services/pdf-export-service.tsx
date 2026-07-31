@@ -173,7 +173,7 @@ const RevenueReportPDF = ({ data }: { data: any }) => (
       )}
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -245,7 +245,7 @@ const PaymentHistoryReportPDF = ({ data }: { data: any }) => (
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -307,7 +307,7 @@ const OccupancyReportPDF = ({ data }: { data: any }) => (
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -424,7 +424,7 @@ const ExpenseReportPDF = ({ data }: { data: any }) => (
       )}
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -534,7 +534,7 @@ const TenantListReportPDF = ({ data }: { data: any }) => (
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -636,7 +636,7 @@ const CollectedAmountReportPDF = ({ data }: { data: any }) => (
       )}
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -718,7 +718,7 @@ const DepositReportPDF = ({ data }: { data: any }) => (
       )}
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );
@@ -797,7 +797,7 @@ const VacantRoomsReportPDF = ({ data }: { data: any }) => (
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>Parenta Property Management System</Text>
+      <Text style={styles.footer}>Alfonso Property Management System</Text>
     </Page>
   </Document>
 );

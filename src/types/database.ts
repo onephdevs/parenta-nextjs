@@ -1,4 +1,4 @@
-// Database type definitions for Parenta Property Management System
+// Database type definitions for Alfonso Property Management System
 
 // =====================================================
 // CORE PROPERTY MANAGEMENT TYPES

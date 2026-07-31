@@ -1,4 +1,4 @@
-# Parenta
+# Alfonso Property Management System
 
 Property management app (Next.js 15 + PostgreSQL/Supabase). Admin, tenant, and staff portals.
 

@@ -37,7 +37,7 @@ export default function CollectedAmountReportPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated' || (session && session.user.role !== 'admin')) {
-      redirect('/auth/signin?role=admin');
+      redirect('/auth/admin/signin');
     }
     
     // Set default date range (last month)

@@ -64,7 +64,11 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
           } else {
             setSuccess('Account created successfully! Please sign in.');
             setTimeout(() => {
-              router.push(`/auth/signin?role=${formData.role}`);
+              const signInPath =
+                formData.role === 'admin'
+                  ? '/auth/admin/signin'
+                  : '/auth/tenant/signin';
+              router.push(signInPath);
             }, 2000);
           }
         } else {
@@ -198,11 +202,15 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
             <button
               type="button"
               onClick={() => {
-                const newPath =
-                  mode === 'signin'
-                    ? `/auth/signup?role=${formData.role}`
-                    : `/auth/signin?role=${formData.role}`;
-                router.push(newPath);
+                if (mode === 'signin') {
+                  router.push(`/auth/signup?role=${formData.role}`);
+                  return;
+                }
+                const signInPath =
+                  formData.role === 'admin'
+                    ? '/auth/admin/signin'
+                    : '/auth/tenant/signin';
+                router.push(signInPath);
               }}
               className="text-purple-600 hover:text-purple-500 font-medium"
               disabled={isLoading}

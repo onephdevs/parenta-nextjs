@@ -394,8 +394,7 @@ export default function AdminSidebar() {
             </svg>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Parenta</h1>
-            <p className="text-xs text-gray-900">Property Manager</p>
+            <h1 className="text-sm font-bold text-gray-900 leading-tight">Alfonso Property Management System</h1>
           </div>
         </Link>
       </div>
@@ -422,7 +421,7 @@ export default function AdminSidebar() {
             <p className="text-xs text-gray-900 truncate">admin@parenta.com</p>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/auth/signin?role=admin' })}
+            onClick={() => signOut({ callbackUrl: '/auth/admin/signin' })}
             className="p-1 text-gray-400 hover:text-gray-900 transition-colors"
             title="Sign out"
           >

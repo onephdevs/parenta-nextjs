@@ -56,7 +56,7 @@ export async function sendEmail(options: EmailOptions): Promise<SendEmailResult>
     }
     
     // Default from address
-    const fromAddress = options.from || process.env.EMAIL_FROM || `Parenta <${process.env.GMAIL_USER}>`;
+    const fromAddress = options.from || process.env.EMAIL_FROM || `Alfonso Property Management System <${process.env.GMAIL_USER}>`;
     
     // Prepare email options
     const mailOptions = {
@@ -180,7 +180,7 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; html: string; 
       <p>Dear {{tenantName}},</p>
       <p>This is a reminder that your payment of {{amount}} is due on {{dueDate}}.</p>
       <p>Please make your payment at your earliest convenience.</p>
-      <p>Thank you,<br>Parenta Management</p>
+      <p>Thank you,<br>Alfonso Property Management System</p>
     `,
     text: 'Payment Reminder: Your payment of {{amount}} is due on {{dueDate}}.',
   },
@@ -191,7 +191,7 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; html: string; 
       <p>Dear {{tenantName}},</p>
       <p>Your lease for {{roomNumber}} will expire on {{expiryDate}}.</p>
       <p>Please contact us to discuss renewal options.</p>
-      <p>Thank you,<br>Parenta Management</p>
+      <p>Thank you,<br>Alfonso Property Management System</p>
     `,
     text: 'Your lease for {{roomNumber}} will expire on {{expiryDate}}.',
   },
@@ -203,7 +203,7 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; html: string; 
       <p>Welcome to {{buildingName}}! Your move-in date is {{moveInDate}}.</p>
       <p>Room: {{roomNumber}}</p>
       <p>We look forward to having you as a tenant.</p>
-      <p>Thank you,<br>Parenta Management</p>
+      <p>Thank you,<br>Alfonso Property Management System</p>
     `,
     text: 'Welcome to {{buildingName}}! Your move-in date is {{moveInDate}}.',
   },
@@ -214,7 +214,7 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; html: string; 
       <p>Dear {{tenantName}},</p>
       <p>Your move-out from {{roomNumber}} has been confirmed for {{moveOutDate}}.</p>
       <p>Please ensure all belongings are removed and the room is cleaned.</p>
-      <p>Thank you,<br>Parenta Management</p>
+      <p>Thank you,<br>Alfonso Property Management System</p>
     `,
     text: 'Your move-out from {{roomNumber}} has been confirmed for {{moveOutDate}}.',
   },

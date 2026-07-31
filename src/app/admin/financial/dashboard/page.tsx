@@ -6,7 +6,7 @@ import DashboardClient from '@/components/features/dashboard/DashboardClient';
 import { getAllDashboardMetrics } from '@/lib/services/dashboard-service';
 
 export const metadata = {
-  title: 'Financial Dashboard | Parenta',
+  title: 'Financial Dashboard | Alfonso Property Management System',
   description: 'Financial performance and key metrics overview',
 };
 

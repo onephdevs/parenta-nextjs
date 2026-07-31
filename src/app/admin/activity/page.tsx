@@ -6,7 +6,7 @@ import ActivityFeedClient from '@/components/features/activity/ActivityFeedClien
 export default async function ActivityPage() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/signin');
+    redirect('/auth/admin/signin');
   }
 
   return (

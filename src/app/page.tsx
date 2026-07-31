@@ -103,7 +103,7 @@ export default function LandingPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Parenta</span>
+              <span className="text-sm sm:text-base font-bold text-gray-900 leading-tight max-w-[12rem] sm:max-w-none">Alfonso Property Management System</span>
         </div>
             <nav className="hidden md:flex items-center space-x-8">
               <a href="#properties" className="text-gray-900 hover:text-blue-600 transition">Properties</a>
@@ -181,7 +181,7 @@ export default function LandingPage() {
       <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Parenta?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why Choose Alfonso Property Management System?</h2>
             <p className="text-xl text-gray-900 max-w-2xl mx-auto">
               Experience the difference with our comprehensive property management services
             </p>
@@ -384,7 +384,7 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Building2 className="h-8 w-8 text-blue-500" />
-                <span className="text-2xl font-bold text-white">Parenta</span>
+                <span className="text-lg font-bold text-white leading-tight">Alfonso Property Management System</span>
               </div>
               <p className="text-sm">
                 Professional property management services for modern living.
@@ -419,7 +419,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>&copy; {new Date().getFullYear()} Parenta Property Management System. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Alfonso Property Management System. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Parenta Property Management",
+  title: "Alfonso Property Management System",
   description: "Modern property management solution",
 };
 

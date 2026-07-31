@@ -223,7 +223,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
 
               {/* Sign Out */}
               <button
-                onClick={() => signOut({ callbackUrl: '/auth/signin?role=admin' })}
+                onClick={() => signOut({ callbackUrl: '/auth/admin/signin' })}
                 className="hidden sm:flex items-center px-3 py-2 text-sm font-medium text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title="Sign out"
               >
