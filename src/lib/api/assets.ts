@@ -322,7 +322,7 @@ export async function deleteAsset(assetId: string): Promise<boolean> {
     // Also update any active assignments
     const assignmentQuery = `
       UPDATE asset_assignments 
-      SET assignment_status = 'terminated', end_date = NOW(), updated_at = NOW()
+      SET assignment_status = 'terminated', return_date = CURRENT_DATE, updated_at = NOW()
       WHERE asset_id = $1 AND assignment_status = 'active'
     `;
     
@@ -353,18 +353,35 @@ export async function assignAssetToRoom(
     // End any current assignment
     await client.query(`
       UPDATE asset_assignments 
-      SET assignment_status = 'returned', return_date = NOW(), updated_at = NOW()
+      SET assignment_status = 'returned', return_date = CURRENT_DATE, updated_at = NOW()
       WHERE asset_id = $1 AND assignment_status = 'active'
     `, [assetId]);
+
+    const locationSnap = await client.query(
+      `SELECT r.room_number, b.name as building_name
+       FROM rooms r
+       LEFT JOIN buildings b ON b.id = r.building_id
+       WHERE r.id = $1`,
+      [roomId]
+    );
+    const loc = locationSnap.rows[0];
     
     // Create new assignment
     const assignmentQuery = `
       INSERT INTO asset_assignments (
-        asset_id, room_id, tenant_id, assignment_date, assignment_status, notes
-      ) VALUES ($1, $2, $3, CURRENT_DATE, 'active', $4)
+        asset_id, room_id, tenant_id, assignment_date, assignment_status, notes,
+        room_number_snapshot, building_name_snapshot
+      ) VALUES ($1, $2, $3, CURRENT_DATE, 'active', $4, $5, $6)
     `;
     
-    await client.query(assignmentQuery, [assetId, roomId, tenantId, notes]);
+    await client.query(assignmentQuery, [
+      assetId,
+      roomId,
+      tenantId,
+      notes,
+      loc?.room_number || null,
+      loc?.building_name || null,
+    ]);
     
     // Update asset status
     await client.query(`
@@ -392,7 +409,7 @@ export async function unassignAsset(assetId: string): Promise<boolean> {
     // End assignment
     await client.query(`
       UPDATE asset_assignments 
-      SET assignment_status = 'terminated', end_date = NOW(), updated_at = NOW()
+      SET assignment_status = 'terminated', return_date = CURRENT_DATE, updated_at = NOW()
       WHERE asset_id = $1 AND assignment_status = 'active'
     `, [assetId]);
     
@@ -413,26 +430,57 @@ export async function unassignAsset(assetId: string): Promise<boolean> {
   }
 }
 
-export async function getAssetAssignmentHistory(assetId: string): Promise<unknown[]> {
+export async function getAssetAssignmentHistory(assetId: string): Promise<
+  Array<{
+    id: string;
+    assetId: string;
+    roomId: string | null;
+    assignmentDate: string | null;
+    returnDate: string | null;
+    assignmentStatus: string;
+    roomNumber: string | null;
+    buildingName: string | null;
+    tenantName: string | null;
+    isCurrent: boolean;
+  }>
+> {
   const client = await pool.connect();
   
   try {
     const query = `
       SELECT 
-        aa.*,
-        r.room_number,
-        b.name as building_name,
+        aa.id,
+        aa.asset_id,
+        aa.room_id,
+        aa.assignment_date,
+        aa.return_date,
+        aa.assignment_status,
+        COALESCE(NULLIF(aa.room_number_snapshot, ''), r.room_number) as room_number,
+        COALESCE(NULLIF(aa.building_name_snapshot, ''), b.name) as building_name,
         CONCAT(t.first_name, ' ', t.last_name) as tenant_name
       FROM asset_assignments aa
       LEFT JOIN rooms r ON aa.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       LEFT JOIN tenants t ON aa.tenant_id = t.id
       WHERE aa.asset_id = $1
-      ORDER BY aa.created_at DESC
+      ORDER BY aa.assignment_date DESC NULLS LAST, aa.created_at DESC
     `;
     
     const result = await client.query(query, [assetId]);
-    return result.rows;
+    return result.rows.map((row) => ({
+      id: row.id,
+      assetId: row.asset_id,
+      roomId: row.room_id,
+      assignmentDate: row.assignment_date,
+      returnDate: row.return_date,
+      assignmentStatus: row.assignment_status,
+      roomNumber: row.room_number,
+      buildingName: row.building_name,
+      tenantName: row.tenant_name?.trim() || null,
+      isCurrent:
+        row.assignment_status === 'active' &&
+        (row.return_date == null || new Date(row.return_date) > new Date()),
+    }));
   } finally {
     client.release();
   }

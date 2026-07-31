@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Edit, Trash2, Eye, MapPin, Calendar, X, Package, AlertCircle, DollarSign, Info } from 'lucide-react';
+import Link from 'next/link';
+import { Edit, Trash2, Eye, MapPin, Calendar, X, Package, AlertCircle, DollarSign, Info, History } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { AssetStatusBadge, AssetConditionBadge } from '@/components/domain/StatusBadges';
 
 interface Asset {
@@ -29,6 +32,18 @@ interface Asset {
   assignmentDate?: Date;
 }
 
+interface LocationHistoryItem {
+  id: string;
+  roomId: string | null;
+  assignmentDate: string | null;
+  returnDate: string | null;
+  assignmentStatus: string;
+  roomNumber: string | null;
+  buildingName: string | null;
+  tenantName: string | null;
+  isCurrent: boolean;
+}
+
 interface AssetsListProps {
   filters: {
     buildingId?: string;
@@ -50,9 +65,36 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [locationHistory, setLocationHistory] = useState<LocationHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const { addNotification, showLoading, dismissToast } = useNotifications();
 
   const itemsPerPage = 10;
+
+  useEffect(() => {
+    if (!selectedAsset?.id) {
+      setLocationHistory([]);
+      return;
+    }
+    let cancelled = false;
+    setHistoryLoading(true);
+    (async () => {
+      try {
+        const response = await fetch(`/api/assets/${selectedAsset.id}/assign`);
+        const result = await response.json();
+        if (!cancelled && result.success) {
+          setLocationHistory(result.data || []);
+        }
+      } catch {
+        if (!cancelled) setLocationHistory([]);
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAsset?.id]);
 
   useEffect(() => {
     const fetchAssets = async () => {
@@ -508,6 +550,75 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                           <div className="flex items-center gap-2 text-gray-400">
                             <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
                             <span className="text-sm">Not currently assigned</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Location History */}
+                    <div>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
+                        <History className="h-4 w-4 text-gray-500" />
+                        Location History
+                      </label>
+                      <div className="rounded-lg border border-gray-200 bg-white p-4">
+                        {historyLoading ? (
+                          <p className="text-sm text-gray-500">Loading history…</p>
+                        ) : locationHistory.length === 0 ? (
+                          <EmptyState
+                            title="No location history"
+                            description="Assignments will appear here when this asset is moved between rooms."
+                            className="py-6"
+                          />
+                        ) : (
+                          <div className="space-y-3">
+                            {locationHistory.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex flex-col gap-2 rounded-md border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {item.roomId ? (
+                                      <Link
+                                        href={`/admin/rooms/${item.roomId}`}
+                                        className="font-medium text-purple-700 hover:underline"
+                                      >
+                                        Room {item.roomNumber || '—'}
+                                      </Link>
+                                    ) : (
+                                      <span className="font-medium text-gray-900">
+                                        Room {item.roomNumber || 'Unknown room'}
+                                      </span>
+                                    )}
+                                    {item.isCurrent && <Badge tone="success">Current location</Badge>}
+                                    {!item.isCurrent && (
+                                      <Badge tone="neutral">{item.assignmentStatus}</Badge>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 text-sm text-gray-500">
+                                    {item.buildingName || 'Building unavailable'}
+                                    {item.tenantName ? ` · ${item.tenantName}` : ''}
+                                  </p>
+                                </div>
+                                <div className="text-sm text-gray-600 sm:text-right">
+                                  <div>
+                                    Assigned:{' '}
+                                    {item.assignmentDate
+                                      ? formatDate(new Date(item.assignmentDate))
+                                      : '—'}
+                                  </div>
+                                  <div>
+                                    Unassigned:{' '}
+                                    {item.isCurrent
+                                      ? 'Current'
+                                      : item.returnDate
+                                        ? formatDate(new Date(item.returnDate))
+                                        : '—'}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { getAllAssets, createAsset } from '@/lib/api/assets';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,6 +41,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
     const body = await request.json();
     
     // Validate required fields
@@ -64,6 +68,20 @@ export async function POST(request: NextRequest) {
     };
 
     const asset = await createAsset(assetData);
+    const assetId = String(asset.id || '');
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'asset.created',
+      category: 'assets',
+      entityType: 'asset',
+      entityId: assetId || null,
+      entityLabel: body.assetName,
+      afterData: asset as unknown as Record<string, unknown>,
+      link: '/admin/assets',
+      metadata: { link: '/admin/assets' },
+    });
     
     return NextResponse.json({
       success: true,

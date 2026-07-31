@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { getTenantByUserId, getTenantCompleteData } from '@/lib/api/tenant-user-link';
+import { getTenantCompleteDataByTenantId } from '@/lib/api/tenant-user-link';
+import { requireTenantAccess } from '@/lib/api/require-tenant-access';
 import pool from '@/lib/db';
 
 /**
@@ -10,30 +9,11 @@ import pool from '@/lib/db';
  */
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    const tenant = await getTenantByUserId(userId);
-    
-    if (!tenant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
-    
-    // Get complete tenant data including room assignment
-    const tenantData = await getTenantCompleteData(userId);
+    const access = await requireTenantAccess();
+    if (access.error) return access.error;
+
+    const { tenant } = access;
+    const tenantData = await getTenantCompleteDataByTenantId(String(tenant.id));
     
     // Get occupants for tenant's room
     const occupantsQuery = `
@@ -111,29 +91,47 @@ export async function GET() {
           url: agreementDocument.filePath || agreementDocument.url,
           name: agreementDocument.documentName || agreementDocument.name,
         } : null,
-        roomAssignment: tenantData ? {
-          roomId: tenantData.room_id,
-          roomNumber: tenantData.room_number,
-          floorNumber: tenantData.floor_number,
-          roomType: tenantData.room_type,
-          buildingId: tenantData.building_id,
-          buildingName: tenantData.building_name,
-          address: [
-            tenantData.address_line1,
-            tenantData.address_line2,
-            tenantData.city,
-            tenantData.state,
-            tenantData.postal_code,
-          ].filter(Boolean).join(', '),
-          assignmentStart: tenantData.assignment_start,
-          assignmentEnd: tenantData.assignment_end,
-          monthlyRate: tenantData.monthly_rate,
-          depositPaid: tenantData.deposit_paid ? parseFloat(tenantData.deposit_paid) : undefined,
-          advancePaid: tenantData.advance_paid ? parseFloat(tenantData.advance_paid) : undefined,
-          utilityDepositPaid: tenantData.utility_deposit_paid ? parseFloat(tenantData.utility_deposit_paid) : undefined,
-          depositValidUntil: tenantData.deposit_valid_until ? new Date(tenantData.deposit_valid_until) : undefined,
-          depositRefundable: tenantData.deposit_refundable !== undefined ? tenantData.deposit_refundable : undefined,
-        } : null,
+        roomAssignment: tenantData?.room_id
+          ? {
+              roomId: tenantData.room_id,
+              roomNumber: tenantData.room_number,
+              floorNumber: tenantData.floor_number,
+              roomType: tenantData.room_type,
+              buildingId: tenantData.building_id,
+              buildingName: tenantData.building_name,
+              address: [
+                tenantData.address_line1,
+                tenantData.address_line2,
+                tenantData.city,
+                tenantData.state,
+                tenantData.postal_code,
+              ]
+                .filter(Boolean)
+                .join(', '),
+              assignmentStart: tenantData.assignment_start,
+              assignmentEnd: tenantData.assignment_end,
+              monthlyRate:
+                tenantData.monthly_rate != null
+                  ? parseFloat(String(tenantData.monthly_rate))
+                  : null,
+              depositPaid: tenantData.deposit_paid
+                ? parseFloat(String(tenantData.deposit_paid))
+                : undefined,
+              advancePaid: tenantData.advance_paid
+                ? parseFloat(String(tenantData.advance_paid))
+                : undefined,
+              utilityDepositPaid: tenantData.utility_deposit_paid
+                ? parseFloat(String(tenantData.utility_deposit_paid))
+                : undefined,
+              depositValidUntil: tenantData.deposit_valid_until
+                ? new Date(tenantData.deposit_valid_until)
+                : undefined,
+              depositRefundable:
+                tenantData.deposit_refundable !== undefined
+                  ? tenantData.deposit_refundable
+                  : undefined,
+            }
+          : null,
         occupants: occupantsResult.rows.map(row => ({
           id: row.id,
           firstName: row.first_name,
@@ -172,27 +170,10 @@ export async function GET() {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    const tenant = await getTenantByUserId(userId);
-    
-    if (!tenant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
+    const access = await requireTenantAccess({ allowMutation: true });
+    if (access.error) return access.error;
+
+    const { tenant } = access;
     
     const body = await request.json();
     const {
@@ -208,6 +189,10 @@ export async function PUT(request: NextRequest) {
       monthlyIncome,
       previousAddress,
     } = body;
+
+    // Empty strings break Postgres date/numeric columns — treat as null so COALESCE keeps existing values
+    const emptyToNull = (value: unknown) =>
+      value === undefined || value === null || value === '' ? null : value;
     
     // Update tenant profile
     const updateQuery = `
@@ -230,17 +215,17 @@ export async function PUT(request: NextRequest) {
     `;
     
     const updateResult = await pool.query(updateQuery, [
-      firstName,
-      lastName,
-      phone,
-      dateOfBirth,
-      emergencyContactName,
-      emergencyContactPhone,
-      emergencyContactRelationship,
-      employmentStatus,
-      employerName,
-      monthlyIncome,
-      previousAddress,
+      emptyToNull(firstName),
+      emptyToNull(lastName),
+      emptyToNull(phone),
+      emptyToNull(dateOfBirth),
+      emptyToNull(emergencyContactName),
+      emptyToNull(emergencyContactPhone),
+      emptyToNull(emergencyContactRelationship),
+      emptyToNull(employmentStatus),
+      emptyToNull(employerName),
+      emptyToNull(monthlyIncome),
+      emptyToNull(previousAddress),
       tenant.id,
     ]);
     

@@ -1,157 +1,195 @@
 'use client';
 
 import Link from 'next/link';
+import { ReactNode } from 'react';
+import { Phone, Calendar, User, Mail, PhilippinePeso } from 'lucide-react';
 import { Tenant } from '@/types/database';
+import { Card } from '@/components/ui/Card';
+import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
+import { TenantStatusBadge } from '@/components/domain/StatusBadges';
+import { cn } from '@/lib/utils';
 
 interface TenantCardProps {
-  tenant: Tenant;
+  tenant: Tenant & {
+    currentMonthlyRent?: number | null;
+  };
+}
+
+function StatRow({
+  icon,
+  label,
+  children,
+  isEmpty = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+  isEmpty?: boolean;
+}) {
+  return (
+    <div className="flex min-h-[1.5rem] items-center justify-between gap-3 text-sm">
+      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+        <span className="text-gray-400">{icon}</span>
+        {label}
+      </span>
+      <span
+        className={cn(
+          'min-w-0 text-right font-medium',
+          isEmpty ? 'italic text-gray-400' : 'text-gray-900'
+        )}
+      >
+        {children}
+      </span>
+    </div>
+  );
 }
 
 export default function TenantCard({ tenant }: TenantCardProps) {
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
-      case 'terminated':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const fullName = `${tenant.firstName} ${tenant.lastName}`.trim() || 'Unnamed tenant';
+  const monthlyRent = tenant.currentMonthlyRent;
+  const hasRent = typeof monthlyRent === 'number' && monthlyRent > 0;
+  const hasIncome = typeof tenant.monthlyIncome === 'number' && tenant.monthlyIncome > 0;
+  const hasPhone = Boolean(tenant.phone?.trim());
+  const hasEmail = Boolean(tenant.email?.trim());
+  const hasMoveIn = Boolean(tenant.moveInDate);
+  const hasEmergency = Boolean(tenant.emergencyContactName?.trim());
+  const hasNotes = Boolean(tenant.notes?.trim());
+  const detailHref = `/admin/tenants/${tenant.id}`;
 
-  const formatCurrency = (amount?: number) => {
-    if (!amount) return 'Not specified';
-    return new Intl.NumberFormat('en-PH', {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
     }).format(amount);
-  };
 
-  const formatDate = (date?: Date) => {
-    if (!date) return 'Not set';
-    return new Date(date).toLocaleDateString('en-US', {
+  const formatDate = (date: Date) =>
+    new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
-  };
+
+  const rentDisplay = hasRent
+    ? `${formatCurrency(monthlyRent!)}/mo`
+    : hasIncome
+      ? formatCurrency(tenant.monthlyIncome!)
+      : 'No rent set';
 
   return (
-    <div className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200">
-      <div className="p-6">
-        {/* Header with name and status */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <span className="text-lg font-medium text-purple-600">
-                  {tenant.firstName.charAt(0)}{tenant.lastName.charAt(0)}
-                </span>
+    <Card
+      padding="none"
+      className={cn(
+        'flex h-full flex-col border border-gray-100 shadow-sm',
+        'transition-all duration-200 hover:border-purple-100 hover:shadow-md'
+      )}
+    >
+      <div className="flex h-full flex-col p-6">
+        {/* Header — same structure as Building/Room cards */}
+        <div className="min-h-[5.5rem]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Avatar
+                name={fullName}
+                size="md"
+                className="mt-0.5 h-10 w-10 flex-shrink-0 text-sm"
+              />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xl font-bold leading-snug text-gray-900">
+                  <Link
+                    href={detailHref}
+                    className="line-clamp-2 break-words hover:text-purple-700"
+                    title={fullName}
+                  >
+                    {fullName}
+                  </Link>
+                </h3>
+                <p
+                  className="mt-2 flex items-start gap-1.5 text-sm leading-snug text-gray-500"
+                  title={hasEmail ? tenant.email! : undefined}
+                >
+                  <Mail className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                  <span
+                    className={cn(
+                      'line-clamp-2 break-words',
+                      !hasEmail && 'italic text-gray-400'
+                    )}
+                  >
+                    {hasEmail ? tenant.email : 'No email'}
+                  </span>
+                </p>
               </div>
             </div>
-            <div className="ml-3">
-              <h3 className="text-lg font-medium text-gray-900">
-                {tenant.firstName} {tenant.lastName}
-              </h3>
-              <p className="text-sm text-gray-900">{tenant.email}</p>
+            <div className="flex flex-shrink-0 items-center gap-2.5 pt-0.5">
+              <TenantStatusBadge status={tenant.tenantStatus || 'pending'} />
             </div>
           </div>
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(tenant.tenantStatus)}`}>
-            {tenant.tenantStatus}
-          </span>
         </div>
 
-        {/* Contact Information */}
-        <div className="space-y-3">
-          <div className="flex items-center text-sm">
-            <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-            </svg>
-            <span className="text-gray-900">{tenant.phone || 'No phone number'}</span>
-          </div>
+        {/* Stats — label left / value right like RoomCard */}
+        <div className="mt-5 space-y-3">
+          <StatRow icon={<Phone className="h-3.5 w-3.5" />} label="Phone" isEmpty={!hasPhone}>
+            {hasPhone ? tenant.phone : 'Not set'}
+          </StatRow>
 
-          {(tenant as any).currentMonthlyRent ? (
-            <div className="flex items-center text-sm">
-              <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <span className="text-gray-900">Monthly Rent: {formatCurrency((tenant as any).currentMonthlyRent)} / month</span>
-            </div>
-          ) : tenant.monthlyIncome ? (
-            <div className="flex items-center text-sm">
-              <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-              <span className="text-gray-900">Monthly Income: {formatCurrency(tenant.monthlyIncome)}</span>
-            </div>
-          ) : null}
+          <StatRow
+            icon={<PhilippinePeso className="h-3.5 w-3.5" />}
+            label={hasRent ? 'Rent' : hasIncome ? 'Income' : 'Rent'}
+            isEmpty={!hasRent && !hasIncome}
+          >
+            {rentDisplay}
+          </StatRow>
 
-          {tenant.moveInDate && (
-            <div className="flex items-center text-sm">
-              <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-gray-900">Moved in: {formatDate(tenant.moveInDate)}</span>
+          <StatRow
+            icon={<Calendar className="h-3.5 w-3.5" />}
+            label="Move-in"
+            isEmpty={!hasMoveIn}
+          >
+            {hasMoveIn ? formatDate(tenant.moveInDate!) : 'Not set'}
+          </StatRow>
+        </div>
+
+        {/* Tertiary block — fixed height like Amenities on Building/Room */}
+        <div className="mt-4 min-h-[3.5rem]">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+            Emergency / Notes
+          </p>
+          {hasEmergency ? (
+            <div className="space-y-1">
+              <p className="flex items-start gap-1.5 text-sm text-gray-700">
+                <User className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                <span className="line-clamp-2 break-words">
+                  {tenant.emergencyContactName}
+                  {tenant.emergencyContactRelationship
+                    ? ` · ${tenant.emergencyContactRelationship}`
+                    : ''}
+                  {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
+                </span>
+              </p>
+              {hasNotes && (
+                <p className="line-clamp-1 text-sm text-gray-500">{tenant.notes}</p>
+              )}
             </div>
+          ) : hasNotes ? (
+            <p className="line-clamp-2 text-sm text-gray-600">{tenant.notes}</p>
+          ) : (
+            <p className="text-sm italic text-gray-400">No details listed</p>
           )}
         </div>
 
-        {/* Emergency Contact */}
-        {tenant.emergencyContactName && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Emergency Contact</h4>
-            <div className="text-sm text-gray-900">
-              <div className="flex items-center">
-                <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span>{tenant.emergencyContactName}</span>
-              </div>
-              {tenant.emergencyContactPhone && (
-                <div className="flex items-center mt-1">
-                  <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <span>{tenant.emergencyContactPhone}</span>
-                </div>
-              )}
-              {tenant.emergencyContactRelationship && (
-                <div className="text-xs text-gray-900 mt-1">
-                  {tenant.emergencyContactRelationship}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="mt-6 flex space-x-3">
-          <Link
-            href={`/admin/tenants/${tenant.id}`}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-          >
-            View Details
+        <div className="mt-auto flex gap-3 pt-6">
+          <Link href={detailHref} className="flex-1">
+            <Button className="w-full" size="sm">
+              View Details
+            </Button>
           </Link>
-          <Link
-            href={`/admin/tenants/${tenant.id}/edit`}
-            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 text-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-          >
-            Edit
+          <Link href={`/admin/tenants/${tenant.id}/edit`} className="flex-1">
+            <Button className="w-full" variant="secondary" size="sm">
+              Edit
+            </Button>
           </Link>
         </div>
-
-        {/* Additional Info */}
-        {tenant.notes && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h4 className="text-sm font-medium text-gray-900 mb-1">Notes</h4>
-            <p className="text-sm text-gray-900 line-clamp-2">{tenant.notes}</p>
-          </div>
-        )}
       </div>
-    </div>
+    </Card>
   );
-} 
+}

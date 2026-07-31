@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { tenantId, amount, action, invoiceId, description } = body;
+    const { tenantId, amount, action, invoiceId, description, paymentMethod } = body;
 
     if (!tenantId || !amount || !action) {
       return NextResponse.json(
@@ -71,14 +71,20 @@ export async function POST(request: NextRequest) {
         });
         break;
 
-      case 'refund':
+      case 'refund': {
+        const refundDescription =
+          description ||
+          (paymentMethod
+            ? `Deposit refund via ${String(paymentMethod).replace(/_/g, ' ')}`
+            : 'Deposit refund');
         result = await refundDeposit(
           tenantId,
           parseFloat(amount),
-          description || 'Deposit refund',
+          refundDescription,
           session.user.id
         );
         break;
+      }
 
       case 'apply':
         if (!invoiceId) {

@@ -31,6 +31,7 @@ import { MaintenanceStatusBadge } from '@/components/domain/StatusBadges';
 import { Badge, BadgeTone } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 
 interface MaintenanceRequest {
   id: string;
@@ -54,6 +55,7 @@ interface MaintenanceData {
 
 export default function MaintenancePage() {
   const { data: session, status } = useSession();
+  const { canAccess, isPreview, isLoading: gateLoading } = useTenantPortalGate();
   const router = useRouter();
   const [maintenanceData, setMaintenanceData] = useState<MaintenanceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,7 +63,7 @@ export default function MaintenancePage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const { showNotification } = useNotifications();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
   const [newRequest, setNewRequest] = useState({
@@ -108,15 +110,16 @@ export default function MaintenancePage() {
   };
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
+    if (gateLoading || status === 'loading') return;
+    if (canAccess) {
       fetchMaintenanceData();
     } else if (status === 'unauthenticated') {
       router.push('/auth/signin?role=tenant');
     }
-  }, [status, session, router]);
+  }, [status, session, router, canAccess, gateLoading]);
 
   // Show loading state while checking authentication
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading' || gateLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b border-gray-200">
@@ -136,9 +139,8 @@ export default function MaintenancePage() {
     );
   }
 
-  // Redirect if not authenticated or not tenant
-  if (!session || session.user.role !== 'tenant') {
-    return null; // Will redirect via useEffect
+  if (!canAccess) {
+    return null;
   }
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
@@ -153,6 +155,7 @@ export default function MaintenancePage() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const response = await fetch('/api/tenant/maintenance', {
         method: 'POST',
@@ -182,7 +185,7 @@ export default function MaintenancePage() {
         showNotification({
           type: 'error',
           title: 'Submission Failed',
-          message: data.error || 'Failed to submit maintenance request'
+          message: data.error || data.details || 'Failed to submit maintenance request'
         });
       }
     } catch (error) {
@@ -192,6 +195,8 @@ export default function MaintenancePage() {
         title: 'Error',
         message: 'Failed to submit maintenance request'
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -266,13 +271,15 @@ export default function MaintenancePage() {
         title="Maintenance Requests"
         description="Manage your maintenance requests and submit new ones"
         actions={
-          <Button
-            variant="success"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => setShowNewRequestForm(true)}
-          >
-            New Request
-          </Button>
+          isPreview ? undefined : (
+            <Button
+              variant="success"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => setShowNewRequestForm(true)}
+            >
+              New Request
+            </Button>
+          )
         }
       />
           {maintenanceData && (
@@ -553,8 +560,8 @@ export default function MaintenancePage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" variant="success">
-                  Submit Request
+                <Button type="submit" variant="success" isLoading={isSubmitting} disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
                 </Button>
               </div>
             </form>

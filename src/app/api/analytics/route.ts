@@ -138,8 +138,8 @@ export async function GET(request: NextRequest) {
           getAssetUtilizationData(buildingFilter),
         ]);
 
-    return NextResponse.json({
-      success: true,
+        return NextResponse.json({
+          success: true,
           data: {
             revenueTrend: revenue,
             expenseBreakdown: expenses,
@@ -171,8 +171,7 @@ async function getRevenueTrendData(dateFrom: string, dateTo: string, buildingFil
       COALESCE(SUM(CASE WHEN payment_status = 'overdue' THEN amount ELSE 0 END), 0) as overdue
     FROM payments p
     LEFT JOIN rooms r ON p.room_id = r.id
-    WHERE p.is_active = true 
-      AND p.payment_date BETWEEN $1 AND $2
+    WHERE p.payment_date BETWEEN $1 AND $2
       ${buildingFilter.replace('building_id', 'r.building_id')}
     GROUP BY TO_CHAR(payment_date, 'YYYY-MM')
     ORDER BY month ASC
@@ -197,20 +196,19 @@ async function getRevenueTrend(dateFrom: string, dateTo: string, buildingFilter:
 async function getExpenseBreakdownData(dateFrom: string, dateTo: string, buildingFilter: string) {
   const query = `
     SELECT 
-      expense_category,
+      category,
       COALESCE(SUM(amount), 0) as total,
       COUNT(*) as count
     FROM expenses
-    WHERE is_active = true 
-      AND expense_date BETWEEN $1 AND $2
+    WHERE expense_date BETWEEN $1 AND $2
       ${buildingFilter}
-    GROUP BY expense_category
+    GROUP BY category
     ORDER BY total DESC
   `;
   
   const result = await pool.query(query, [dateFrom, dateTo]);
   return result.rows.map(row => ({
-    category: row.expense_category,
+    category: row.category,
     amount: parseFloat(row.total),
     count: parseInt(row.count),
     percentage: 0, // Calculated on frontend
@@ -231,7 +229,7 @@ async function getExpenseBreakdown(dateFrom: string, dateTo: string, buildingFil
 async function getOccupancyTrendData(buildingFilter: string) {
   const query = `
     SELECT 
-      b.building_name,
+      b.name as building_name,
       COUNT(*) as total_rooms,
       COUNT(*) FILTER (WHERE r.room_status = 'occupied') as occupied,
       COUNT(*) FILTER (WHERE r.room_status = 'vacant') as vacant,
@@ -239,8 +237,8 @@ async function getOccupancyTrendData(buildingFilter: string) {
     FROM rooms r
     INNER JOIN buildings b ON r.building_id = b.id
     WHERE r.is_active = true ${buildingFilter.replace('building_id', 'r.building_id')}
-    GROUP BY b.id, b.building_name
-    ORDER BY b.building_name
+    GROUP BY b.id, b.name
+    ORDER BY b.name
   `;
   
   const result = await pool.query(query);
@@ -270,8 +268,7 @@ async function getPaymentStatusData(dateFrom: string, dateTo: string, buildingFi
       COALESCE(SUM(amount), 0) as total
     FROM payments p
     LEFT JOIN rooms r ON p.room_id = r.id
-    WHERE p.is_active = true 
-      AND p.payment_date BETWEEN $1 AND $2
+    WHERE p.payment_date BETWEEN $1 AND $2
       ${buildingFilter.replace('building_id', 'r.building_id')}
     GROUP BY payment_status
   `;
@@ -293,15 +290,16 @@ async function getPaymentStatusChart(dateFrom: string, dateTo: string, buildingF
 async function getTenantDistributionData(buildingFilter: string) {
   const query = `
     SELECT 
-      b.building_name,
+      b.name as building_name,
       COUNT(DISTINCT t.id) as tenant_count,
       COUNT(DISTINCT t.id) FILTER (WHERE t.tenant_status = 'active') as active,
       COUNT(DISTINCT t.id) FILTER (WHERE t.tenant_status = 'pending') as pending
     FROM tenants t
-    INNER JOIN rooms r ON t.room_id = r.id
+    INNER JOIN tenant_room_assignments tra ON t.id = tra.tenant_id AND tra.assignment_status = 'active'
+    INNER JOIN rooms r ON tra.room_id = r.id
     INNER JOIN buildings b ON r.building_id = b.id
     WHERE t.is_active = true ${buildingFilter.replace('building_id', 'r.building_id')}
-    GROUP BY b.id, b.building_name
+    GROUP BY b.id, b.name
     ORDER BY tenant_count DESC
   `;
   
@@ -325,14 +323,14 @@ async function getFinancialSummaryData(dateFrom: string, dateTo: string, buildin
     SELECT COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END), 0) as revenue
     FROM payments p
     LEFT JOIN rooms r ON p.room_id = r.id
-    WHERE p.is_active = true AND p.payment_date BETWEEN $1 AND $2
+    WHERE p.payment_date BETWEEN $1 AND $2
       ${buildingFilter.replace('building_id', 'r.building_id')}
   `;
   
   const expenseQuery = `
     SELECT COALESCE(SUM(amount), 0) as expenses
     FROM expenses
-    WHERE is_active = true AND expense_date BETWEEN $1 AND $2
+    WHERE expense_date BETWEEN $1 AND $2
       ${buildingFilter}
   `;
 
@@ -363,13 +361,12 @@ async function getMaintenanceStatsData(dateFrom: string, dateTo: string, buildin
   const query = `
     SELECT 
       COUNT(*) as total,
-      COUNT(*) FILTER (WHERE mr.request_status = 'pending') as pending,
-      COUNT(*) FILTER (WHERE mr.request_status = 'in_progress') as in_progress,
-      COUNT(*) FILTER (WHERE mr.request_status = 'completed') as completed
+      COUNT(*) FILTER (WHERE mr.status = 'pending') as pending,
+      COUNT(*) FILTER (WHERE mr.status = 'in_progress') as in_progress,
+      COUNT(*) FILTER (WHERE mr.status = 'completed') as completed
     FROM maintenance_requests mr
     LEFT JOIN rooms r ON mr.room_id = r.id
-    WHERE mr.is_active = true 
-      AND mr.request_date BETWEEN $1 AND $2
+    WHERE mr.request_date BETWEEN $1 AND $2
       ${buildingFilter.replace('building_id', 'r.building_id')}
   `;
   
@@ -393,20 +390,20 @@ async function getMaintenanceStats(dateFrom: string, dateTo: string, buildingFil
 async function getAssetUtilizationData(buildingFilter: string) {
   const query = `
     SELECT 
-      a.asset_category,
+      a.asset_type,
       COUNT(*) as total,
       COUNT(*) FILTER (WHERE a.asset_status = 'assigned') as assigned,
       COUNT(*) FILTER (WHERE a.asset_status = 'available') as available,
       COUNT(*) FILTER (WHERE a.asset_status = 'maintenance') as maintenance
     FROM assets a
     WHERE a.is_active = true ${buildingFilter.replace('building_id', 'a.building_id')}
-    GROUP BY a.asset_category
+    GROUP BY a.asset_type
     ORDER BY total DESC
   `;
   
   const result = await pool.query(query);
   return result.rows.map(row => ({
-    category: row.asset_category,
+    category: row.asset_type,
     total: parseInt(row.total),
     assigned: parseInt(row.assigned || 0),
     available: parseInt(row.available || 0),

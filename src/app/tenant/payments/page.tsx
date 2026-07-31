@@ -34,6 +34,7 @@ import PaymentForm from '@/components/features/tenant/PaymentForm';
 import DepositPaymentForm from '@/components/features/tenant/DepositPaymentForm';
 import UtilityDepositForm from '@/components/features/tenant/UtilityDepositForm';
 import ManualPaymentForm from '@/components/features/tenant/ManualPaymentForm';
+import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 
 interface Payment {
   id: string;
@@ -95,6 +96,7 @@ interface BalanceData {
 
 export default function PaymentsPage() {
   const { data: session, status } = useSession();
+  const { canAccess, isPreview, isLoading: gateLoading } = useTenantPortalGate();
   const router = useRouter();
   const [paymentData, setPaymentData] = useState<PaymentSummary | null>(null);
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null);
@@ -111,14 +113,15 @@ export default function PaymentsPage() {
   const { showNotification } = useNotifications();
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
+    if (gateLoading || status === 'loading') return;
+    if (canAccess) {
       fetchPaymentData();
       fetchDepositData();
       fetchUtilityDepositData();
     } else if (status === 'unauthenticated') {
       router.push('/auth/signin?role=tenant');
     }
-  }, [status, session, router]);
+  }, [status, session, router, canAccess, gateLoading]);
 
   const fetchPaymentData = async () => {
     try {
@@ -346,7 +349,7 @@ export default function PaymentsPage() {
       return matchesStatus && matchesSearch;
     });
 
-  if (status === 'loading') {
+  if (status === 'loading' || gateLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -357,7 +360,7 @@ export default function PaymentsPage() {
     );
   }
 
-  if (!session || session.user.role !== 'tenant') {
+  if (!canAccess) {
     return null;
   }
 
@@ -493,9 +496,11 @@ export default function PaymentsPage() {
                         Please make a payment to avoid additional late fees. Late payments may result in additional charges.
                       </p>
                       <div className="mt-3">
-                        <Button variant="success" size="sm" onClick={handleMakePayment}>
-                          Make Payment Now
-                        </Button>
+                        {!isPreview && (
+                          <Button variant="success" size="sm" onClick={handleMakePayment}>
+                            Make Payment Now
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -591,14 +596,16 @@ export default function PaymentsPage() {
                           <div className="text-sm text-gray-900 mb-4">
                             Due: {formatDate(balanceData?.nextDueDate || paymentData?.nextDueDate || '')}
                           </div>
-                          <Button
-                            variant="success"
-                            size="lg"
-                            onClick={handleMakePayment}
-                            leftIcon={<CreditCard className="h-5 w-5" />}
-                          >
-                            Pay Now
-                          </Button>
+                          {!isPreview && (
+                            <Button
+                              variant="success"
+                              size="lg"
+                              onClick={handleMakePayment}
+                              leftIcon={<CreditCard className="h-5 w-5" />}
+                            >
+                              Pay Now
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

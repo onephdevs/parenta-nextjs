@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Session } from 'next-auth';
 import { useSession } from 'next-auth/react';
 import { User, Lock, Camera } from 'lucide-react';
@@ -36,6 +36,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
     state: '',
     zipCode: '',
     bio: '',
+    avatarUrl: '',
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -43,6 +44,8 @@ export default function ProfileClient({ session }: ProfileClientProps) {
     newPassword: '',
     confirmPassword: '',
   });
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +65,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
             state: data.data.state || '',
             zipCode: data.data.zipCode || '',
             bio: data.data.bio || '',
+            avatarUrl: data.data.avatarUrl || '',
           }));
         }
       } catch {
@@ -141,6 +145,32 @@ export default function ProfileClient({ session }: ProfileClientProps) {
     return `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`;
   };
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload photo');
+      }
+      setProfileData((prev) => ({ ...prev, avatarUrl: data.data.avatarUrl }));
+      showSuccess('Profile photo updated');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to upload photo');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -163,14 +193,32 @@ export default function ProfileClient({ session }: ProfileClientProps) {
               <CardBody className="p-6">
                 <div className="flex flex-col items-center">
                   <div className="relative">
-                    <div className="h-32 w-32 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
-                      {getInitials()}
-                    </div>
+                    {profileData.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={profileData.avatarUrl}
+                        alt="Profile"
+                        className="h-32 w-32 rounded-full object-cover shadow-lg"
+                      />
+                    ) : (
+                      <div className="h-32 w-32 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
+                        {getInitials()}
+                      </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handlePhotoChange}
+                    />
                     <IconButton
                       label="Change profile photo"
                       variant="outline"
                       size="sm"
                       className="absolute bottom-0 right-0 bg-white shadow-lg"
+                      isLoading={isUploadingPhoto}
+                      onClick={() => fileInputRef.current?.click()}
                     >
                       <Camera className="w-5 h-5" />
                     </IconButton>

@@ -28,6 +28,7 @@ import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { StatCard } from '@/components/ui/StatCard';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 
 interface Document {
   id: string;
@@ -48,6 +49,7 @@ interface DocumentsData {
 
 export default function DocumentsPage() {
   const { data: session, status } = useSession();
+  const { canAccess, isLoading: gateLoading } = useTenantPortalGate();
   const router = useRouter();
   const [documentsData, setDocumentsData] = useState<DocumentsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,15 +107,16 @@ export default function DocumentsPage() {
   };
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
+    if (gateLoading || status === 'loading') return;
+    if (canAccess) {
       fetchDocuments();
     } else if (status === 'unauthenticated') {
       router.push('/auth/signin?role=tenant');
     }
-  }, [status, session, router]);
+  }, [status, session, router, canAccess, gateLoading]);
 
   // Show loading state while checking authentication
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading' || gateLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b border-gray-200">
@@ -133,9 +136,8 @@ export default function DocumentsPage() {
     );
   }
 
-  // Redirect if not authenticated or not tenant
-  if (!session || session.user.role !== 'tenant') {
-    return null; // Will redirect via useEffect
+  if (!canAccess) {
+    return null;
   }
 
   const handleDownload = (document: Document) => {

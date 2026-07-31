@@ -205,7 +205,7 @@ export default function TenantsList({ tenants }: TenantsListProps) {
             }
           />
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredAndSortedTenants.map((tenant) => (
               <TenantCard key={tenant.id} tenant={tenant} />
             ))}
@@ -236,26 +236,35 @@ export default function TenantsList({ tenants }: TenantsListProps) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{tenant.phone || 'No phone'}</TableCell>
+                  <TableCell>
+                    {tenant.phone ? (
+                      tenant.phone
+                    ) : (
+                      <span className="text-gray-400 italic">No phone</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <TenantStatusBadge status={tenant.tenantStatus} />
                   </TableCell>
                   <TableCell>
-                    {tenant.monthlyIncome
-                      ? formatCurrency(tenant.monthlyIncome)
-                      : 'Not specified'}
+                    {tenant.monthlyIncome ? (
+                      formatCurrency(tenant.monthlyIncome)
+                    ) : (
+                      <span className="text-gray-400 italic">Not specified</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    {tenant.moveInDate
-                      ? new Date(tenant.moveInDate).toLocaleDateString()
-                      : 'Not set'}
+                    {tenant.moveInDate ? (
+                      new Date(tenant.moveInDate).toLocaleDateString()
+                    ) : (
+                      <span className="text-gray-400 italic">Not set</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link
-                      href={`/admin/tenants/${tenant.id}`}
-                      className="text-sm font-medium text-purple-600 hover:text-purple-900"
-                    >
-                      View Details
+                    <Link href={`/admin/tenants/${tenant.id}`}>
+                      <Button size="sm" variant="outline">
+                        View Details
+                      </Button>
                     </Link>
                   </TableCell>
                 </TableRow>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getPaymentById, updatePayment, deletePayment } from '@/lib/api/payments';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -55,7 +56,24 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const before = await getPaymentById(id);
     const payment = await updatePayment(id, body);
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'payment.updated',
+      category: 'payments',
+      entityType: 'payment',
+      entityId: id,
+      entityLabel: before
+        ? `₱${Number(before.amount ?? payment.amount).toLocaleString()}`
+        : id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: payment as unknown as Record<string, unknown>,
+      link: '/admin/financial/payments',
+      metadata: { link: '/admin/financial/payments' },
+    });
     
     return NextResponse.json({
       success: true,
@@ -88,8 +106,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    
+    const before = await getPaymentById(id);
+
     await deletePayment(id);
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'payment.deleted',
+      category: 'payments',
+      entityType: 'payment',
+      entityId: id,
+      entityLabel: before ? `₱${Number(before.amount).toLocaleString()}` : id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/financial/payments',
+      metadata: { link: '/admin/financial/payments' },
+    });
     
     return NextResponse.json({
       success: true,

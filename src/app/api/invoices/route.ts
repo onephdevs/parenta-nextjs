@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getInvoices, createInvoice } from '@/lib/api/invoices';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -106,6 +107,23 @@ export async function POST(request: NextRequest) {
     };
 
     const invoice = await createInvoice(invoiceData);
+    const invoiceId = String(invoice.id || invoice.invoiceId || '');
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'invoice.created',
+      category: 'invoices',
+      entityType: 'invoice',
+      entityId: invoiceId || null,
+      entityLabel: invoice.invoiceNumber || invoice.invoice_number || invoiceId || null,
+      afterData: invoice as unknown as Record<string, unknown>,
+      link: tenantId ? `/admin/tenants/${tenantId}` : '/admin/financial/invoices',
+      metadata: {
+        link: tenantId ? `/admin/tenants/${tenantId}` : '/admin/financial/invoices',
+        tenantId,
+      },
+    });
     
     return NextResponse.json({ 
       success: true,

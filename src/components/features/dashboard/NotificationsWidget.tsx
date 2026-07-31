@@ -29,7 +29,7 @@ export default function NotificationsWidget() {
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/dashboard/notifications');
+      const response = await fetch('/api/notifications?limit=10', { credentials: 'include' });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.statusText}`);
@@ -38,7 +38,25 @@ export default function NotificationsWidget() {
       const data = await response.json();
 
       if (data.success) {
-        setNotifications(data.data.notifications || []);
+        setNotifications(
+          (data.data.items || []).map((n: {
+            id: string;
+            actionType?: string;
+            title: string;
+            body: string;
+            priority?: string;
+            isRead: boolean;
+            createdAt: string;
+          }) => ({
+            id: n.id,
+            type: n.actionType || 'info',
+            title: n.title,
+            message: n.body,
+            priority: n.priority || 'normal',
+            isRead: n.isRead,
+            createdAt: n.createdAt,
+          }))
+        );
         setUnreadCount(data.data.unreadCount || 0);
       } else {
         console.error('API returned error:', data.error);
@@ -132,7 +150,7 @@ export default function NotificationsWidget() {
           )}
         </div>
         <Link
-          href="/admin/notifications"
+          href="/admin/settings?tab=notifications"
           className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
         >
           View All <ArrowRight className="h-4 w-4 ml-1" />

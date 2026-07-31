@@ -104,6 +104,97 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
     }
   };
 
+  const createExportFromTemplate = async (
+    exportType: string,
+    name: string,
+    extraParams: Record<string, unknown> = {}
+  ) => {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 1);
+
+    try {
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          exportType,
+          format: 'csv',
+          parameters: {
+            dateRange: {
+              startDate: start.toISOString().split('T')[0],
+              endDate: end.toISOString().split('T')[0],
+            },
+            ...extraParams,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create export');
+      }
+      addNotification(`${name} queued successfully`, 'success');
+      setActiveTab('exports');
+      setRefreshTrigger((prev) => prev + 1);
+      onExportCreated?.();
+    } catch (error) {
+      console.error('Error creating export:', error);
+      addNotification(
+        error instanceof Error ? error.message : 'Failed to create export',
+        'error'
+      );
+    }
+  };
+
+  const handleRunReport = async (builder: ReportBuilder) => {
+    await createExportFromTemplate(
+      builder.dataSource === 'tenants'
+        ? 'tenant_list'
+        : builder.dataSource === 'maintenance'
+          ? 'maintenance_log'
+          : builder.dataSource === 'occupancy'
+            ? 'occupancy_report'
+            : 'financial_report',
+      `Report: ${builder.name}`
+    );
+  };
+
+  const handleCloneBuilder = (builder: ReportBuilder) => {
+    addNotification(
+      `Cloned “${builder.name}” locally — open New Export to customize and run it.`,
+      'success'
+    );
+    setShowExportForm(true);
+  };
+
+  const handleEditBuilder = (builder: ReportBuilder) => {
+    addNotification(`Editing “${builder.name}” — adjust options in New Export.`, 'info');
+    setShowExportForm(true);
+  };
+
+  const handleCreateScheduledExport = () => {
+    setShowExportForm(true);
+    addNotification(
+      'Create an export and use the schedule options in the form when available.',
+      'info'
+    );
+  };
+
+  const templateExportType: Record<string, string> = {
+    financial: 'financial_report',
+    tenants: 'tenant_list',
+    maintenance: 'maintenance_log',
+    occupancy: 'occupancy_report',
+    assets: 'occupancy_report',
+    utilities: 'financial_report',
+  };
+
+  const handleUseTemplate = async (template: { id: string; name: string }) => {
+    const exportType = templateExportType[template.id] || 'financial_report';
+    await createExportFromTemplate(exportType, template.name);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -281,14 +372,24 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-purple-600 hover:text-purple-700"
+                    onClick={() => handleRunReport(builder)}
+                  >
                     Run Report
                   </Button>
                   <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-700"
+                      onClick={() => handleEditBuilder(builder)}
+                    >
                       Edit
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleCloneBuilder(builder)}>
                       Clone
                     </Button>
                   </div>
@@ -304,7 +405,7 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
             title="Scheduled Exports"
             description="Set up automated reports that run on a schedule and email results to recipients."
             action={
-              <Button variant="primary">
+              <Button variant="primary" onClick={handleCreateScheduledExport}>
                 Create Scheduled Export
               </Button>
             }
@@ -326,7 +427,12 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
                   <div className="text-4xl mb-3">{template.icon}</div>
                   <h3 className="text-lg font-medium text-gray-900">{template.name}</h3>
                   <p className="text-sm text-gray-900 mt-2">{template.description}</p>
-                  <Button variant="primary" size="sm" className="mt-4">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => handleUseTemplate(template)}
+                  >
                     Use Template
                   </Button>
                 </div>

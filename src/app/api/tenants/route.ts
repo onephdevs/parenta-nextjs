@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAllTenants, createTenant } from '../../../lib/api/tenants';
 import { createTenantWithUser } from '@/lib/api/tenant-user-link';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET() {
   try {
@@ -33,7 +34,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const tenantData = await request.json();
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
     
     // Check if this should create a user account too
     const createUserAccount = tenantData.createUserAccount !== false; // Default to true
+    const entityLabel = `${tenantData.firstName} ${tenantData.lastName}`.trim();
     
     if (createUserAccount) {
       // Create both user account and tenant profile (linked)
@@ -75,6 +77,25 @@ export async function POST(request: Request) {
         leaseEndDate: tenantData.leaseEndDate,
         notes: tenantData.notes,
       });
+
+      logActivitySafe({
+        actorUserId: session?.user?.id || null,
+        actorRole: 'admin',
+        actionType: 'tenant.created',
+        category: 'tenants',
+        entityType: 'tenant',
+        entityId: result.tenantId,
+        entityLabel,
+        beforeData: null,
+        afterData: {
+          id: result.tenantId,
+          firstName: tenantData.firstName,
+          lastName: tenantData.lastName,
+          email: tenantData.email,
+        },
+        link: `/admin/tenants/${result.tenantId}`,
+        metadata: { link: `/admin/tenants/${result.tenantId}` },
+      });
       
       return NextResponse.json({
         success: true,
@@ -90,6 +111,21 @@ export async function POST(request: Request) {
     } else {
       // Create only tenant profile (for existing users or manual linking)
       const tenant = await createTenant(tenantData);
+      const tenantId = String(tenant.id || tenant.tenantId || '');
+
+      logActivitySafe({
+        actorUserId: session?.user?.id || null,
+        actorRole: 'admin',
+        actionType: 'tenant.created',
+        category: 'tenants',
+        entityType: 'tenant',
+        entityId: tenantId || null,
+        entityLabel,
+        beforeData: null,
+        afterData: tenant as unknown as Record<string, unknown>,
+        link: tenantId ? `/admin/tenants/${tenantId}` : null,
+        metadata: { link: tenantId ? `/admin/tenants/${tenantId}` : null },
+      });
       
       return NextResponse.json({
         success: true,
@@ -99,7 +135,25 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error('Create tenant error:', error);
-    
+
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      if (
+        msg.includes('email already exists') ||
+        msg.includes('duplicate key') ||
+        msg.includes('unique constraint')
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Email already exists',
+            details: 'A user or tenant with this email address already exists',
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { 
         success: false, 

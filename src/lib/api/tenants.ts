@@ -113,6 +113,7 @@ export async function getAllTenants(options?: {
       FROM tenants t
       LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id 
         AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date::date >= CURRENT_DATE)
       LEFT JOIN rooms r ON tra.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       ${whereClause}
@@ -195,7 +196,9 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
       FROM tenant_room_assignments ra
       JOIN rooms r ON ra.room_id = r.id
       JOIN buildings b ON r.building_id = b.id
-      WHERE ra.tenant_id = $1 AND ra.assignment_status = 'active'
+      WHERE ra.tenant_id = $1
+        AND ra.assignment_status = 'active'
+        AND (ra.end_date IS NULL OR ra.end_date::date >= CURRENT_DATE)
       ORDER BY ra.start_date DESC
       LIMIT 1
     `;

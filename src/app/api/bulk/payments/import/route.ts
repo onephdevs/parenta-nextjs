@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { importPaymentsFromCSV } from '@/lib/services/bulk-operations-service';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 /**
  * POST /api/bulk/payments/import
@@ -32,6 +33,24 @@ export async function POST(request: NextRequest) {
     
     const userId = (session.user as any)?.id;
     const result = await importPaymentsFromCSV(payments, userId);
+
+    if (result.successful > 0) {
+      logActivitySafe({
+        actorUserId: userId || null,
+        actorRole: 'admin',
+        actionType: 'bulk.payments_imported',
+        category: 'system',
+        entityType: 'bulk_operation',
+        entityLabel: `${result.successful} payment(s) imported`,
+        afterData: {
+          successful: result.successful,
+          failed: result.failed,
+          total: payments.length,
+        },
+        link: '/admin/bulk-operations',
+        metadata: { link: '/admin/bulk-operations' },
+      });
+    }
     
     if (!result.success) {
       return NextResponse.json(

@@ -20,7 +20,7 @@ interface CreditTransaction {
 }
 
 interface TenantCreditsManagerProps {
-  tenantId: number;
+  tenantId: string;
   tenantName: string;
 }
 

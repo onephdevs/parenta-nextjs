@@ -8,6 +8,8 @@ import RoomFinancialDashboard from './RoomFinancialDashboard';
 import EditRoomForm from './EditRoomForm';
 import RoomDetailWithImages from './RoomDetailWithImages';
 import DeleteRoomModal from './DeleteRoomModal';
+import { AmenityBadges } from '@/components/domain/AmenityBadges';
+import { normalizeAmenities } from '@/lib/format/amenities';
 
 interface Room {
   id: string;
@@ -316,14 +318,10 @@ export default function RoomDetailClient({ roomDetails: initialData }: RoomDetai
             )}
 
             {/* Amenities */}
-            {roomDetails.room.amenities && (
-              <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
-                <h3 className="text-lg font-medium text-gray-900 mb-3">Amenities</h3>
-                <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
-                  {String(roomDetails.room.amenities || '')}
-                </div>
-              </div>
-            )}
+            <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Amenities</h3>
+              <AmenityBadges amenities={normalizeAmenities(roomDetails.room.amenities)} />
+            </div>
           </div>
         )}
 

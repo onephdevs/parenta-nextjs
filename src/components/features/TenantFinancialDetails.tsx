@@ -57,7 +57,7 @@ interface Deposit {
 }
 
 interface TenantFinancialDetailsProps {
-  tenantId: number;
+  tenantId: string;
 }
 
 export default function TenantFinancialDetails({ tenantId }: TenantFinancialDetailsProps) {

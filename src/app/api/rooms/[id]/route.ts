@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getRoomById, updateRoom, deleteRoom } from '../../../../lib/api/rooms';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -45,13 +46,28 @@ export async function GET(request: Request, { params }: RouteParams) {
 
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;
     const roomData = await request.json();
+    const before = await getRoomById(id);
     
     const room = await updateRoom(id, roomData);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'room.updated',
+      category: 'buildings',
+      entityType: 'room',
+      entityId: id,
+      entityLabel: room.roomNumber || room.room_number || before?.roomNumber || before?.room_number || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: room as unknown as Record<string, unknown>,
+      link: `/admin/rooms/${id}`,
+      metadata: { link: `/admin/rooms/${id}` },
+    });
     
     return NextResponse.json({
       success: true,
@@ -76,12 +92,27 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;
+    const before = await getRoomById(id);
     
     await deleteRoom(id);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'room.deleted',
+      category: 'buildings',
+      entityType: 'room',
+      entityId: id,
+      entityLabel: before?.roomNumber || before?.room_number || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/rooms',
+      metadata: { link: '/admin/rooms' },
+    });
     
     return NextResponse.json({
       success: true,

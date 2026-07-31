@@ -12,18 +12,24 @@ import { FormField } from '@/components/forms/FormField';
 import { FileText, Undo2 } from 'lucide-react';
 
 interface DepositTransaction {
-  id: number;
+  id: string;
   amount: number;
-  transactionType: 'deposit' | 'applied_to_invoice' | 'refund';
-  description: string;
-  relatedInvoiceId?: number;
-  paymentMethod?: string;
-  referenceNumber?: string;
+  transactionType: 'deposit' | 'applied' | 'refund' | 'adjustment' | string;
+  description?: string;
+  appliedToInvoiceId?: string;
+  invoiceNumber?: string;
   createdAt: string;
 }
 
+interface OutstandingInvoice {
+  id: string;
+  invoiceNumber: string;
+  balanceDue: number;
+  status?: string;
+}
+
 interface DepositLedgerManagerProps {
-  tenantId: number;
+  tenantId: string;
   tenantName: string;
 }
 
@@ -32,6 +38,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
   const { formatCurrency } = useCurrency();
   const [balance, setBalance] = useState<number>(0);
   const [history, setHistory] = useState<DepositTransaction[]>([]);
+  const [outstandingInvoices, setOutstandingInvoices] = useState<OutstandingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showActionForm, setShowActionForm] = useState(false);
   const [actionType, setActionType] = useState<'refund' | 'apply' | null>(null);
@@ -46,26 +53,67 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
 
   const loadDepositData = async () => {
     try {
-      const [balanceRes, historyRes] = await Promise.all([
+      const [balanceRes, historyRes, invoicesRes] = await Promise.all([
         fetch(`/api/deposit-ledger/${tenantId}?type=balance`),
         fetch(`/api/deposit-ledger/${tenantId}?type=history`),
+        fetch(`/api/invoices?tenantId=${tenantId}&limit=50`),
       ]);
 
       if (balanceRes.ok) {
         const balanceData = await balanceRes.json();
-        const balance =
+        const nextBalance =
           typeof balanceData.data === 'number'
             ? balanceData.data
             : balanceData.data?.balance || balanceData.balance || 0;
-        setBalance(balance);
+        setBalance(nextBalance);
       }
 
       if (historyRes.ok) {
         const historyData = await historyRes.json();
-        const history = Array.isArray(historyData.data)
+        const rows = Array.isArray(historyData.data)
           ? historyData.data
           : historyData.history || [];
-        setHistory(history);
+        setHistory(
+          rows.map((item: Record<string, unknown>) => ({
+            id: String(item.id),
+            amount: Number(item.amount || 0),
+            transactionType: String(item.transactionType || item.transaction_type || ''),
+            description: (item.description as string) || undefined,
+            appliedToInvoiceId: (item.appliedToInvoiceId ||
+              item.applied_to_invoice_id ||
+              item.relatedInvoiceId) as string | undefined,
+            invoiceNumber: item.invoiceNumber as string | undefined,
+            createdAt: String(
+              item.createdAt || item.created_at || item.transactionDate || new Date().toISOString()
+            ),
+          }))
+        );
+      }
+
+      if (invoicesRes.ok) {
+        const invoicesData = await invoicesRes.json();
+        const invoices = Array.isArray(invoicesData.data?.invoices)
+          ? invoicesData.data.invoices
+          : Array.isArray(invoicesData.invoices)
+            ? invoicesData.invoices
+            : Array.isArray(invoicesData.data)
+              ? invoicesData.data
+              : [];
+
+        setOutstandingInvoices(
+          invoices
+            .map((inv: Record<string, unknown>) => ({
+              id: String(inv.id),
+              invoiceNumber: String(inv.invoiceNumber || inv.invoice_number || inv.id),
+              balanceDue: Number(inv.balanceDue ?? inv.balance_due ?? 0),
+              status: String(inv.status || inv.invoiceStatus || inv.invoice_status || ''),
+            }))
+            .filter(
+              (inv: OutstandingInvoice) =>
+                inv.balanceDue > 0 &&
+                !['paid', 'cancelled', 'void', 'draft'].includes((inv.status || '').toLowerCase())
+            )
+        );
       }
     } catch (error) {
       console.error('Error loading deposit data:', error);
@@ -82,6 +130,11 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!actionType) {
+      addNotification('Please choose an action', 'error');
+      return;
+    }
+
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       addNotification('Please enter a valid amount', 'error');
       return;
@@ -92,9 +145,15 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
       return;
     }
 
+    if (actionType === 'apply' && !formData.invoiceId) {
+      addNotification('Please select an invoice to apply the deposit to', 'error');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
+      // API expects: { tenantId, amount, action, invoiceId?, description? }
       const response = await fetch('/api/deposit-ledger', {
         method: 'POST',
         headers: {
@@ -103,11 +162,14 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
         body: JSON.stringify({
           tenantId,
           amount: parseFloat(formData.amount),
-          transactionType: actionType === 'refund' ? 'refund' : 'applied_to_invoice',
-          description: formData.description || `Manual ${actionType} by admin`,
-          relatedInvoiceId: actionType === 'apply' ? parseInt(formData.invoiceId) : null,
-          paymentMethod: actionType === 'refund' ? formData.paymentMethod : null,
-          referenceNumber: formData.referenceNumber || null,
+          action: actionType,
+          invoiceId: actionType === 'apply' ? formData.invoiceId : undefined,
+          paymentMethod: actionType === 'refund' ? formData.paymentMethod : undefined,
+          description:
+            formData.description ||
+            (actionType === 'refund'
+              ? `Deposit refund via ${formData.paymentMethod.replace(/_/g, ' ')}`
+              : 'Deposit applied to invoice'),
         }),
       });
 
@@ -158,6 +220,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
         return 'text-green-600 bg-green-50 border-green-200';
       case 'refund':
         return 'text-red-600 bg-red-50 border-red-200';
+      case 'applied':
       case 'applied_to_invoice':
         return 'text-purple-600 bg-purple-50 border-purple-200';
       default:
@@ -179,6 +242,7 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
           </svg>
         );
+      case 'applied':
       case 'applied_to_invoice':
         return (
           <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,15 +356,26 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
               </FormField>
 
               {actionType === 'apply' ? (
-                <FormField htmlFor="invoiceId" label="Invoice ID" required>
-                  <Input
+                <FormField htmlFor="invoiceId" label="Invoice" required>
+                  <Select
                     id="invoiceId"
-                    type="number"
                     value={formData.invoiceId}
                     onChange={(e) => setFormData({ ...formData, invoiceId: e.target.value })}
-                    placeholder="Enter invoice ID"
                     required
-                  />
+                  >
+                    <option value="">Select outstanding invoice</option>
+                    {outstandingInvoices.length === 0 ? (
+                      <option value="" disabled>
+                        No unpaid invoices found
+                      </option>
+                    ) : (
+                      outstandingInvoices.map((invoice) => (
+                        <option key={invoice.id} value={invoice.id}>
+                          {invoice.invoiceNumber} — {formatCurrency(invoice.balanceDue)} due
+                        </option>
+                      ))
+                    )}
+                  </Select>
                 </FormField>
               ) : (
                 <FormField htmlFor="paymentMethod" label="Refund Method" required>
@@ -325,16 +400,6 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="e.g., Final refund, Partial application"
-                />
-              </FormField>
-
-              <FormField htmlFor="referenceNumber" label="Reference Number (Optional)">
-                <Input
-                  id="referenceNumber"
-                  type="text"
-                  value={formData.referenceNumber}
-                  onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-                  placeholder="Transaction reference"
                 />
               </FormField>
             </div>
@@ -365,17 +430,11 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-900 capitalize">
-                        {transaction.transactionType.replace('_', ' ')}
+                        {transaction.transactionType.replace(/_/g, ' ')}
                       </p>
-                      <p className="text-xs text-gray-900 mt-1">{transaction.description}</p>
-                      {transaction.paymentMethod && (
-                        <p className="text-xs text-gray-900 mt-1">
-                          Method: {transaction.paymentMethod.replace('_', ' ')}
-                        </p>
-                      )}
-                      {transaction.referenceNumber && (
-                        <p className="text-xs text-gray-900">Ref: {transaction.referenceNumber}</p>
-                      )}
+                      <p className="text-xs text-gray-900 mt-1">
+                        {transaction.description || 'No description'}
+                      </p>
                       <p className="text-xs text-gray-900 mt-1">{formatDate(transaction.createdAt)}</p>
                     </div>
                     <div className="text-right">
@@ -387,12 +446,14 @@ export default function DepositLedgerManager({ tenantId, tenantName }: DepositLe
                         {transaction.transactionType === 'deposit' ? '+' : '-'}
                         {formatCurrency(Math.abs(transaction.amount))}
                       </p>
-                      {transaction.relatedInvoiceId && (
+                      {transaction.appliedToInvoiceId && (
                         <a
-                          href={`/admin/financial/invoices/${transaction.relatedInvoiceId}`}
+                          href={`/admin/financial/invoices/${transaction.appliedToInvoiceId}`}
                           className="text-xs text-purple-600 hover:text-purple-900"
                         >
-                          View Invoice →
+                          {transaction.invoiceNumber
+                            ? `View ${transaction.invoiceNumber} →`
+                            : 'View Invoice →'}
                         </a>
                       )}
                     </div>

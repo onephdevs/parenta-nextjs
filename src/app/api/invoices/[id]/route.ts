@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getInvoiceById, updateInvoice, deleteInvoice } from '@/lib/api/invoices';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -77,11 +78,31 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (body.notes !== undefined) updates.notes = body.notes;
     if (body.paidAmount !== undefined) updates.paidAmount = parseFloat(body.paidAmount);
 
+    const before = await getInvoiceById(id);
     const invoice = await updateInvoice(id, updates);
     
     if (!invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'invoice.updated',
+      category: 'invoices',
+      entityType: 'invoice',
+      entityId: id,
+      entityLabel:
+        invoice.invoiceNumber ||
+        invoice.invoice_number ||
+        before?.invoiceNumber ||
+        before?.invoice_number ||
+        id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: invoice as unknown as Record<string, unknown>,
+      link: '/admin/financial/invoices',
+      metadata: { link: '/admin/financial/invoices' },
+    });
     
     return NextResponse.json({
       success: true,
@@ -111,11 +132,27 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Invalid invoice ID' }, { status: 400 });
     }
 
+    const before = await getInvoiceById(id);
     const deleted = await deleteInvoice(id);
     
     if (!deleted) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'invoice.deleted',
+      category: 'invoices',
+      entityType: 'invoice',
+      entityId: id,
+      entityLabel:
+        before?.invoiceNumber || before?.invoice_number || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/financial/invoices',
+      metadata: { link: '/admin/financial/invoices' },
+    });
     
     return NextResponse.json({
       success: true,

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { getTenantByUserId } from '@/lib/api/tenant-user-link';
+import { requireTenantAccess } from '@/lib/api/require-tenant-access';
 import { generatePaymentHistoryReportExcel } from '@/lib/services/excel-export-service';
 import { generatePaymentHistoryReportPDF } from '@/lib/services/pdf-export-service';
 import pool from '@/lib/db';
@@ -12,27 +10,11 @@ import pool from '@/lib/db';
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    const tenant = await getTenantByUserId(userId);
-    
-    if (!tenant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
+    // Exports are read-only views of data — allow in preview
+    const access = await requireTenantAccess();
+    if (access.error) return access.error;
+
+    const { tenant } = access;
     
     const body = await request.json();
     const { reportType, format, dateFrom, dateTo } = body;

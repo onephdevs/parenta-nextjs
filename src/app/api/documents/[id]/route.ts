@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getDocumentById, updateDocument, deleteDocument } from '@/lib/api/documents';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -91,6 +92,25 @@ export async function PUT(
 
     const document = await updateDocument(id, updates);
 
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'document.updated',
+      category: 'documents',
+      entityType: 'document',
+      entityId: id,
+      entityLabel:
+        document.documentName ||
+        document.document_name ||
+        existingDocument.documentName ||
+        existingDocument.document_name ||
+        id,
+      beforeData: existingDocument as unknown as Record<string, unknown>,
+      afterData: document as unknown as Record<string, unknown>,
+      link: `/admin/documents/${id}/edit`,
+      metadata: { link: `/admin/documents/${id}/edit` },
+    });
+
     return NextResponse.json({
       success: true,
       data: document,
@@ -153,6 +173,21 @@ export async function DELETE(
         error: 'Failed to delete document' 
       }, { status: 500 });
     }
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'document.deleted',
+      category: 'documents',
+      entityType: 'document',
+      entityId: id,
+      entityLabel:
+        existingDocument.documentName || existingDocument.document_name || id,
+      beforeData: existingDocument as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/documents',
+      metadata: { link: '/admin/documents' },
+    });
 
     return NextResponse.json({
       success: true,

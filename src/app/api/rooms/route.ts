@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllRooms, createRoom } from '../../../lib/api/rooms';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: Request) {
   try {
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const roomData = await request.json();
@@ -64,6 +65,20 @@ export async function POST(request: Request) {
     }
     
     const room = await createRoom(roomData);
+    const roomId = String(room.id || room.roomId || '');
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'room.created',
+      category: 'buildings',
+      entityType: 'room',
+      entityId: roomId || null,
+      entityLabel: room.roomNumber || room.room_number || roomData.roomNumber || null,
+      afterData: room as unknown as Record<string, unknown>,
+      link: roomId ? `/admin/rooms/${roomId}` : '/admin/rooms',
+      metadata: { link: roomId ? `/admin/rooms/${roomId}` : '/admin/rooms' },
+    });
     
     return NextResponse.json({
       success: true,

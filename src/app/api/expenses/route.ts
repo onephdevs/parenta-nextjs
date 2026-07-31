@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getExpenses, createExpense } from '@/lib/api/expenses';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -119,6 +120,20 @@ export async function POST(request: NextRequest) {
     };
 
     const expense = await createExpense(expenseData);
+    const expenseId = String(expense.id || '');
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'expense.created',
+      category: 'expenses',
+      entityType: 'expense',
+      entityId: expenseId || null,
+      entityLabel: description,
+      afterData: expense as unknown as Record<string, unknown>,
+      link: '/admin/financial/expenses',
+      metadata: { link: '/admin/financial/expenses' },
+    });
     
     return NextResponse.json({ expense }, { status: 201 });
   } catch (error) {

@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
 import GlobalSearchModal from '@/components/features/search/GlobalSearchModal';
-import { Bell, Search, Settings, Menu, X, ChevronRight } from 'lucide-react';
+import { NotificationBell } from '@/components/features/notifications/NotificationBell';
+import { Search, Settings, Menu, X, ChevronRight } from 'lucide-react';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -192,13 +193,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
               </button>
 
               {/* Notifications */}
-              <Link
-                href="/admin/notifications"
-                className="p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md relative"
-              >
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-              </Link>
+              <NotificationBell />
 
               {/* Settings */}
               <Link

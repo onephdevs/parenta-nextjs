@@ -1,10 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 import Link from 'next/link';
+import {
+  Building2,
+  Home,
+  Layers,
+  Ruler,
+  PhilippinePeso,
+  Wallet,
+} from 'lucide-react';
 import { Room } from '@/types/database';
 import QuickEditModal from './QuickEditModal';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { AmenityBadges } from '@/components/domain/AmenityBadges';
+import { RoomStatusBadge } from '@/components/domain/StatusBadges';
+import { normalizeAmenities } from '@/lib/format/amenities';
+import { cn } from '@/lib/utils';
 
 interface RoomCardProps {
   room: Room;
@@ -15,62 +29,52 @@ interface RoomCardProps {
   onSelectionChange?: (roomId: string, selected: boolean) => void;
 }
 
-export default function RoomCard({ 
-  room, 
-  buildingName, 
+function StatRow({
+  icon,
+  label,
+  children,
+  isEmpty = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+  isEmpty?: boolean;
+}) {
+  return (
+    <div className="flex min-h-[1.5rem] items-center justify-between gap-3 text-sm">
+      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+        <span className="text-gray-400">{icon}</span>
+        {label}
+      </span>
+      <span
+        className={cn(
+          'min-w-0 text-right font-medium',
+          isEmpty ? 'italic text-gray-400' : 'text-gray-900'
+        )}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+export default function RoomCard({
+  room,
+  buildingName,
   onRoomUpdate,
   selectionMode = false,
   isSelected = false,
-  onSelectionChange
+  onSelectionChange,
 }: RoomCardProps) {
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
   const [currentRoom, setCurrentRoom] = useState(room);
   const { formatCurrency } = useCurrency();
+  const amenities = normalizeAmenities(currentRoom.amenities);
 
   const handleRoomUpdate = (updatedRoom: Room) => {
     setCurrentRoom(updatedRoom);
     if (onRoomUpdate) {
       onRoomUpdate(updatedRoom);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'occupied': return 'bg-green-100 text-green-800 border-green-200';
-      case 'vacant': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'maintenance': return 'bg-red-100 text-red-800 border-red-200';
-      case 'reserved': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'occupied':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        );
-      case 'vacant':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        );
-      case 'maintenance':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        );
     }
   };
 
@@ -80,103 +84,128 @@ export default function RoomCard({
     }
   };
 
+  const monthlyRate = currentRoom.monthlyRate != null ? Number(currentRoom.monthlyRate) : null;
+  const depositAmount =
+    currentRoom.depositAmount != null ? Number(currentRoom.depositAmount) : null;
+  const hasRent = monthlyRate != null && monthlyRate > 0;
+  const hasDeposit = depositAmount != null && depositAmount > 0;
+
   return (
-    <div className={`bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200 relative ${
-      isSelected ? 'ring-2 ring-purple-500 border-purple-500' : ''
-    }`}>
+    <Card
+      padding="none"
+      className={cn(
+        'relative flex h-full flex-col border border-gray-100 shadow-sm',
+        'transition-all duration-200 hover:border-purple-100 hover:shadow-md',
+        isSelected && 'ring-2 ring-purple-500'
+      )}
+    >
       {selectionMode && (
         <div className="absolute top-3 right-3 z-10">
           <input
             type="checkbox"
             checked={isSelected}
             onChange={handleSelectionChange}
-            className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+            className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
           />
         </div>
       )}
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{currentRoom.roomNumber}</h3>
-            <p className="text-sm text-gray-900">{buildingName}</p>
+
+      <div className="flex h-full flex-col p-6">
+        <div className="mb-5 flex min-h-[4.25rem] items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3
+              className="text-xl font-bold leading-snug text-gray-900 line-clamp-2 break-words"
+              title={String(currentRoom.roomNumber)}
+            >
+              Room {currentRoom.roomNumber}
+            </h3>
+            <p
+              className="mt-1.5 flex items-start gap-1.5 text-sm leading-snug text-gray-500"
+              title={buildingName || 'Unknown building'}
+            >
+              <Building2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+              <span className="line-clamp-2 break-words">
+                {buildingName || 'Unknown building'}
+              </span>
+            </p>
           </div>
-          <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(currentRoom.roomStatus)}`}>
-            {getStatusIcon(currentRoom.roomStatus)}
-            <span className="ml-1 capitalize">{currentRoom.roomStatus}</span>
+          <div className="flex-shrink-0 pt-0.5">
+            <RoomStatusBadge status={currentRoom.roomStatus || 'vacant'} />
           </div>
         </div>
 
-        {/* Room Details */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-900">Type</span>
-            <span className="text-sm font-medium text-gray-900 capitalize">{currentRoom.roomType}</span>
-          </div>
+          <StatRow icon={<Home className="h-3.5 w-3.5" />} label="Type">
+            {currentRoom.roomType ? (
+              <span className="capitalize">{currentRoom.roomType}</span>
+            ) : (
+              '—'
+            )}
+          </StatRow>
 
-          {currentRoom.squareFootage && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-900">Size</span>
-              <span className="text-sm font-medium text-gray-900">{currentRoom.squareFootage} sq ft</span>
-            </div>
-          )}
+          <StatRow
+            icon={<Ruler className="h-3.5 w-3.5" />}
+            label="Size"
+            isEmpty={!currentRoom.squareFootage}
+          >
+            {currentRoom.squareFootage ? `${currentRoom.squareFootage} sq ft` : 'Not set'}
+          </StatRow>
 
-          {currentRoom.floorNumber && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-900">Floor</span>
-              <span className="text-sm font-medium text-gray-900">{currentRoom.floorNumber}</span>
-            </div>
-          )}
+          <StatRow
+            icon={<Layers className="h-3.5 w-3.5" />}
+            label="Floor"
+            isEmpty={currentRoom.floorNumber == null}
+          >
+            {currentRoom.floorNumber != null ? currentRoom.floorNumber : 'Not set'}
+          </StatRow>
 
-          {currentRoom.monthlyRate && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-900">Rent</span>
-              <span className="text-sm font-semibold text-gray-900">{formatCurrency(parseFloat(currentRoom.monthlyRate))}/mo</span>
-            </div>
-          )}
+          <StatRow
+            icon={<PhilippinePeso className="h-3.5 w-3.5" />}
+            label="Rent"
+            isEmpty={!hasRent}
+          >
+            {hasRent ? `${formatCurrency(monthlyRate!)}/mo` : 'No rent set'}
+          </StatRow>
 
-          {currentRoom.depositAmount && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-900">Deposit</span>
-              <span className="text-sm font-medium text-gray-900">{formatCurrency(parseFloat(currentRoom.depositAmount))}</span>
-            </div>
-          )}
+          <StatRow
+            icon={<Wallet className="h-3.5 w-3.5" />}
+            label="Deposit"
+            isEmpty={!hasDeposit}
+          >
+            {hasDeposit ? formatCurrency(depositAmount!) : 'No deposit set'}
+          </StatRow>
         </div>
 
-        {/* Amenities */}
-        {currentRoom.amenities && (
-          <div className="mt-4">
-            <div className="text-sm text-gray-900 mb-2">Amenities</div>
-            <div className="text-sm text-gray-900">
-              {currentRoom.amenities}
-            </div>
-          </div>
-        )}
+        <div className="mt-4 min-h-[3.5rem]">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+            Amenities
+          </p>
+          <AmenityBadges amenities={amenities} tone="purple" />
+        </div>
 
-        {/* Actions */}
-        <div className="mt-6 flex space-x-3">
-          <Link
-            href={`/admin/rooms/${room.id}`}
-            className="flex-1 bg-purple-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-          >
-            View Details
+        <div className="mt-auto flex gap-3 pt-6">
+          <Link href={`/admin/rooms/${room.id}`} className="flex-1">
+            <Button className="w-full" size="sm">
+              View Details
+            </Button>
           </Link>
-          <button 
+          <Button
+            className="flex-1"
+            variant="secondary"
+            size="sm"
             onClick={() => setIsQuickEditOpen(true)}
-            className="flex-1 bg-gray-100 text-gray-900 text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             Quick Edit
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Quick Edit Modal */}
       <QuickEditModal
         room={currentRoom}
         isOpen={isQuickEditOpen}
         onClose={() => setIsQuickEditOpen(false)}
         onUpdate={handleRoomUpdate}
       />
-    </div>
+    </Card>
   );
-} 
+}

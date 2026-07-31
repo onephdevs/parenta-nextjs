@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Session } from 'next-auth';
 import { Bell, Lock, Globe, Shield, Database } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -8,13 +9,27 @@ import { Select } from '@/components/ui/Select';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { useNotifications } from '@/hooks/useNotifications';
+import NotificationPreferencesPanel from '@/components/features/notifications/NotificationPreferencesPanel';
+import { useSearchParams } from 'next/navigation';
 
 interface SettingsClientProps {
   session: Session;
 }
 
 export default function SettingsClient({ session }: SettingsClientProps) {
-  const [activeTab, setActiveTab] = useState('notifications');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { showNotification } = useNotifications();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    tabParam === 'security' ||
+      tabParam === 'preferences' ||
+      tabParam === 'system' ||
+      tabParam === 'notifications'
+      ? tabParam
+      : 'notifications'
+  );
   const [settings, setSettings] = useState({
     emailNotifications: true,
     paymentReminders: true,
@@ -31,6 +46,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveMessageVariant, setSaveMessageVariant] = useState<'success' | 'danger'>('success');
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -78,18 +94,62 @@ export default function SettingsClient({ session }: SettingsClientProps) {
       if (data.success) {
         setSaveMessage('Settings saved successfully!');
         setSaveMessageVariant('success');
+        showNotification({
+          type: 'success',
+          title: 'Settings saved',
+          message: 'Your preferences have been updated.',
+        });
         setTimeout(() => setSaveMessage(''), 3000);
-        window.location.reload();
       } else {
         setSaveMessage('Failed to save settings');
         setSaveMessageVariant('danger');
       }
-    } catch (error) {
+    } catch {
       setSaveMessage('Failed to save settings');
       setSaveMessageVariant('danger');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    try {
+      // Clear client-side caches that affect admin UX
+      try {
+        localStorage.removeItem('parenta-settings-cache');
+        sessionStorage.clear();
+      } catch {
+        // ignore storage access errors
+      }
+
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+
+      showNotification({
+        type: 'success',
+        title: 'Cache cleared',
+        message: 'Browser and session cache cleared. Reloading…',
+      });
+      setTimeout(() => window.location.reload(), 600);
+    } catch {
+      showNotification({
+        type: 'error',
+        title: 'Clear cache failed',
+        message: 'Unable to clear cache. Try refreshing the page.',
+      });
+      setIsClearingCache(false);
+    }
+  };
+
+  const handleExportData = () => {
+    router.push('/admin/export');
+  };
+
+  const handleChangePassword = () => {
+    router.push('/admin/profile');
   };
 
   const tabs = [
@@ -141,61 +201,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
           <div className="p-6">
             {activeTab === 'notifications' && (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Email Notifications
-                  </h3>
-                  <div className="space-y-4">
-                    {[
-                      {
-                        key: 'emailNotifications' as const,
-                        label: 'Email Notifications',
-                        description: 'Receive notifications via email',
-                      },
-                      {
-                        key: 'paymentReminders' as const,
-                        label: 'Payment Reminders',
-                        description: 'Get notified about upcoming payments',
-                      },
-                      {
-                        key: 'maintenanceAlerts' as const,
-                        label: 'Maintenance Alerts',
-                        description: 'Receive maintenance request notifications',
-                      },
-                      {
-                        key: 'monthlyReports' as const,
-                        label: 'Monthly Reports',
-                        description: 'Receive monthly financial reports',
-                      },
-                    ].map(({ key, label, description }) => (
-                      <div key={key} className="flex items-center justify-between">
-                        <div>
-                          <label className="text-sm font-medium text-gray-900">
-                            {label}
-                          </label>
-                          <p className="text-sm text-gray-900">{description}</p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setSettings({
-                              ...settings,
-                              [key]: !settings[key],
-                            })
-                          }
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings[key] ? 'bg-purple-600' : 'bg-gray-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings[key] ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <NotificationPreferencesPanel />
               </div>
             )}
 
@@ -256,7 +262,11 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                     </FormField>
 
                     <div className="pt-4 border-t border-gray-200">
-                      <Button variant="outline" leftIcon={<Lock className="w-4 h-4" />}>
+                      <Button
+                        variant="outline"
+                        leftIcon={<Lock className="w-4 h-4" />}
+                        onClick={handleChangePassword}
+                      >
                         Change Password
                       </Button>
                     </div>
@@ -365,10 +375,19 @@ export default function SettingsClient({ session }: SettingsClientProps) {
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Actions</h4>
                     <div className="flex flex-wrap gap-3">
-                      <Button variant="outline" leftIcon={<Database className="w-4 h-4" />}>
+                      <Button
+                        variant="outline"
+                        leftIcon={<Database className="w-4 h-4" />}
+                        onClick={handleClearCache}
+                        isLoading={isClearingCache}
+                      >
                         Clear Cache
                       </Button>
-                      <Button variant="outline" leftIcon={<Database className="w-4 h-4" />}>
+                      <Button
+                        variant="outline"
+                        leftIcon={<Database className="w-4 h-4" />}
+                        onClick={handleExportData}
+                      >
                         Export Data
                       </Button>
                     </div>

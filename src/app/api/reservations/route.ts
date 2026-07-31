@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAllReservations, createReservation } from '@/lib/api/reservations';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: Request) {
   try {
@@ -75,6 +76,24 @@ export async function POST(request: Request) {
       reservationData,
       session.user.id
     );
+    const reservationId = String(reservation.id || '');
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'reservation.created',
+      category: 'leases',
+      entityType: 'reservation',
+      entityId: reservationId || null,
+      entityLabel: reservationId || reservationData.tenantId,
+      afterData: reservation as unknown as Record<string, unknown>,
+      link: '/admin/tenants/reservations',
+      metadata: {
+        link: '/admin/tenants/reservations',
+        tenantId: reservationData.tenantId,
+        roomId: reservationData.roomId,
+      },
+    });
     
     return NextResponse.json({
       success: true,

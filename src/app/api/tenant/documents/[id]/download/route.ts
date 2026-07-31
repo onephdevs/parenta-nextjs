@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { getTenantByUserId, getTenantCompleteData } from '@/lib/api/tenant-user-link';
+import { requireTenantAccess } from '@/lib/api/require-tenant-access';
+import { getTenantCompleteDataByTenantId } from '@/lib/api/tenant-user-link';
 import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
@@ -14,40 +13,17 @@ interface RouteParams {
  * GET /api/tenant/documents/[id]/download
  * Download a document (verify tenant has access)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    const tenant = await getTenantByUserId(userId);
-    
-    if (!tenant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
-    
-    // Get tenant's room assignment
-    const tenantData = await getTenantCompleteData(userId);
+    const access = await requireTenantAccess();
+    if (access.error) return access.error;
+
+    const { tenant } = access;
+    const tenantData = await getTenantCompleteDataByTenantId(String(tenant.id));
     const roomId = tenantData?.room_id || null;
-    
+
     const { id } = await params;
-    
-    // Get document and verify access
+
     const documentQuery = `
       SELECT 
         d.id,
@@ -69,9 +45,9 @@ export async function GET(
         )
         AND (d.expiry_date IS NULL OR d.expiry_date >= CURRENT_DATE)
     `;
-    
+
     const documentResult = await pool.query(documentQuery, [id, tenant.id, roomId]);
-    
+
     if (documentResult.rows.length === 0) {
       return NextResponse.json(
         {
@@ -81,18 +57,14 @@ export async function GET(
         { status: 404 }
       );
     }
-    
+
     const document = documentResult.rows[0];
-    
-    // Read the file
     const filePath = path.join(process.cwd(), 'public', document.file_path);
-    
+
     try {
       const fileBuffer = await fs.readFile(filePath);
-      
-      // Determine content type
       const contentType = document.mime_type || 'application/octet-stream';
-      
+
       return new NextResponse(fileBuffer, {
         status: 200,
         headers: {
@@ -111,7 +83,6 @@ export async function GET(
         { status: 404 }
       );
     }
-    
   } catch (error) {
     console.error('Error downloading document:', error);
     return NextResponse.json(

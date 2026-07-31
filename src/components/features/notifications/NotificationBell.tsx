@@ -1,0 +1,212 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Bell } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { cn } from '@/lib/utils';
+
+interface InboxItem {
+  id: string;
+  category: string | null;
+  title: string;
+  body: string;
+  link: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+function formatRelative(dateString: string): string {
+  const date = new Date(dateString);
+  const diffMs = Date.now() - date.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+export function NotificationBell() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<InboxItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const fetchInbox = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/notifications?limit=10', { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) {
+        setItems(data.data.items || []);
+        setUnreadCount(data.data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Failed to load notifications', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInbox();
+    const id = window.setInterval(fetchInbox, 30000);
+    return () => window.clearInterval(id);
+  }, [fetchInbox]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  const markAllRead = async () => {
+    await fetch('/api/notifications/read-all', {
+      method: 'PATCH',
+      credentials: 'include',
+    });
+    setItems((prev) => prev.map((i) => ({ ...i, isRead: true })));
+    setUnreadCount(0);
+  };
+
+  const openItem = async (item: InboxItem) => {
+    if (!item.isRead) {
+      await fetch(`/api/notifications/${item.id}/read`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i))
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+    }
+    setOpen(false);
+    if (item.link) router.push(item.link);
+  };
+
+  return (
+    <div className="relative" ref={panelRef}>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((v) => !v);
+          if (!open) fetchInbox();
+        }}
+        className="relative rounded-md p-2 text-gray-900 hover:bg-gray-100 hover:text-gray-900"
+        aria-label="Notifications"
+        aria-expanded={open}
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white ring-2 ring-white">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-50 mt-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900">Notifications</p>
+              {unreadCount > 0 && (
+                <Badge tone="danger" size="sm">
+                  {unreadCount} new
+                </Badge>
+              )}
+            </div>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="text-xs font-medium text-purple-700 hover:underline"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-96 overflow-y-auto">
+            {loading && items.length === 0 ? (
+              <div className="space-y-2 p-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-14 animate-pulse rounded bg-gray-100" />
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="No notifications"
+                  description="Activity you care about will show up here."
+                />
+              </div>
+            ) : (
+              <ul>
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => openItem(item)}
+                      className={cn(
+                        'w-full border-b border-gray-50 px-4 py-3 text-left hover:bg-gray-50',
+                        !item.isRead && 'bg-purple-50/60'
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                        <span className="shrink-0 text-[11px] text-gray-500">
+                          {formatRelative(item.createdAt)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{item.body}</p>
+                      {item.category && (
+                        <span className="mt-1 inline-block text-[10px] uppercase tracking-wide text-gray-500">
+                          {item.category}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex gap-2 border-t border-gray-100 px-3 py-2">
+            <Link
+              href="/admin/activity"
+              className="flex-1"
+              onClick={() => setOpen(false)}
+            >
+              <Button type="button" variant="outline" size="sm" className="w-full">
+                Recent activity
+              </Button>
+            </Link>
+            <Link
+              href="/admin/settings?tab=notifications"
+              className="flex-1"
+              onClick={() => setOpen(false)}
+            >
+              <Button type="button" variant="ghost" size="sm" className="w-full">
+                Preferences
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -426,15 +426,22 @@ export async function getRoomAssignmentHistory(roomId: string) {
     const query = `
       SELECT 
         tra.*,
+        COALESCE(
+          NULLIF(tra.tenant_name_snapshot, ''),
+          TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, '')))
+        ) as display_name,
+        COALESCE(NULLIF(tra.tenant_email_snapshot, ''), t.email) as display_email,
         t.first_name,
         t.last_name,
         t.email,
         t.phone,
-        t.tenant_status
+        t.tenant_status,
+        t.id as live_tenant_id,
+        (t.id IS NOT NULL) as tenant_exists
       FROM tenant_room_assignments tra
-      JOIN tenants t ON tra.tenant_id = t.id
+      LEFT JOIN tenants t ON tra.tenant_id = t.id
       WHERE tra.room_id = $1
-      ORDER BY tra.start_date DESC
+      ORDER BY tra.start_date DESC NULLS LAST, tra.created_at DESC
     `;
     
     const result = await pool.query(query, [roomId]);
@@ -486,11 +493,21 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
     }
     
     // Create assignment
+    const tenantSnap = await client.query(
+      `SELECT first_name, last_name, email FROM tenants WHERE id = $1`,
+      [tenantId]
+    );
+    const snap = tenantSnap.rows[0];
+    const tenantNameSnapshot = snap
+      ? `${snap.first_name || ''} ${snap.last_name || ''}`.trim()
+      : null;
+
     const assignmentQuery = `
       INSERT INTO tenant_room_assignments (
-        tenant_id, room_id, start_date, monthly_rate, deposit_paid, notes, assignment_status
+        tenant_id, room_id, start_date, monthly_rate, deposit_paid, notes, assignment_status,
+        tenant_name_snapshot, tenant_email_snapshot
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'active')
+      VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)
       RETURNING *
     `;
     
@@ -500,7 +517,9 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
       assignmentData.startDate,
       assignmentData.monthlyRate,
       assignmentData.depositPaid || 0,
-      assignmentData.notes
+      assignmentData.notes,
+      tenantNameSnapshot,
+      snap?.email || null,
     ]);
     
     // Update room status to occupied

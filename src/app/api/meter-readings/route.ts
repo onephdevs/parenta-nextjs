@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getAllMeterReadings, createMeterReading } from '@/lib/api/meterReadings';
 import { CreateMeterReadingData } from '@/types/database';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -111,6 +112,20 @@ export async function POST(request: NextRequest) {
     };
 
     const meterReading = await createMeterReading(readingData);
+    const readingId = String(meterReading.id || '');
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'meter_reading.recorded',
+      category: 'utilities',
+      entityType: 'meter_reading',
+      entityId: readingId || null,
+      entityLabel: `${body.utilityType} — ${body.readingValue}`,
+      afterData: meterReading as unknown as Record<string, unknown>,
+      link: '/admin/utilities/readings',
+      metadata: { link: '/admin/utilities/readings', buildingId: body.buildingId },
+    });
     
     return NextResponse.json({ 
       success: true,

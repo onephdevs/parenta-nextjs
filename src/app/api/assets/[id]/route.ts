@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getAssetById, updateAsset, deleteAsset } from '@/lib/api/assets';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -54,11 +55,26 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const before = await getAssetById(id);
     const asset = await updateAsset(id, body);
     
     if (!asset) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'asset.updated',
+      category: 'assets',
+      entityType: 'asset',
+      entityId: id,
+      entityLabel: asset.assetName || asset.asset_name || before?.assetName || before?.asset_name || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: asset as unknown as Record<string, unknown>,
+      link: '/admin/assets',
+      metadata: { link: '/admin/assets' },
+    });
     
     return NextResponse.json({
       success: true,
@@ -83,12 +99,27 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
+    const before = await getAssetById(id);
     
     const deleted = await deleteAsset(id);
     
     if (!deleted) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'asset.deleted',
+      category: 'assets',
+      entityType: 'asset',
+      entityId: id,
+      entityLabel: before?.assetName || before?.asset_name || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/assets',
+      metadata: { link: '/admin/assets' },
+    });
     
     return NextResponse.json({
       success: true,

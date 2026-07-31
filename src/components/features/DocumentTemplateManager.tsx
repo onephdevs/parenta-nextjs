@@ -162,60 +162,72 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
 
         <TabPanel value="templates">
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2 xl:grid-cols-3">
               {templates.map((template) => (
-                <Card key={template.id}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">{template.name}</h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        categories.find(c => c.id === template.category)?.color || 'bg-gray-100 text-gray-800'
-                      }`}>
+                <Card
+                  key={template.id}
+                  className="flex h-full flex-col border border-gray-100 shadow-sm transition-all duration-200 hover:border-purple-100 hover:shadow-md"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3
+                        className="text-xl font-bold leading-snug text-gray-900 line-clamp-2 break-words"
+                        title={template.name}
+                      >
+                        {template.name}
+                      </h3>
+                      <span
+                        className={`mt-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          categories.find((c) => c.id === template.category)?.color ||
+                          'bg-purple-100 text-purple-800'
+                        }`}
+                      >
                         {template.category}
                       </span>
                     </div>
-                    <div className="flex items-center space-x-1">
+                    <div className="flex flex-shrink-0 items-center gap-1.5">
                       {template.isSystem && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
                           System
                         </span>
                       )}
                       {!template.isActive && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
                           Inactive
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {template.description && (
-                    <p className="text-sm text-gray-900 mb-4">{template.description}</p>
-                  )}
+                  <p className="mb-4 min-h-[2.5rem] text-sm leading-snug text-gray-500 line-clamp-2">
+                    {template.description || (
+                      <span className="italic text-gray-400">No description</span>
+                    )}
+                  </p>
 
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-900">Variables:</span>
-                      <span className="font-medium">{template.variables.length}</span>
+                  <div className="mb-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Variables</span>
+                      <span className="font-medium text-gray-900">{template.variables.length}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-900">Usage Count:</span>
-                      <span className="font-medium">{template.usageCount}</span>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Usage</span>
+                      <span className="font-medium text-gray-900">{template.usageCount}</span>
                     </div>
                     {template.lastUsed && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-900">Last Used:</span>
-                        <span className="font-medium">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Last used</span>
+                        <span className="font-medium text-gray-900">
                           {new Date(template.lastUsed).toLocaleDateString()}
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="mt-auto flex items-center gap-2 border-t border-gray-100 pt-4">
                     <Button
-                      variant="ghost"
                       size="sm"
-                      className="text-purple-600 hover:text-purple-700"
+                      className="flex-1"
                       onClick={() => {
                         setGenerationData({ templateId: template.id, variables: {} });
                         setShowGenerator(true);
@@ -223,29 +235,26 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
                     >
                       Generate
                     </Button>
-                    <div className="flex items-center space-x-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setSelectedTemplate(template);
+                        setShowForm(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    {!template.isSystem && (
                       <Button
-                        variant="ghost"
+                        variant="danger"
                         size="sm"
-                        className="text-blue-600 hover:text-blue-700"
-                        onClick={() => {
-                          setSelectedTemplate(template);
-                          setShowForm(true);
-                        }}
+                        onClick={() => handleDeleteTemplate(template.id)}
                       >
-                        Edit
+                        Delete
                       </Button>
-                      {!template.isSystem && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteTemplate(template.id)}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </Card>
               ))}

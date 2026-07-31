@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 
 interface ProfileData {
   profile: {
@@ -77,6 +78,7 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
+  const { canAccess, isPreview, isLoading: gateLoading } = useTenantPortalGate();
   const router = useRouter();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,14 +112,15 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.user.role === 'tenant') {
+    if (gateLoading || status === 'loading') return;
+    if (canAccess) {
       fetchProfile();
     } else if (status === 'unauthenticated') {
       router.push('/auth/tenant/signin');
     }
-  }, [status, session, router]);
+  }, [status, session, router, canAccess, gateLoading]);
 
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading' || gateLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -130,8 +133,8 @@ export default function ProfilePage() {
     );
   }
 
-  if (!session || session.user.role !== 'tenant') {
-    return null; // Will redirect via useEffect
+  if (!canAccess) {
+    return null;
   }
 
   const formatCurrency = (amount: number | undefined | null) => {

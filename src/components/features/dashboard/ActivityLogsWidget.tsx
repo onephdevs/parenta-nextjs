@@ -11,6 +11,7 @@ interface ActivityLog {
   recordId?: string;
   createdAt: string;
   user: string;
+  description?: string;
 }
 
 export default function ActivityLogsWidget() {
@@ -27,7 +28,7 @@ export default function ActivityLogsWidget() {
   const fetchActivityLogs = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/dashboard/activity-logs');
+      const response = await fetch('/api/activity?limit=10', { credentials: 'include' });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.statusText}`);
@@ -36,7 +37,25 @@ export default function ActivityLogsWidget() {
       const data = await response.json();
 
       if (data.success) {
-        setActivityLogs(data.data.activityLogs || []);
+        setActivityLogs(
+          (data.data.items || []).map((item: {
+            id: string;
+            actionType: string;
+            entityType: string;
+            entityId?: string;
+            createdAt: string;
+            actorName: string;
+            description: string;
+          }) => ({
+            id: item.id,
+            action: item.actionType,
+            tableName: item.entityType,
+            recordId: item.entityId,
+            createdAt: item.createdAt,
+            user: item.actorName,
+            description: item.description,
+          }))
+        );
       } else {
         console.error('API returned error:', data.error);
         setActivityLogs([]);
@@ -50,33 +69,30 @@ export default function ActivityLogsWidget() {
   };
 
   const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'CREATE':
-        return <Plus className="h-4 w-4 text-green-600" />;
-      case 'UPDATE':
-        return <Edit className="h-4 w-4 text-blue-600" />;
-      case 'DELETE':
-        return <Trash2 className="h-4 w-4 text-red-600" />;
-      case 'READ':
-        return <Eye className="h-4 w-4 text-gray-600" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-600" />;
+    if (/\.(created|requested|recorded|uploaded|generated|imported)$/.test(action) || action === 'CREATE') {
+      return <Plus className="h-4 w-4 text-green-600" />;
     }
+    if (/\.(updated|status_changed|assigned|allocated|converted)$/.test(action) || action === 'UPDATE') {
+      return <Edit className="h-4 w-4 text-blue-600" />;
+    }
+    if (/\.(deleted|cancelled|unassigned)$/.test(action) || action === 'DELETE') {
+      return <Trash2 className="h-4 w-4 text-red-600" />;
+    }
+    if (action === 'READ') return <Eye className="h-4 w-4 text-gray-600" />;
+    return <Activity className="h-4 w-4 text-gray-600" />;
   };
 
   const getActionColor = (action: string) => {
-    switch (action) {
-      case 'CREATE':
-        return 'text-green-700 bg-green-50';
-      case 'UPDATE':
-        return 'text-blue-700 bg-blue-50';
-      case 'DELETE':
-        return 'text-red-700 bg-red-50';
-      case 'READ':
-        return 'text-gray-700 bg-gray-50';
-      default:
-        return 'text-gray-700 bg-gray-50';
+    if (/\.(created|requested|recorded|uploaded|generated|imported)$/.test(action) || action === 'CREATE') {
+      return 'text-green-700 bg-green-50';
     }
+    if (/\.(updated|status_changed|assigned|allocated|converted)$/.test(action) || action === 'UPDATE') {
+      return 'text-blue-700 bg-blue-50';
+    }
+    if (/\.(deleted|cancelled|unassigned)$/.test(action) || action === 'DELETE') {
+      return 'text-red-700 bg-red-50';
+    }
+    return 'text-gray-700 bg-gray-50';
   };
 
   const formatActionDescription = (action: string, tableName: string) => {
@@ -139,7 +155,7 @@ export default function ActivityLogsWidget() {
           Recent Activity
         </h3>
         <Link
-          href="/admin/activity-logs"
+          href="/admin/activity"
           className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
         >
           View All <ArrowRight className="h-4 w-4 ml-1" />
@@ -172,7 +188,7 @@ export default function ActivityLogsWidget() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-900 font-medium">
-                    {formatActionDescription(log.action, log.tableName)}
+                    {log.description || formatActionDescription(log.action, log.tableName)}
                   </p>
                   <div className="flex items-center space-x-2 mt-1">
                     <User className="h-3 w-3 text-gray-400" />

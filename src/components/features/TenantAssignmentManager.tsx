@@ -9,9 +9,12 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Dialog } from '@/components/ui/Dialog';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/forms/FormField';
 import AddOccupantModal from './AddOccupantModal';
-import { Plus, UserPlus, X } from 'lucide-react';
+import { Plus, UserPlus, X, History } from 'lucide-react';
+import Link from 'next/link';
 
 interface Tenant {
   id: string;
@@ -46,9 +49,13 @@ interface AssignmentHistory {
   end_date?: string;
   monthly_rate: number;
   assignment_status: string;
-  first_name: string;
-  last_name: string;
-  email: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  display_name?: string;
+  display_email?: string;
+  tenant_exists?: boolean;
+  live_tenant_id?: string | null;
 }
 
 interface Occupant {
@@ -518,43 +525,79 @@ export default function TenantAssignmentManager({
         </Card>
       )}
 
-      {assignmentHistory.length > 0 && (
-        <Card>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Assignment History</h3>
-          <div className="space-y-4">
-            {assignmentHistory.map((assignment) => (
-              <div key={assignment.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      {assignment.first_name} {assignment.last_name}
-                    </h4>
-                    <p className="text-sm text-gray-900">{assignment.email}</p>
+      <Card>
+        <h3 className="mb-4 flex items-center text-lg font-medium text-gray-900">
+          <History className="mr-2 h-5 w-5 text-gray-500" />
+          Tenancy History
+        </h3>
+        {assignmentHistory.length === 0 ? (
+          <EmptyState
+            title="No tenancy history yet"
+            description="Assignments will appear here when tenants move in or out of this room."
+            className="py-8"
+          />
+        ) : (
+          <div className="space-y-3">
+            {assignmentHistory.map((assignment) => {
+              const isCurrent =
+                assignment.assignment_status === 'active' && !assignment.end_date;
+              const name =
+                assignment.display_name ||
+                `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim() ||
+                'Former tenant';
+              const email = assignment.display_email || assignment.email || null;
+              const tenantLinkId = assignment.live_tenant_id || assignment.tenant_id;
+              const canLink = Boolean(assignment.tenant_exists !== false && tenantLinkId);
+
+              return (
+                <div
+                  key={assignment.id}
+                  className="flex flex-col gap-3 rounded-lg border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {canLink ? (
+                        <Link
+                          href={`/admin/tenants/${tenantLinkId}`}
+                          className="font-medium text-purple-700 hover:underline"
+                        >
+                          {name}
+                        </Link>
+                      ) : (
+                        <h4 className="font-medium text-gray-900">{name}</h4>
+                      )}
+                      {isCurrent && <Badge tone="success">Current</Badge>}
+                      {!isCurrent && (
+                        <Badge tone="neutral">{assignment.assignment_status}</Badge>
+                      )}
+                    </div>
+                    {email && <p className="mt-1 text-sm text-gray-500">{email}</p>}
                   </div>
-                  <div className="text-right text-sm text-gray-900">
+                  <div className="text-sm text-gray-700 sm:text-right">
                     <div>
-                      {new Date(assignment.start_date).toLocaleDateString()} -
-                      {assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : 'Current'}
+                      Moved in:{' '}
+                      {assignment.start_date
+                        ? new Date(assignment.start_date).toLocaleDateString()
+                        : '—'}
                     </div>
-                    <div className="font-medium">
-                      ₱{parseFloat(assignment.monthly_rate.toString()).toLocaleString()}/month
+                    <div>
+                      Moved out:{' '}
+                      {isCurrent
+                        ? 'Current'
+                        : assignment.end_date
+                          ? new Date(assignment.end_date).toLocaleDateString()
+                          : '—'}
                     </div>
-                    <div
-                      className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                        assignment.assignment_status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {assignment.assignment_status}
+                    <div className="mt-1 font-medium text-gray-900">
+                      ₱{parseFloat(String(assignment.monthly_rate || 0)).toLocaleString()}/month
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       <Dialog
         isOpen={showAssignForm}

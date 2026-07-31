@@ -3,6 +3,7 @@ import { convertReservationToAssignment } from '@/lib/api/reservations';
 import { generateInvoicesForTenant } from '@/lib/services/invoice-generator';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -68,6 +69,30 @@ export async function POST(request: Request, { params }: RouteParams) {
         // Don't fail the conversion if invoice generation fails
       }
     }
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'reservation.converted',
+      category: 'leases',
+      entityType: 'reservation',
+      entityId: reservationId,
+      entityLabel: reservationId,
+      afterData: {
+        reservation: result.reservation,
+        assignmentId: result.assignmentId,
+        invoices: invoiceResult || null,
+      },
+      link: result.reservation?.tenantId
+        ? `/admin/tenants/${result.reservation.tenantId}`
+        : '/admin/tenants/reservations',
+      metadata: {
+        link: result.reservation?.tenantId
+          ? `/admin/tenants/${result.reservation.tenantId}`
+          : '/admin/tenants/reservations',
+        assignmentId: result.assignmentId,
+      },
+    });
     
     return NextResponse.json({
       success: true,

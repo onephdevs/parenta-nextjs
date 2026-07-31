@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getDocuments, createDocument, saveUploadedFile } from '@/lib/api/documents';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from '@/types/document';
 
 export async function GET(request: NextRequest) {
@@ -165,6 +166,20 @@ export async function POST(request: NextRequest) {
     };
 
     const document = await createDocument(documentData);
+    const documentId = String(document.id || '');
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'document.uploaded',
+      category: 'documents',
+      entityType: 'document',
+      entityId: documentId || null,
+      entityLabel: documentName,
+      afterData: document as unknown as Record<string, unknown>,
+      link: documentId ? `/admin/documents/${documentId}/edit` : '/admin/documents',
+      metadata: { link: documentId ? `/admin/documents/${documentId}/edit` : '/admin/documents' },
+    });
     
     return NextResponse.json({ 
       success: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getExpenseById, updateExpense, deleteExpense } from '@/lib/api/expenses';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -88,7 +89,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    const before = await getExpenseById(id);
     const expense = await updateExpense(id, body);
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'expense.updated',
+      category: 'expenses',
+      entityType: 'expense',
+      entityId: id,
+      entityLabel: expense.description || before?.description || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: expense as unknown as Record<string, unknown>,
+      link: '/admin/financial/expenses',
+      metadata: { link: '/admin/financial/expenses' },
+    });
     
     return NextResponse.json({
       success: true,
@@ -121,8 +137,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
+    const before = await getExpenseById(id);
     
     await deleteExpense(id);
+
+    logActivitySafe({
+      actorUserId: session.user.id || null,
+      actorRole: 'admin',
+      actionType: 'expense.deleted',
+      category: 'expenses',
+      entityType: 'expense',
+      entityId: id,
+      entityLabel: before?.description || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/financial/expenses',
+      metadata: { link: '/admin/financial/expenses' },
+    });
     
     return NextResponse.json({
       success: true,

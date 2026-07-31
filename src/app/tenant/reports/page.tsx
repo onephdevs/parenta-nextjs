@@ -22,9 +22,11 @@ import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
 import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonCard from '@/components/ui/SkeletonCard';
+import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 
 export default function ReportsPage() {
   const { data: session, status } = useSession();
+  const { canAccess, isLoading: gateLoading } = useTenantPortalGate();
   const router = useRouter();
   const [reportType, setReportType] = useState<'payments' | 'invoices' | 'summary'>('payments');
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -35,10 +37,11 @@ export default function ReportsPage() {
   const { showNotification } = useNotifications();
 
   React.useEffect(() => {
+    if (gateLoading || status === 'loading') return;
     if (status === 'unauthenticated') {
       router.push('/auth/tenant/signin');
     }
-  }, [status, router]);
+  }, [status, router, gateLoading]);
 
   // Set default date range (last 3 months) — must run unconditionally (Rules of Hooks)
   React.useEffect(() => {
@@ -50,7 +53,7 @@ export default function ReportsPage() {
     setDateTo(today.toISOString().split('T')[0]);
   }, []);
 
-  if (status === 'loading') {
+  if (status === 'loading' || gateLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -60,8 +63,8 @@ export default function ReportsPage() {
     );
   }
 
-  if (!session || session.user.role !== 'tenant') {
-    return null; // Will redirect via useEffect
+  if (!canAccess) {
+    return null;
   }
 
   const handleGenerateReport = async () => {

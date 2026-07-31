@@ -366,6 +366,15 @@ export interface InvoiceGenerationResult {
   success: boolean;
   invoicesCreated: number;
   invoiceIds: string[];
+  /** Summary rows for notifications / API responses */
+  invoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    totalAmount: number;
+  }>;
+  totalAmount: number;
+  firstInvoiceNumber?: string;
+  lastInvoiceNumber?: string;
   depositRecorded: boolean;
   depositAmount?: number;
   message: string;

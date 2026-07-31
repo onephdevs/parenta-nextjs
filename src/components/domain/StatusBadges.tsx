@@ -105,11 +105,20 @@ function ReservationStatusBadge({ status }: { status: string }) {
   return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
 }
 
+function BuildingStatusBadge({ isActive }: { isActive: boolean }) {
+  return (
+    <Badge tone={isActive ? 'success' : 'neutral'}>
+      {isActive ? 'Active' : 'Inactive'}
+    </Badge>
+  );
+}
+
 export {
   PaymentStatusBadge,
   InvoiceStatusBadge,
   RoomStatusBadge,
   TenantStatusBadge,
+  BuildingStatusBadge,
   AssetStatusBadge,
   AssetConditionBadge,
   MaintenanceStatusBadge,

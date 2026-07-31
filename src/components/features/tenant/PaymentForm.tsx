@@ -32,7 +32,7 @@ export default function PaymentForm({
 }: PaymentFormProps) {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<string>('online');
+  const [paymentMethod, setPaymentMethod] = useState<string>('bank_transfer');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -89,8 +89,10 @@ export default function PaymentForm({
       if (data.success) {
         showNotification({
           type: 'success',
-          title: 'Payment Initiated',
-          message: data.message || 'Your payment has been processed successfully',
+          title: 'Payment Submitted',
+          message:
+            data.message ||
+            'Your payment was submitted for verification. Balance updates after confirmation.',
         });
 
         onPaymentComplete?.();
@@ -98,7 +100,7 @@ export default function PaymentForm({
         showNotification({
           type: 'error',
           title: 'Payment Failed',
-          message: data.error || 'Failed to process payment',
+          message: data.error || data.details || 'Failed to submit payment',
         });
       }
     } catch (error) {
@@ -182,21 +184,37 @@ export default function PaymentForm({
           onChange={(e) => setPaymentMethod(e.target.value)}
           required
         >
-          <option value="online">Online Payment</option>
+          <option value="bank_transfer">Bank Transfer / GCash</option>
+          <option value="online">Online (card / e-wallet)</option>
           <option value="credit_card">Credit Card</option>
-          <option value="bank_transfer">Bank Transfer</option>
         </Select>
       </FormField>
 
-      <FormField label="Reference Number (Optional)" htmlFor="referenceNumber">
+      <FormField
+        label={
+          paymentMethod === 'bank_transfer'
+            ? 'Reference Number'
+            : 'Reference Number (Optional)'
+        }
+        htmlFor="referenceNumber"
+        required={paymentMethod === 'bank_transfer'}
+        hint="Required for bank/GCash transfers so the office can verify your payment."
+      >
         <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
           placeholder="Transaction reference, receipt number, etc."
+          required={paymentMethod === 'bank_transfer'}
         />
       </FormField>
+
+      <Alert variant="info" title="Verification required">
+        Submitting records your payment claim. The office will confirm it before your invoice
+        balance is updated. Card gateways are not live yet — use bank/GCash with a reference when
+        possible.
+      </Alert>
 
       <FormField label="Notes (Optional)" htmlFor="notes">
         <Textarea
@@ -244,7 +262,7 @@ export default function PaymentForm({
           isDisabled={!selectedInvoiceId || paymentAmount <= 0}
           leftIcon={<CreditCard className="h-5 w-5" />}
         >
-          Process Payment
+          Submit Payment for Verification
         </Button>
       </div>
     </form>

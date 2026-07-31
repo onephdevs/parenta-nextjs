@@ -11,6 +11,7 @@ import {
   isDepositRefundable,
 } from '@/lib/api/building-deposit-config';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -20,7 +21,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   const client = await pool.connect();
   
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id: roomId } = await params;
@@ -174,13 +175,23 @@ export async function POST(request: Request, { params }: RouteParams) {
       [tenantId]
     );
 
+    // Snapshot tenant identity for history (survives later tenant delete/rename)
+    const tenantSnap = await client.query(
+      `SELECT first_name, last_name, email FROM tenants WHERE id = $1`,
+      [tenantId]
+    );
+    const snap = tenantSnap.rows[0];
+    const tenantNameSnapshot = snap
+      ? `${snap.first_name || ''} ${snap.last_name || ''}`.trim()
+      : null;
+
     // Create new assignment with advance, utility deposit, and validity tracking
     const assignmentResult = await client.query(
       `INSERT INTO tenant_room_assignments 
        (tenant_id, room_id, start_date, end_date, monthly_rate, deposit_paid, 
         advance_paid, utility_deposit_paid, deposit_valid_until, deposit_refundable, 
-        assignment_status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11)
+        assignment_status, notes, tenant_name_snapshot, tenant_email_snapshot)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13)
        RETURNING *`,
       [
         tenantId, 
@@ -193,7 +204,9 @@ export async function POST(request: Request, { params }: RouteParams) {
         utilityDepositValue || null,
         depositValidUntil || null,
         depositRefundable,
-        notes || null
+        notes || null,
+        tenantNameSnapshot || null,
+        snap?.email || null,
       ]
     );
 
@@ -241,6 +254,25 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'tenant.assigned',
+      category: 'tenants',
+      entityType: 'tenant',
+      entityId: tenantId,
+      entityLabel: `Room ${roomId}`,
+      afterData: {
+        assignment: assignmentResult.rows[0],
+        roomId,
+        tenantId,
+        startDate,
+        monthlyRate,
+      },
+      link: `/admin/tenants/${tenantId}`,
+      metadata: { link: `/admin/tenants/${tenantId}`, roomId },
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -251,12 +283,14 @@ export async function POST(request: Request, { params }: RouteParams) {
         ? `Tenant assigned successfully. ${invoiceResult.invoicesCreated} invoice(s) generated.`
         : 'Tenant assigned to room successfully',
       invoicesGenerated: invoiceResult?.invoicesCreated || 0,
-      invoiceDetails: invoiceResult ? {
-        totalInvoices: invoiceResult.invoicesCreated,
-        totalAmount: invoiceResult.invoices?.reduce((sum: number, inv: any) => sum + parseFloat(inv.amount), 0) || 0,
-        firstInvoiceNumber: invoiceResult.invoices?.[0]?.invoiceNumber,
-        lastInvoiceNumber: invoiceResult.invoices?.[invoiceResult.invoices.length - 1]?.invoiceNumber
-      } : null
+      invoiceDetails: invoiceResult
+        ? {
+            totalInvoices: invoiceResult.invoicesCreated,
+            totalAmount: invoiceResult.totalAmount ?? 0,
+            firstInvoiceNumber: invoiceResult.firstInvoiceNumber ?? null,
+            lastInvoiceNumber: invoiceResult.lastInvoiceNumber ?? null,
+          }
+        : null
     });
   } catch (error) {
     await client.query('ROLLBACK');

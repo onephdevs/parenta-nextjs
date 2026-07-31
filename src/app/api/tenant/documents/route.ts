@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { getTenantByUserId, getTenantCompleteData } from '@/lib/api/tenant-user-link';
+import { getTenantCompleteDataByTenantId } from '@/lib/api/tenant-user-link';
+import { requireTenantAccess } from '@/lib/api/require-tenant-access';
 import pool from '@/lib/db';
 
 /**
@@ -10,30 +9,13 @@ import pool from '@/lib/db';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    const tenant = await getTenantByUserId(userId);
-    
-    if (!tenant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
+    const access = await requireTenantAccess();
+    if (access.error) return access.error;
+
+    const { tenant } = access;
     
     // Get tenant's room assignment
-    const tenantData = await getTenantCompleteData(userId);
+    const tenantData = await getTenantCompleteDataByTenantId(String(tenant.id));
     
     // Query documents accessible to tenant:
     // 1. Documents specifically assigned to tenant (tenant_id = tenant.id)

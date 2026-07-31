@@ -9,12 +9,12 @@ async function getProfileExtras(userId: string) {
     [`user_profile:${userId}`]
   );
   if (result.rows.length === 0) {
-    return { phone: '', address: '', city: '', state: '', zipCode: '', bio: '' };
+    return { phone: '', address: '', city: '', state: '', zipCode: '', bio: '', avatarUrl: '' };
   }
   try {
     return JSON.parse(result.rows[0].value);
   } catch {
-    return { phone: '', address: '', city: '', state: '', zipCode: '', bio: '' };
+    return { phone: '', address: '', city: '', state: '', zipCode: '', bio: '', avatarUrl: '' };
   }
 }
 
@@ -106,6 +106,10 @@ export async function PUT(request: NextRequest) {
       zipCode: String(body.zipCode || '').trim(),
       bio: String(body.bio || '').trim(),
     };
+    const existing = await getProfileExtras(session.user.id);
+    if (existing.avatarUrl && !extras.avatarUrl) {
+      (extras as Record<string, string>).avatarUrl = existing.avatarUrl;
+    }
     await saveProfileExtras(session.user.id, extras);
 
     const user = updated.rows[0];

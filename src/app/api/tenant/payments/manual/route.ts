@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { getTenantByUserId } from '@/lib/api/tenant-user-link';
+import { requireTenantAccess } from '@/lib/api/require-tenant-access';
 import { createDepositTransaction } from '@/lib/api/deposit-ledger';
 import pool from '@/lib/db';
 
@@ -12,27 +10,10 @@ import pool from '@/lib/db';
  */
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    const tenant = await getTenantByUserId(userId);
-    
-    if (!tenant) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
+    const access = await requireTenantAccess({ allowMutation: true });
+    if (access.error) return access.error;
+
+    const { tenant } = access;
     
     const body = await request.json();
     const { amount, paymentType, paymentMethod, referenceNumber, notes } = body;

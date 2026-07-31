@@ -48,7 +48,7 @@ export async function getUtilityBills(
 ): Promise<UtilityBillResult> {
   try {
     const offset = (page - 1) * limit;
-    const conditions: string[] = ['ub.is_active = true'];
+    const conditions: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
 
@@ -147,7 +147,7 @@ export async function getUtilityBillById(id: string): Promise<UtilityBill | null
       FROM utility_bills ub
       LEFT JOIN buildings b ON ub.building_id = b.id
       LEFT JOIN rooms r ON ub.room_id = r.id
-      WHERE ub.id = $1 AND ub.is_active = true
+      WHERE ub.id = $1
     `;
     
     const result = await pool.query(query, [id]);
@@ -171,8 +171,8 @@ export async function createUtilityBill(billData: Partial<UtilityBill>): Promise
     const query = `
       INSERT INTO utility_bills (
         building_id, room_id, utility_type, amount, billing_period_start,
-        billing_period_end, due_date, bill_status, provider, account_number,
-        meter_reading, notes
+        billing_period_end, due_date, bill_status, provider_name, provider_account_number,
+        usage_amount, notes
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
@@ -214,30 +214,30 @@ export async function updateUtilityBill(
   updates: Partial<UtilityBill>
 ): Promise<UtilityBill> {
   try {
-    const allowedFields = [
-      'building_id',
-      'room_id',
-      'utility_type',
-      'amount',
-      'billing_period_start',
-      'billing_period_end',
-      'due_date',
-      'bill_status',
-      'provider',
-      'account_number',
-      'meter_reading',
-      'notes',
-    ];
+    const fieldMap: Record<string, string> = {
+      buildingId: 'building_id',
+      roomId: 'room_id',
+      utilityType: 'utility_type',
+      amount: 'amount',
+      billingPeriodStart: 'billing_period_start',
+      billingPeriodEnd: 'billing_period_end',
+      dueDate: 'due_date',
+      billStatus: 'bill_status',
+      provider: 'provider_name',
+      accountNumber: 'provider_account_number',
+      meterReading: 'usage_amount',
+      notes: 'notes',
+    };
     
     const setClauses: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
 
     Object.entries(updates).forEach(([key, value]) => {
-      const snakeKey = camelToSnake(key);
-      if (allowedFields.includes(snakeKey)) {
+      const column = fieldMap[key];
+      if (column) {
         paramCount++;
-        setClauses.push(`${snakeKey} = $${paramCount}`);
+        setClauses.push(`${column} = $${paramCount}`);
         values.push(value);
       }
     });
@@ -256,7 +256,7 @@ export async function updateUtilityBill(
     const query = `
       UPDATE utility_bills
       SET ${setClauses.join(', ')}
-      WHERE id = $${paramCount} AND is_active = true
+      WHERE id = $${paramCount}
       RETURNING *
     `;
 
@@ -274,14 +274,14 @@ export async function updateUtilityBill(
 }
 
 /**
- * Delete a utility bill (soft delete)
+ * Delete a utility bill (cancel / soft delete via status)
  */
 export async function deleteUtilityBill(id: string): Promise<void> {
   try {
     const query = `
       UPDATE utility_bills
-      SET is_active = false, updated_at = NOW()
-      WHERE id = $1 AND is_active = true
+      SET bill_status = 'cancelled', updated_at = NOW()
+      WHERE id = $1 AND bill_status <> 'cancelled'
     `;
     
     const result = await pool.query(query, [id]);
@@ -303,7 +303,7 @@ export async function markUtilityBillPaid(id: string): Promise<UtilityBill> {
     const query = `
       UPDATE utility_bills
       SET bill_status = 'paid', updated_at = NOW()
-      WHERE id = $1 AND is_active = true
+      WHERE id = $1
       RETURNING *
     `;
     
@@ -333,7 +333,7 @@ export async function getUtilityBillSummary(filters: UtilityFilters = {}): Promi
   monthlyTrend: Array<{ month: string; amount: number }>;
 }> {
   try {
-    const conditions: string[] = ['is_active = true'];
+    const conditions: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
 
@@ -432,23 +432,24 @@ function mapRowToUtilityBill(row: Record<string, unknown>): UtilityBill {
     billingPeriodEnd: new Date(String(row.billing_period_end)),
     dueDate: new Date(String(row.due_date)),
     billStatus: String(row.bill_status) as UtilityBill['billStatus'],
-    provider: String(row.provider),
-    accountNumber: row.account_number ? String(row.account_number) : undefined,
-    meterReading: row.meter_reading ? Number(row.meter_reading) : undefined,
+    provider: String(row.provider_name ?? row.provider ?? ''),
+    accountNumber: row.provider_account_number
+      ? String(row.provider_account_number)
+      : row.account_number
+        ? String(row.account_number)
+        : undefined,
+    meterReading: row.usage_amount != null
+      ? Number(row.usage_amount)
+      : row.meter_reading != null
+        ? Number(row.meter_reading)
+        : undefined,
     notes: row.notes ? String(row.notes) : undefined,
-    isActive: Boolean(row.is_active),
+    isActive: row.is_active != null ? Boolean(row.is_active) : String(row.bill_status) !== 'cancelled',
     createdAt: new Date(String(row.created_at)),
     updatedAt: new Date(String(row.updated_at)),
     buildingName: row.building_name ? String(row.building_name) : undefined,
     roomNumber: row.room_number ? String(row.room_number) : undefined,
   };
-}
-
-/**
- * Helper: Convert camelCase to snake_case
- */
-function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
 
 /**
@@ -515,13 +516,13 @@ export async function getUtilityTrends(buildingId?: string, months = 12) {
 export async function getProvidersStats() {
   const query = `
     SELECT
-      provider,
+      provider_name as provider,
       COUNT(*) as bill_count,
       SUM(amount) as total_amount,
       AVG(amount) as avg_amount
     FROM utility_bills
-    WHERE is_active = true
-    GROUP BY provider
+    WHERE bill_status <> 'cancelled'
+    GROUP BY provider_name
     ORDER BY total_amount DESC
   `;
   
@@ -543,7 +544,6 @@ export async function getUpcomingDueBills(days = 7) {
     LEFT JOIN rooms r ON ub.room_id = r.id
     WHERE ub.due_date BETWEEN NOW() AND NOW() + INTERVAL '${days} days'
       AND ub.bill_status = 'pending'
-      AND ub.is_active = true
     ORDER BY ub.due_date ASC
   `;
   

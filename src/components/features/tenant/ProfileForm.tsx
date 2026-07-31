@@ -74,12 +74,22 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
     setIsSaving(true);
 
     try {
+      const payload = {
+        ...formData,
+        dateOfBirth: formData.dateOfBirth?.trim() ? formData.dateOfBirth : null,
+        phone: formData.phone?.trim() ? formData.phone : null,
+        monthlyIncome:
+          formData.monthlyIncome === undefined || Number.isNaN(formData.monthlyIncome)
+            ? null
+            : formData.monthlyIncome,
+      };
+
       const response = await fetch('/api/tenant/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -95,7 +105,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
         showNotification({
           type: 'error',
           title: 'Error',
-          message: data.error || 'Failed to update profile',
+          message: data.error || data.details || 'Failed to update profile',
         });
       }
     } catch {

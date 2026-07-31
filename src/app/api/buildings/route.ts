@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllBuildings, createBuilding } from '@/lib/api/buildings';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET() {
   try {
@@ -32,7 +33,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const buildingData = await request.json();
@@ -56,6 +57,20 @@ export async function POST(request: Request) {
     }
 
     const building = await createBuilding(buildingData);
+    const buildingId = String(building.id || building.buildingId || '');
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'building.created',
+      category: 'buildings',
+      entityType: 'building',
+      entityId: buildingId || null,
+      entityLabel: building.name || buildingData.name,
+      afterData: building as unknown as Record<string, unknown>,
+      link: buildingId ? `/admin/buildings/${buildingId}` : '/admin/buildings',
+      metadata: { link: buildingId ? `/admin/buildings/${buildingId}` : '/admin/buildings' },
+    });
 
     return NextResponse.json({
       success: true,

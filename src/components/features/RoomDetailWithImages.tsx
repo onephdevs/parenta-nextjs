@@ -5,6 +5,8 @@ import { Image } from '@/lib/api/images';
 import ImageUpload from '@/components/features/ImageUpload';
 import ImageGallery from '@/components/features/ImageGallery';
 import { useNotifications } from '@/hooks/useNotifications';
+import { AmenityBadges } from '@/components/domain/AmenityBadges';
+import { normalizeAmenities } from '@/lib/format/amenities';
 
 interface Room {
   id: string;
@@ -313,20 +315,12 @@ export default function RoomDetailWithImages({ roomDetails }: RoomDetailWithImag
       )}
 
       {/* Amenities */}
-      {roomDetails.room.amenities && (
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">Amenities</h3>
-            <div className="text-gray-900 bg-gray-50 p-4 rounded-md">
-              {Array.isArray(roomDetails.room.amenities) 
-                ? roomDetails.room.amenities.join(', ') 
-                : (typeof roomDetails.room.amenities === 'string' 
-                    ? roomDetails.room.amenities 
-                    : String(roomDetails.room.amenities || ''))}
-            </div>
-          </div>
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">Amenities</h3>
+          <AmenityBadges amenities={normalizeAmenities(roomDetails.room.amenities)} />
         </div>
-      )}
+      </div>
     </div>
   );
 } 

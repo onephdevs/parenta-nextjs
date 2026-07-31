@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBuildingById, updateBuilding, deleteBuilding } from '../../../../lib/api/buildings';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -45,13 +46,28 @@ export async function GET(request: Request, { params }: RouteParams) {
 
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;
     const buildingData = await request.json();
+    const before = await getBuildingById(id);
     
     const building = await updateBuilding(id, buildingData);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'building.updated',
+      category: 'buildings',
+      entityType: 'building',
+      entityId: id,
+      entityLabel: building.name || before?.name || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: building as unknown as Record<string, unknown>,
+      link: `/admin/buildings/${id}`,
+      metadata: { link: `/admin/buildings/${id}` },
+    });
     
     return NextResponse.json({
       success: true,
@@ -76,12 +92,27 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;
+    const before = await getBuildingById(id);
     
     await deleteBuilding(id);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'building.deleted',
+      category: 'buildings',
+      entityType: 'building',
+      entityId: id,
+      entityLabel: before?.name || id,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/buildings',
+      metadata: { link: '/admin/buildings' },
+    });
     
     return NextResponse.json({
       success: true,

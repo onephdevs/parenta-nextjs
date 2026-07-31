@@ -7,6 +7,7 @@ import TenantFinancialDetails from '@/components/features/TenantFinancialDetails
 import TenantCreditsManager from '@/components/features/TenantCreditsManager';
 import DepositLedgerManager from '@/components/features/DepositLedgerManager';
 import TenantDetailClient from '@/components/features/TenantDetailClient';
+import { PreviewTenantPortalButton } from '@/components/features/tenant/PreviewTenantPortalButton';
 
 interface TenantDetailPageProps {
   params: Promise<{ id: string }>;
@@ -86,6 +87,10 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                 </span>
               </div>
               <div className="flex items-center space-x-3">
+                <PreviewTenantPortalButton
+                  tenantId={String(tenant.id)}
+                  tenantName={`${tenant.firstName} ${tenant.lastName}`.trim()}
+                />
                 <Link
                   href={`/admin/financial/payments/new?tenantId=${tenant.id}`}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"

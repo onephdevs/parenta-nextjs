@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTenantById, updateTenant, deleteTenant } from '../../../../lib/api/tenants';
 import { requireAdmin } from '@/lib/api-auth';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -45,11 +46,12 @@ export async function GET(request: Request, { params }: RouteParams) {
 
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;
     const tenantData = await request.json();
+    const before = await getTenantById(id);
     
     // Validate email format if provided
     if (tenantData.email) {
@@ -72,6 +74,28 @@ export async function PUT(request: Request, { params }: RouteParams) {
     }
     
     const tenant = await updateTenant(id, tenantData);
+    const label =
+      `${tenant.firstName || tenant.first_name || before?.firstName || ''} ${tenant.lastName || tenant.last_name || before?.lastName || ''}`.trim() ||
+      tenant.email ||
+      id;
+    const statusChanged =
+      tenantData.tenantStatus != null &&
+      before &&
+      String(before.tenantStatus || before.tenant_status) !== String(tenantData.tenantStatus);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: statusChanged ? 'tenant.status_changed' : 'tenant.updated',
+      category: 'tenants',
+      entityType: 'tenant',
+      entityId: id,
+      entityLabel: label,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: tenant as unknown as Record<string, unknown>,
+      link: `/admin/tenants/${id}`,
+      metadata: { link: `/admin/tenants/${id}` },
+    });
     
     return NextResponse.json({
       success: true,
@@ -117,12 +141,32 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { error } = await requireAdmin();
+    const { session, error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;
+    const before = await getTenantById(id);
+    const label = before
+      ? `${before.firstName || before.first_name || ''} ${before.lastName || before.last_name || ''}`.trim() ||
+        before.email ||
+        id
+      : id;
     
     await deleteTenant(id);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'tenant.deleted',
+      category: 'tenants',
+      entityType: 'tenant',
+      entityId: id,
+      entityLabel: label,
+      beforeData: before as unknown as Record<string, unknown>,
+      afterData: null,
+      link: '/admin/tenants',
+      metadata: { link: '/admin/tenants' },
+    });
     
     return NextResponse.json({
       success: true,

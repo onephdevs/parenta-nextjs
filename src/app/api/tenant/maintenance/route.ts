@@ -1,40 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
+import { logActivitySafe } from '@/lib/services/activity-logger';
+import { requireTenantAccess } from '@/lib/api/require-tenant-access';
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const access = await requireTenantAccess();
+    if (access.error) return access.error;
 
-    if (!session || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // First, check if tenant profile exists
-    const tenantCheckQuery = `
-      SELECT t.id as tenant_id
-      FROM users u
-      INNER JOIN tenants t ON u.id = t.user_id
-      WHERE u.id = $1
-    `;
-
-    const tenantCheck = await pool.query(tenantCheckQuery, [session.user.id]);
-
-    if (tenantCheck.rows.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No tenant profile found',
-        },
-        { status: 404 }
-      );
-    }
-
-    const tenantId = tenantCheck.rows[0].tenant_id;
+    const tenantId = access.tenant.id;
 
     // Get tenant's maintenance requests
     const query = `
@@ -94,14 +68,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session || session.user.role !== 'tenant') {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const access = await requireTenantAccess({ allowMutation: true });
+    if (access.error) return access.error;
 
     const body = await request.json();
     const { title, description, category, priority } = body;
@@ -120,15 +88,14 @@ export async function POST(request: Request) {
         t.id as tenant_id, 
         tra.room_id, 
         r.building_id
-      FROM users u
-      INNER JOIN tenants t ON u.id = t.user_id
+      FROM tenants t
       LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id 
         AND tra.assignment_status = 'active'
       LEFT JOIN rooms r ON tra.room_id = r.id
-      WHERE u.id = $1
+      WHERE t.id = $1
     `;
     
-    const tenantResult = await pool.query(tenantQuery, [session.user.id]);
+    const tenantResult = await pool.query(tenantQuery, [access.tenant.id]);
 
     if (tenantResult.rows.length === 0) {
       return NextResponse.json(
@@ -166,10 +133,24 @@ export async function POST(request: Request) {
     ];
 
     const result = await pool.query(insertQuery, values);
+    const created = result.rows[0];
+
+    logActivitySafe({
+      actorUserId: access.session.user.id || null,
+      actorRole: 'tenant',
+      actionType: 'maintenance.requested',
+      category: 'maintenance',
+      entityType: 'maintenance_request',
+      entityId: String(created.id),
+      entityLabel: title,
+      afterData: created as Record<string, unknown>,
+      link: '/admin/maintenance',
+      metadata: { link: '/admin/maintenance', tenantId: tenant_id },
+    });
 
     return NextResponse.json({
       success: true,
-      data: result.rows[0],
+      data: created,
       message: 'Maintenance request submitted successfully'
     });
 
