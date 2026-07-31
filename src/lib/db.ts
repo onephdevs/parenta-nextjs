@@ -46,19 +46,19 @@ function mapDatabaseUserToUser(dbUser: DatabaseUser): User {
 
 // Create a new user
 export async function createUser(userData: CreateUserData): Promise<User> {
-  const { email, password, role, firstName, lastName } = userData;
+  const { email, password, role, firstName, lastName, isActive = true } = userData;
   
   // Hash password
   const saltRounds = 12;
   const passwordHash = await bcrypt.hash(password, saltRounds);
   
   const query = `
-    INSERT INTO users (email, password_hash, role, first_name, last_name)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO users (email, password_hash, role, first_name, last_name, is_active)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *
   `;
   
-  const values = [email, passwordHash, role, firstName, lastName];
+  const values = [email, passwordHash, role, firstName, lastName, isActive];
   
   try {
     const result = await pool.query(query, values);

@@ -20,6 +20,8 @@ export interface CreateUserData {
   role: UserRole;
   firstName: string;
   lastName: string;
+  /** When false, user cannot sign in until an admin activates the account */
+  isActive?: boolean;
 }
 
 export interface LoginCredentials {

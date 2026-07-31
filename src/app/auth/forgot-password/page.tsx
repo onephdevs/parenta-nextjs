@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { FormEvent, Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, Mail } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Alert } from '@/components/ui/Alert';
-import { FormField } from '@/components/forms/FormField';
+import { AuthSplitShell, AuthHeroPanel } from '@/components/features/auth/AuthSplitShell';
+import {
+  AuthField,
+  AuthPrimaryButton,
+} from '@/components/features/auth/AuthFields';
 
 type Role = 'admin' | 'tenant' | 'staff';
 
@@ -30,7 +31,7 @@ function ForgotPasswordContent() {
   const role: Role =
     roleParam === 'admin' || roleParam === 'tenant' || roleParam === 'staff'
       ? roleParam
-      : 'admin';
+      : 'tenant';
   const signInHref = signInPaths[role];
   const label = roleLabels[role];
 
@@ -76,87 +77,72 @@ function ForgotPasswordContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <Link
-          href={signInHref}
-          className="inline-flex items-center text-sm text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 mb-8 transition"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to sign in
-        </Link>
-
-        <Card className="p-8">
-          <div className="flex justify-center mb-6">
-            <div className="bg-blue-100 p-3 rounded-xl">
-              <Mail className="h-8 w-8 text-blue-600" />
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
-            Forgot password?
-          </h1>
-          <p className="text-gray-600 text-center mb-6">
+    <AuthSplitShell left={<AuthHeroPanel />}>
+      <div>
+        <div className="mb-6 flex justify-center sm:justify-start">
+          <BrandLogo variant="full" height={44} priority />
+        </div>
+        <div className="mb-8 border-t border-gray-200 pt-8">
+          <h2 className="text-3xl font-bold text-gray-900">Forgot password?</h2>
+          <p className="mt-2 text-sm text-gray-500">
             Enter the email for your {label.toLowerCase()} account and we&apos;ll send a reset
             link.
           </p>
+        </div>
 
-          {message && (
-            <Alert variant="success" title="Check your email" className="mb-4">
-              {message}
-            </Alert>
-          )}
-          {warning && (
-            <Alert variant="warning" title="Email not sent" className="mb-4">
-              {warning}
-              {devResetUrl && (
-                <p className="mt-2 break-all">
-                  Dev reset link:{' '}
-                  <Link href={devResetUrl} className="underline font-medium">
-                    Open reset page
-                  </Link>
-                </p>
-              )}
-            </Alert>
-          )}
-          {error && (
-            <Alert variant="danger" title="Request failed" className="mb-4">
-              {error}
-            </Alert>
-          )}
+        {message && (
+          <Alert variant="success" title="Check your email" className="mb-5">
+            {message}
+          </Alert>
+        )}
+        {warning && (
+          <Alert variant="warning" title="Email not sent" className="mb-5">
+            {warning}
+            {devResetUrl && (
+              <p className="mt-2 break-all">
+                Dev reset link:{' '}
+                <Link href={devResetUrl} className="underline font-medium">
+                  Open reset page
+                </Link>
+              </p>
+            )}
+          </Alert>
+        )}
+        {error && (
+          <Alert variant="danger" title="Request failed" className="mb-5">
+            {error}
+          </Alert>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <FormField label="Email" htmlFor="email" required>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
-            </FormField>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <AuthField
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            required
+            aria-label="Email"
+          />
 
-            <Button type="submit" className="w-full" isLoading={loading}>
-              Send reset link
-            </Button>
-          </form>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <Link href={signInHref} className="block">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                leftIcon={<ArrowLeft className="h-4 w-4" />}
-              >
-                Return to {label} sign in
-              </Button>
-            </Link>
+          <div className="pt-2">
+            <AuthPrimaryButton isLoading={loading}>Send reset link</AuthPrimaryButton>
           </div>
-        </Card>
+        </form>
+
+        <p className="mt-8 text-center text-sm text-gray-600">
+          Remember your password?{' '}
+          <Link
+            href={signInHref}
+            className="font-semibold text-[#3B82F6] hover:text-blue-600"
+          >
+            Back to Login
+          </Link>
+        </p>
+        <div className="mt-6 border-t border-gray-200" />
       </div>
-    </div>
+    </AuthSplitShell>
   );
 }
 
@@ -164,9 +150,9 @@ export default function ForgotPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 flex items-center justify-center">
+        <AuthSplitShell left={<AuthHeroPanel />}>
           <div className="animate-pulse text-gray-500">Loading...</div>
-        </div>
+        </AuthSplitShell>
       }
     >
       <ForgotPasswordContent />

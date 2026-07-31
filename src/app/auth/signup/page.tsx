@@ -1,66 +1,212 @@
-import { Suspense } from 'react';
-import { AuthForm } from '@/components/features/AuthForm';
-import type { UserRole } from '@/types/auth.types';
+'use client';
 
-interface SignUpPageProps {
-  searchParams: Promise<{ role?: string }>;
+import { FormEvent, useState } from 'react';
+import Link from 'next/link';
+import { Alert } from '@/components/ui/Alert';
+import { BrandLogo } from '@/components/ui/BrandLogo';
+import { AuthSplitShell, AuthHeroPanel } from '@/components/features/auth/AuthSplitShell';
+import {
+  AuthField,
+  AuthPasswordField,
+  AuthPrimaryButton,
+} from '@/components/features/auth/AuthFields';
+import { RegistrationSuccessModal } from '@/components/features/auth/RegistrationSuccessModal';
+
+interface SignUpFormState {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  username: string;
+  password: string;
+  confirmPassword: string;
 }
 
-async function SignUpContent({ searchParams }: SignUpPageProps) {
-  const params = await searchParams;
-  const role = (params.role as UserRole) || 'tenant';
-  const isAdmin = role === 'admin';
+export default function SignUpPage() {
+  const [form, setForm] = useState<SignUpFormState>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    username: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const updateField = (key: keyof SignUpFormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          phone: form.phone.trim() || undefined,
+          username: form.username.trim() || undefined,
+          role: 'tenant',
+          pendingActivation: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        setError(data.message || 'Failed to create account');
+        return;
+      }
+
+      setShowSuccess(true);
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className={`mx-auto h-12 w-12 rounded-full flex items-center justify-center ${
-            isAdmin ? 'bg-purple-100' : 'bg-blue-100'
-          }`}>
-            {isAdmin ? (
-              <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-            ) : (
-              <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-            )}
+    <>
+      <AuthSplitShell left={<AuthHeroPanel />}>
+        <div>
+          <div className="mb-6 flex justify-center lg:hidden">
+            <BrandLogo variant="full" height={40} priority />
           </div>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Create {isAdmin ? 'Admin' : 'Tenant'} Account
-          </h2>
-          <p className="mt-2 text-sm text-gray-900">
-            Join our platform as a {isAdmin ? 'system administrator' : 'tenant user'}
+          <h2 className="mb-8 text-3xl font-bold text-gray-900">Create your account</h2>
+
+          {error && (
+            <Alert variant="danger" className="mb-5">
+              {error}
+            </Alert>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <AuthField
+                id="firstName"
+                name="firstName"
+                required
+                value={form.firstName}
+                onChange={updateField('firstName')}
+                placeholder="First Name"
+                autoComplete="given-name"
+              />
+              <AuthField
+                id="lastName"
+                name="lastName"
+                required
+                value={form.lastName}
+                onChange={updateField('lastName')}
+                placeholder="Last Name"
+                autoComplete="family-name"
+              />
+            </div>
+
+            <AuthField
+              id="email"
+              name="email"
+              type="email"
+              required
+              value={form.email}
+              onChange={updateField('email')}
+              placeholder="Email"
+              autoComplete="email"
+            />
+
+            <AuthField
+              id="phone"
+              name="phone"
+              type="tel"
+              value={form.phone}
+              onChange={updateField('phone')}
+              placeholder="Phone / Mobile Number"
+              autoComplete="tel"
+            />
+
+            <div className="border-t border-gray-200 pt-3.5">
+              <AuthField
+                id="username"
+                name="username"
+                required
+                value={form.username}
+                onChange={updateField('username')}
+                placeholder="Username"
+                autoComplete="username"
+              />
+            </div>
+
+            <AuthPasswordField
+              id="password"
+              name="password"
+              required
+              value={form.password}
+              onChange={updateField('password')}
+              placeholder="Password"
+              autoComplete="new-password"
+              minLength={6}
+            />
+
+            <AuthPasswordField
+              id="confirmPassword"
+              name="confirmPassword"
+              required
+              value={form.confirmPassword}
+              onChange={updateField('confirmPassword')}
+              placeholder="Confirm Password"
+              autoComplete="new-password"
+              minLength={6}
+            />
+
+            <p className="pt-1 text-xs leading-relaxed text-gray-500">
+              By submitting this form, you agree to share your information with the administrator
+              for account activation.
+            </p>
+
+            <div className="pt-1">
+              <AuthPrimaryButton isLoading={isLoading}>Sign up</AuthPrimaryButton>
+            </div>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link
+              href="/auth/tenant/signin"
+              className="font-semibold text-[#3B82F6] hover:text-blue-600"
+            >
+              Login here
+            </Link>
           </p>
         </div>
+      </AuthSplitShell>
 
-        {/* Auth Form */}
-        <div className="bg-white py-8 px-6 shadow rounded-lg">
-          <AuthForm mode="signup" defaultRole={role} />
-        </div>
-
-        {/* Footer */}
-        <div className="text-center">
-          <p className="text-xs text-gray-900">
-            By creating an account, you agree to our terms of service
-          </p>
-        </div>
-      </div>
-    </div>
+      <RegistrationSuccessModal
+        isOpen={showSuccess}
+        onClose={() => setShowSuccess(false)}
+        loginHref="/auth/tenant/signin"
+      />
+    </>
   );
 }
-
-export default function SignUpPage({ searchParams }: SignUpPageProps) {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    }>
-      <SignUpContent searchParams={searchParams} />
-    </Suspense>
-  );
-} 

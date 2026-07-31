@@ -5,7 +5,7 @@ import type { CreateUserData } from '@/types/auth.types';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, role, firstName, lastName } = body;
+    const { email, password, role, firstName, lastName, pendingActivation } = body;
 
     // Validate required fields
     if (!email || !password || !role || !firstName || !lastName) {
@@ -52,12 +52,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Self-registration waits for admin activation (inactive until approved)
+    const requiresActivation = Boolean(pendingActivation) && role === 'tenant';
+
     const userData: CreateUserData = {
       email: email.toLowerCase().trim(),
       password,
       role,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
+      isActive: !requiresActivation,
     };
 
     const user = await createUser(userData);
@@ -68,7 +72,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'User created successfully',
+      message: requiresActivation
+        ? 'Registration submitted. Waiting for administrator approval.'
+        : 'User created successfully',
+      pendingActivation: requiresActivation,
       user: userWithoutPassword,
     });
 
