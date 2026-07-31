@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Mail, Lock, AlertCircle, Shield, ArrowLeft } from 'lucide-react';
+import { Building2, Mail, Lock, Shield, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export default function AdminSignIn() {
   const router = useRouter();
@@ -61,10 +62,8 @@ export default function AdminSignIn() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <div className="bg-blue-600 p-3 rounded-xl">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
+            <div className="flex items-center justify-center mb-4">
+              <BrandLogo variant="mark" height={56} priority />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Admin Portal</h2>
             <p className="mt-2 text-gray-900 dark:text-gray-300">
@@ -157,9 +156,8 @@ export default function AdminSignIn() {
       {/* Right Side - Branding */}
       <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-blue-600 to-blue-800 text-white items-center justify-center p-12">
         <div className="max-w-md">
-          <div className="flex items-center space-x-3 mb-8">
-            <Building2 className="h-12 w-12" />
-            <span className="text-2xl font-bold leading-tight">Alfonso Property Management System</span>
+          <div className="flex items-center mb-8">
+            <BrandLogo variant="full" height={48} />
           </div>
           <h3 className="text-3xl font-bold mb-4">
             Property Management Made Simple

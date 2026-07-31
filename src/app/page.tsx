@@ -15,6 +15,7 @@ import {
   MapPin,
   Star
 } from 'lucide-react';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 interface Building {
   id: string;
@@ -101,10 +102,9 @@ export default function LandingPage() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="text-sm sm:text-base font-bold text-gray-900 leading-tight max-w-[12rem] sm:max-w-none">Alfonso Property Management System</span>
-        </div>
+            <Link href="/" className="flex items-center" aria-label="Alfonso Property Management System">
+              <BrandLogo variant="full" height={36} priority className="max-w-[10rem] sm:max-w-none" />
+            </Link>
             <nav className="hidden md:flex items-center space-x-8">
               <a href="#properties" className="text-gray-900 hover:text-blue-600 transition">Properties</a>
               <a href="#features" className="text-gray-900 hover:text-blue-600 transition">Features</a>
@@ -382,9 +382,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <Building2 className="h-8 w-8 text-blue-500" />
-                <span className="text-lg font-bold text-white leading-tight">Alfonso Property Management System</span>
+              <div className="mb-4">
+                <BrandLogo variant="full" height={40} />
               </div>
               <p className="text-sm">
                 Professional property management services for modern living.
