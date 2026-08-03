@@ -113,7 +113,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
       onBuildingAdded(result.data.id);
 
       setTimeout(() => {
-        router.push(`/admin/buildings?buildingId=${result.data.id}`);
+        router.push(`/admin/properties?buildingId=${result.data.id}`);
         router.refresh();
       }, 400);
     } catch (err) {

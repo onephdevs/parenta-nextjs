@@ -6,7 +6,6 @@ import type { Building } from '@/types/database';
 import type { RoomPageDetail, RoomsPageListItem } from '@/lib/api/properties';
 import RoomsListPanel from './RoomsListPanel';
 import RoomDetailPane from './RoomDetailPane';
-import RoomDetailsModal from './RoomDetailsModal';
 
 interface RoomsMasterDetailProps {
   initialRooms: RoomsPageListItem[];
@@ -29,8 +28,6 @@ export default function RoomsMasterDetail({
   const [detail, setDetail] = useState<RoomPageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [modalRoomId, setModalRoomId] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
 
   const syncUrl = useCallback(
     (roomId: string | null) => {
@@ -64,15 +61,6 @@ export default function RoomsMasterDetail({
     } finally {
       setDetailLoading(false);
     }
-  }, []);
-
-  const openRoomModal = useCallback((roomId: string) => {
-    setModalRoomId(roomId);
-    setModalOpen(true);
-  }, []);
-
-  const closeRoomModal = useCallback(() => {
-    setModalOpen(false);
   }, []);
 
   const refreshRoomsList = useCallback(async () => {
@@ -131,19 +119,9 @@ export default function RoomsMasterDetail({
     void loadDetail(selectedRoomId);
   }, [selectedRoomId, loadDetail]);
 
-  // Deep-link: open modal once when landing with ?roomId=
-  useEffect(() => {
-    if (initialRoomId) {
-      openRoomModal(initialRoomId);
-    }
-    // Only on mount for the initial deep link
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleSelectRoom = (roomId: string) => {
     setSelectedRoomId(roomId);
     syncUrl(roomId);
-    openRoomModal(roomId);
   };
 
   const handleRoomAdded = async (roomId?: string) => {
@@ -151,7 +129,6 @@ export default function RoomsMasterDetail({
     if (roomId) {
       setSelectedRoomId(roomId);
       syncUrl(roomId);
-      openRoomModal(roomId);
     }
   };
 
@@ -167,21 +144,7 @@ export default function RoomsMasterDetail({
         />
       </div>
 
-      <RoomDetailPane
-        detail={detail}
-        loading={detailLoading}
-        error={detailError}
-        onViewRoomDetails={openRoomModal}
-      />
-
-      <RoomDetailsModal
-        isOpen={modalOpen}
-        roomId={modalRoomId}
-        onClose={closeRoomModal}
-        initialDetail={
-          detail && modalRoomId && detail.room.id === modalRoomId ? detail : null
-        }
-      />
+      <RoomDetailPane detail={detail} loading={detailLoading} error={detailError} />
     </div>
   );
 }

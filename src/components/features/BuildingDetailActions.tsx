@@ -62,7 +62,7 @@ export default function BuildingDetailActions({ buildingId, building }: Building
       });
 
       // Redirect to buildings list
-      router.push('/admin/buildings');
+      router.push('/admin/properties');
     } catch (error) {
       console.error('Error deleting building:', error);
       showNotification({

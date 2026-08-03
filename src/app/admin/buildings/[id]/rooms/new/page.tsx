@@ -49,7 +49,7 @@ export default async function AddRoomPage({ params }: AddRoomPageProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
             <Link 
-              href="/admin/buildings" 
+              href="/admin/properties" 
               className="text-sm text-gray-900 hover:text-gray-900"
             >
               Buildings

@@ -225,7 +225,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
       });
 
       setTimeout(() => {
-        router.push('/admin/buildings');
+        router.push('/admin/properties');
       }, 1000);
     } catch (err) {
       updateNotification(loadingNotificationId, {

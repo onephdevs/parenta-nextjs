@@ -264,7 +264,7 @@ function BuildingSummaryCard({ detail }: { detail: RoomPageDetail }) {
 
           <div className="flex flex-1 flex-col gap-2 p-4">
             <Link
-              href={`/admin/buildings?buildingId=${building.id}`}
+              href={`/admin/properties?buildingId=${building.id}`}
               className="text-[16px] font-bold leading-none text-gray-900 hover:underline"
             >
               {building.name}

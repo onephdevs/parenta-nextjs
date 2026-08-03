@@ -151,7 +151,7 @@ export default async function AdminDashboard() {
     {
       title: 'Add Building',
       description: 'Create a new property',
-      href: '/admin/buildings',
+      href: '/admin/properties',
       icon: Building2,
       bgColor: 'bg-blue-100',
       iconColor: 'text-blue-600'
@@ -230,7 +230,7 @@ export default async function AdminDashboard() {
               <p className="text-sm text-gray-900 mb-3">Total Buildings</p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-900">{stats.buildings.totalUnits} units</span>
-                <Link href="/admin/buildings" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                <Link href="/admin/properties" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
                   View <ArrowRight className="h-3 w-3 ml-1" />
                 </Link>
               </div>

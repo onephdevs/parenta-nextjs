@@ -43,21 +43,13 @@ export default function AdminSidebar() {
     },
     {
       name: 'Properties',
+      href: '/admin/properties',
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
       children: [
-        {
-          name: 'All Buildings',
-          href: '/admin/buildings',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          ),
-        },
         {
           name: 'All Rooms',
           href: '/admin/rooms',
@@ -322,66 +314,105 @@ export default function AdminSidebar() {
   // Expand only the section that owns the current route; everything else stays collapsed
   useEffect(() => {
     const activeParents = menuItems
-      .filter((item) =>
-        item.children?.some(
-          (child) => child.href && (pathname === child.href || pathname.startsWith(`${child.href}/`))
-        )
+      .filter(
+        (item) =>
+          (item.href && isActive(item.href)) ||
+          item.children?.some((child) => child.href && isActive(child.href))
       )
       .map((item) => item.name);
     setExpandedSections(activeParents);
-    // menuItems is stable module-level structure in this component render; pathname drives updates
+    // menuItems / isActive are driven by pathname
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   const toggleSection = (sectionName: string) => {
-    setExpandedSections((prev) =>
-      prev.includes(sectionName)
-        ? prev.filter((s) => s !== sectionName)
-        : [...prev, sectionName]
+    setExpandedSections((prev) => (prev.includes(sectionName) ? [] : [sectionName]));
+  };
+
+  const parentRowClass = (highlighted: boolean) =>
+    `flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+      highlighted
+        ? 'bg-white font-semibold text-[#111827] shadow-sm'
+        : 'font-medium text-[#303030] hover:bg-black/[0.04]'
+    }`;
+
+  const renderChildLink = (child: MenuItem) => {
+    const childActive = child.href ? isActive(child.href) : false;
+    return (
+      <li key={child.name} className="relative">
+        {/* L-connector with arrow — only for the selected sub-page */}
+        {childActive && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-1/2 z-10 flex -translate-x-px -translate-y-1/2 items-center"
+          >
+            <span className="block h-px w-3 bg-[#b5b5b5]" />
+            <svg
+              width="5"
+              height="8"
+              viewBox="0 0 5 8"
+              className="text-[#b5b5b5]"
+              aria-hidden
+            >
+              <path d="M0 0l5 4-5 4" fill="currentColor" />
+            </svg>
+          </span>
+        )}
+        <Link
+          href={child.href!}
+          className={`ml-3 block rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            childActive
+              ? 'bg-white font-semibold text-[#111827] shadow-sm'
+              : 'font-normal text-[#616161] hover:bg-black/[0.04] hover:text-[#303030]'
+          }`}
+        >
+          {child.name}
+        </Link>
+      </li>
     );
   };
 
-  const sectionContainsActive = (item: MenuItem) =>
-    Boolean(
-      item.children?.some(
-        (child) => child.href && (pathname === child.href || pathname.startsWith(`${child.href}/`))
-      )
-    );
-
-  const renderMenuItem = (item: MenuItem, depth: number = 0) => {
-    const hasChildren = item.children && item.children.length > 0;
+  const renderMenuItem = (item: MenuItem) => {
+    const hasChildren = Boolean(item.children && item.children.length > 0);
     const isExpanded = expandedSections.includes(item.name);
+    const childIsActive = Boolean(
+      item.children?.some((child) => child.href && isActive(child.href))
+    );
     const active = item.href ? isActive(item.href) : false;
-    const parentActive = hasChildren ? sectionContainsActive(item) : false;
+    // Parent highlight only when this page is active and no child owns the route
+    const parentHighlight = hasChildren ? active && !childIsActive : active;
 
     if (hasChildren) {
       return (
         <div key={item.name}>
-          <button
-            onClick={() => toggleSection(item.name)}
-            className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              parentActive
-                ? 'bg-gray-100 text-[#111827]'
-                : 'text-gray-900 hover:bg-gray-100 hover:text-gray-900'
-            }`}
-          >
-            <span className="flex items-center space-x-3">
-              {item.icon}
-              <span>{item.name}</span>
-            </span>
-            <svg
-              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {item.href ? (
+            <Link
+              href={item.href}
+              className={parentRowClass(parentHighlight)}
+              onClick={() => setExpandedSections([item.name])}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-current">
+                {item.icon}
+              </span>
+              <span>{item.name}</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => toggleSection(item.name)}
+              className={parentRowClass(parentHighlight)}
+              aria-expanded={isExpanded}
+            >
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-current">
+                {item.icon}
+              </span>
+              <span>{item.name}</span>
+            </button>
+          )}
           {isExpanded && (
-            <div className="mt-1 ml-4 space-y-1">
-              {item.children?.map((child) => renderMenuItem(child, depth + 1))}
-            </div>
+            <ul className="relative ml-5 mt-0.5 space-y-0.5 border-l border-[#b5b5b5] py-0.5">
+              {item.children?.map((child) => renderChildLink(child))}
+            </ul>
           )}
         </div>
       );
@@ -391,41 +422,38 @@ export default function AdminSidebar() {
       <Link
         key={item.name}
         href={item.href!}
-        className={`flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-          depth > 0 ? 'pl-8' : ''
-        } ${
-          active
-            ? 'bg-gray-100 text-[#111827]'
-            : 'text-gray-900 hover:bg-gray-100 hover:text-gray-900'
-        }`}
+        className={parentRowClass(active)}
+        onClick={() => setExpandedSections([])}
       >
-        {item.icon}
+        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-current">
+          {item.icon}
+        </span>
         <span>{item.name}</span>
       </Link>
     );
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+    <div className="flex h-full flex-col border-r border-gray-200 bg-[#f1f1f1]">
       {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-gray-200">
+      <div className="flex h-16 items-center border-b border-gray-200/80 px-4">
         <Link href="/admin" className="flex items-center" aria-label="Alfonso Property Management System">
           <BrandLogo variant="full" height={36} priority />
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        <div className="space-y-1">
-          {menuItems.map(item => renderMenuItem(item))}
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
+        <div className="space-y-0.5">
+          {menuItems.map((item) => renderMenuItem(item))}
         </div>
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="border-t border-gray-200/80 p-4">
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold uppercase text-[#111827]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-semibold uppercase text-[#111827] shadow-sm">
               {session?.user?.firstName || session?.user?.lastName ? (
                 `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
               ) : (
@@ -435,16 +463,16 @@ export default function AdminSidebar() {
               )}
             </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
-            <p className="text-xs text-gray-900 truncate">{session?.user?.email || ''}</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
+            <p className="truncate text-xs text-gray-600">{session?.user?.email || ''}</p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/auth/admin/signin' })}
-            className="p-1 text-gray-400 hover:text-gray-900 transition-colors"
+            className="p-1 text-gray-400 transition-colors hover:text-gray-900"
             title="Sign out"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
           </button>

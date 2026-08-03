@@ -97,7 +97,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
             <Link 
-              href="/admin/buildings" 
+              href="/admin/properties" 
               className="text-sm text-gray-900 hover:text-gray-900"
             >
               Buildings
@@ -111,7 +111,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
               <Link
-                href="/admin/buildings"
+                href="/admin/properties"
                 className="mr-4 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                 title="Back to Buildings"
               >

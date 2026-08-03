@@ -51,7 +51,7 @@ export default function PropertiesMasterDetail({
         params.delete('buildingId');
       }
       const query = params.toString();
-      router.replace(query ? `/admin/buildings?${query}` : '/admin/buildings', { scroll: false });
+      router.replace(query ? `/admin/properties?${query}` : '/admin/properties', { scroll: false });
     },
     [router, searchParams]
   );

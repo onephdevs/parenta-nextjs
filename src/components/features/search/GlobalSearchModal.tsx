@@ -109,7 +109,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
   };
 
   const quickActions = [
-    { url: '/admin/buildings', icon: Building, label: 'View All Buildings' },
+    { url: '/admin/properties', icon: Building, label: 'View All Buildings' },
     { url: '/admin/tenants', icon: Users, label: 'View All Tenants' },
     { url: '/admin/financial/payments', icon: DollarSign, label: 'View Payments' },
     { url: '/admin/financial/reports', icon: FileText, label: 'View Reports' },
