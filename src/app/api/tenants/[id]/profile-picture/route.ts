@@ -34,7 +34,7 @@ async function deleteStoredFile(filePathOrUrl: string | null | undefined): Promi
     if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
       // Vercel Blob absolute URL — delete by pathname when token is available
       if (process.env.BLOB_READ_WRITE_TOKEN) {
-        await del(filePathOrUrl);
+        await del(filePathOrUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
       }
       return;
     }

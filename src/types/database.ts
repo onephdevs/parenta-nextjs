@@ -897,4 +897,124 @@ export interface CreateAssetBillingData {
   rentalAmount: number;
   dueDate?: Date;
   notes?: string;
-} 
+}
+
+// =====================================================
+// PIPELINE / TASKS CRM
+// =====================================================
+
+export type PipelineBoardSlug = string;
+export type BuiltInPipelineBoardSlug = 'onboarding' | 'nurture' | 'payments' | 'expenses';
+export type PipelineCardStatus = 'open' | 'won' | 'lost' | 'archived';
+export type PipelineBackgroundCheckStatus =
+  | 'not_started'
+  | 'pending'
+  | 'approved'
+  | 'failed';
+export type PipelineLeaseStatus =
+  | 'not_started'
+  | 'generated'
+  | 'awaiting_signature'
+  | 'signed';
+
+export interface PipelineStage {
+  id: string;
+  boardId: string;
+  slug: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+  isWon: boolean;
+  isLost: boolean;
+  isTerminal: boolean;
+  cardCount?: number;
+  totalAmount?: number;
+}
+
+export interface PipelineBoard {
+  id: string;
+  slug: PipelineBoardSlug;
+  name: string;
+  description?: string;
+  sortOrder: number;
+  isActive: boolean;
+  stages: PipelineStage[];
+  openCount?: number;
+  openTotalAmount?: number;
+}
+
+export interface PipelineCard {
+  id: string;
+  boardId: string;
+  stageId: string;
+  title: string;
+  contactFirstName?: string;
+  contactLastName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  buildingId?: string;
+  buildingName?: string;
+  roomId?: string;
+  roomNumber?: string;
+  tenantId?: string;
+  assignmentId?: string;
+  expenseId?: string;
+  amount?: number;
+  source?: string;
+  tags: string[];
+  cardStatus: PipelineCardStatus;
+  dueAt?: string;
+  nextActionAt?: string;
+  viewingAt?: string;
+  notes?: string;
+  priorStageId?: string;
+  priorBoardId?: string;
+  nurtureReason?: string;
+  lostReason?: string;
+  backgroundCheckStatus?: PipelineBackgroundCheckStatus;
+  backgroundCheckNotes?: string;
+  leaseStatus?: PipelineLeaseStatus;
+  leaseStartDate?: string;
+  leaseEndDate?: string;
+  moveInDate?: string;
+  position: number;
+  wonAt?: string;
+  lostAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  stageColor?: string;
+  stageSlug?: string;
+  stageName?: string;
+  stageIsWon?: boolean;
+  boardSlug?: PipelineBoardSlug;
+}
+
+export interface CreatePipelineCardData {
+  boardSlug: PipelineBoardSlug;
+  stageSlug?: string;
+  title?: string;
+  contactFirstName?: string;
+  contactLastName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  buildingId?: string;
+  roomId?: string;
+  tenantId?: string;
+  assignmentId?: string;
+  expenseId?: string;
+  amount?: number;
+  source?: string;
+  tags?: string[];
+  dueAt?: string;
+  nextActionAt?: string;
+  viewingAt?: string;
+  notes?: string;
+  lostReason?: string;
+}
+
+export interface MovePipelineCardData {
+  stageId: string;
+  position?: number;
+}
+ 

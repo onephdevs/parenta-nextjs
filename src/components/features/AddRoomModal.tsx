@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Building2, Info, DollarSign, FileText } from 'lucide-react';
 import { Building, CreateRoomData } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
-import FullScreenModal from '@/components/ui/FullScreenModal';
-import { Button } from '@/components/ui/Button';
+import SectionedFormShell from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
@@ -21,6 +21,39 @@ interface AddRoomModalProps {
   onRoomAdded?: (roomId?: string) => void;
 }
 
+type AddRoomSection = 'basic' | 'details' | 'financial' | 'additional';
+
+const SECTIONS: { id: AddRoomSection; label: string; icon: React.ReactNode; title: string; subtitle: string }[] = [
+  { 
+    id: 'basic', 
+    label: 'Basic info', 
+    icon: <Building2 className="h-4 w-4" />,
+    title: 'Basic information',
+    subtitle: 'Building and room identification.'
+  },
+  { 
+    id: 'details', 
+    label: 'Details', 
+    icon: <Info className="h-4 w-4" />,
+    title: 'Room details',
+    subtitle: 'Type, floor, and size information.'
+  },
+  { 
+    id: 'financial', 
+    label: 'Financial', 
+    icon: <DollarSign className="h-4 w-4" />,
+    title: 'Financial information',
+    subtitle: 'Monthly rate and pricing.'
+  },
+  { 
+    id: 'additional', 
+    label: 'Additional', 
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional information',
+    subtitle: 'Description and amenities.'
+  },
+];
+
 export default function AddRoomModal({
   isOpen,
   onClose,
@@ -34,6 +67,7 @@ export default function AddRoomModal({
   const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [section, setSection] = useState<AddRoomSection>('basic');
 
   const [formData, setFormData] = useState<CreateRoomData>({
     buildingId: buildingId || building?.id || '',
@@ -94,10 +128,12 @@ export default function AddRoomModal({
         throw new Error(result.error || 'Failed to create room');
       }
 
+      const targetBuildingId = formData.buildingId || buildingId || building?.id || '';
+
       updateNotification(loadingId, {
         type: 'success',
         title: 'Room created successfully!',
-        message: `Room ${formData.roomNumber} has been created and you'll be redirected to view it.`,
+        message: `Room ${formData.roomNumber} has been added. Opening the property page…`,
       });
 
       setFormData({
@@ -111,12 +147,16 @@ export default function AddRoomModal({
         description: '',
       });
       setAmenitiesInput('');
+      setSection('basic');
 
       onClose();
       onRoomAdded?.(result.data.id);
 
       setTimeout(() => {
-        router.push(`/admin/rooms?roomId=${result.data.id}`);
+        const params = new URLSearchParams();
+        if (targetBuildingId) params.set('buildingId', targetBuildingId);
+        if (result.data?.id) params.set('roomId', result.data.id);
+        router.push(`/admin/properties?${params.toString()}`);
         router.refresh();
       }, 400);
     } catch (err) {
@@ -134,85 +174,77 @@ export default function AddRoomModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <FullScreenModal
+    <SectionedFormShell
       isOpen={isOpen}
-      onClose={onClose}
-      title="Add New Room"
-      primaryButton={
-        <Button type="submit" form="room-form" isLoading={isSubmitting}>
-          Create Room
-        </Button>
-      }
-      secondaryButton={
-        <Button type="button" variant="outline" onClick={onClose} isDisabled={isSubmitting}>
-          Cancel
-        </Button>
-      }
+      onCancel={onClose}
+      eyebrow="Add room"
+      sections={SECTIONS}
+      activeSection={section}
+      onSectionChange={setSection}
+      formId="add-room-form"
+      primaryLabel="Create room"
+      primaryLoading={isSubmitting}
+      primaryType="submit"
+      errorBanner={error ? <FormErrorBanner message={error} className="mb-6" /> : null}
     >
-      {error && <FormErrorBanner message={error} className="mb-6" />}
+      <form id="add-room-form" onSubmit={handleSubmit} className="space-y-5">
+        {section === 'basic' && (
+          <div className="space-y-5">
+            <FormField label="Building" htmlFor="buildingId" required>
+              <Select
+                id="buildingId"
+                name="buildingId"
+                required
+                value={formData.buildingId}
+                onChange={handleInputChange}
+                isDisabled={!!(buildingId || building)}
+              >
+                <option value="">Select a building</option>
+                {buildingOptions.map((bldg) => (
+                  <option key={bldg.id} value={bldg.id}>
+                    {bldg.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-      <form id="room-form" onSubmit={handleSubmit} className="space-y-8">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField label="Building" htmlFor="buildingId" required>
-                <Select
-                  id="buildingId"
-                  name="buildingId"
-                  required
-                  value={formData.buildingId}
-                  onChange={handleInputChange}
-                  isDisabled={!!(buildingId || building)}
-                >
-                  <option value="">Select a building</option>
-                  {buildingOptions.map((bldg) => (
-                    <option key={bldg.id} value={bldg.id}>
-                      {bldg.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField label="Room Number" htmlFor="roomNumber" required>
-                <Input
-                  type="text"
-                  id="roomNumber"
-                  name="roomNumber"
-                  required
-                  value={formData.roomNumber}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-            </div>
+            <FormField label="Room number" htmlFor="roomNumber" required>
+              <Input
+                type="text"
+                id="roomNumber"
+                name="roomNumber"
+                required
+                value={formData.roomNumber}
+                onChange={handleInputChange}
+                placeholder="e.g., 101, A-201, Studio 5"
+              />
+            </FormField>
           </div>
+        )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Room Details</h3>
+        {section === 'details' && (
+          <div className="space-y-5">
+            <FormField label="Room type" htmlFor="roomType" required>
+              <Select
+                id="roomType"
+                name="roomType"
+                value={formData.roomType}
+                onChange={handleInputChange}
+              >
+                <option value="bedroom">Bedroom</option>
+                <option value="studio">Studio</option>
+                <option value="1br">1 Bedroom</option>
+                <option value="2br">2 Bedroom</option>
+                <option value="3br">3 Bedroom</option>
+                <option value="office">Office</option>
+                <option value="retail">Retail</option>
+                <option value="storage">Storage</option>
+              </Select>
+            </FormField>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <FormField label="Room Type" htmlFor="roomType">
-                <Select
-                  id="roomType"
-                  name="roomType"
-                  value={formData.roomType}
-                  onChange={handleInputChange}
-                >
-                  <option value="bedroom">Bedroom</option>
-                  <option value="studio">Studio</option>
-                  <option value="1br">1 Bedroom</option>
-                  <option value="2br">2 Bedroom</option>
-                  <option value="3br">3 Bedroom</option>
-                  <option value="office">Office</option>
-                  <option value="retail">Retail</option>
-                  <option value="storage">Storage</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Floor Number" htmlFor="floorNumber">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <FormField label="Floor number" htmlFor="floorNumber">
                 <Input
                   type="number"
                   id="floorNumber"
@@ -221,10 +253,11 @@ export default function AddRoomModal({
                   max={50}
                   value={formData.floorNumber || ''}
                   onChange={handleInputChange}
+                  placeholder="e.g., 2"
                 />
               </FormField>
 
-              <FormField label="Square Footage" htmlFor="squareFootage">
+              <FormField label="Square footage" htmlFor="squareFootage">
                 <Input
                   type="number"
                   id="squareFootage"
@@ -234,16 +267,17 @@ export default function AddRoomModal({
                   step={1}
                   value={formData.squareFootage || ''}
                   onChange={handleInputChange}
+                  placeholder="e.g., 250"
                 />
               </FormField>
             </div>
           </div>
+        )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Information</h3>
-
+        {section === 'financial' && (
+          <div className="space-y-5">
             <FormField
-              label="Monthly Rate (₱)"
+              label="Monthly rate (₱)"
               htmlFor="monthlyRate"
               required
               hint="Enter amount in Philippine Pesos"
@@ -261,10 +295,10 @@ export default function AddRoomModal({
               />
             </FormField>
           </div>
+        )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
-
+        {section === 'additional' && (
+          <div className="space-y-5">
             <FormField label="Description" htmlFor="description">
               <Textarea
                 id="description"
@@ -272,12 +306,14 @@ export default function AddRoomModal({
                 rows={4}
                 value={formData.description}
                 onChange={handleInputChange}
+                placeholder="Brief description of the room..."
               />
             </FormField>
 
             <FormField
-              label="Amenities (comma-separated)"
+              label="Amenities"
               htmlFor="amenities"
+              hint="Separate with commas."
             >
               <Input
                 type="text"
@@ -285,12 +321,12 @@ export default function AddRoomModal({
                 name="amenities"
                 value={amenitiesInput}
                 onChange={handleAmenitiesChange}
-                placeholder="Private Bathroom, Balcony, Air Conditioning, etc."
+                placeholder="Private Bathroom, Balcony, Air Conditioning"
               />
             </FormField>
           </div>
-        </div>
+        )}
       </form>
-    </FullScreenModal>
+    </SectionedFormShell>
   );
 }

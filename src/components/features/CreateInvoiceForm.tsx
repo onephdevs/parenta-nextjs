@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card, CardHeader, CardBody, CardFooter } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { User, Home, Calendar, Plus, Calculator, FileText } from 'lucide-react';
 
 interface Tenant {
   id: string;
@@ -38,11 +39,52 @@ interface CreateInvoiceFormProps {
   tenantId?: string;
 }
 
+type FormSection = 'tenant' | 'dates' | 'items' | 'calculations' | 'notes';
+
+const formSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'tenant',
+    label: 'Tenant',
+    icon: <User className="h-4 w-4" />,
+    title: 'Tenant & Room',
+    subtitle: 'Select tenant and room',
+  },
+  {
+    id: 'dates',
+    label: 'Dates',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'Billing Period',
+    subtitle: 'Set due date and billing period',
+  },
+  {
+    id: 'items',
+    label: 'Items',
+    icon: <Plus className="h-4 w-4" />,
+    title: 'Invoice Items',
+    subtitle: 'Add items to the invoice',
+  },
+  {
+    id: 'calculations',
+    label: 'Calculations',
+    icon: <Calculator className="h-4 w-4" />,
+    title: 'Tax & Discount',
+    subtitle: 'Configure tax rate and discounts',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional Notes',
+    subtitle: 'Payment terms and notes',
+  },
+];
+
 export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFormProps = {}) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const { formatCurrency } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSection, setActiveSection] = useState<FormSection>('tenant');
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantRooms, setTenantRooms] = useState<Room[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -307,116 +349,114 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     }
   };
 
-  return (
-    <Card padding="none">
-      <CardHeader className="px-6 py-4 border-b border-gray-200 mb-0">
-        <h3 className="text-lg font-medium text-gray-900">Create New Invoice</h3>
-        <p className="text-sm text-gray-900 mt-1">Generate an invoice for tenant payments</p>
-      </CardHeader>
+  const errorBanner = error ? (
+    <Alert variant="danger">
+      {error}
+    </Alert>
+  ) : undefined;
 
-      <CardBody className="p-6">
-        {error && (
-          <Alert variant="danger" className="mb-4">
-            {error}
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-          <div>
-            <h4 className="text-md font-medium text-gray-900 mb-4">Invoice Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Tenant" htmlFor="tenantId" required>
-                <Select
-                  id="tenantId"
-                  name="tenantId"
-                  required
-                  value={formData.tenantId}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Select a tenant</option>
-                  {Array.isArray(tenants) && tenants.length > 0 ? (
-                    tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.firstName} {tenant.lastName} ({tenant.email})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>
-                      Loading tenants...
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'tenant':
+        return (
+          <div className="space-y-6">
+            <FormField label="Tenant" htmlFor="tenantId" required>
+              <Select
+                id="tenantId"
+                name="tenantId"
+                required
+                value={formData.tenantId}
+                onChange={handleInputChange}
+              >
+                <option value="">Select a tenant</option>
+                {Array.isArray(tenants) && tenants.length > 0 ? (
+                  tenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.firstName} {tenant.lastName} ({tenant.email})
                     </option>
-                  )}
-                </Select>
-              </FormField>
-
-              <FormField label="Room" htmlFor="roomId" required>
-                <Select
-                  id="roomId"
-                  name="roomId"
-                  required
-                  value={formData.roomId}
-                  onChange={handleInputChange}
-                  isDisabled={!formData.tenantId || tenantRooms.length === 0}
-                >
-                  <option value="">
-                    {!formData.tenantId
-                      ? 'Select a tenant first'
-                      : tenantRooms.length === 0
-                        ? 'No rooms available'
-                        : 'Select a room'}
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No tenants available
                   </option>
-                  {tenantRooms.map((room) => (
+                )}
+              </Select>
+            </FormField>
+
+            <FormField label="Room" htmlFor="roomId" required>
+              <Select
+                id="roomId"
+                name="roomId"
+                required
+                value={formData.roomId}
+                onChange={handleInputChange}
+                isDisabled={!formData.tenantId}
+              >
+                <option value="">{!formData.tenantId ? 'Select a tenant first' : 'Select a room'}</option>
+                {Array.isArray(tenantRooms) && tenantRooms.length > 0 ? (
+                  tenantRooms.map((room) => (
                     <option key={room.id} value={room.id}>
-                      Room {room.roomNumber} - {room.buildingName} (
-                      {formatCurrency(room.monthlyRate)}/month)
+                      Room {room.roomNumber} - {room.buildingName} (Rate: {formatCurrency(room.monthlyRate)})
                     </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField label="Due Date" htmlFor="dueDate" required>
-                <Input
-                  type="date"
-                  id="dueDate"
-                  name="dueDate"
-                  required
-                  value={formData.dueDate}
-                  onChange={handleInputChange}
-                  min="2000-01-01"
-                  max="2099-12-31"
-                  style={{ colorScheme: 'light' }}
-                />
-              </FormField>
-
-              <FormField label="Billing Period Start" htmlFor="billingPeriodStart">
-                <Input
-                  type="date"
-                  id="billingPeriodStart"
-                  name="billingPeriodStart"
-                  value={formData.billingPeriodStart}
-                  onChange={handleInputChange}
-                  min="2000-01-01"
-                  max="2099-12-31"
-                  style={{ colorScheme: 'light' }}
-                />
-              </FormField>
-
-              <FormField label="Billing Period End" htmlFor="billingPeriodEnd">
-                <Input
-                  type="date"
-                  id="billingPeriodEnd"
-                  name="billingPeriodEnd"
-                  value={formData.billingPeriodEnd}
-                  onChange={handleInputChange}
-                  min={formData.billingPeriodStart || '2000-01-01'}
-                  max="2099-12-31"
-                  style={{ colorScheme: 'light' }}
-                />
-              </FormField>
-            </div>
+                  ))
+                ) : formData.tenantId ? (
+                  <option value="" disabled>
+                    No rooms available for this tenant
+                  </option>
+                ) : null}
+              </Select>
+            </FormField>
           </div>
+        );
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
+      case 'dates':
+        return (
+          <div className="space-y-6">
+            <FormField label="Due Date" htmlFor="dueDate" required>
+              <Input
+                type="date"
+                id="dueDate"
+                name="dueDate"
+                required
+                value={formData.dueDate}
+                onChange={handleInputChange}
+                min={new Date().toISOString().split('T')[0]}
+                max="2099-12-31"
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField label="Billing Period Start" htmlFor="billingPeriodStart">
+              <Input
+                type="date"
+                id="billingPeriodStart"
+                name="billingPeriodStart"
+                value={formData.billingPeriodStart}
+                onChange={handleInputChange}
+                max={formData.billingPeriodEnd || '2099-12-31'}
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField label="Billing Period End" htmlFor="billingPeriodEnd">
+              <Input
+                type="date"
+                id="billingPeriodEnd"
+                name="billingPeriodEnd"
+                value={formData.billingPeriodEnd}
+                onChange={handleInputChange}
+                min={formData.billingPeriodStart || '2000-01-01'}
+                max="2099-12-31"
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+          </div>
+        );
+
+      case 'items':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
               <h4 className="text-md font-medium text-gray-900">Invoice Items</h4>
               <Button type="button" variant="secondary" size="sm" onClick={addItem}>
                 Add Item
@@ -506,10 +546,12 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               ))}
             </div>
           </div>
+        );
 
-          <div>
-            <h4 className="text-md font-medium text-gray-900 mb-4">Calculations</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      case 'calculations':
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField label="Tax Rate (%)" htmlFor="taxRate">
                 <Input
                   type="number"
@@ -536,7 +578,8 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </FormField>
             </div>
 
-            <div className="mt-6 bg-gray-50 p-4 rounded-md">
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h5 className="font-medium text-gray-900 mb-3">Invoice Total</h5>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-900">Subtotal:</span>
@@ -567,7 +610,10 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               </div>
             </div>
           </div>
+        );
 
+      case 'notes':
+        return (
           <FormField label="Notes" htmlFor="notes">
             <Textarea
               id="notes"
@@ -578,17 +624,30 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
               placeholder="Additional notes or payment terms..."
             />
           </FormField>
+        );
 
-          <CardFooter className="flex justify-end space-x-3 pt-6 border-t border-gray-200 mt-0">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Invoice'}
-            </Button>
-          </CardFooter>
-        </form>
-      </CardBody>
-    </Card>
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <SectionedFormShell
+      mode="page"
+      onCancel={() => router.back()}
+      eyebrow="Create Invoice"
+      entityLabel="New Invoice"
+      sections={formSections}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      primaryLabel="Create Invoice"
+      primaryLoading={isSubmitting}
+      formId="create-invoice-form"
+      errorBanner={errorBanner}
+    >
+      <form id="create-invoice-form" onSubmit={handleSubmit} className="space-y-6">
+        {renderSectionContent()}
+      </form>
+    </SectionedFormShell>
   );
 }

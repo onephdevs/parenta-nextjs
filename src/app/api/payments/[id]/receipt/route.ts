@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { contentDispositionHeader, sanitizeDownloadFileName } from '@/lib/format/upload-filename';
 import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
@@ -43,11 +44,14 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const filePath = path.join(process.cwd(), 'public', payment.receipt_file_path);
+    const storedPath = String(payment.receipt_file_path);
+    const fileName = sanitizeDownloadFileName(
+      payment.receipt_file_name || `receipt-${id}`,
+      `receipt-${id}`
+    );
 
-    try {
-      const fileBuffer = await fs.readFile(filePath);
-      const fileExtension = path.extname(payment.receipt_file_path).toLowerCase();
+    const contentTypeFromExt = (filePathOrName: string) => {
+      const fileExtension = path.extname(filePathOrName).toLowerCase();
       const contentTypeMap: Record<string, string> = {
         '.pdf': 'application/pdf',
         '.jpg': 'image/jpeg',
@@ -55,14 +59,42 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         '.png': 'image/png',
         '.webp': 'image/webp',
       };
-      const contentType = contentTypeMap[fileExtension] || 'application/octet-stream';
-      const fileName = payment.receipt_file_name || `receipt-${id}${fileExtension}`;
+      return contentTypeMap[fileExtension] || 'application/octet-stream';
+    };
 
+    if (storedPath.startsWith('http://') || storedPath.startsWith('https://')) {
+      try {
+        const remote = await fetch(storedPath);
+        if (!remote.ok) {
+          return NextResponse.json({ error: 'Receipt file not found' }, { status: 404 });
+        }
+        const fileBuffer = Buffer.from(await remote.arrayBuffer());
+        return new NextResponse(fileBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type':
+              remote.headers.get('content-type') ||
+              contentTypeFromExt(fileName) ||
+              'application/octet-stream',
+            'Content-Disposition': contentDispositionHeader(fileName, 'attachment'),
+            'Content-Length': fileBuffer.length.toString(),
+          },
+        });
+      } catch (err) {
+        console.error('Error fetching remote receipt:', err);
+        return NextResponse.redirect(storedPath);
+      }
+    }
+
+    const filePath = path.join(process.cwd(), 'public', storedPath.replace(/^\//, ''));
+
+    try {
+      const fileBuffer = await fs.readFile(filePath);
       return new NextResponse(fileBuffer, {
         status: 200,
         headers: {
-          'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${fileName}"`,
+          'Content-Type': contentTypeFromExt(storedPath),
+          'Content-Disposition': contentDispositionHeader(fileName, 'attachment'),
           'Content-Length': fileBuffer.length.toString(),
         },
       });

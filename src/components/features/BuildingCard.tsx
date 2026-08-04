@@ -187,6 +187,7 @@ export default function BuildingCard({ building, viewMode }: BuildingCardProps) 
       <EditBuildingModal
         building={building}
         isOpen={isEditModalOpen}
+        onImagesChanged={() => router.refresh()}
         onClose={() => {
           setIsEditModalOpen(false);
           router.refresh();

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, User, Briefcase, Home, MapPin, Phone, Heart, FileText } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
+import SectionedFormShell, { SectionedFormSection, SectionCard } from '@/components/ui/SectionedFormShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -16,8 +17,8 @@ import { Alert } from '@/components/ui/Alert';
 import { Dialog } from '@/components/ui/Dialog';
 import { cn } from '@/lib/utils';
 
-/** Assign API enforces this floor when no building deposit config exists */
-const MINIMUM_DEPOSIT_AMOUNT = 3000;
+/** Fallback only when a building has no deposit config saved */
+const DEFAULT_MINIMUM_DEPOSIT_AMOUNT = 0;
 
 const DRAFT_STORAGE_KEY = 'parenta:tenant-form-draft';
 const DIRTY_FLAG_KEY = 'parenta:tenant-form-dirty';
@@ -67,17 +68,72 @@ interface TenantFormData {
 }
 
 type FormErrors = Record<string, string>;
+type SectionId = 'personal' | 'emergency' | 'employment' | 'housing' | 'lease' | 'notes';
 
-const STEPS = [
-  { id: 1, title: 'Personal', description: 'Identity & emergency contact' },
-  { id: 2, title: 'Employment', description: 'Work & financial info' },
-  { id: 3, title: 'Housing', description: 'Room, rent & lease' },
-] as const;
+export interface TenantFormProps {
+  mode?: 'page' | 'modal';
+  isOpen?: boolean;
+  onClose?: () => void;
+  initialBuildingId?: string;
+  initialRoomId?: string;
+  /** When true, building/room fields stay fixed to the initial values */
+  lockHousing?: boolean;
+  returnTo?: string;
+  onCreated?: (tenantId: string) => void;
+}
 
-const STEP_FIELDS: Record<number, string[]> = {
-  1: ['firstName', 'lastName', 'email', 'phone', 'emergencyContactPhone'],
-  2: ['monthlyIncome'],
-  3: ['monthlyRent', 'depositMonths', 'advanceMonths', 'leaseStartDate', 'customLeaseMonths'],
+const SECTIONS: SectionedFormSection<SectionId>[] = [
+  {
+    id: 'personal',
+    label: 'Personal Info',
+    icon: <User className="h-4 w-4" />,
+    title: 'Personal Information',
+    subtitle: 'Basic tenant details and contact information',
+  },
+  {
+    id: 'emergency',
+    label: 'Emergency Contact',
+    icon: <Heart className="h-4 w-4" />,
+    title: 'Emergency Contact',
+    subtitle: 'Contact person in case of emergencies',
+  },
+  {
+    id: 'employment',
+    label: 'Employment',
+    icon: <Briefcase className="h-4 w-4" />,
+    title: 'Employment & Financial',
+    subtitle: 'Work and income information',
+  },
+  {
+    id: 'housing',
+    label: 'Housing',
+    icon: <Home className="h-4 w-4" />,
+    title: 'Property & Room Assignment',
+    subtitle: 'Room selection and rent details',
+  },
+  {
+    id: 'lease',
+    label: 'Lease',
+    icon: <MapPin className="h-4 w-4" />,
+    title: 'Lease Information',
+    subtitle: 'Lease duration and move-in dates',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional Information',
+    subtitle: 'Optional notes and comments',
+  },
+];
+
+const SECTION_FIELDS: Record<SectionId, string[]> = {
+  personal: ['firstName', 'lastName', 'email', 'phone'],
+  emergency: ['emergencyContactPhone'],
+  employment: ['monthlyIncome'],
+  housing: ['monthlyRent', 'depositMonths', 'advanceMonths'],
+  lease: ['leaseStartDate', 'customLeaseMonths'],
+  notes: [],
 };
 
 const INITIAL_FORM_DATA: TenantFormData = {
@@ -226,37 +282,19 @@ function getFieldError(name: string, data: TenantFormData): string {
   }
 }
 
-function SectionCard({
-  title,
-  description,
-  optional,
-  children,
-}: {
-  title: string;
-  description?: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border border-gray-200 bg-white p-5 sm:p-6">
-      <div className="mb-4">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-          {optional && (
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Optional
-            </span>
-          )}
-        </div>
-        {description && <p className="mt-1 text-sm text-gray-600">{description}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
 
-export default function TenantForm() {
+export default function TenantForm({
+  mode = 'page',
+  isOpen = true,
+  onClose,
+  initialBuildingId,
+  initialRoomId,
+  lockHousing = false,
+  returnTo,
+  onCreated,
+}: TenantFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showNotification, updateNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
   const [loading, setLoading] = useState(false);
@@ -264,11 +302,22 @@ export default function TenantForm() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [overrideMonthlyRent, setOverrideMonthlyRent] = useState(false);
-  const formTopRef = useRef<HTMLDivElement>(null);
+  const [minimumDepositAmount, setMinimumDepositAmount] = useState(
+    DEFAULT_MINIMUM_DEPOSIT_AMOUNT
+  );
 
-  const [step, setStep] = useState(1);
+  const resolvedBuildingId = initialBuildingId || searchParams.get('buildingId') || '';
+  const resolvedRoomId = initialRoomId || searchParams.get('roomId') || '';
+  const resolvedReturnTo = returnTo || searchParams.get('returnTo') || '';
+  const housingLocked = lockHousing || Boolean(resolvedBuildingId && resolvedRoomId);
+
+  const [activeSection, setActiveSection] = useState<SectionId>('personal');
   const [checkingEmail, setCheckingEmail] = useState(false);
-  const [formData, setFormData] = useState<TenantFormData>(INITIAL_FORM_DATA);
+  const [formData, setFormData] = useState<TenantFormData>(() => ({
+    ...INITIAL_FORM_DATA,
+    buildingId: resolvedBuildingId,
+    roomId: resolvedRoomId,
+  }));
   const [errors, setErrors] = useState<FormErrors>({});
   const [isDirty, setIsDirty] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -281,8 +330,9 @@ export default function TenantForm() {
   } | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
 
-  // Restore draft once on mount
+  // Restore draft once on mount (skip when opened from a specific room)
   useEffect(() => {
+    if (housingLocked) return;
     try {
       const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
@@ -290,19 +340,25 @@ export default function TenantForm() {
         formData?: TenantFormData;
         overrideMonthlyRent?: boolean;
         step?: number;
+        activeSection?: SectionId;
       };
       if (!parsed.formData) return;
       skipNextDraftSave.current = true;
       setFormData({ ...INITIAL_FORM_DATA, ...parsed.formData });
       setOverrideMonthlyRent(Boolean(parsed.overrideMonthlyRent));
-      if (parsed.step && parsed.step >= 1 && parsed.step <= 3) setStep(parsed.step);
+      if (parsed.activeSection && SECTIONS.some((s) => s.id === parsed.activeSection)) {
+        setActiveSection(parsed.activeSection);
+      } else if (typeof parsed.step === 'number') {
+        const legacy: SectionId[] = ['personal', 'emergency', 'employment', 'housing', 'lease', 'notes'];
+        setActiveSection(legacy[Math.min(Math.max(parsed.step - 1, 0), legacy.length - 1)] ?? 'personal');
+      }
       setIsDirty(true);
       setDraftRestored(true);
       sessionStorage.setItem(DIRTY_FLAG_KEY, '1');
     } catch (error) {
       console.warn('Could not restore tenant form draft:', error);
     }
-  }, []);
+  }, [housingLocked]);
 
   // Autosave draft
   useEffect(() => {
@@ -315,7 +371,7 @@ export default function TenantForm() {
       try {
         localStorage.setItem(
           DRAFT_STORAGE_KEY,
-          JSON.stringify({ formData, overrideMonthlyRent, step, savedAt: Date.now() })
+          JSON.stringify({ formData, overrideMonthlyRent, activeSection, savedAt: Date.now() })
         );
         sessionStorage.setItem(DIRTY_FLAG_KEY, '1');
       } catch (error) {
@@ -323,7 +379,7 @@ export default function TenantForm() {
       }
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [formData, overrideMonthlyRent, step, isDirty, submitted]);
+  }, [formData, overrideMonthlyRent, activeSection, isDirty, submitted]);
 
   // Browser leave / refresh guard
   useEffect(() => {
@@ -411,20 +467,26 @@ export default function TenantForm() {
   useEffect(() => {
     if (formData.buildingId) {
       const filtered = rooms.filter(
-        (r) => r.buildingId === formData.buildingId && r.roomStatus === 'vacant'
+        (r) =>
+          r.buildingId === formData.buildingId &&
+          (r.roomStatus === 'vacant' || r.id === formData.roomId)
       );
       setFilteredRooms(filtered);
 
-      if (formData.roomId && !filtered.find((r) => r.id === formData.roomId)) {
+      if (
+        !housingLocked &&
+        formData.roomId &&
+        !filtered.find((r) => r.id === formData.roomId)
+      ) {
         setFormData((prev) => ({ ...prev, roomId: '' }));
       }
-    } else {
+    } else if (!housingLocked) {
       setFilteredRooms([]);
       if (formData.roomId) {
         setFormData((prev) => ({ ...prev, roomId: '' }));
       }
     }
-  }, [formData.buildingId, rooms, formData.roomId]);
+  }, [formData.buildingId, rooms, formData.roomId, housingLocked]);
 
   // Auto-fill monthly rent when room is selected (only if override is not checked)
   useEffect(() => {
@@ -441,14 +503,51 @@ export default function TenantForm() {
     }
   }, [formData.roomId, rooms, overrideMonthlyRent]);
 
+  // Load building deposit minimum (respects 0)
+  useEffect(() => {
+    if (!formData.buildingId) {
+      setMinimumDepositAmount(DEFAULT_MINIMUM_DEPOSIT_AMOUNT);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadMinimumDeposit() {
+      try {
+        const response = await fetch(
+          `/api/building-deposit-config/${formData.buildingId}`
+        );
+        const result = await response.json();
+        if (cancelled) return;
+        if (result.success && result.data) {
+          const min = result.data.minimumDepositAmount;
+          setMinimumDepositAmount(
+            typeof min === 'number' && Number.isFinite(min)
+              ? min
+              : DEFAULT_MINIMUM_DEPOSIT_AMOUNT
+          );
+          return;
+        }
+        setMinimumDepositAmount(DEFAULT_MINIMUM_DEPOSIT_AMOUNT);
+      } catch {
+        if (!cancelled) setMinimumDepositAmount(DEFAULT_MINIMUM_DEPOSIT_AMOUNT);
+      }
+    }
+
+    void loadMinimumDeposit();
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.buildingId]);
+
   const computedDeposit = (formData.monthlyRent || 0) * formData.depositMonths;
   const computedAdvance = (formData.monthlyRent || 0) * formData.advanceMonths;
   const effectiveDeposit =
-    formData.roomId && computedDeposit < MINIMUM_DEPOSIT_AMOUNT
-      ? MINIMUM_DEPOSIT_AMOUNT
+    formData.roomId && computedDeposit < minimumDepositAmount
+      ? minimumDepositAmount
       : computedDeposit;
   const depositRaisedToMinimum =
-    Boolean(formData.roomId) && computedDeposit < MINIMUM_DEPOSIT_AMOUNT;
+    Boolean(formData.roomId) && computedDeposit < minimumDepositAmount;
   const hasRentForTotal = Boolean(formData.monthlyRent && formData.monthlyRent > 0);
   const rentLocked = !overrideMonthlyRent && Boolean(formData.roomId);
   const rentDisabled = !overrideMonthlyRent && !formData.roomId;
@@ -461,7 +560,7 @@ export default function TenantForm() {
   const collectErrors = useCallback((fields?: string[]): FormErrors => {
     const names =
       fields ??
-      Object.keys(STEP_FIELDS).flatMap((k) => STEP_FIELDS[Number(k)]);
+      Object.keys(SECTION_FIELDS).flatMap((k) => SECTION_FIELDS[k as SectionId]);
     const next: FormErrors = {};
     for (const name of names) {
       const message = getFieldError(name, formData);
@@ -476,11 +575,11 @@ export default function TenantForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const validateStep = (stepNumber: number): boolean => {
-    const newErrors = collectErrors(STEP_FIELDS[stepNumber]);
+  const validateSection = (sectionId: SectionId): boolean => {
+    const newErrors = collectErrors(SECTION_FIELDS[sectionId]);
     setErrors((prev) => {
       const cleared = { ...prev };
-      for (const field of STEP_FIELDS[stepNumber]) {
+      for (const field of SECTION_FIELDS[sectionId]) {
         delete cleared[field];
       }
       return { ...cleared, ...newErrors };
@@ -537,21 +636,21 @@ export default function TenantForm() {
   };
 
   const focusFirstError = (errorMap: FormErrors) => {
-    const order = [
-      ...STEP_FIELDS[1],
-      ...STEP_FIELDS[2],
-      ...STEP_FIELDS[3],
-    ];
+    const sectionOrder: SectionId[] = ['personal', 'emergency', 'employment', 'housing', 'lease', 'notes'];
+    const order = sectionOrder.flatMap(sectionId => SECTION_FIELDS[sectionId]);
     const first = order.find((name) => errorMap[name]);
     if (!first) return;
 
-    let targetStep = 1;
-    if (STEP_FIELDS[2].includes(first)) targetStep = 2;
-    if (STEP_FIELDS[3].includes(first)) targetStep = 3;
-    setStep(targetStep);
+    let targetSection: SectionId = 'personal';
+    for (const sectionId of sectionOrder) {
+      if (SECTION_FIELDS[sectionId].includes(first)) {
+        targetSection = sectionId;
+        break;
+      }
+    }
+    setActiveSection(targetSection);
 
     window.setTimeout(() => {
-      formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const el = document.getElementById(first);
       el?.focus();
     }, 50);
@@ -578,39 +677,9 @@ export default function TenantForm() {
     }
   };
 
-  const goBack = () => {
-    setStep((s) => Math.max(1, s - 1));
-    formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const goNext = async (): Promise<boolean> => {
-    if (!validateStep(step)) {
-      focusFirstError(collectErrors(STEP_FIELDS[step]));
-      return false;
-    }
-
-    if (step === 1) {
-      const emailOk = await ensureEmailAvailable(formData.email);
-      if (!emailOk) {
-        focusFirstError({ email: 'This email is already in use.' });
-        return false;
-      }
-    }
-
-    setStep((s) => Math.min(3, s + 1));
-    formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return true;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Enter / implicit form submit must never create until the final step.
-    // On earlier steps, treat submit as "Continue".
-    if (step < 3) {
-      await goNext();
-      return;
-    }
 
     const allErrors = collectErrors();
     setErrors(allErrors);
@@ -675,7 +744,7 @@ export default function TenantForm() {
 
         const monthlyRate = Number(formData.monthlyRent) || 0;
         const depositFromMonths = monthlyRate * formData.depositMonths;
-        const depositPaid = Math.max(depositFromMonths, MINIMUM_DEPOSIT_AMOUNT);
+        const depositPaid = Math.max(depositFromMonths, minimumDepositAmount);
         const advanceAmount = monthlyRate * formData.advanceMonths;
 
         const assignResponse = await fetch(`/api/rooms/${formData.roomId}/assign`, {
@@ -756,8 +825,8 @@ export default function TenantForm() {
         });
       } else {
         setTimeout(() => {
-          router.push(`/admin/tenants/${tenantId}`);
-        }, 1500);
+          finishAfterCreate(tenantId);
+        }, 400);
       }
     } catch (error) {
       console.error('Error creating tenant:', error);
@@ -858,20 +927,6 @@ export default function TenantForm() {
     }
   };
 
-  const handleCancel = async () => {
-    if (!(await confirmLeave())) return;
-    clearDraft();
-    setIsDirty(false);
-    router.push('/admin/tenants');
-  };
-
-  const handleBackLink = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    if (!(await confirmLeave())) return;
-    clearDraft();
-    setIsDirty(false);
-    router.push('/admin/tenants');
-  };
 
   const handleCopyTemporaryPassword = async () => {
     if (!credentialsModal?.temporaryPassword) return;
@@ -890,130 +945,102 @@ export default function TenantForm() {
     }
   };
 
+  const finishAfterCreate = useCallback(
+    (tenantId: string) => {
+      onCreated?.(tenantId);
+      if (onClose) {
+        onClose();
+        return;
+      }
+      if (resolvedReturnTo) {
+        router.push(resolvedReturnTo);
+        return;
+      }
+      router.push(`/admin/tenants/${tenantId}`);
+    },
+    [onClose, onCreated, resolvedReturnTo, router]
+  );
+
   const handleCredentialsModalContinue = () => {
     if (!credentialsModal) return;
     const { tenantId } = credentialsModal;
     setCredentialsModal(null);
-    router.push(`/admin/tenants/${tenantId}`);
+    finishAfterCreate(tenantId);
   };
 
+  const errorBanner = draftRestored ? (
+    <Alert
+      variant="info"
+      title="Draft restored"
+      className="mb-6"
+      onDismiss={() => setDraftRestored(false)}
+    >
+      Your previous unsaved entries were restored from this browser.{' '}
+      <button
+        type="button"
+        className="font-medium underline"
+        onClick={async () => {
+          if (
+            !(await confirm({
+              title: 'Clear draft?',
+              message: 'Clear the saved draft and start over?',
+              confirmText: 'Clear draft',
+              variant: 'danger',
+            }))
+          )
+            return;
+          clearDraft();
+          skipNextDraftSave.current = true;
+          setFormData(INITIAL_FORM_DATA);
+          setOverrideMonthlyRent(false);
+          setErrors({});
+          setActiveSection('personal');
+          setIsDirty(false);
+        }}
+      >
+        Discard draft
+      </button>
+    </Alert>
+  ) : undefined;
+
+  const handleCancel = async () => {
+    if (!(await confirmLeave())) return;
+    clearDraft();
+    setIsDirty(false);
+    if (onClose) {
+      onClose();
+      return;
+    }
+    if (resolvedReturnTo) {
+      router.push(resolvedReturnTo);
+      return;
+    }
+    router.push('/admin/tenants');
+  };
+
+  if (mode === 'modal' && !isOpen) return null;
+
   return (
-    <div ref={formTopRef} className="text-gray-900">
+    <div className="text-gray-900">
       {dialog}
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 mb-6 border-b border-gray-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <Link
-            href="/admin/tenants"
-            onClick={handleBackLink}
-            className="inline-flex items-center text-sm text-gray-700 hover:text-gray-900"
-          >
-            <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Back to Tenants
-          </Link>
-          <p className="text-xs text-gray-500">
-            Step {step} of {STEPS.length}
-            {isDirty && !submitted ? ' · Draft saved locally' : ''}
-          </p>
-        </div>
-
-        <nav aria-label="Form progress" className="flex gap-2">
-          {STEPS.map((s) => {
-            const active = s.id === step;
-            const complete = s.id < step;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={async () => {
-                  if (s.id < step) {
-                    setStep(s.id);
-                    return;
-                  }
-                  if (s.id > step) {
-                    for (let i = step; i < s.id; i += 1) {
-                      if (!validateStep(i)) {
-                        focusFirstError(collectErrors(STEP_FIELDS[i]));
-                        return;
-                      }
-                      if (i === 1) {
-                        const emailOk = await ensureEmailAvailable(formData.email);
-                        if (!emailOk) {
-                          focusFirstError({ email: 'This email is already in use.' });
-                          return;
-                        }
-                      }
-                    }
-                    setStep(s.id);
-                  }
-                }}
-                className={cn(
-                  'min-w-0 flex-1 rounded-md border px-2 py-2 text-left transition',
-                  active && 'border-purple-500 bg-purple-50',
-                  complete && !active && 'border-green-200 bg-green-50',
-                  !active && !complete && 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                )}
-              >
-                <div className="text-xs font-semibold text-gray-900">
-                  {s.id}. {s.title}
-                </div>
-                <div className="mt-0.5 hidden text-[11px] text-gray-600 sm:block">
-                  {s.description}
-                </div>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      {draftRestored && (
-        <Alert
-          variant="info"
-          title="Draft restored"
-          className="mb-4"
-          onDismiss={() => setDraftRestored(false)}
-        >
-          Your previous unsaved entries were restored from this browser.{' '}
-          <button
-            type="button"
-            className="font-medium underline"
-            onClick={async () => {
-              if (
-                !(await confirm({
-                  title: 'Clear draft?',
-                  message: 'Clear the saved draft and start over?',
-                  confirmText: 'Clear draft',
-                  variant: 'danger',
-                }))
-              )
-                return;
-              clearDraft();
-              skipNextDraftSave.current = true;
-              setFormData(INITIAL_FORM_DATA);
-              setOverrideMonthlyRent(false);
-              setErrors({});
-              setStep(1);
-              setIsDirty(false);
-            }}
-          >
-            Discard draft
-          </button>
-        </Alert>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        {step === 1 && (
-          <>
-            <SectionCard
-              title="Personal Information"
-              description="Required identity details for the tenant account. Fields marked * are required."
-            >
+      <SectionedFormShell
+        {...(mode === 'modal'
+          ? { mode: 'modal' as const, isOpen }
+          : { mode: 'page' as const })}
+        eyebrow="Create tenant"
+        sections={SECTIONS}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        onCancel={handleCancel}
+        primaryLabel="Create Tenant"
+        primaryLoading={loading || checkingEmail}
+        primaryType="submit"
+        formId="tenant-form"
+        errorBanner={errorBanner}
+      >
+        <form id="tenant-form" onSubmit={handleSubmit} className="space-y-6" noValidate>
+          {activeSection === 'personal' && (
+            <SectionCard title="Personal Information">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <FormField label="First Name" htmlFor="firstName" required error={errors.firstName}>
                   <Input
@@ -1091,12 +1118,10 @@ export default function TenantForm() {
                 </FormField>
               </div>
             </SectionCard>
+          )}
 
-            <SectionCard
-              title="Emergency Contact"
-              description="Optional contact in case of emergencies."
-              optional
-            >
+          {activeSection === 'emergency' && (
+            <SectionCard title="Emergency Contact">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                 <FormField label="Contact Name" htmlFor="emergencyContactName">
                   <Input
@@ -1136,310 +1161,303 @@ export default function TenantForm() {
                 </FormField>
               </div>
             </SectionCard>
-          </>
-        )}
+          )}
 
-        {step === 2 && (
-          <SectionCard
-            title="Employment & Financial Information"
-            description="Optional background used for screening and records."
-            optional
-          >
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <FormField label="Employment Status" htmlFor="employmentStatus">
-                <Select
-                  name="employmentStatus"
-                  id="employmentStatus"
-                  value={formData.employmentStatus || ''}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Select status</option>
-                  <option value="employed">Employed</option>
-                  <option value="unemployed">Unemployed</option>
-                  <option value="student">Student</option>
-                  <option value="retired">Retired</option>
-                  <option value="other">Other</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Employer Name" htmlFor="employerName">
-                <Input
-                  type="text"
-                  name="employerName"
-                  id="employerName"
-                  value={formData.employerName}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-
-              <FormField
-                label="Monthly Income (₱)"
-                htmlFor="monthlyIncome"
-                error={errors.monthlyIncome}
-              >
-                <Input
-                  type="number"
-                  name="monthlyIncome"
-                  id="monthlyIncome"
-                  min={0}
-                  step={0.01}
-                  value={formData.monthlyIncome ?? ''}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  isInvalid={Boolean(errors.monthlyIncome)}
-                />
-              </FormField>
-            </div>
-          </SectionCard>
-        )}
-
-        {step === 3 && (
-          <>
-            <SectionCard
-              title="Property & Room Assignment"
-              description="Optional — assign now to auto-generate invoices, or do it later from the tenant page."
-              optional
-            >
+          {activeSection === 'employment' && (
+            <SectionCard title="Employment & Financial Information">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <FormField
-                  label="Property"
-                  htmlFor="buildingId"
-                  hint="Select a property to filter available rooms"
-                >
+                <FormField label="Employment Status" htmlFor="employmentStatus">
                   <Select
-                    name="buildingId"
-                    id="buildingId"
-                    value={formData.buildingId}
+                    name="employmentStatus"
+                    id="employmentStatus"
+                    value={formData.employmentStatus || ''}
                     onChange={handleInputChange}
-                    isDisabled={!Array.isArray(buildings) || buildings.length === 0}
                   >
-                    <option value="">
-                      {Array.isArray(buildings) && buildings.length === 0
-                        ? 'Loading properties...'
-                        : 'Select a property'}
-                    </option>
-                    {Array.isArray(buildings) &&
-                      buildings.map((building) => (
-                        <option key={building.id} value={building.id}>
-                          {building.name}
+                    <option value="">Select status</option>
+                    <option value="employed">Employed</option>
+                    <option value="unemployed">Unemployed</option>
+                    <option value="student">Student</option>
+                    <option value="retired">Retired</option>
+                    <option value="other">Other</option>
+                  </Select>
+                </FormField>
+
+                <FormField label="Employer Name" htmlFor="employerName">
+                  <Input
+                    type="text"
+                    name="employerName"
+                    id="employerName"
+                    value={formData.employerName}
+                    onChange={handleInputChange}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Monthly Income (₱)"
+                  htmlFor="monthlyIncome"
+                  error={errors.monthlyIncome}
+                >
+                  <Input
+                    type="number"
+                    name="monthlyIncome"
+                    id="monthlyIncome"
+                    min={0}
+                    step={0.01}
+                    value={formData.monthlyIncome ?? ''}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    isInvalid={Boolean(errors.monthlyIncome)}
+                  />
+                </FormField>
+              </div>
+            </SectionCard>
+          )}
+
+          {activeSection === 'housing' && (
+            <>
+              <SectionCard title="Property & Room Assignment">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <FormField
+                    label="Property"
+                    htmlFor="buildingId"
+                    hint={
+                      housingLocked
+                        ? 'Preselected from the room you are assigning'
+                        : 'Select a property to filter available rooms'
+                    }
+                  >
+                    <Select
+                      name="buildingId"
+                      id="buildingId"
+                      value={formData.buildingId}
+                      onChange={handleInputChange}
+                      isDisabled={
+                        housingLocked || !Array.isArray(buildings) || buildings.length === 0
+                      }
+                    >
+                      <option value="">
+                        {Array.isArray(buildings) && buildings.length === 0
+                          ? 'Loading properties...'
+                          : 'Select a property'}
+                      </option>
+                      {Array.isArray(buildings) &&
+                        buildings.map((building) => (
+                          <option key={building.id} value={building.id}>
+                            {building.name}
+                          </option>
+                        ))}
+                    </Select>
+                  </FormField>
+
+                  <FormField
+                    label="Room"
+                    htmlFor="roomId"
+                    hint={
+                      housingLocked
+                        ? 'This tenant will be assigned to this room'
+                        : !formData.buildingId
+                          ? 'Select a property first'
+                          : formData.roomId
+                            ? 'Invoices will be auto-generated after tenant creation'
+                            : 'You can assign a room later from the tenant detail page'
+                    }
+                  >
+                    <Select
+                      name="roomId"
+                      id="roomId"
+                      value={formData.roomId}
+                      onChange={handleInputChange}
+                      isDisabled={
+                        housingLocked || !formData.buildingId || !filteredRooms.length
+                      }
+                      className={
+                        !housingLocked && (!formData.buildingId || !filteredRooms.length)
+                          ? 'bg-gray-50 text-gray-400'
+                          : undefined
+                      }
+                    >
+                      <option value="">
+                        {!formData.buildingId
+                          ? 'Select a property first'
+                          : !filteredRooms.length
+                            ? 'No available rooms in this property'
+                            : 'Select a room'}
+                      </option>
+                      {filteredRooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          Room {room.roomNumber} (₱
+                          {Number(room.monthlyRate).toLocaleString()}/month)
                         </option>
                       ))}
-                  </Select>
-                </FormField>
+                    </Select>
+                  </FormField>
 
-                <FormField
-                  label="Room"
-                  htmlFor="roomId"
-                  hint={
-                    !formData.buildingId
-                      ? 'Select a property first'
-                      : formData.roomId
-                        ? 'Invoices will be auto-generated after tenant creation'
-                        : 'You can assign a room later from the tenant detail page'
-                  }
-                >
-                  <Select
-                    name="roomId"
-                    id="roomId"
-                    value={formData.roomId}
-                    onChange={handleInputChange}
-                    isDisabled={!formData.buildingId || !filteredRooms.length}
-                    className={
-                      !formData.buildingId || !filteredRooms.length
-                        ? 'bg-gray-50 text-gray-400'
-                        : undefined
-                    }
-                  >
-                    <option value="">
-                      {!formData.buildingId
-                        ? 'Select a property first'
-                        : !filteredRooms.length
-                          ? 'No available rooms in this property'
-                          : 'Select a room'}
-                    </option>
-                    {filteredRooms.map((room) => (
-                      <option key={room.id} value={room.id}>
-                        Room {room.roomNumber} (₱
-                        {Number(room.monthlyRate).toLocaleString()}/month)
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-
-                {formData.roomId && (
-                  <div className="sm:col-span-2 rounded-md border border-gray-200 bg-gray-50 p-4">
-                    <h4 className="text-sm font-medium text-gray-900">Auto-invoicing enabled</h4>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Creating this tenant with a room will generate the advance invoice and monthly
-                      invoices for the lease period (pending status).
-                    </p>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
-
-            <SectionCard
-              title="Rent & Payment Details"
-              description="Defaults below match common 1-month deposit + 1-month advance practice."
-            >
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <FormField
-                  label="Monthly Rent (₱)"
-                  htmlFor="monthlyRent"
-                  required={Boolean(formData.roomId)}
-                  error={errors.monthlyRent}
-                  hint={
-                    rentDisabled
-                      ? "Check 'Override monthly rent' to enter a custom rate, or select a room to use its rate."
-                      : rentLocked
-                        ? "Using the selected room's rate. Check 'Override monthly rent' to set a custom amount."
-                        : 'Enter amount in Philippine Pesos'
-                  }
-                  className="sm:col-span-2 lg:col-span-3"
-                >
-                  <Checkbox
-                    id="overrideMonthlyRent"
-                    checked={overrideMonthlyRent}
-                    onChange={(e) => {
-                      setOverrideMonthlyRent(e.target.checked);
-                      markDirty();
-                      if (!e.target.checked && formData.roomId) {
-                        const selectedRoom = rooms.find((r) => r.id === formData.roomId);
-                        if (selectedRoom) {
-                          setFormData((prev) => ({
-                            ...prev,
-                            monthlyRent: Number(selectedRoom.monthlyRate),
-                          }));
-                        }
-                      }
-                    }}
-                    label="Override monthly rent"
-                    className="mb-2"
-                  />
-                  <Input
-                    type="number"
-                    name="monthlyRent"
-                    id="monthlyRent"
-                    min={0}
-                    step={1}
-                    value={formData.monthlyRent ?? ''}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    isDisabled={rentDisabled || rentLocked}
-                    isInvalid={Boolean(errors.monthlyRent)}
-                    placeholder={rentDisabled ? 'Select a room or enable override' : 'e.g., 5000'}
-                    className={
-                      rentDisabled || rentLocked
-                        ? 'bg-gray-100 text-gray-600 border-gray-200'
-                        : undefined
-                    }
-                  />
-                </FormField>
-
-                <FormField
-                  label="Deposit Months"
-                  htmlFor="depositMonths"
-                  required
-                  error={errors.depositMonths}
-                  hint={
-                    hasRentForTotal
-                      ? `Deposit: ₱${computedDeposit.toLocaleString()}`
-                      : 'Enter any number of months (default 1)'
-                  }
-                >
-                  <Input
-                    type="number"
-                    name="depositMonths"
-                    id="depositMonths"
-                    min={0}
-                    step={0.5}
-                    value={formData.depositMonths}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    isInvalid={Boolean(errors.depositMonths)}
-                    placeholder="e.g., 1"
-                  />
-                  {depositRaisedToMinimum && (
-                    <p className="mt-1 text-xs text-amber-700">
-                      Building minimum of ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} will be charged
-                      on assign
-                    </p>
-                  )}
-                </FormField>
-
-                <FormField
-                  label="Advance Months"
-                  htmlFor="advanceMonths"
-                  required
-                  error={errors.advanceMonths}
-                  hint={
-                    hasRentForTotal
-                      ? `Advance: ₱${computedAdvance.toLocaleString()}`
-                      : 'Enter any number of months (default 1)'
-                  }
-                >
-                  <Input
-                    type="number"
-                    name="advanceMonths"
-                    id="advanceMonths"
-                    min={0}
-                    step={0.5}
-                    value={formData.advanceMonths}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    isInvalid={Boolean(errors.advanceMonths)}
-                    placeholder="e.g., 1"
-                  />
-                </FormField>
-
-                <div className="flex flex-col justify-center rounded-md border border-gray-200 bg-gray-50 p-4">
-                  {hasRentForTotal ? (
-                    <>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-medium text-gray-900">
-                          Total Initial Payment
-                        </span>
-                        <span className="text-lg font-bold text-gray-900">
-                          ₱{(effectiveDeposit + computedAdvance).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-600">
-                        (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths}{' '}
-                        month{formData.depositMonths !== 1 ? 's' : ''} deposit
-                        {depositRaisedToMinimum
-                          ? ` → ₱${MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} min`
-                          : ''}
-                        ) + (₱{(formData.monthlyRent || 0).toLocaleString()} ×{' '}
-                        {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''}{' '}
-                        advance)
+                  {formData.roomId && (
+                    <div className="sm:col-span-2 rounded-md border border-gray-200 bg-gray-50 p-4">
+                      <h4 className="text-sm font-medium text-gray-900">Auto-invoicing enabled</h4>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Creating this tenant with a room will generate the advance invoice and monthly
+                        invoices for the lease period (pending status).
                       </p>
-                      {depositRaisedToMinimum && (
-                        <p className="mt-2 text-xs text-amber-800">
-                          Room rent × deposit months is below the ₱
-                          {MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} building minimum. Create Tenant
-                          will charge ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} deposit so
-                          assignment can proceed.
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-gray-600">
-                      Enter rent details to see total initial payment.
-                    </p>
+                    </div>
                   )}
                 </div>
-              </div>
-            </SectionCard>
+              </SectionCard>
 
-            <SectionCard
-              title="Lease Information"
-              description={
-                formData.roomId
-                  ? 'Pick start date and duration — end date updates automatically.'
-                  : 'Optional until a room is assigned. End date updates from start + duration.'
-              }
-              optional={!formData.roomId}
-            >
+              <SectionCard title="Rent & Payment Details">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <FormField
+                    label="Monthly Rent (₱)"
+                    htmlFor="monthlyRent"
+                    required={Boolean(formData.roomId)}
+                    error={errors.monthlyRent}
+                    hint={
+                      rentDisabled
+                        ? "Check 'Override monthly rent' to enter a custom rate, or select a room to use its rate."
+                        : rentLocked
+                          ? "Using the selected room's rate. Check 'Override monthly rent' to set a custom amount."
+                          : 'Enter amount in Philippine Pesos'
+                    }
+                    className="sm:col-span-2 lg:col-span-3"
+                  >
+                    <Checkbox
+                      id="overrideMonthlyRent"
+                      checked={overrideMonthlyRent}
+                      onChange={(e) => {
+                        setOverrideMonthlyRent(e.target.checked);
+                        markDirty();
+                        if (!e.target.checked && formData.roomId) {
+                          const selectedRoom = rooms.find((r) => r.id === formData.roomId);
+                          if (selectedRoom) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              monthlyRent: Number(selectedRoom.monthlyRate),
+                            }));
+                          }
+                        }
+                      }}
+                      label="Override monthly rent"
+                      className="mb-2"
+                    />
+                    <Input
+                      type="number"
+                      name="monthlyRent"
+                      id="monthlyRent"
+                      min={0}
+                      step={1}
+                      value={formData.monthlyRent ?? ''}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
+                      isDisabled={rentDisabled || rentLocked}
+                      isInvalid={Boolean(errors.monthlyRent)}
+                      placeholder={rentDisabled ? 'Select a room or enable override' : 'e.g., 5000'}
+                      className={
+                        rentDisabled || rentLocked
+                          ? 'bg-gray-100 text-gray-600 border-gray-200'
+                          : undefined
+                      }
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Deposit Months"
+                    htmlFor="depositMonths"
+                    required
+                    error={errors.depositMonths}
+                    hint={
+                      hasRentForTotal
+                        ? `Deposit: ₱${computedDeposit.toLocaleString()}`
+                        : 'Enter any number of months (default 1)'
+                    }
+                  >
+                    <Input
+                      type="number"
+                      name="depositMonths"
+                      id="depositMonths"
+                      min={0}
+                      step={0.5}
+                      value={formData.depositMonths}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
+                      isInvalid={Boolean(errors.depositMonths)}
+                      placeholder="e.g., 1"
+                    />
+                    {depositRaisedToMinimum && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Building minimum of ₱{minimumDepositAmount.toLocaleString()} will be charged
+                        on assign
+                      </p>
+                    )}
+                  </FormField>
+
+                  <FormField
+                    label="Advance Months"
+                    htmlFor="advanceMonths"
+                    required
+                    error={errors.advanceMonths}
+                    hint={
+                      hasRentForTotal
+                        ? `Advance: ₱${computedAdvance.toLocaleString()}`
+                        : 'Enter any number of months (default 1)'
+                    }
+                  >
+                    <Input
+                      type="number"
+                      name="advanceMonths"
+                      id="advanceMonths"
+                      min={0}
+                      step={0.5}
+                      value={formData.advanceMonths}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
+                      isInvalid={Boolean(errors.advanceMonths)}
+                      placeholder="e.g., 1"
+                    />
+                  </FormField>
+
+                  <div className="flex flex-col justify-center rounded-md border border-gray-200 bg-gray-50 p-4">
+                    {hasRentForTotal ? (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-gray-900">
+                            Total Initial Payment
+                          </span>
+                          <span className="text-lg font-bold text-gray-900">
+                            ₱{(effectiveDeposit + computedAdvance).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-600">
+                          (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths}{' '}
+                          month{formData.depositMonths !== 1 ? 's' : ''} deposit
+                          {depositRaisedToMinimum
+                            ? ` → ₱${minimumDepositAmount.toLocaleString()} min`
+                            : ''}
+                          ) + (₱{(formData.monthlyRent || 0).toLocaleString()} ×{' '}
+                          {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''}{' '}
+                          advance)
+                        </p>
+                        {depositRaisedToMinimum && (
+                          <p className="mt-2 text-xs text-amber-800">
+                            Room rent × deposit months is below the ₱
+                            {minimumDepositAmount.toLocaleString()} building minimum. Create Tenant
+                            will charge ₱{minimumDepositAmount.toLocaleString()} deposit so
+                            assignment can proceed.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-600">
+                        Enter rent details to see total initial payment.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </SectionCard>
+            </>
+          )}
+
+          {activeSection === 'lease' && (
+            <SectionCard title="Lease Information">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <FormField
                   label="Lease Start Date"
@@ -1578,8 +1596,10 @@ export default function TenantForm() {
                 </FormField>
               </div>
             </SectionCard>
+          )}
 
-            <SectionCard title="Additional Information" optional>
+          {activeSection === 'notes' && (
+            <SectionCard title="Additional Information">
               <FormField label="Notes" htmlFor="notes">
                 <Textarea
                   name="notes"
@@ -1591,32 +1611,10 @@ export default function TenantForm() {
                 />
               </FormField>
             </SectionCard>
-          </>
-        )}
+          )}
+        </form>
+      </SectionedFormShell>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <Button type="button" variant="outline" onClick={handleCancel} isDisabled={loading}>
-            Cancel
-          </Button>
-
-          <div className="flex gap-3">
-            {step > 1 && (
-              <Button type="button" variant="outline" onClick={goBack} isDisabled={loading}>
-                Previous
-              </Button>
-            )}
-            {step < 3 ? (
-              <Button type="submit" isDisabled={loading || checkingEmail} isLoading={checkingEmail}>
-                {checkingEmail ? 'Checking email...' : 'Continue'}
-              </Button>
-            ) : (
-              <Button type="submit" isLoading={loading || checkingEmail}>
-                {loading ? 'Creating...' : 'Create Tenant'}
-              </Button>
-            )}
-          </div>
-        </div>
-      </form>
 
       <Dialog
         isOpen={Boolean(credentialsModal)}

@@ -285,27 +285,27 @@ export async function calculateRequiredDeposit(
   const config = await getBuildingDepositConfig(buildingId);
   
   if (!config) {
-    // No building config, return minimum deposit
-    return 3000; // Default minimum
+    // No building config — no enforced floor
+    return 0;
   }
   
   switch (config.depositType) {
     case 'fixed':
-      return config.depositAmount || config.minimumDepositAmount;
+      return config.depositAmount ?? config.minimumDepositAmount ?? 0;
     
     case 'percentage':
       if (config.depositPercentage) {
         const calculated = (monthlyRate * config.depositPercentage) / 100;
-        return Math.max(calculated, config.minimumDepositAmount);
+        return Math.max(calculated, config.minimumDepositAmount ?? 0);
       }
-      return config.minimumDepositAmount;
+      return config.minimumDepositAmount ?? 0;
     
     case 'months':
       const calculated = monthlyRate * config.depositMonths;
-      return Math.max(calculated, config.minimumDepositAmount);
+      return Math.max(calculated, config.minimumDepositAmount ?? 0);
     
     default:
-      return config.minimumDepositAmount;
+      return config.minimumDepositAmount ?? 0;
   }
 }
 

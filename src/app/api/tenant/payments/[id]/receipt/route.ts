@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTenantByUserId } from '@/lib/api/tenant-user-link';
 import { saveUploadedFile } from '@/lib/api/documents';
+import { contentDispositionHeader, sanitizeDownloadFileName } from '@/lib/format/upload-filename';
 import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
@@ -146,7 +147,7 @@ export async function POST(
     
     const updateResult = await pool.query(updateQuery, [
       filePath,
-      file.name,
+      fileName,
       fileSize,
       paymentId,
     ]);
@@ -252,15 +253,44 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    const storedPath = String(payment.receipt_file_path);
+    const fileName = sanitizeDownloadFileName(
+      payment.receipt_file_name || 'receipt',
+      'receipt'
+    );
+
+    if (storedPath.startsWith('http://') || storedPath.startsWith('https://')) {
+      try {
+        const remote = await fetch(storedPath);
+        if (!remote.ok) {
+          return NextResponse.json(
+            { success: false, error: 'Receipt file not found' },
+            { status: 404 }
+          );
+        }
+        const fileBuffer = Buffer.from(await remote.arrayBuffer());
+        return new NextResponse(fileBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type':
+              remote.headers.get('content-type') || 'application/octet-stream',
+            'Content-Disposition': contentDispositionHeader(fileName, 'attachment'),
+            'Content-Length': fileBuffer.length.toString(),
+          },
+        });
+      } catch (fileError) {
+        console.error('Error fetching remote receipt file:', fileError);
+        return NextResponse.redirect(storedPath);
+      }
+    }
     
-    // Read the file
-    const filePath = path.join(process.cwd(), 'public', payment.receipt_file_path);
+    const filePath = path.join(process.cwd(), 'public', storedPath.replace(/^\//, ''));
     
     try {
       const fileBuffer = await fs.readFile(filePath);
       
-      // Determine content type based on file extension
-      const fileExtension = path.extname(payment.receipt_file_path).toLowerCase();
+      const fileExtension = path.extname(storedPath).toLowerCase();
       const contentTypeMap: Record<string, string> = {
         '.pdf': 'application/pdf',
         '.jpg': 'image/jpeg',
@@ -274,7 +304,7 @@ export async function GET(
         status: 200,
         headers: {
           'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${payment.receipt_file_name || 'receipt'}"`,
+          'Content-Disposition': contentDispositionHeader(fileName, 'attachment'),
           'Content-Length': fileBuffer.length.toString(),
         },
       });

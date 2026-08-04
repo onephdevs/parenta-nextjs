@@ -2,78 +2,120 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getDocumentById } from '@/lib/api/documents';
+import {
+  contentDispositionHeader,
+  sanitizeDownloadFileName,
+} from '@/lib/format/upload-filename';
 import fs from 'fs/promises';
 import path from 'path';
 
+function isRemoteUrl(filePath: string): boolean {
+  return filePath.startsWith('http://') || filePath.startsWith('https://');
+}
+
+function downloadFileName(document: {
+  documentName?: string;
+  fileName?: string;
+}): string {
+  return sanitizeDownloadFileName(
+    document.documentName || document.fileName || 'document',
+    'document'
+  );
+}
+
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Unauthorized' 
-      }, { status: 401 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized',
+        },
+        { status: 401 }
+      );
     }
 
     const { id } = await params;
     const document = await getDocumentById(id);
 
     if (!document) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Document not found' 
-      }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Document not found',
+        },
+        { status: 404 }
+      );
     }
 
-    // Construct the full file path
-    const fullFilePath = path.join(process.cwd(), 'public', document.filePath);
+    const storedPath = document.filePath || '';
+    const filename = downloadFileName(document);
+
+    // Vercel Blob (and other remote) URLs — stream with original filename
+    if (isRemoteUrl(storedPath)) {
+      try {
+        const remote = await fetch(storedPath);
+        if (!remote.ok) {
+          return NextResponse.json(
+            { success: false, error: 'Remote file not found' },
+            { status: 404 }
+          );
+        }
+        const buffer = Buffer.from(await remote.arrayBuffer());
+        const response = new NextResponse(buffer);
+        response.headers.set(
+          'Content-Type',
+          document.mimeType || remote.headers.get('content-type') || 'application/octet-stream'
+        );
+        response.headers.set('Content-Disposition', contentDispositionHeader(filename));
+        response.headers.set('Content-Length', buffer.length.toString());
+        response.headers.set('Cache-Control', 'private, max-age=3600');
+        return response;
+      } catch (remoteError) {
+        console.error('Error fetching remote document:', remoteError);
+        return NextResponse.redirect(storedPath);
+      }
+    }
+
+    // Local filesystem under public/
+    const relative = storedPath.replace(/^\//, '');
+    const fullFilePath = path.join(process.cwd(), 'public', relative);
 
     try {
-      // Check if file exists
       await fs.access(fullFilePath);
-      
-      // Read the file
       const fileBuffer = await fs.readFile(fullFilePath);
-      
-      // Create response with appropriate headers
+
       const response = new NextResponse(fileBuffer);
-      
-      // Set content type
       if (document.mimeType) {
         response.headers.set('Content-Type', document.mimeType);
       }
-      
-      // Set content disposition
-      response.headers.set('Content-Disposition', `inline; filename="${document.fileName}"`);
-      
-      // Set content length
+      response.headers.set('Content-Disposition', contentDispositionHeader(filename));
       response.headers.set('Content-Length', fileBuffer.length.toString());
-      
-      // Add caching headers for better performance
-      response.headers.set('Cache-Control', 'public, max-age=3600');
-      
+      response.headers.set('Cache-Control', 'private, max-age=3600');
       return response;
-      
     } catch (fileError) {
-      console.error('Error reading file:', fileError);
-      return NextResponse.json({ 
-        success: false,
-        error: 'File not found on disk' 
-      }, { status: 404 });
+      console.error('Error reading local document file:', fileError, fullFilePath);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'File not found on disk',
+        },
+        { status: 404 }
+      );
     }
-
   } catch (error) {
     console.error('Error downloading document:', error);
     return NextResponse.json(
-      { 
+      {
         success: false,
-        error: 'Failed to download document' 
+        error: 'Failed to download document',
       },
       { status: 500 }
     );
   }
-} 
+}

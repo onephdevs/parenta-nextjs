@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Button } from '@/components/ui/Button';
+import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
+import { DollarSign, Tag, Calendar, Home, User, FileText } from 'lucide-react';
 
 interface Building {
   id: string | number;
@@ -40,10 +40,58 @@ interface ExpenseFormProps {
   onCancel?: () => void;
 }
 
+type FormSection = 'amount' | 'category' | 'date' | 'location' | 'vendor' | 'notes';
+
+const formSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'amount',
+    label: 'Amount',
+    icon: <DollarSign className="h-4 w-4" />,
+    title: 'Expense Amount',
+    subtitle: 'Enter the expense amount',
+  },
+  {
+    id: 'category',
+    label: 'Category',
+    icon: <Tag className="h-4 w-4" />,
+    title: 'Category & Description',
+    subtitle: 'Classify and describe the expense',
+  },
+  {
+    id: 'date',
+    label: 'Date',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'Expense Date',
+    subtitle: 'When did this expense occur',
+  },
+  {
+    id: 'location',
+    label: 'Location',
+    icon: <Home className="h-4 w-4" />,
+    title: 'Building & Room',
+    subtitle: 'Associate expense with a property',
+  },
+  {
+    id: 'vendor',
+    label: 'Vendor',
+    icon: <User className="h-4 w-4" />,
+    title: 'Vendor Information',
+    subtitle: 'Who provided the service',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional Notes',
+    subtitle: 'Any additional details',
+  },
+];
+
 export default function ExpenseForm({ initialData, onSubmit, onCancel }: ExpenseFormProps) {
   const router = useRouter();
   const { addNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState<FormSection>('amount');
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
@@ -200,185 +248,199 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
     }
   };
 
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'amount':
+        return (
+          <FormField
+            label="Amount"
+            htmlFor="amount"
+            required
+            error={errors.amount}
+          >
+            <Input
+              type="number"
+              id="amount"
+              name="amount"
+              value={formData.amount}
+              onChange={(e) => handleInputChange('amount', e.target.value)}
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              isInvalid={Boolean(errors.amount)}
+            />
+          </FormField>
+        );
+
+      case 'category':
+        return (
+          <div className="space-y-6">
+            <FormField
+              label="Category"
+              htmlFor="category"
+              required
+              error={errors.category}
+            >
+              <Select
+                id="category"
+                name="category"
+                value={formData.category}
+                onChange={(e) => handleInputChange('category', e.target.value)}
+                isInvalid={Boolean(errors.category)}
+              >
+                <option value="cleaning">Cleaning</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="repair">Repair</option>
+                <option value="upgrade">Upgrade</option>
+                <option value="garbage_collection">Garbage Collection</option>
+                <option value="worker_wages">Worker Wages</option>
+                <option value="utilities">Utilities</option>
+                <option value="supplies">Supplies</option>
+                <option value="services">Services</option>
+                <option value="insurance">Insurance</option>
+                <option value="taxes">Taxes</option>
+                <option value="other">Other</option>
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Description"
+              htmlFor="description"
+              required
+              error={errors.description}
+            >
+              <Input
+                type="text"
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                placeholder="Brief description of the expense"
+                isInvalid={Boolean(errors.description)}
+              />
+            </FormField>
+          </div>
+        );
+
+      case 'date':
+        return (
+          <FormField
+            label="Expense Date"
+            htmlFor="expenseDate"
+            required
+            error={errors.expenseDate}
+          >
+            <Input
+              type="date"
+              id="expenseDate"
+              name="expenseDate"
+              value={formData.expenseDate}
+              onChange={(e) => handleInputChange('expenseDate', e.target.value)}
+              min="2000-01-01"
+              max="2099-12-31"
+              style={{ colorScheme: 'light' }}
+              isInvalid={Boolean(errors.expenseDate)}
+            />
+          </FormField>
+        );
+
+      case 'location':
+        return (
+          <div className="space-y-6">
+            <FormField
+              label="Building (Optional)"
+              htmlFor="buildingId"
+            >
+              <Select
+                id="buildingId"
+                name="buildingId"
+                value={formData.buildingId}
+                onChange={(e) => handleInputChange('buildingId', e.target.value)}
+              >
+                <option value="">Select a building</option>
+                {buildings.map((building) => (
+                  <option key={building.id} value={building.id}>
+                    {building.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Room (Optional)"
+              htmlFor="roomId"
+              hint={!formData.buildingId ? 'Select a building first to choose a room' : undefined}
+            >
+              <Select
+                id="roomId"
+                name="roomId"
+                value={formData.roomId}
+                onChange={(e) => handleInputChange('roomId', e.target.value)}
+                isDisabled={!formData.buildingId}
+              >
+                <option value="">Select a room</option>
+                {filteredRooms.map((room) => (
+                  <option key={room.id} value={String(room.id)}>
+                    {room.buildingName ? `${room.buildingName} - ` : ''}Room {room.roomNumber}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+        );
+
+      case 'vendor':
+        return (
+          <FormField
+            label="Vendor"
+            htmlFor="vendor"
+          >
+            <Input
+              type="text"
+              id="vendor"
+              name="vendor"
+              value={formData.vendor}
+              onChange={(e) => handleInputChange('vendor', e.target.value)}
+              placeholder="Vendor or service provider name"
+            />
+          </FormField>
+        );
+
+      case 'notes':
+        return (
+          <FormField label="Notes" htmlFor="notes">
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={4}
+              value={formData.notes}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              placeholder="Additional notes or details about the expense"
+            />
+          </FormField>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      <Card>
-        <div className="md:grid md:grid-cols-3 md:gap-6">
-          <div className="md:col-span-1">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">Expense Information</h3>
-            <p className="mt-1 text-sm text-gray-900">
-              Record a new expense or update expense details.
-            </p>
-          </div>
-          <div className="mt-5 md:mt-0 md:col-span-2">
-            <div className="grid grid-cols-6 gap-6">
-              <FormField
-                label="Amount"
-                htmlFor="amount"
-                required
-                error={errors.amount}
-                className="col-span-6 sm:col-span-2"
-              >
-                <Input
-                  type="number"
-                  id="amount"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange('amount', e.target.value)}
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  isInvalid={Boolean(errors.amount)}
-                />
-              </FormField>
-
-              <FormField
-                label="Category"
-                htmlFor="category"
-                required
-                error={errors.category}
-                className="col-span-6 sm:col-span-2"
-              >
-                <Select
-                  id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={(e) => handleInputChange('category', e.target.value)}
-                  isInvalid={Boolean(errors.category)}
-                >
-                  <option value="cleaning">Cleaning</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="repair">Repair</option>
-                  <option value="upgrade">Upgrade</option>
-                  <option value="garbage_collection">Garbage Collection</option>
-                  <option value="worker_wages">Worker Wages</option>
-                  <option value="utilities">Utilities</option>
-                  <option value="supplies">Supplies</option>
-                  <option value="services">Services</option>
-                  <option value="insurance">Insurance</option>
-                  <option value="taxes">Taxes</option>
-                  <option value="other">Other</option>
-                </Select>
-              </FormField>
-
-              <FormField
-                label="Expense Date"
-                htmlFor="expenseDate"
-                required
-                error={errors.expenseDate}
-                className="col-span-6 sm:col-span-2"
-              >
-                <Input
-                  type="date"
-                  id="expenseDate"
-                  name="expenseDate"
-                  value={formData.expenseDate}
-                  onChange={(e) => handleInputChange('expenseDate', e.target.value)}
-                  min="2000-01-01"
-                  max="2099-12-31"
-                  style={{ colorScheme: 'light' }}
-                  isInvalid={Boolean(errors.expenseDate)}
-                />
-              </FormField>
-
-              <FormField
-                label="Building (Optional)"
-                htmlFor="buildingId"
-                className="col-span-6 sm:col-span-3"
-              >
-                <Select
-                  id="buildingId"
-                  name="buildingId"
-                  value={formData.buildingId}
-                  onChange={(e) => handleInputChange('buildingId', e.target.value)}
-                >
-                  <option value="">Select a building</option>
-                  {buildings.map((building) => (
-                    <option key={building.id} value={building.id}>
-                      {building.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField
-                label="Room (Optional)"
-                htmlFor="roomId"
-                hint={!formData.buildingId ? 'Select a building first to choose a room' : undefined}
-                className="col-span-6 sm:col-span-3"
-              >
-                <Select
-                  id="roomId"
-                  name="roomId"
-                  value={formData.roomId}
-                  onChange={(e) => handleInputChange('roomId', e.target.value)}
-                  isDisabled={!formData.buildingId}
-                >
-                  <option value="">Select a room</option>
-                  {filteredRooms.map((room) => (
-                    <option key={room.id} value={String(room.id)}>
-                      {room.buildingName ? `${room.buildingName} - ` : ''}Room {room.roomNumber}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField
-                label="Vendor"
-                htmlFor="vendor"
-                className="col-span-6 sm:col-span-3"
-              >
-                <Input
-                  type="text"
-                  id="vendor"
-                  name="vendor"
-                  value={formData.vendor}
-                  onChange={(e) => handleInputChange('vendor', e.target.value)}
-                  placeholder="Vendor or service provider name"
-                />
-              </FormField>
-
-              <FormField
-                label="Description"
-                htmlFor="description"
-                required
-                error={errors.description}
-                className="col-span-6"
-              >
-                <Input
-                  type="text"
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Brief description of the expense"
-                  isInvalid={Boolean(errors.description)}
-                />
-              </FormField>
-
-              <FormField label="Notes" htmlFor="notes" className="col-span-6">
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  rows={4}
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                  placeholder="Additional notes or details about the expense"
-                />
-              </FormField>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <div className="flex justify-end space-x-3">
-        <Button type="button" variant="outline" size="lg" onClick={handleCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" size="lg" isLoading={isLoading}>
-          {isLoading ? 'Recording...' : 'Record Expense'}
-        </Button>
-      </div>
-    </form>
+    <SectionedFormShell
+      mode="page"
+      onCancel={handleCancel}
+      eyebrow="Record Expense"
+      entityLabel="New Expense"
+      sections={formSections}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      primaryLabel="Record Expense"
+      primaryLoading={isLoading}
+      formId="expense-form"
+    >
+      <form id="expense-form" onSubmit={handleSubmit} className="space-y-6">
+        {renderSectionContent()}
+      </form>
+    </SectionedFormShell>
   );
 }

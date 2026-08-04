@@ -1,0 +1,209 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileText, Trash2, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { FormField } from '@/components/forms/FormField';
+import { Select } from '@/components/ui/Select';
+import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from '@/types/document';
+
+interface CardDocument {
+  id: string;
+  documentName: string;
+  documentType?: string;
+  fileName: string;
+  fileSize?: number;
+  createdAt?: string | Date;
+}
+
+const DOC_TYPE_OPTIONS = [
+  { value: 'id_proof', label: 'ID / government ID' },
+  { value: 'income_proof', label: 'Income proof' },
+  { value: 'lease', label: 'Lease agreement' },
+  { value: 'background_check', label: 'Background / credit report' },
+  { value: 'other', label: 'Other' },
+];
+
+interface OpportunityDocumentsPanelProps {
+  cardId: string;
+  buildingId?: string;
+  roomId?: string;
+  onUploaded?: (doc: CardDocument) => void;
+}
+
+export function OpportunityDocumentsPanel({
+  cardId,
+  buildingId,
+  roomId,
+  onUploaded,
+}: OpportunityDocumentsPanelProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [docs, setDocs] = useState<CardDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState('id_proof');
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/documents?pipelineCardId=${encodeURIComponent(cardId)}&limit=50`
+      );
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to load documents');
+      setDocs(json.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load documents');
+    } finally {
+      setLoading(false);
+    }
+  }, [cardId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
+        throw new Error('Unsupported file type');
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`File exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`);
+      }
+
+      const form = new FormData();
+      form.append('file', file);
+      // Keep the original upload name for list + download (storage path stays unique)
+      form.append('documentName', file.name || 'Opportunity document');
+      form.append('documentType', docType);
+      form.append('pipelineCardId', cardId);
+      form.append('accessLevel', 'admin');
+      if (buildingId) form.append('buildingId', buildingId);
+      if (roomId) form.append('roomId', roomId);
+
+      const res = await fetch('/api/documents', { method: 'POST', body: form });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Upload failed');
+
+      const created = json.data as CardDocument;
+      setDocs((prev) => [created, ...prev]);
+      onUploaded?.(created);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Remove this document?')) return;
+    try {
+      const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Delete failed');
+      setDocs((prev) => prev.filter((d) => d.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Upload ID, income proof, lease drafts, and screening reports for this prospect.
+      </p>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <FormField label="Document type" htmlFor="opp-doc-type" className="flex-1">
+          <Select
+            id="opp-doc-type"
+            value={docType}
+            onChange={(e) => setDocType(e.target.value)}
+          >
+            {DOC_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept={SUPPORTED_FILE_TYPES.join(',')}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleUpload(file);
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileRef.current?.click()}
+            isDisabled={uploading}
+            isLoading={uploading}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            {uploading ? 'Uploading…' : 'Upload'}
+          </Button>
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {loading ? (
+        <p className="text-sm text-gray-500">Loading documents…</p>
+      ) : docs.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
+          No documents yet
+        </div>
+      ) : (
+        <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+          {docs.map((doc) => (
+            <li
+              key={doc.id}
+              className="flex items-center justify-between gap-3 px-3 py-2.5"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <FileText className="h-4 w-4 shrink-0 text-gray-400" />
+                <div className="min-w-0">
+                  <a
+                    href={`/api/documents/${doc.id}/download`}
+                    className="block truncate text-sm font-medium text-indigo-600 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                    title={doc.documentName || doc.fileName}
+                  >
+                    {doc.documentName || doc.fileName || 'Document'}
+                  </a>
+                  <p className="truncate text-xs text-gray-500">
+                    {DOC_TYPE_OPTIONS.find((o) => o.value === doc.documentType)?.label ||
+                      doc.documentType ||
+                      'Document'}
+                    {doc.fileSize != null ? ` · ${(doc.fileSize / 1024).toFixed(0)} KB` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleDelete(doc.id)}
+                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                aria-label="Remove document"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

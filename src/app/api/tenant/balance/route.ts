@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTenantCompleteDataByTenantId } from '@/lib/api/tenant-user-link';
 import { requireTenantAccess } from '@/lib/api/require-tenant-access';
-import { calculateAllLateFees } from '@/lib/services/late-fee-service';
 import { getBuildingDepositConfig } from '@/lib/api/building-deposit-config';
 import pool from '@/lib/db';
 
@@ -15,6 +14,14 @@ export async function GET() {
     if (access.error) return access.error;
 
     const { tenant } = access;
+
+    // Persist late fees for settings with auto_apply (after apply_after_days)
+    try {
+      const { applyAutoLateFees } = await import('@/lib/services/late-fee-service');
+      await applyAutoLateFees({ tenantId: String(tenant.id) });
+    } catch (autoApplyError) {
+      console.warn('Auto late fee apply skipped:', autoApplyError);
+    }
     
     // Get tenant's complete data including building info
     const tenantData = await getTenantCompleteDataByTenantId(String(tenant.id));

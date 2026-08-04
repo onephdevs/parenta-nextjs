@@ -58,14 +58,7 @@ async function getDashboardStats(): Promise<DashboardStats | null> {
   try {
     const { getBuildingStats, getOccupancyStats } = await import('@/lib/api/buildings');
     const pool = (await import('@/lib/db')).default;
-    
-    // Get building and occupancy stats
-    const [buildingStats, occupancyStats] = await Promise.all([
-      getBuildingStats(),
-      getOccupancyStats()
-    ]);
-    
-    // Get tenant stats
+
     const tenantStatsQuery = `
       SELECT 
         COUNT(*) as total_tenants,
@@ -74,11 +67,7 @@ async function getDashboardStats(): Promise<DashboardStats | null> {
       FROM tenants 
       WHERE is_active = true
     `;
-    
-    const tenantStatsResult = await pool.query(tenantStatsQuery);
-    const tenantStats = tenantStatsResult.rows[0];
-    
-    // Get financial stats
+
     const financialStatsQuery = `
       SELECT 
         COUNT(*) as total_payments,
@@ -89,10 +78,18 @@ async function getDashboardStats(): Promise<DashboardStats | null> {
         COALESCE(SUM(amount) FILTER (WHERE payment_status = 'pending'), 0) as pending_revenue
       FROM payments
     `;
-    
-    const financialStatsResult = await pool.query(financialStatsQuery);
+
+    const [buildingStats, occupancyStats, tenantStatsResult, financialStatsResult] =
+      await Promise.all([
+        getBuildingStats(),
+        getOccupancyStats(),
+        pool.query(tenantStatsQuery),
+        pool.query(financialStatsQuery),
+      ]);
+
+    const tenantStats = tenantStatsResult.rows[0];
     const financialStats = financialStatsResult.rows[0];
-    
+
     // Calculate metrics
     const occupancyRate = parseFloat(occupancyStats.occupancy_rate || '0');
     const activeTenantsCount = parseInt(tenantStats.active_tenants || '0');

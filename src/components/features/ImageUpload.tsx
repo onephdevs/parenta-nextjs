@@ -646,6 +646,7 @@ export default function ImageUpload({
       {files.filter(f => !f.error).length > 0 && (
         <div className="flex justify-end">
           <Button
+            type="button"
             variant="primary"
             onClick={handleUpload}
             isLoading={isUploading}

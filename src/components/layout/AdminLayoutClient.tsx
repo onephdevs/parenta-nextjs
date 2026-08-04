@@ -159,11 +159,11 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
     <div className="flex h-screen bg-gray-50">
       {/* Desktop Sidebar */}
       <div
-        className={`hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${
+        className={`relative z-[60] hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${
           sidebarOpen ? 'lg:w-64' : 'lg:w-0'
         }`}
       >
-        <div className={`flex flex-col w-64 ${sidebarOpen ? '' : 'hidden'} relative z-[60]`}>
+        <div className={`flex w-64 flex-col ${sidebarOpen ? '' : 'hidden'}`}>
           <AdminSidebar />
         </div>
       </div>

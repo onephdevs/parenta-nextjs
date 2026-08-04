@@ -1,14 +1,794 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-//
-// Prisma 7: connection URLs live in prisma.config.ts / env vars
-// - DATABASE_URL: transaction pooler (app runtime via driver adapter)
-// - DIRECT_URL: session pooler (CLI migrations) — set in prisma.config.ts
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model asset_assignments {
+  id                      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asset_id                String          @db.Uuid
+  room_id                 String?         @db.Uuid
+  tenant_id               String?         @db.Uuid
+  assignment_date         DateTime        @db.Date
+  return_date             DateTime?       @db.Date
+  monthly_rental_fee      Decimal?        @db.Decimal(10, 2)
+  assignment_status       String?         @default("active") @db.VarChar(20)
+  condition_on_assignment String?         @db.VarChar(50)
+  condition_on_return     String?         @db.VarChar(50)
+  notes                   String?
+  created_at              DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?       @default(now()) @db.Timestamp(6)
+  assets                  assets          @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms                   rooms?          @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  tenants                 tenants?        @relation(fields: [tenant_id], references: [id], onUpdate: NoAction)
+  asset_billing           asset_billing[]
+
+  @@index([asset_id], map: "idx_asset_assignments_asset")
+  @@index([room_id], map: "idx_asset_assignments_room")
+  @@index([assignment_status], map: "idx_asset_assignments_status")
+  @@index([tenant_id], map: "idx_asset_assignments_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model asset_billing {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  asset_assignment_id  String            @db.Uuid
+  tenant_id            String            @db.Uuid
+  billing_period_start DateTime          @db.Date
+  billing_period_end   DateTime          @db.Date
+  rental_amount        Decimal           @db.Decimal(10, 2)
+  payment_id           String?           @db.Uuid
+  billing_status       String?           @default("pending") @db.VarChar(20)
+  due_date             DateTime?         @db.Date
+  notes                String?
+  created_at           DateTime?         @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?         @default(now()) @db.Timestamp(6)
+  asset_assignments    asset_assignments @relation(fields: [asset_assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payments             payments?         @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
+  tenants              tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([asset_assignment_id], map: "idx_asset_billing_assignment")
+  @@index([due_date], map: "idx_asset_billing_due_date")
+  @@index([payment_id], map: "idx_asset_billing_payment")
+  @@index([billing_status], map: "idx_asset_billing_status")
+  @@index([tenant_id], map: "idx_asset_billing_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model assets {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id           String?             @db.Uuid
+  asset_name            String              @db.VarChar(255)
+  asset_type            String              @db.VarChar(100)
+  brand                 String?             @db.VarChar(100)
+  model                 String?             @db.VarChar(100)
+  serial_number         String?             @db.VarChar(100)
+  purchase_date         DateTime?           @db.Date
+  purchase_price        Decimal?            @db.Decimal(10, 2)
+  current_value         Decimal?            @db.Decimal(10, 2)
+  depreciation_rate     Decimal?            @db.Decimal(5, 2)
+  asset_condition       String?             @default("good") @db.VarChar(50)
+  asset_status          String?             @default("available") @db.VarChar(20)
+  warranty_expiry       DateTime?           @db.Date
+  maintenance_schedule  String?             @db.VarChar(100)
+  last_maintenance_date DateTime?           @db.Date
+  next_maintenance_date DateTime?           @db.Date
+  rental_rate           Decimal?            @db.Decimal(10, 2)
+  description           String?
+  notes                 String?
+  is_active             Boolean?            @default(true)
+  created_at            DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?           @default(now()) @db.Timestamp(6)
+  asset_assignments     asset_assignments[]
+  buildings             buildings?          @relation(fields: [building_id], references: [id], onUpdate: NoAction)
+  documents             documents[]
+
+  @@index([building_id], map: "idx_assets_building")
+  @@index([asset_condition], map: "idx_assets_condition")
+  @@index([asset_status], map: "idx_assets_status")
+  @@index([asset_type], map: "idx_assets_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model audit_logs {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  table_name String    @db.VarChar(100)
+  record_id  String?   @db.Uuid
+  action     String    @db.VarChar(20)
+  old_values Json?
+  new_values Json?
+  ip_address String?   @db.Inet
+  user_agent String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([created_at], map: "idx_audit_logs_created")
+  @@index([record_id], map: "idx_audit_logs_record")
+  @@index([table_name], map: "idx_audit_logs_table")
+  @@index([user_id], map: "idx_audit_logs_user")
+}
+
+model buildings {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String                     @db.VarChar(255)
+  address_line1            String                     @db.VarChar(255)
+  address_line2            String?                    @db.VarChar(255)
+  city                     String                     @db.VarChar(100)
+  state                    String                     @db.VarChar(50)
+  postal_code              String                     @db.VarChar(20)
+  country                  String?                    @default("USA") @db.VarChar(50)
+  description              String?
+  building_type            String?                    @default("residential") @db.VarChar(50)
+  year_built               Int?
+  total_floors             Int?
+  total_units              Int?                       @default(0)
+  amenities                String[]
+  is_active                Boolean?                   @default(true)
+  created_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  assets                   assets[]
+  cost_allocation_history  cost_allocation_history[]
+  documents                documents[]
+  expenses                 expenses[]
+  pipeline_cards           pipeline_cards[]
+  rooms                    rooms[]
+  tenant_utility_bills     tenant_utility_bills[]
+  utility_allocation_rules utility_allocation_rules[]
+  utility_bills            utility_bills[]
+  utility_meter_readings   utility_meter_readings[]
+
+  @@index([is_active], map: "idx_buildings_active")
+  @@index([building_type], map: "idx_buildings_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model communications {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String?   @db.Uuid
+  user_id            String?   @db.Uuid
+  communication_type String    @db.VarChar(50)
+  subject            String?   @db.VarChar(255)
+  message            String
+  direction          String    @db.VarChar(20)
+  communication_date DateTime? @default(now()) @db.Timestamp(6)
+  follow_up_required Boolean?  @default(false)
+  follow_up_date     DateTime? @db.Date
+  priority           String?   @default("normal") @db.VarChar(20)
+  status             String?   @default("completed") @db.VarChar(20)
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  tenants            tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users              users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([communication_date], map: "idx_communications_date")
+  @@index([tenant_id], map: "idx_communications_tenant")
+  @@index([communication_type], map: "idx_communications_type")
+  @@index([user_id], map: "idx_communications_user")
+}
+
+model cost_allocation_history {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id        String        @db.Uuid
+  utility_bill_id    String        @db.Uuid
+  allocation_date    DateTime      @db.Date
+  total_amount       Decimal       @db.Decimal(10, 2)
+  total_tenants      Int
+  allocation_method  String        @db.VarChar(20)
+  allocation_summary Json
+  created_by         String?       @db.VarChar(255)
+  created_at         DateTime?     @default(now()) @db.Timestamp(6)
+  buildings          buildings     @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  utility_bills      utility_bills @relation(fields: [utility_bill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model deposit_ledger {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  amount                Decimal   @db.Decimal(10, 2)
+  transaction_type      String    @db.VarChar(20)
+  applied_to_invoice_id String?   @db.Uuid
+  payment_id            String?   @db.Uuid
+  description           String?
+  transaction_date      DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_by            String?   @db.Uuid
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  invoices              invoices? @relation(fields: [applied_to_invoice_id], references: [id], onUpdate: NoAction)
+  users                 users?    @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  payments              payments? @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_deposit_ledger_tenant_id")
+  @@index([transaction_date], map: "idx_deposit_ledger_transaction_date")
+  @@index([transaction_type], map: "idx_deposit_ledger_transaction_type")
+}
+
+model document_categories {
+  id                        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String                @unique @db.VarChar(100)
+  description               String?
+  parent_category_id        String?               @db.Uuid
+  is_active                 Boolean?              @default(true)
+  created_at                DateTime?             @default(now()) @db.Timestamp(6)
+  document_categories       document_categories?  @relation("document_categoriesTodocument_categories", fields: [parent_category_id], references: [id], onUpdate: NoAction)
+  other_document_categories document_categories[] @relation("document_categoriesTodocument_categories")
+  documents                 documents[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model documents {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category_id         String?              @db.Uuid
+  building_id         String?              @db.Uuid
+  room_id             String?              @db.Uuid
+  tenant_id           String?              @db.Uuid
+  asset_id            String?              @db.Uuid
+  pipeline_card_id    String?              @db.Uuid
+  document_name       String               @db.VarChar(255)
+  file_name           String               @db.VarChar(255)
+  file_path           String               @db.VarChar(500)
+  file_size           Int?
+  mime_type           String?              @db.VarChar(100)
+  document_type       String?              @db.VarChar(100)
+  description         String?
+  tags                String[]
+  is_public           Boolean?             @default(false)
+  expiry_date         DateTime?            @db.Date
+  version_number      Int?                 @default(1)
+  previous_version_id String?              @db.Uuid
+  uploaded_by         String?              @db.Uuid
+  access_level        String?              @default("admin") @db.VarChar(20)
+  created_at          DateTime?            @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?            @default(now()) @db.Timestamp(6)
+  assets              assets?              @relation(fields: [asset_id], references: [id], onUpdate: NoAction)
+  buildings           buildings?           @relation(fields: [building_id], references: [id], onUpdate: NoAction)
+  document_categories document_categories? @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  documents           documents?           @relation("documentsTodocuments", fields: [previous_version_id], references: [id], onUpdate: NoAction)
+  other_documents     documents[]          @relation("documentsTodocuments")
+  pipeline_card       pipeline_cards?      @relation(fields: [pipeline_card_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  rooms               rooms?               @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  tenants             tenants?             @relation(fields: [tenant_id], references: [id], onUpdate: NoAction)
+  users               users?               @relation(fields: [uploaded_by], references: [id], onUpdate: NoAction)
+
+  @@index([access_level], map: "idx_documents_access")
+  @@index([building_id], map: "idx_documents_building")
+  @@index([category_id], map: "idx_documents_category")
+  @@index([is_public], map: "idx_documents_public")
+  @@index([pipeline_card_id], map: "idx_documents_pipeline_card")
+  @@index([room_id], map: "idx_documents_room")
+  @@index([tenant_id], map: "idx_documents_tenant")
+  @@index([document_type], map: "idx_documents_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model expenses {
+  id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id         String?    @db.Uuid
+  category            String     @db.VarChar(100)
+  description         String     @db.VarChar(255)
+  amount              Decimal    @db.Decimal(10, 2)
+  expense_date        DateTime   @db.Date
+  vendor_name         String?    @db.VarChar(255)
+  vendor_contact      String?    @db.VarChar(255)
+  payment_method      String?    @default("cash") @db.VarChar(50)
+  receipt_url         String?    @db.VarChar(500)
+  expense_status      String?    @default("pending") @db.VarChar(20)
+  is_recurring        Boolean?   @default(false)
+  recurrence_interval String?    @db.VarChar(20)
+  notes               String?
+  created_at          DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?  @default(now()) @db.Timestamp(6)
+  buildings           buildings?       @relation(fields: [building_id], references: [id], onUpdate: NoAction)
+  pipeline_cards      pipeline_cards[]
+
+  @@index([building_id], map: "idx_expenses_building")
+  @@index([category], map: "idx_expenses_category")
+  @@index([expense_date], map: "idx_expenses_date")
+  @@index([expense_status], map: "idx_expenses_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model images {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_type String    @db.VarChar(20)
+  entity_id   String    @db.Uuid
+  file_name   String    @db.VarChar(255)
+  file_path   String    @db.VarChar(500)
+  file_size   Int
+  mime_type   String    @db.VarChar(100)
+  image_type  String?   @default("photo") @db.VarChar(50)
+  caption     String?
+  is_primary  Boolean?  @default(false)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([entity_type, entity_id], map: "idx_images_entity")
+  @@index([is_primary], map: "idx_images_primary")
+  @@index([image_type], map: "idx_images_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model invoice_line_items {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id  String    @db.Uuid
+  description String    @db.VarChar(255)
+  quantity    Decimal?  @default(1) @db.Decimal(10, 2)
+  unit_price  Decimal   @db.Decimal(10, 2)
+  line_total  Decimal?  @default(dbgenerated("(quantity * unit_price)")) @db.Decimal(10, 2)
+  item_type   String?   @default("rent") @db.VarChar(50)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  invoices    invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([invoice_id], map: "idx_line_items_invoice")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model invoices {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id            String                @db.Uuid
+  invoice_number       String                @unique @db.VarChar(100)
+  issue_date           DateTime              @db.Date
+  due_date             DateTime              @db.Date
+  billing_period_start DateTime?             @db.Date
+  billing_period_end   DateTime?             @db.Date
+  subtotal             Decimal               @default(0) @db.Decimal(10, 2)
+  tax_amount           Decimal               @default(0) @db.Decimal(10, 2)
+  discount_amount      Decimal               @default(0) @db.Decimal(10, 2)
+  total_amount         Decimal               @db.Decimal(10, 2)
+  amount_paid          Decimal               @default(0) @db.Decimal(10, 2)
+  balance_due          Decimal?              @default(dbgenerated("(total_amount - amount_paid)")) @db.Decimal(10, 2)
+  invoice_status       String?               @default("draft") @db.VarChar(20)
+  notes                String?
+  created_at           DateTime?             @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?             @default(now()) @db.Timestamp(6)
+  deposit_ledger       deposit_ledger[]
+  invoice_line_items   invoice_line_items[]
+  tenants              tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment_allocations  payment_allocations[]
+  tenant_credits       tenant_credits[]
+
+  @@index([due_date], map: "idx_invoices_due_date")
+  @@index([invoice_number], map: "idx_invoices_number")
+  @@index([invoice_status], map: "idx_invoices_status")
+  @@index([tenant_id], map: "idx_invoices_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notifications {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String    @db.Uuid
+  tenant_id           String?   @db.Uuid
+  notification_type   String    @db.VarChar(50)
+  title               String    @db.VarChar(255)
+  message             String
+  priority            String?   @default("normal") @db.VarChar(20)
+  is_read             Boolean?  @default(false)
+  read_at             DateTime? @db.Timestamp(6)
+  scheduled_for       DateTime? @db.Timestamp(6)
+  sent_at             DateTime? @db.Timestamp(6)
+  notification_status String?   @default("pending") @db.VarChar(20)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  tenants             tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([is_read], map: "idx_notifications_read")
+  @@index([notification_status], map: "idx_notifications_status")
+  @@index([tenant_id], map: "idx_notifications_tenant")
+  @@index([notification_type], map: "idx_notifications_type")
+  @@index([user_id], map: "idx_notifications_user")
+}
+
+model payment_allocations {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payment_id       String    @db.Uuid
+  invoice_id       String    @db.Uuid
+  allocated_amount Decimal   @db.Decimal(10, 2)
+  allocation_date  DateTime? @default(now()) @db.Timestamp(6)
+  notes            String?
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  invoices         invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payments         payments  @relation(fields: [payment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([invoice_id], map: "idx_payment_allocations_invoice_id")
+  @@index([payment_id], map: "idx_payment_allocations_payment_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model payments {
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id               String                   @db.Uuid
+  room_id                 String?                  @db.Uuid
+  assignment_id           String?                  @db.Uuid
+  asset_assignment_ids    String[]                 @db.Uuid
+  amount                  Decimal                  @db.Decimal(10, 2)
+  payment_type            String                   @db.VarChar(50)
+  payment_method          String?                  @default("cash") @db.VarChar(50)
+  payment_date            DateTime                 @db.Date
+  due_date                DateTime                 @db.Date
+  payment_status          String?                  @default("pending") @db.VarChar(20)
+  reference_number        String?                  @db.VarChar(100)
+  notes                   String?
+  created_at              DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?                @default(now()) @db.Timestamp(6)
+  asset_billing           asset_billing[]
+  deposit_ledger          deposit_ledger[]
+  payment_allocations     payment_allocations[]
+  tenant_room_assignments tenant_room_assignments? @relation(fields: [assignment_id], references: [id], onUpdate: NoAction)
+  rooms                   rooms?                   @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  tenants                 tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant_credits          tenant_credits[]
+
+  @@index([payment_date], map: "idx_payments_date")
+  @@index([due_date], map: "idx_payments_due_date")
+  @@index([room_id], map: "idx_payments_room")
+  @@index([payment_status], map: "idx_payments_status")
+  @@index([tenant_id], map: "idx_payments_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model rooms {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id             String                    @db.Uuid
+  room_number             String                    @db.VarChar(50)
+  floor_number            Int?
+  room_type               String?                   @default("bedroom") @db.VarChar(50)
+  square_footage          Decimal?                  @db.Decimal(8, 2)
+  monthly_rate            Decimal                   @db.Decimal(10, 2)
+  deposit_amount          Decimal?                  @db.Decimal(10, 2)
+  room_status             String?                   @default("vacant") @db.VarChar(20)
+  description             String?
+  amenities               String[]
+  is_active               Boolean?                  @default(true)
+  created_at              DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?                 @default(now()) @db.Timestamp(6)
+  asset_assignments       asset_assignments[]
+  documents               documents[]
+  payments                payments[]
+  pipeline_cards          pipeline_cards[]
+  buildings               buildings                 @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenant_room_assignments tenant_room_assignments[]
+  tenant_utility_bills    tenant_utility_bills[]
+  utility_meter_readings  utility_meter_readings[]
+
+  @@unique([building_id, room_number])
+  @@index([is_active], map: "idx_rooms_active")
+  @@index([building_id], map: "idx_rooms_building")
+  @@index([room_status], map: "idx_rooms_status")
+}
+
+model schema_migrations {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  executed_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tenant_credits {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  amount                Decimal   @db.Decimal(10, 2)
+  source                String    @db.VarChar(50)
+  description           String?
+  payment_id            String?   @db.Uuid
+  applied_to_invoice_id String?   @db.Uuid
+  status                String?   @default("available") @db.VarChar(20)
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  invoices              invoices? @relation(fields: [applied_to_invoice_id], references: [id], onUpdate: NoAction)
+  payments              payments? @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_tenant_credits_status")
+  @@index([tenant_id], map: "idx_tenant_credits_tenant_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tenant_room_assignments {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String     @db.Uuid
+  room_id           String     @db.Uuid
+  start_date        DateTime   @db.Date
+  end_date          DateTime?  @db.Date
+  monthly_rate      Decimal    @db.Decimal(10, 2)
+  deposit_paid      Decimal?   @db.Decimal(10, 2)
+  assignment_status String?    @default("active") @db.VarChar(20)
+  notes             String?
+  created_at        DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?  @default(now()) @db.Timestamp(6)
+  payments          payments[]
+  pipeline_cards    pipeline_cards[]
+  rooms             rooms      @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants           tenants    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([start_date, end_date], map: "idx_assignments_dates")
+  @@index([room_id], map: "idx_assignments_room")
+  @@index([assignment_status], map: "idx_assignments_status")
+  @@index([tenant_id], map: "idx_assignments_tenant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tenant_utility_bills {
+  id                      String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id               String         @db.Uuid
+  building_id             String         @db.Uuid
+  room_id                 String?        @db.Uuid
+  utility_bill_id         String?        @db.Uuid
+  utility_type            String         @db.VarChar(50)
+  billing_period_start    DateTime       @db.Date
+  billing_period_end      DateTime       @db.Date
+  total_building_cost     Decimal        @db.Decimal(10, 2)
+  total_building_usage    Decimal?       @db.Decimal(10, 2)
+  tenant_usage            Decimal?       @db.Decimal(10, 2)
+  tenant_share_percentage Decimal        @db.Decimal(5, 2)
+  allocated_amount        Decimal        @db.Decimal(10, 2)
+  allocation_method       String         @db.VarChar(20)
+  common_area_charge      Decimal?       @default(0.00) @db.Decimal(10, 2)
+  usage_charge            Decimal?       @default(0.00) @db.Decimal(10, 2)
+  base_charge             Decimal?       @default(0.00) @db.Decimal(10, 2)
+  bill_status             String?        @default("pending") @db.VarChar(20)
+  due_date                DateTime?      @db.Date
+  paid_date               DateTime?      @db.Date
+  notes                   String?
+  allocation_details      Json?
+  created_at              DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?      @default(now()) @db.Timestamp(6)
+  buildings               buildings      @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms                   rooms?         @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  tenants                 tenants        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  utility_bills           utility_bills? @relation(fields: [utility_bill_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tenants {
+  id                             String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                        String?                   @db.Uuid
+  first_name                     String                    @db.VarChar(100)
+  last_name                      String                    @db.VarChar(100)
+  email                          String                    @db.VarChar(255)
+  phone                          String?                   @db.VarChar(20)
+  date_of_birth                  DateTime?                 @db.Date
+  emergency_contact_name         String?                   @db.VarChar(255)
+  emergency_contact_phone        String?                   @db.VarChar(20)
+  emergency_contact_relationship String?                   @db.VarChar(100)
+  employment_status              String?                   @db.VarChar(50)
+  employer_name                  String?                   @db.VarChar(255)
+  monthly_income                 Decimal?                  @db.Decimal(10, 2)
+  previous_address               String?
+  move_in_date                   DateTime?                 @db.Date
+  move_out_date                  DateTime?                 @db.Date
+  lease_start_date               DateTime?                 @db.Date
+  lease_end_date                 DateTime?                 @db.Date
+  security_deposit               Decimal?                  @db.Decimal(10, 2)
+  tenant_status                  String?                   @default("active") @db.VarChar(20)
+  notes                          String?
+  is_active                      Boolean?                  @default(true)
+  created_at                     DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_at                     DateTime?                 @default(now()) @db.Timestamp(6)
+  asset_assignments              asset_assignments[]
+  asset_billing                  asset_billing[]
+  communications                 communications[]
+  deposit_ledger                 deposit_ledger[]
+  documents                      documents[]
+  invoices                       invoices[]
+  notifications                  notifications[]
+  payments                       payments[]
+  pipeline_cards                 pipeline_cards[]
+  tenant_credits                 tenant_credits[]
+  tenant_room_assignments        tenant_room_assignments[]
+  tenant_utility_bills           tenant_utility_bills[]
+  users                          users?                    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([is_active], map: "idx_tenants_active")
+  @@index([email], map: "idx_tenants_email")
+  @@index([tenant_status], map: "idx_tenants_status")
+  @@index([user_id], map: "idx_tenants_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String           @unique @db.VarChar(255)
+  password_hash  String           @db.VarChar(255)
+  role           String           @db.VarChar(20)
+  first_name     String           @db.VarChar(100)
+  last_name      String           @db.VarChar(100)
+  is_active      Boolean?         @default(true)
+  email_verified Boolean?         @default(false)
+  created_at     DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamp(6)
+  audit_logs            audit_logs[]
+  communications        communications[]
+  deposit_ledger        deposit_ledger[]
+  documents             documents[]
+  notifications         notifications[]
+  pipeline_cards        pipeline_cards[]
+  pipeline_card_events  pipeline_card_events[]
+  tenants               tenants[]
+
+  @@index([is_active], map: "idx_users_active")
+  @@index([email], map: "idx_users_email")
+  @@index([role], map: "idx_users_role")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model utility_allocation_rules {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id            String    @db.Uuid
+  utility_type           String    @db.VarChar(50)
+  allocation_method      String    @default("equal") @db.VarChar(20)
+  include_common_areas   Boolean?  @default(true)
+  common_area_percentage Decimal?  @default(20.00) @db.Decimal(5, 2)
+  is_active              Boolean?  @default(true)
+  created_at             DateTime? @default(now()) @db.Timestamp(6)
+  updated_at             DateTime? @default(now()) @db.Timestamp(6)
+  buildings              buildings @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([building_id, utility_type])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model utility_bills {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id             String                    @db.Uuid
+  utility_type            String                    @db.VarChar(50)
+  provider_name           String                    @db.VarChar(255)
+  provider_account_number String?                   @db.VarChar(100)
+  billing_period_start    DateTime                  @db.Date
+  billing_period_end      DateTime                  @db.Date
+  due_date                DateTime                  @db.Date
+  amount                  Decimal                   @db.Decimal(10, 2)
+  usage_amount            Decimal?                  @db.Decimal(10, 2)
+  usage_unit              String?                   @db.VarChar(20)
+  bill_status             String?                   @default("pending") @db.VarChar(20)
+  bill_url                String?                   @db.VarChar(500)
+  notes                   String?
+  created_at              DateTime?                 @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?                 @default(now()) @db.Timestamp(6)
+  cost_allocation_history cost_allocation_history[]
+  tenant_utility_bills    tenant_utility_bills[]
+  buildings               buildings                 @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([building_id], map: "idx_utility_bills_building")
+  @@index([due_date], map: "idx_utility_bills_due_date")
+  @@index([bill_status], map: "idx_utility_bills_status")
+  @@index([utility_type], map: "idx_utility_bills_type")
+}
+
+model utility_meter_readings {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id      String    @db.Uuid
+  room_id          String?   @db.Uuid
+  utility_type     String    @db.VarChar(50)
+  meter_number     String?   @db.VarChar(100)
+  reading_date     DateTime  @db.Date
+  reading_value    Decimal   @db.Decimal(10, 2)
+  previous_reading Decimal?  @db.Decimal(10, 2)
+  usage_calculated Decimal?  @default(dbgenerated("(reading_value - COALESCE(previous_reading, (0)::numeric))")) @db.Decimal(10, 2)
+  notes            String?
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  buildings        buildings @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms            rooms?    @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// Tasks / CRM multi-board pipeline
+model pipeline_boards {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                 String                 @unique @db.VarChar(50)
+  name                 String                 @db.VarChar(100)
+  description          String?
+  sort_order           Int                    @default(0)
+  is_active            Boolean                @default(true)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  stages               pipeline_stages[]
+  cards                pipeline_cards[]
+  prior_cards          pipeline_cards[]       @relation("CardPriorBoard")
+  events_from          pipeline_card_events[] @relation("EventFromBoard")
+  events_to            pipeline_card_events[] @relation("EventToBoard")
+}
+
+model pipeline_stages {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  board_id             String                 @db.Uuid
+  slug                 String                 @db.VarChar(50)
+  name                 String                 @db.VarChar(100)
+  color                String                 @default("#6366f1") @db.VarChar(20)
+  sort_order           Int                    @default(0)
+  is_won               Boolean                @default(false)
+  is_lost              Boolean                @default(false)
+  is_terminal          Boolean                @default(false)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  board                pipeline_boards        @relation(fields: [board_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cards                pipeline_cards[]
+  prior_cards          pipeline_cards[]       @relation("CardPriorStage")
+  events_from          pipeline_card_events[] @relation("EventFromStage")
+  events_to            pipeline_card_events[] @relation("EventToStage")
+
+  @@unique([board_id, slug])
+  @@index([board_id, sort_order], map: "idx_pipeline_stages_board_sort")
+}
+
+model pipeline_cards {
+  id                 String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  board_id           String                   @db.Uuid
+  stage_id           String                   @db.Uuid
+  title              String                   @db.VarChar(255)
+  contact_first_name String?                  @db.VarChar(100)
+  contact_last_name  String?                  @db.VarChar(100)
+  contact_email      String?                  @db.VarChar(255)
+  contact_phone      String?                  @db.VarChar(20)
+  building_id        String?                  @db.Uuid
+  room_id            String?                  @db.Uuid
+  tenant_id          String?                  @db.Uuid
+  assignment_id      String?                  @db.Uuid
+  expense_id         String?                  @db.Uuid
+  amount             Decimal?                 @db.Decimal(10, 2)
+  source             String?                  @db.VarChar(100)
+  tags               String[]                 @default([])
+  card_status        String                   @default("open") @db.VarChar(20)
+  due_at             DateTime?                @db.Timestamptz(6)
+  next_action_at     DateTime?                @db.Timestamptz(6)
+  viewing_at         DateTime?                @db.Timestamptz(6)
+  notes              String?
+  prior_stage_id     String?                  @db.Uuid
+  prior_board_id     String?                  @db.Uuid
+  nurture_reason     String?                  @db.VarChar(100)
+  lost_reason        String?
+  background_check_status String  @default("not_started") @db.VarChar(30)
+  background_check_notes  String?
+  lease_status            String  @default("not_started") @db.VarChar(30)
+  lease_start_date        DateTime? @db.Date
+  lease_end_date          DateTime? @db.Date
+  move_in_date            DateTime? @db.Date
+  position           Int                      @default(0)
+  won_at             DateTime?                @db.Timestamptz(6)
+  lost_at            DateTime?                @db.Timestamptz(6)
+  created_by         String?                  @db.Uuid
+  created_at         DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?                @default(now()) @db.Timestamp(6)
+  board              pipeline_boards          @relation(fields: [board_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  stage              pipeline_stages          @relation(fields: [stage_id], references: [id], onUpdate: NoAction)
+  prior_stage        pipeline_stages?         @relation("CardPriorStage", fields: [prior_stage_id], references: [id], onUpdate: NoAction)
+  prior_board        pipeline_boards?         @relation("CardPriorBoard", fields: [prior_board_id], references: [id], onUpdate: NoAction)
+  building           buildings?               @relation(fields: [building_id], references: [id], onUpdate: NoAction)
+  room               rooms?                   @relation(fields: [room_id], references: [id], onUpdate: NoAction)
+  tenant             tenants?                 @relation(fields: [tenant_id], references: [id], onUpdate: NoAction)
+  assignment         tenant_room_assignments? @relation(fields: [assignment_id], references: [id], onUpdate: NoAction)
+  expense            expenses?                @relation(fields: [expense_id], references: [id], onUpdate: NoAction)
+  creator            users?                   @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  events             pipeline_card_events[]
+  documents          documents[]
+
+  @@index([board_id, stage_id, position], map: "idx_pipeline_cards_board_stage")
+  @@index([card_status], map: "idx_pipeline_cards_status")
+  @@index([building_id], map: "idx_pipeline_cards_building")
+  @@index([tenant_id], map: "idx_pipeline_cards_tenant")
+}
+
+model pipeline_card_events {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  card_id       String           @db.Uuid
+  event_type    String           @db.VarChar(50)
+  from_stage_id String?          @db.Uuid
+  to_stage_id   String?          @db.Uuid
+  from_board_id String?          @db.Uuid
+  to_board_id   String?          @db.Uuid
+  note          String?
+  metadata      Json?            @default("{}")
+  created_by    String?          @db.Uuid
+  created_at    DateTime?        @default(now()) @db.Timestamp(6)
+  card          pipeline_cards   @relation(fields: [card_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  from_stage    pipeline_stages? @relation("EventFromStage", fields: [from_stage_id], references: [id], onUpdate: NoAction)
+  to_stage      pipeline_stages? @relation("EventToStage", fields: [to_stage_id], references: [id], onUpdate: NoAction)
+  from_board    pipeline_boards? @relation("EventFromBoard", fields: [from_board_id], references: [id], onUpdate: NoAction)
+  to_board      pipeline_boards? @relation("EventToBoard", fields: [to_board_id], references: [id], onUpdate: NoAction)
+  creator       users?           @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+
+  @@index([card_id, created_at(sort: Desc)], map: "idx_pipeline_card_events_card")
 }

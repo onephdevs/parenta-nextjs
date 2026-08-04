@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, UserPlus, X } from 'lucide-react';
 import type { RoomPageDetail } from '@/lib/api/properties';
+import TenantForm from '@/components/features/TenantForm';
 import RoomDetailsContent from './RoomDetailsContent';
 
 interface RoomDetailsModalProps {
@@ -11,6 +12,7 @@ interface RoomDetailsModalProps {
   onClose: () => void;
   /** Optional preloaded detail to avoid a flash while fetching. */
   initialDetail?: RoomPageDetail | null;
+  onRoomUpdated?: () => void;
 }
 
 export default function RoomDetailsModal({
@@ -18,11 +20,13 @@ export default function RoomDetailsModal({
   roomId,
   onClose,
   initialDetail = null,
+  onRoomUpdated,
 }: RoomDetailsModalProps) {
   const [detail, setDetail] = useState<RoomPageDetail | null>(initialDetail);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slidIn, setSlidIn] = useState(false);
+  const [addTenantOpen, setAddTenantOpen] = useState(false);
 
   const loadDetail = useCallback(async (id: string) => {
     setLoading(true);
@@ -60,6 +64,7 @@ export default function RoomDetailsModal({
   useEffect(() => {
     if (!isOpen) {
       setError(null);
+      setAddTenantOpen(false);
     }
   }, [isOpen]);
 
@@ -77,6 +82,7 @@ export default function RoomDetailsModal({
 
   const title = detail ? `Room ${detail.room.roomNumber}` : 'Room details';
   const subtitle = detail?.building.name;
+  const isVacant = Boolean(detail && !detail.room.tenant);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -122,14 +128,26 @@ export default function RoomDetailsModal({
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-900"
-                aria-label="Close modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex flex-shrink-0 items-center gap-2">
+                {isVacant && (
+                  <button
+                    type="button"
+                    onClick={() => setAddTenantOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#111827] px-3 py-2 text-sm font-semibold text-white hover:bg-black"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Add Tenant
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-gray-400 transition-colors hover:text-gray-900"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -154,6 +172,22 @@ export default function RoomDetailsModal({
           </div>
         </div>
       </div>
+
+      {detail && (
+        <TenantForm
+          mode="modal"
+          isOpen={addTenantOpen}
+          onClose={() => setAddTenantOpen(false)}
+          initialBuildingId={detail.building.id}
+          initialRoomId={detail.room.id}
+          lockHousing
+          onCreated={() => {
+            setAddTenantOpen(false);
+            void loadDetail(detail.room.id);
+            onRoomUpdated?.();
+          }}
+        />
+      )}
     </div>
   );
 }

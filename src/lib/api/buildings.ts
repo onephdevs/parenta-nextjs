@@ -162,7 +162,7 @@ export async function createBuilding(buildingData: CreateBuildingData): Promise<
       buildingData.city,
       buildingData.state,
       buildingData.postalCode,
-      buildingData.country || 'USA',
+      buildingData.country || 'Philippines',
       buildingData.description,
       buildingData.buildingType || 'residential',
       buildingData.yearBuilt,

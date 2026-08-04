@@ -127,6 +127,22 @@ export default function PropertiesMasterDetail({
     void loadDetail(selectedBuildingId);
   }, [selectedBuildingId, loadDetail]);
 
+  // After creating a room, highlight/scroll to it on the property page
+  useEffect(() => {
+    const roomIdFromUrl = searchParams.get('roomId');
+    if (!roomIdFromUrl || detailLoading || !detail) return;
+    const exists = detail.rooms.some((room) => room.id === roomIdFromUrl);
+    if (!exists) return;
+
+    setActiveRoomId(roomIdFromUrl);
+    setScrollRequest({ roomId: roomIdFromUrl, nonce: Date.now() });
+    setExpandedBuildingId(detail.building.id);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('roomId');
+    const query = params.toString();
+    router.replace(query ? `/admin/properties?${query}` : '/admin/properties', { scroll: false });
+  }, [searchParams, detail, detailLoading, router]);
   const handleSelectBuilding = (id: string) => {
     setSelectedBuildingId(id);
     setActiveRoomId(null);
@@ -245,6 +261,7 @@ export default function PropertiesMasterDetail({
         isOpen={modalOpen}
         roomId={modalRoomId}
         onClose={() => setModalOpen(false)}
+        onRoomUpdated={handleBuildingUpdated}
       />
     </div>
   );

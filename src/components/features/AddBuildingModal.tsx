@@ -2,15 +2,16 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Building2, MapPin, Info } from 'lucide-react';
 import { CreateBuildingData } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
-import FullScreenModal from '@/components/ui/FullScreenModal';
-import { Button } from '@/components/ui/Button';
+import SectionedFormShell from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
+import BuildingLocationFields from '@/components/features/BuildingLocationFields';
 
 interface AddBuildingModalProps {
   isOpen: boolean;
@@ -18,11 +19,38 @@ interface AddBuildingModalProps {
   onBuildingAdded: (buildingId?: string) => void;
 }
 
+type AddBuildingSection = 'basic' | 'location' | 'details';
+
+const SECTIONS: { id: AddBuildingSection; label: string; icon: React.ReactNode; title: string; subtitle: string }[] = [
+  { 
+    id: 'basic', 
+    label: 'Basic info', 
+    icon: <Building2 className="h-4 w-4" />,
+    title: 'Basic information',
+    subtitle: 'Name and building type.'
+  },
+  { 
+    id: 'location', 
+    label: 'Location', 
+    icon: <MapPin className="h-4 w-4" />,
+    title: 'Location',
+    subtitle: 'Street address and region.'
+  },
+  { 
+    id: 'details', 
+    label: 'Details', 
+    icon: <Info className="h-4 w-4" />,
+    title: 'Additional details',
+    subtitle: 'Description, size, and amenities.'
+  },
+];
+
 export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: AddBuildingModalProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [section, setSection] = useState<AddBuildingSection>('basic');
 
   const [formData, setFormData] = useState<CreateBuildingData>({
     name: '',
@@ -108,6 +136,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
         totalFloors: undefined,
         amenities: '',
       });
+      setSection('basic');
 
       onClose();
       onBuildingAdded(result.data.id);
@@ -128,130 +157,89 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <FullScreenModal
+    <SectionedFormShell
       isOpen={isOpen}
-      onClose={onClose}
-      title="Add New Building"
-      secondaryButton={
-        <Button variant="outline" onClick={onClose} isDisabled={isSubmitting}>
-          Cancel
-        </Button>
-      }
-      primaryButton={
-        <Button
-          type="submit"
-          form="building-form"
-          variant="primary"
-          isLoading={isSubmitting}
-        >
-          {isSubmitting ? 'Creating...' : 'Create Building'}
-        </Button>
-      }
+      onCancel={onClose}
+      eyebrow="Add building"
+      sections={SECTIONS}
+      activeSection={section}
+      onSectionChange={setSection}
+      formId="add-building-form"
+      primaryLabel="Create building"
+      primaryLoading={isSubmitting}
+      primaryType="submit"
+      errorBanner={error ? <FormErrorBanner message={error} className="mb-6" /> : null}
     >
-      {error && <FormErrorBanner message={error} className="mb-6" />}
-
-      <form id="building-form" onSubmit={handleSubmit} className="space-y-8 text-gray-900">
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField label="Building Name" htmlFor="name" required>
-                <Input
-                  id="name"
-                  name="name"
-                  required
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-
-              <FormField label="Building Type" htmlFor="buildingType">
-                <Select
-                  id="buildingType"
-                  name="buildingType"
-                  value={formData.buildingType}
-                  onChange={handleInputChange}
-                >
-                  <option value="residential">Residential</option>
-                  <option value="commercial">Commercial</option>
-                  <option value="mixed">Mixed Use</option>
-                </Select>
-              </FormField>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Address</h3>
-
-            <FormField label="Address Line 1" htmlFor="addressLine1" required>
+      <form id="add-building-form" onSubmit={handleSubmit} className="space-y-5">
+        {section === 'basic' && (
+          <div className="space-y-5">
+            <FormField label="Building name" htmlFor="name" required>
               <Input
-                id="addressLine1"
-                name="addressLine1"
+                id="name"
+                name="name"
                 required
-                value={formData.addressLine1}
+                value={formData.name}
                 onChange={handleInputChange}
+                placeholder="Enter building name"
               />
             </FormField>
 
-            <FormField label="Address Line 2" htmlFor="addressLine2">
-              <Input
-                id="addressLine2"
-                name="addressLine2"
-                value={formData.addressLine2}
+            <FormField label="Building type" htmlFor="buildingType" required>
+              <Select
+                id="buildingType"
+                name="buildingType"
+                value={formData.buildingType}
                 onChange={handleInputChange}
-              />
+              >
+                <option value="residential">Residential</option>
+                <option value="commercial">Commercial</option>
+                <option value="mixed">Mixed Use</option>
+              </Select>
             </FormField>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <FormField label="City" htmlFor="city" required>
-                <Input
-                  id="city"
-                  name="city"
-                  required
-                  value={formData.city}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-              <FormField label="State" htmlFor="state" required>
-                <Input
-                  id="state"
-                  name="state"
-                  required
-                  value={formData.state}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-              <FormField label="Postal Code" htmlFor="postalCode" required>
-                <Input
-                  id="postalCode"
-                  name="postalCode"
-                  required
-                  value={formData.postalCode}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-            </div>
           </div>
+        )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Details</h3>
+        {section === 'location' && (
+          <BuildingLocationFields
+            addressLine1={formData.addressLine1}
+            addressLine2={formData.addressLine2 || ''}
+            city={formData.city}
+            state={formData.state}
+            postalCode={formData.postalCode}
+            country={formData.country || 'Philippines'}
+            onChange={(fields) => setFormData((prev) => ({ ...prev, ...fields }))}
+            disabled={isSubmitting}
+          />
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField label="Year Built" htmlFor="yearBuilt">
+        {section === 'details' && (
+          <div className="space-y-5">
+            <FormField label="Description" htmlFor="description">
+              <Textarea
+                id="description"
+                name="description"
+                rows={4}
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Brief description of the building..."
+              />
+            </FormField>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <FormField label="Year built" htmlFor="yearBuilt">
                 <Input
                   type="number"
                   id="yearBuilt"
                   name="yearBuilt"
                   min={1800}
-                  max={new Date().getFullYear()}
+                  max={new Date().getFullYear() + 5}
                   value={formData.yearBuilt || ''}
                   onChange={handleInputChange}
+                  placeholder="e.g., 2015"
                 />
               </FormField>
-              <FormField label="Total Floors" htmlFor="totalFloors">
+              <FormField label="Total floors" htmlFor="totalFloors">
                 <Input
                   type="number"
                   id="totalFloors"
@@ -260,36 +248,27 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
                   max={200}
                   value={formData.totalFloors || ''}
                   onChange={handleInputChange}
+                  placeholder="e.g., 5"
                 />
               </FormField>
             </div>
 
-            <FormField label="Description" htmlFor="description">
-              <Textarea
-                id="description"
-                name="description"
-                rows={4}
-                value={formData.description}
-                onChange={handleInputChange}
-              />
-            </FormField>
-
             <FormField
               label="Amenities"
               htmlFor="amenities"
-              hint="Enter amenities freely with spaces and commas as needed"
+              hint="Separate with commas."
             >
               <Input
                 id="amenities"
                 name="amenities"
                 value={formData.amenities || ''}
                 onChange={handleInputChange}
-                placeholder="e.g., Parking, Pool (heated), Gym, 24/7 Security"
+                placeholder="Parking, Pool, Gym, Security"
               />
             </FormField>
           </div>
-        </div>
+        )}
       </form>
-    </FullScreenModal>
+    </SectionedFormShell>
   );
 }

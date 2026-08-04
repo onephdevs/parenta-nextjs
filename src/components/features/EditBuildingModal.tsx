@@ -1,37 +1,198 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2 } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  Clock,
+  Image as ImageIcon,
+  Info,
+  Lock,
+  MapPin,
+  Trash2,
+  Wallet,
+} from 'lucide-react';
 import { Building } from '@/types/database';
+import type { Image as BuildingImage } from '@/lib/api/images';
 import { useNotifications } from '@/hooks/useNotifications';
-import FullScreenModal from '@/components/ui/FullScreenModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import SectionedFormShell, { SectionCard, type SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
 import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
+import ImageUpload from '@/components/features/ImageUpload';
+import ImageGallery from '@/components/features/ImageGallery';
+import BuildingLocationFields from '@/components/features/BuildingLocationFields';
+import { cn } from '@/lib/utils';
+
+type EditSection = 'basic' | 'location' | 'details' | 'deposits' | 'photos';
+type AmountType = 'months' | 'fixed' | 'percentage';
 
 interface EditBuildingModalProps {
   building: Building;
   isOpen: boolean;
   onClose: () => void;
+  onImagesChanged?: () => void;
 }
 
-export default function EditBuildingModal({ building, isOpen, onClose }: EditBuildingModalProps) {
+const SECTIONS: SectionedFormSection<EditSection>[] = [
+  { 
+    id: 'basic', 
+    label: 'Basic info', 
+    icon: <Building2 className="h-4 w-4" />, 
+    title: 'Basic info', 
+    subtitle: 'Name and building type.' 
+  },
+  { 
+    id: 'location', 
+    label: 'Location', 
+    icon: <MapPin className="h-4 w-4" />, 
+    title: 'Location', 
+    subtitle: 'Street address and region.' 
+  },
+  { 
+    id: 'details', 
+    label: 'Details', 
+    icon: <Info className="h-4 w-4" />, 
+    title: 'Details', 
+    subtitle: 'Description, size, and amenities.' 
+  },
+  { 
+    id: 'deposits', 
+    label: 'Deposits & advance', 
+    icon: <Wallet className="h-4 w-4" />, 
+    title: 'Deposits & advance', 
+    subtitle: 'Rooms inherit these unless overridden individually.' 
+  },
+  { 
+    id: 'photos', 
+    label: 'Photos', 
+    icon: <ImageIcon className="h-4 w-4" />, 
+    title: 'Photos', 
+    subtitle: 'Upload photos and set the primary image for this property.' 
+  },
+];
+
+const TYPE_OPTIONS: { value: AmountType; label: string }[] = [
+  { value: 'months', label: 'Months of rent' },
+  { value: 'fixed', label: 'Fixed amount' },
+  { value: 'percentage', label: 'Percentage' },
+];
+
+function SegmentedControl({
+  value,
+  onChange,
+  options,
+  name,
+}: {
+  value: AmountType;
+  onChange: (next: AmountType) => void;
+  options: { value: AmountType; label: string }[];
+  name: string;
+}) {
+  return (
+    <div
+      className="inline-flex w-full flex-wrap gap-1 rounded-lg bg-gray-100 p-1 sm:w-auto"
+      role="group"
+      aria-label={name}
+    >
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none',
+              active
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AffixedNumberInput({
+  id,
+  name,
+  value,
+  onChange,
+  prefix,
+  suffix,
+  min,
+  max,
+  step,
+  placeholder,
+}: {
+  id: string;
+  name: string;
+  value: number | undefined;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  prefix?: string;
+  suffix?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative">
+      {prefix && (
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-500">
+          {prefix}
+        </span>
+      )}
+      <Input
+        type="number"
+        id={id}
+        name={name}
+        min={min}
+        max={max}
+        step={step}
+        value={value ?? ''}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={cn(prefix && 'pl-8', suffix && 'pr-16')}
+      />
+      {suffix && (
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-500">
+          {suffix}
+        </span>
+      )}
+    </div>
+  );
+}
+
+
+export default function EditBuildingModal({
+  building,
+  isOpen,
+  onClose,
+  onImagesChanged,
+}: EditBuildingModalProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const [section, setSection] = useState<EditSection>('basic');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [images, setImages] = useState<BuildingImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
 
   const amenitiesString = Array.isArray(building.amenities)
     ? building.amenities.join(', ')
-    : (building.amenities || '');
+    : building.amenities || '';
 
   const [formData, setFormData] = useState({
     name: building.name,
@@ -48,14 +209,13 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
     amenities: amenitiesString,
   });
 
-  const [depositConfig, setDepositConfig] = useState<any>(null);
   const [depositFormData, setDepositFormData] = useState({
     depositMonths: 1,
-    depositType: 'months' as 'fixed' | 'percentage' | 'months',
+    depositType: 'months' as AmountType,
     depositAmount: undefined as number | undefined,
     depositPercentage: undefined as number | undefined,
     advanceMonths: 1,
-    advanceType: 'months' as 'fixed' | 'percentage' | 'months',
+    advanceType: 'months' as AmountType,
     advanceAmount: undefined as number | undefined,
     advancePercentage: undefined as number | undefined,
     utilityDepositAmount: 0,
@@ -64,34 +224,33 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
     minimumDepositAmount: 3000,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchDepositConfig();
+  const fetchImages = useCallback(async () => {
+    setImagesLoading(true);
+    try {
+      const response = await fetch(
+        `/api/images?entityType=building&entityId=${building.id}`,
+        { credentials: 'include' }
+      );
+      if (!response.ok) {
+        setImages([]);
+        return;
+      }
+      const result = await response.json();
+      setImages(result.success ? result.data : []);
+    } catch (err) {
+      console.error('Error fetching building images:', err);
+      setImages([]);
+    } finally {
+      setImagesLoading(false);
     }
-  }, [isOpen, building.id]);
+  }, [building.id]);
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]:
-        name === 'yearBuilt' || name === 'totalFloors'
-          ? value
-            ? parseInt(value)
-            : undefined
-          : value,
-    }));
-  };
-
-  const fetchDepositConfig = async () => {
+  const fetchDepositConfig = useCallback(async () => {
     try {
       const response = await fetch(`/api/building-deposit-config/${building.id}`);
       const result = await response.json();
 
       if (result.success && result.data) {
-        setDepositConfig(result.data);
         setDepositFormData({
           depositMonths: result.data.depositMonths || 1,
           depositType: result.data.depositType || 'months',
@@ -104,29 +263,73 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
           utilityDepositAmount: result.data.utilityDepositAmount || 0,
           depositValidityDays: result.data.depositValidityDays || 5,
           depositRefundableAfterDays: result.data.depositRefundableAfterDays || 5,
-          minimumDepositAmount: result.data.minimumDepositAmount || 3000,
+          minimumDepositAmount: result.data.minimumDepositAmount ?? 0,
         });
       }
-    } catch (error) {
-      console.error('Error fetching deposit config:', error);
+    } catch (err) {
+      console.error('Error fetching deposit config:', err);
     }
+  }, [building.id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setSection('basic');
+    setError(null);
+    setFormData({
+      name: building.name,
+      buildingType: building.buildingType,
+      addressLine1: building.addressLine1,
+      addressLine2: building.addressLine2 || '',
+      city: building.city,
+      state: building.state,
+      postalCode: building.postalCode,
+      country: building.country,
+      description: building.description || '',
+      yearBuilt: building.yearBuilt,
+      totalFloors: building.totalFloors,
+      amenities: Array.isArray(building.amenities)
+        ? building.amenities.join(', ')
+        : building.amenities || '',
+    });
+    void fetchDepositConfig();
+    void fetchImages();
+  }, [isOpen, building, fetchDepositConfig, fetchImages]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
+
+  const handleImagesUpdated = () => {
+    void fetchImages();
+    onImagesChanged?.();
   };
 
-  const handleDepositConfigChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]:
+        name === 'yearBuilt' || name === 'totalFloors'
+          ? value
+            ? parseInt(value, 10)
+            : undefined
+          : value,
+    }));
+  };
+
+  const handleDepositConfigChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setDepositFormData((prev) => ({
       ...prev,
-      [name]:
-        name.includes('Months') ||
-        name.includes('Days') ||
-        name.includes('Amount') ||
-        name.includes('Percentage')
-          ? value
-            ? parseFloat(value)
-            : undefined
-          : value,
+      [name]: value === '' ? undefined : parseFloat(value),
     }));
   };
 
@@ -143,14 +346,15 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
 
     try {
       const amenitiesArray = formData.amenities
-        ? formData.amenities.split(',').map((a) => a.trim()).filter((a) => a.length > 0)
+        ? formData.amenities
+            .split(',')
+            .map((a) => a.trim())
+            .filter((a) => a.length > 0)
         : [];
 
       const buildingResponse = await fetch(`/api/buildings/${building.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           amenities: amenitiesArray,
@@ -158,7 +362,6 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
       });
 
       const buildingResult = await buildingResponse.json();
-
       if (!buildingResult.success) {
         throw new Error(buildingResult.error || 'Failed to update building');
       }
@@ -166,9 +369,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
       try {
         await fetch('/api/building-deposit-config', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             buildingId: building.id,
             ...depositFormData,
@@ -211,7 +412,6 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
       const response = await fetch(`/api/buildings/${building.id}`, {
         method: 'DELETE',
       });
-
       const result = await response.json();
 
       if (!result.success) {
@@ -238,60 +438,37 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
     }
   };
 
-  const actionButtons = (
-    <div className="flex justify-end items-center w-full">
-      <div className="flex space-x-3">
-        <Button
-          variant="outline"
-          onClick={onClose}
-          isDisabled={isSubmitting || isDeleting}
-        >
-          Cancel
-        </Button>
-        <Button
-          variant="outline"
-          className="text-red-700 border-red-300 hover:bg-red-50"
-          leftIcon={<Trash2 className="h-4 w-4" />}
-          onClick={() => setShowDeleteConfirm(true)}
-          isDisabled={isDeleting || isSubmitting}
-        >
-          Delete Building
-        </Button>
-        <Button
-          type="submit"
-          form="edit-building-form"
-          variant="primary"
-          isLoading={isSubmitting}
-          isDisabled={isDeleting}
-        >
-          {isSubmitting ? 'Updating...' : 'Update Building'}
-        </Button>
-      </div>
-    </div>
-  );
-
   return (
     <>
-      <FullScreenModal
+      <SectionedFormShell
         isOpen={isOpen}
-        onClose={onClose}
-        title="Edit Building"
-        subtitle={`Update information for ${building.name}`}
-        actionButtons={actionButtons}
+        onCancel={onClose}
+        eyebrow="Edit building"
+        entityLabel={building.name}
+        sections={SECTIONS}
+        activeSection={section}
+        onSectionChange={setSection}
+        formId="edit-building-form"
+        primaryLabel="Update building"
+        primaryLoading={isSubmitting}
+        primaryDisabled={isDeleting}
+        errorBanner={error ? <FormErrorBanner message={error} className="mb-6" /> : null}
+        navFooter={
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting || isSubmitting}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete building
+          </button>
+        }
       >
-        {error && <FormErrorBanner message={error} className="mb-6" />}
-
-        <form id="edit-building-form" onSubmit={handleSubmit} className="space-y-8 text-gray-900">
-          <Card padding="md" className="border border-gray-200 shadow-none">
-            <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
-              <svg className="mr-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m0 0H3m2 0v-8a2 2 0 012-2h4a2 2 0 012 2v8M9 7h6m-6 4h6m-2 5h2" />
-              </svg>
-              Basic Information
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField label="Building Name" htmlFor="name" required>
+        <form id="edit-building-form" onSubmit={handleSubmit}>
+          {section === 'basic' && (
+            <div className="space-y-5">
+              <FormField label="Building name" htmlFor="name" required>
                 <Input
                   id="name"
                   name="name"
@@ -301,8 +478,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                   placeholder="Enter building name"
                 />
               </FormField>
-
-              <FormField label="Building Type" htmlFor="buildingType" required>
+              <FormField label="Building type" htmlFor="buildingType" required>
                 <Select
                   id="buildingType"
                   name="buildingType"
@@ -315,96 +491,23 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                 </Select>
               </FormField>
             </div>
-          </Card>
+          )}
 
-          <Card padding="md" className="border border-gray-200 shadow-none">
-            <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
-              <svg className="mr-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Address
-            </h3>
+          {section === 'location' && (
+            <BuildingLocationFields
+              addressLine1={formData.addressLine1}
+              addressLine2={formData.addressLine2 || ''}
+              city={formData.city}
+              state={formData.state}
+              postalCode={formData.postalCode}
+              country={formData.country || 'Philippines'}
+              onChange={(fields) => setFormData((prev) => ({ ...prev, ...fields }))}
+              disabled={isSubmitting}
+            />
+          )}
 
-            <div className="space-y-6">
-              <FormField label="Address Line 1" htmlFor="addressLine1" required>
-                <Input
-                  id="addressLine1"
-                  name="addressLine1"
-                  required
-                  value={formData.addressLine1}
-                  onChange={handleInputChange}
-                  placeholder="Enter street address"
-                />
-              </FormField>
-
-              <FormField label="Address Line 2" htmlFor="addressLine2">
-                <Input
-                  id="addressLine2"
-                  name="addressLine2"
-                  value={formData.addressLine2}
-                  onChange={handleInputChange}
-                  placeholder="Apartment, suite, etc. (optional)"
-                />
-              </FormField>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FormField label="City" htmlFor="city" required>
-                  <Input
-                    id="city"
-                    name="city"
-                    required
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    placeholder="City"
-                  />
-                </FormField>
-
-                <FormField label="State" htmlFor="state" required>
-                  <Input
-                    id="state"
-                    name="state"
-                    required
-                    value={formData.state}
-                    onChange={handleInputChange}
-                    placeholder="State"
-                  />
-                </FormField>
-
-                <FormField label="Postal Code" htmlFor="postalCode" required>
-                  <Input
-                    id="postalCode"
-                    name="postalCode"
-                    required
-                    value={formData.postalCode}
-                    onChange={handleInputChange}
-                    placeholder="Postal Code"
-                  />
-                </FormField>
-              </div>
-
-              <FormField label="Country" htmlFor="country" required>
-                <Input
-                  id="country"
-                  name="country"
-                  required
-                  value={formData.country}
-                  onChange={handleInputChange}
-                  placeholder="Country"
-                />
-              </FormField>
-            </div>
-          </Card>
-
-          <Card padding="md" className="border border-gray-200 shadow-none">
-            <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
-              <svg className="mr-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Building Details
-            </h3>
-
-            <div className="space-y-6">
+          {section === 'details' && (
+            <div className="space-y-5">
               <FormField label="Description" htmlFor="description">
                 <Textarea
                   id="description"
@@ -412,12 +515,11 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                   rows={4}
                   value={formData.description}
                   onChange={handleInputChange}
-                  placeholder="Brief description of the building, its features, and amenities..."
+                  placeholder="Brief description of the building..."
                 />
               </FormField>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField label="Year Built" htmlFor="yearBuilt">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <FormField label="Year built" htmlFor="yearBuilt">
                   <Input
                     type="number"
                     id="yearBuilt"
@@ -429,8 +531,7 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                     placeholder="e.g., 2015"
                   />
                 </FormField>
-
-                <FormField label="Total Floors" htmlFor="totalFloors">
+                <FormField label="Total floors" htmlFor="totalFloors">
                   <Input
                     type="number"
                     id="totalFloors"
@@ -443,262 +544,261 @@ export default function EditBuildingModal({ building, isOpen, onClose }: EditBui
                   />
                 </FormField>
               </div>
-
               <FormField
                 label="Amenities"
                 htmlFor="amenities"
-                hint="Enter amenities freely with spaces and commas as needed."
+                hint="Separate with commas."
               >
                 <Input
                   id="amenities"
                   name="amenities"
                   value={formData.amenities || ''}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, amenities: e.target.value }));
-                  }}
-                  placeholder="e.g., Parking, Pool (heated), Gym, 24/7 Security, Laundry Room"
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, amenities: e.target.value }))
+                  }
+                  placeholder="Parking, Pool, Gym, Security"
                 />
               </FormField>
             </div>
-          </Card>
+          )}
 
-          <Card padding="md" className="border border-gray-200 shadow-none">
-            <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
-              <svg className="mr-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Deposit & Advance Configuration
-            </h3>
-            <p className="text-sm text-gray-900 mb-4">
-              Configure deposit, advance payment, and utility deposit requirements for this building.
-              Rooms will inherit these settings unless configured individually.
-            </p>
-
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-md font-medium text-gray-900 mb-4">Deposit Requirements</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Deposit Type" htmlFor="depositType">
-                    <Select
-                      id="depositType"
+          {section === 'deposits' && (
+            <div className="space-y-5">
+              <SectionCard title="Deposit requirement">
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-gray-700">Deposit type</p>
+                    <SegmentedControl
                       name="depositType"
                       value={depositFormData.depositType}
-                      onChange={handleDepositConfigChange}
-                    >
-                      <option value="months">Months of Rent</option>
-                      <option value="fixed">Fixed Amount</option>
-                      <option value="percentage">Percentage</option>
-                    </Select>
-                  </FormField>
+                      options={TYPE_OPTIONS}
+                      onChange={(next) =>
+                        setDepositFormData((prev) => ({ ...prev, depositType: next }))
+                      }
+                    />
+                  </div>
 
                   {depositFormData.depositType === 'months' && (
-                    <FormField
-                      label="Deposit Months"
-                      htmlFor="depositMonths"
-                      hint="Number of months (e.g., 2 = 2 months rent)"
-                    >
-                      <Input
-                        type="number"
+                    <FormField label="Months of rent" htmlFor="depositMonths">
+                      <AffixedNumberInput
                         id="depositMonths"
                         name="depositMonths"
                         min={0}
                         step={0.5}
                         value={depositFormData.depositMonths}
                         onChange={handleDepositConfigChange}
+                        suffix="months"
                         placeholder="e.g., 2"
                       />
                     </FormField>
                   )}
 
                   {depositFormData.depositType === 'fixed' && (
-                    <FormField label="Deposit Amount" htmlFor="depositAmount">
-                      <Input
-                        type="number"
+                    <FormField label="Deposit amount" htmlFor="depositAmount">
+                      <AffixedNumberInput
                         id="depositAmount"
                         name="depositAmount"
                         min={0}
                         step={0.01}
-                        value={depositFormData.depositAmount || ''}
+                        value={depositFormData.depositAmount}
                         onChange={handleDepositConfigChange}
+                        prefix="₱"
                         placeholder="e.g., 9600"
                       />
                     </FormField>
                   )}
 
                   {depositFormData.depositType === 'percentage' && (
-                    <FormField
-                      label="Deposit Percentage"
-                      htmlFor="depositPercentage"
-                      hint="Percentage of monthly rent"
-                    >
-                      <Input
-                        type="number"
+                    <FormField label="Deposit percentage" htmlFor="depositPercentage">
+                      <AffixedNumberInput
                         id="depositPercentage"
                         name="depositPercentage"
                         min={0}
                         max={100}
                         step={0.01}
-                        value={depositFormData.depositPercentage || ''}
+                        value={depositFormData.depositPercentage}
                         onChange={handleDepositConfigChange}
+                        suffix="%"
                         placeholder="e.g., 50"
                       />
                     </FormField>
                   )}
 
                   <FormField
-                    label="Minimum Deposit Amount"
+                    label="Minimum deposit floor"
                     htmlFor="minimumDepositAmount"
-                    hint="Minimum required deposit (default: 3,000)"
+                    hint="Applied if computed deposit is lower than this."
                   >
-                    <Input
-                      type="number"
+                    <AffixedNumberInput
                       id="minimumDepositAmount"
                       name="minimumDepositAmount"
                       min={0}
                       step={0.01}
                       value={depositFormData.minimumDepositAmount}
                       onChange={handleDepositConfigChange}
-                      placeholder="e.g., 3000"
+                      prefix="₱"
+                      placeholder="3000"
                     />
                   </FormField>
                 </div>
-              </div>
+              </SectionCard>
 
-              <div>
-                <h4 className="text-md font-medium text-gray-900 mb-4">Advance Payment Requirements</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Advance Type" htmlFor="advanceType">
-                    <Select
-                      id="advanceType"
+              <SectionCard title="Advance payment">
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-gray-700">Advance type</p>
+                    <SegmentedControl
                       name="advanceType"
                       value={depositFormData.advanceType}
-                      onChange={handleDepositConfigChange}
-                    >
-                      <option value="months">Months of Rent</option>
-                      <option value="fixed">Fixed Amount</option>
-                      <option value="percentage">Percentage</option>
-                    </Select>
-                  </FormField>
+                      options={TYPE_OPTIONS}
+                      onChange={(next) =>
+                        setDepositFormData((prev) => ({ ...prev, advanceType: next }))
+                      }
+                    />
+                  </div>
 
                   {depositFormData.advanceType === 'months' && (
-                    <FormField
-                      label="Advance Months"
-                      htmlFor="advanceMonths"
-                      hint="Number of months (e.g., 1 = 1 month rent)"
-                    >
-                      <Input
-                        type="number"
+                    <FormField label="Months of rent" htmlFor="advanceMonths">
+                      <AffixedNumberInput
                         id="advanceMonths"
                         name="advanceMonths"
                         min={0}
                         step={0.5}
                         value={depositFormData.advanceMonths}
                         onChange={handleDepositConfigChange}
+                        suffix="months"
                         placeholder="e.g., 1"
                       />
                     </FormField>
                   )}
 
                   {depositFormData.advanceType === 'fixed' && (
-                    <FormField label="Advance Amount" htmlFor="advanceAmount">
-                      <Input
-                        type="number"
+                    <FormField label="Advance amount" htmlFor="advanceAmount">
+                      <AffixedNumberInput
                         id="advanceAmount"
                         name="advanceAmount"
                         min={0}
                         step={0.01}
-                        value={depositFormData.advanceAmount || ''}
+                        value={depositFormData.advanceAmount}
                         onChange={handleDepositConfigChange}
+                        prefix="₱"
                         placeholder="e.g., 4800"
                       />
                     </FormField>
                   )}
 
                   {depositFormData.advanceType === 'percentage' && (
-                    <FormField
-                      label="Advance Percentage"
-                      htmlFor="advancePercentage"
-                      hint="Percentage of monthly rent"
-                    >
-                      <Input
-                        type="number"
+                    <FormField label="Advance percentage" htmlFor="advancePercentage">
+                      <AffixedNumberInput
                         id="advancePercentage"
                         name="advancePercentage"
                         min={0}
                         max={100}
                         step={0.01}
-                        value={depositFormData.advancePercentage || ''}
+                        value={depositFormData.advancePercentage}
                         onChange={handleDepositConfigChange}
+                        suffix="%"
                         placeholder="e.g., 50"
                       />
                     </FormField>
                   )}
                 </div>
-              </div>
+              </SectionCard>
 
-              <div>
-                <h4 className="text-md font-medium text-gray-900 mb-4">Utility Deposit</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    label="Utility Deposit Amount"
-                    htmlFor="utilityDepositAmount"
-                    hint="Fixed utility deposit amount"
-                  >
-                    <Input
-                      type="number"
+              <SectionCard title="Utility deposit & validity">
+                <div className="space-y-5">
+                  <FormField label="Utility deposit amount" htmlFor="utilityDepositAmount">
+                    <AffixedNumberInput
                       id="utilityDepositAmount"
                       name="utilityDepositAmount"
                       min={0}
                       step={0.01}
                       value={depositFormData.utilityDepositAmount}
                       onChange={handleDepositConfigChange}
-                      placeholder="e.g., 1000"
-                    />
-                  </FormField>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-md font-medium text-gray-900 mb-4">Deposit Validity Rules</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    label="Deposit Validity (Days)"
-                    htmlFor="depositValidityDays"
-                    hint="Number of days deposit is valid (default: 5)"
-                  >
-                    <Input
-                      type="number"
-                      id="depositValidityDays"
-                      name="depositValidityDays"
-                      min={1}
-                      value={depositFormData.depositValidityDays}
-                      onChange={handleDepositConfigChange}
-                      placeholder="e.g., 5"
+                      prefix="₱"
+                      placeholder="0"
                     />
                   </FormField>
 
-                  <FormField
-                    label="Non-Refundable After (Days)"
-                    htmlFor="depositRefundableAfterDays"
-                    hint="After this many days, deposit becomes non-refundable (default: 5)"
-                  >
-                    <Input
-                      type="number"
-                      id="depositRefundableAfterDays"
-                      name="depositRefundableAfterDays"
-                      min={1}
-                      value={depositFormData.depositRefundableAfterDays}
-                      onChange={handleDepositConfigChange}
-                      placeholder="e.g., 5"
-                    />
-                  </FormField>
+                  <div className="rounded-lg bg-gray-50 px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <Check className="h-3.5 w-3.5" />
+                        Lease starts
+                      </span>
+                      <span className="hidden h-px w-8 bg-emerald-300 sm:block" />
+                      <span className="inline-flex items-center gap-1.5 text-amber-700">
+                        <Clock className="h-3.5 w-3.5" />
+                        Refundable window ends
+                      </span>
+                      <span className="hidden h-px w-8 bg-amber-300 sm:block" />
+                      <span className="inline-flex items-center gap-1.5 text-red-600">
+                        <Lock className="h-3.5 w-3.5" />
+                        Non-refundable
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <FormField label="Deposit validity" htmlFor="depositValidityDays">
+                      <AffixedNumberInput
+                        id="depositValidityDays"
+                        name="depositValidityDays"
+                        min={1}
+                        step={1}
+                        value={depositFormData.depositValidityDays}
+                        onChange={handleDepositConfigChange}
+                        suffix="days"
+                        placeholder="5"
+                      />
+                    </FormField>
+                    <FormField
+                      label="Non-refundable after"
+                      htmlFor="depositRefundableAfterDays"
+                    >
+                      <AffixedNumberInput
+                        id="depositRefundableAfterDays"
+                        name="depositRefundableAfterDays"
+                        min={1}
+                        step={1}
+                        value={depositFormData.depositRefundableAfterDays}
+                        onChange={handleDepositConfigChange}
+                        suffix="days"
+                        placeholder="5"
+                      />
+                    </FormField>
+                  </div>
                 </div>
-              </div>
+              </SectionCard>
             </div>
-          </Card>
+          )}
         </form>
-      </FullScreenModal>
-
+        
+        {section === 'photos' && (
+          <div className="space-y-6">
+            <div className="rounded-xl border-2 border-dashed border-gray-200 p-4">
+              <ImageUpload
+                entityType="building"
+                entityId={building.id}
+                onUploadComplete={handleImagesUpdated}
+                maxImages={20}
+              />
+            </div>
+            {imagesLoading ? (
+              <p className="text-sm text-gray-500">Loading photos...</p>
+            ) : (
+              <ImageGallery
+                images={images}
+                entityType="building"
+                entityId={building.id}
+                onImageUpdate={handleImagesUpdated}
+                showUpload={false}
+              />
+            )}
+          </div>
+        )}
+      </SectionedFormShell>
+      
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}

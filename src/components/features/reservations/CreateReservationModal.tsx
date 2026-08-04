@@ -5,13 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Room, Tenant, CreateReservationData } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/formatCurrency';
-import AdminFullScreenModal from '@/components/ui/AdminFullScreenModal';
-import { Button } from '@/components/ui/Button';
+import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
+import { Home, User, Calendar, DollarSign, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 interface CreateReservationModalProps {
@@ -21,6 +20,46 @@ interface CreateReservationModalProps {
   initialTenantId?: string;
 }
 
+type FormSection = 'room' | 'tenant' | 'dates' | 'payments' | 'notes';
+
+const formSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'room',
+    label: 'Room',
+    icon: <Home className="h-4 w-4" />,
+    title: 'Room Selection',
+    subtitle: 'Select the room to reserve',
+  },
+  {
+    id: 'tenant',
+    label: 'Tenant',
+    icon: <User className="h-4 w-4" />,
+    title: 'Tenant Information',
+    subtitle: 'Select the tenant for the reservation',
+  },
+  {
+    id: 'dates',
+    label: 'Dates',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'Reservation Dates',
+    subtitle: 'Set reservation and expiry dates',
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    icon: <DollarSign className="h-4 w-4" />,
+    title: 'Payment Details',
+    subtitle: 'Configure rates and deposits',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional Notes',
+    subtitle: 'Add any additional information',
+  },
+];
+
 export default function CreateReservationModal({
   isOpen,
   onClose,
@@ -29,8 +68,9 @@ export default function CreateReservationModal({
 }: CreateReservationModalProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
-  const { currencySymbol, currencyCode } = useCurrency();
+  const { formatCurrency, currencySymbol } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSection, setActiveSection] = useState<FormSection>('room');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
@@ -189,14 +229,15 @@ export default function CreateReservationModal({
       if (result.success && result.data) {
         const reservations = result.data.reservations || result.data || [];
         // Get set of room IDs that have active reservations
-        const roomIdsWithActiveReservations = new Set(
+        const roomIdsWithActiveReservations = new Set<string>(
           reservations
-            .filter((r: any) => {
+            .filter((r: { expiryDate?: string; expiry_date?: string }) => {
               // Only include reservations that haven't expired
-              const expiryDate = new Date(r.expiryDate || r.expiry_date);
+              const expiryDate = new Date(r.expiryDate || r.expiry_date || 0);
               return expiryDate >= new Date();
             })
-            .map((r: any) => r.roomId || r.room_id)
+            .map((r: { roomId?: string; room_id?: string }) => r.roomId || r.room_id)
+            .filter((id: string | undefined): id is string => Boolean(id))
         );
         setActiveReservationRoomIds(roomIdsWithActiveReservations);
       }
@@ -322,8 +363,8 @@ export default function CreateReservationModal({
         type: 'error',
         title: 'Reservation deposit required',
         message: depositValue === 0 || formData.reservationDeposit == null
-          ? `Reservation deposit is required. Minimum: ${formatCurrency(currentRequiredDeposit, currencyCode)}`
-          : `Minimum deposit required: ${formatCurrency(currentRequiredDeposit, currencyCode)}`,
+          ? `Reservation deposit is required. Minimum: ${formatCurrency(currentRequiredDeposit)}`
+          : `Minimum deposit required: ${formatCurrency(currentRequiredDeposit)}`,
       });
       setIsSubmitting(false);
       return;
@@ -335,7 +376,7 @@ export default function CreateReservationModal({
         showNotification({
           type: 'error',
           title: 'Insufficient Advance',
-          message: `Minimum advance required: ${formatCurrency(requiredAdvance, currencyCode)}`,
+          message: `Minimum advance required: ${formatCurrency(requiredAdvance)}`,
         });
         setIsSubmitting(false);
         return;
@@ -348,7 +389,7 @@ export default function CreateReservationModal({
         showNotification({
           type: 'error',
           title: 'Insufficient Utility Deposit',
-          message: `Minimum utility deposit required: ${formatCurrency(requiredUtility, currencyCode)}`,
+          message: `Minimum utility deposit required: ${formatCurrency(requiredUtility)}`,
         });
         setIsSubmitting(false);
         return;
@@ -441,258 +482,275 @@ export default function CreateReservationModal({
   
   const displayRequiredDeposit = buildingConfig ? requiredDeposit : calculateRequiredDepositLocal();
 
-  const actionButtons = (
-    <>
-      <Button type="button" variant="outline" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button
-        type="submit"
-        form="create-reservation-form"
-        isLoading={isSubmitting}
-        isDisabled={
-          (formData.reservationDeposit ?? 0) < 0 ||
-          (displayRequiredDeposit > 0 &&
-            (formData.reservationDeposit ?? 0) < displayRequiredDeposit)
-        }
-      >
-        Create Reservation
-      </Button>
-    </>
-  );
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'room':
+        return (
+          <FormField
+            label="Room"
+            htmlFor="roomId"
+            required
+            hint={
+              selectedRoom
+                ? `Monthly Rate: ${formatCurrency(selectedRoom.monthlyRate)}${
+                    requiredDeposit > 0
+                      ? ` | Required Deposit: ${formatCurrency(requiredDeposit)}`
+                      : ''
+                  }${
+                    buildingConfig && requiredAdvance > 0
+                      ? ` | Required Advance: ${formatCurrency(requiredAdvance)}`
+                      : ''
+                  }${
+                    buildingConfig && requiredUtility > 0
+                      ? ` | Utility Deposit: ${formatCurrency(requiredUtility)}`
+                      : ''
+                  }`
+                : undefined
+            }
+          >
+            <Select
+              id="roomId"
+              name="roomId"
+              required
+              value={formData.roomId}
+              onChange={handleInputChange}
+              isDisabled={loadingRooms}
+            >
+              <option value="">Select a room</option>
+              {rooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.roomNumber} - {room.buildingName || 'Unknown Building'}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        );
+
+      case 'tenant':
+        return (
+          <FormField label="Tenant" htmlFor="tenantId" required>
+            <div className="flex gap-2">
+              <Select
+                id="tenantId"
+                name="tenantId"
+                required
+                value={formData.tenantId}
+                onChange={handleInputChange}
+                isDisabled={loadingTenants}
+                className="flex-1"
+              >
+                <option value="">Select a tenant</option>
+                {Array.isArray(tenants) && tenants.length > 0 ? (
+                  tenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.firstName} {tenant.lastName} ({tenant.email})
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    {loadingTenants ? 'Loading tenants...' : 'No tenants available'}
+                  </option>
+                )}
+              </Select>
+              <Link
+                href="/admin/tenants/new"
+                target="_blank"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 hover:bg-gray-50"
+              >
+                New Tenant
+              </Link>
+            </div>
+          </FormField>
+        );
+
+      case 'dates':
+        return (
+          <div className="space-y-6">
+            <FormField label="Reservation Date" htmlFor="reservationDate" required>
+              <Input
+                type="date"
+                id="reservationDate"
+                name="reservationDate"
+                required
+                value={formData.reservationDate?.toISOString().split('T')[0] || ''}
+                onChange={handleInputChange}
+                min="2000-01-01"
+                max="2099-12-31"
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField label="Expiry Date" htmlFor="expiryDate" required>
+              <Input
+                type="date"
+                id="expiryDate"
+                name="expiryDate"
+                required
+                value={formData.expiryDate.toISOString().split('T')[0]}
+                onChange={handleInputChange}
+                min={formData.reservationDate?.toISOString().split('T')[0] || '2000-01-01'}
+                max="2099-12-31"
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+          </div>
+        );
+
+      case 'payments':
+        return (
+          <div className="space-y-6">
+            <FormField label={`Monthly Rate (${currencySymbol})`} htmlFor="monthlyRate" required>
+              <Input
+                type="number"
+                id="monthlyRate"
+                name="monthlyRate"
+                required
+                min="0"
+                step="0.01"
+                value={formData.monthlyRate ?? ''}
+                onChange={handleInputChange}
+                placeholder="0"
+              />
+            </FormField>
+
+            <FormField
+              label={`Reservation Deposit (${currencySymbol})`}
+              htmlFor="reservationDeposit"
+              required
+              error={
+                (formData.reservationDeposit ?? 0) < 0
+                  ? 'Reservation deposit cannot be negative.'
+                  : displayRequiredDeposit > 0 &&
+                      (formData.reservationDeposit == null ||
+                        (formData.reservationDeposit >= 0 &&
+                          formData.reservationDeposit < displayRequiredDeposit))
+                    ? formData.reservationDeposit == null || formData.reservationDeposit === 0
+                      ? `Reservation deposit is required. Minimum: ${formatCurrency(displayRequiredDeposit)}`
+                      : `Minimum deposit required: ${formatCurrency(displayRequiredDeposit)}`
+                    : undefined
+              }
+              hint={
+                buildingConfig && depositValidityDays > 0
+                  ? `Deposit valid for ${depositValidityDays} day${depositValidityDays !== 1 ? 's' : ''} from reservation date${
+                      displayRequiredDeposit > 0
+                        ? ` (Min: ${formatCurrency(displayRequiredDeposit)})`
+                        : ''
+                    }`
+                  : displayRequiredDeposit > 0
+                    ? `Minimum: ${formatCurrency(displayRequiredDeposit)}`
+                    : undefined
+              }
+            >
+              <Input
+                type="number"
+                id="reservationDeposit"
+                name="reservationDeposit"
+                min={displayRequiredDeposit > 0 ? displayRequiredDeposit : 0}
+                step="0.01"
+                value={formData.reservationDeposit ?? ''}
+                onChange={handleInputChange}
+                placeholder="0"
+                isInvalid={
+                  (formData.reservationDeposit ?? 0) < 0 ||
+                  (displayRequiredDeposit > 0 &&
+                    (formData.reservationDeposit == null ||
+                      (formData.reservationDeposit >= 0 &&
+                        formData.reservationDeposit < displayRequiredDeposit)))
+                }
+              />
+            </FormField>
+
+            {buildingConfig && requiredAdvance > 0 && (
+              <FormField
+                label={`Advance Payment (${currencySymbol}) (Optional)`}
+                htmlFor="advanceAmount"
+                hint={`0 for none, or min ${formatCurrency(requiredAdvance)} if provided. Any advance rent payment made at the start of the lease.`}
+              >
+                <Input
+                  type="number"
+                  id="advanceAmount"
+                  name="advanceAmount"
+                  min={0}
+                  step="0.01"
+                  value={
+                    formData.advanceAmount === 0 || Number.isNaN(formData.advanceAmount)
+                      ? ''
+                      : formData.advanceAmount
+                  }
+                  onChange={handleInputChange}
+                  placeholder="0"
+                />
+              </FormField>
+            )}
+
+            {buildingConfig && requiredUtility > 0 && (
+              <FormField
+                label={`Utility Deposit (${currencySymbol}) (Optional)`}
+                htmlFor="utilityDepositAmount"
+                hint={`0 for none, or min ${formatCurrency(requiredUtility)} if provided. Utility deposit amount for this building.`}
+              >
+                <Input
+                  type="number"
+                  id="utilityDepositAmount"
+                  name="utilityDepositAmount"
+                  min={0}
+                  step="0.01"
+                  value={
+                    formData.utilityDepositAmount === 0 ||
+                    Number.isNaN(formData.utilityDepositAmount)
+                      ? ''
+                      : formData.utilityDepositAmount
+                  }
+                  onChange={handleInputChange}
+                  placeholder="0"
+                />
+              </FormField>
+            )}
+          </div>
+        );
+
+      case 'notes':
+        return (
+          <FormField label="Notes" htmlFor="notes">
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={3}
+              value={formData.notes}
+              onChange={handleInputChange}
+              placeholder="Additional notes about this reservation..."
+            />
+          </FormField>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <AdminFullScreenModal
+    <SectionedFormShell
+      mode="modal"
       isOpen={isOpen}
-      onClose={onClose}
-      title="Create Reservation"
-      subtitle="Reserve a room for a tenant with deposit and expiry date"
-      actionButtons={actionButtons}
+      onCancel={onClose}
+      eyebrow="Create Reservation"
+      entityLabel="New Reservation"
+      sections={formSections}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      primaryLabel="Create Reservation"
+      primaryLoading={isSubmitting}
+      primaryDisabled={
+        (formData.reservationDeposit ?? 0) < 0 ||
+        (displayRequiredDeposit > 0 &&
+          (formData.reservationDeposit ?? 0) < displayRequiredDeposit)
+      }
+      formId="create-reservation-form"
     >
       <form id="create-reservation-form" onSubmit={handleSubmit} className="space-y-6">
-        <FormField
-          label="Room"
-          htmlFor="roomId"
-          required
-          hint={
-            selectedRoom
-              ? `Monthly Rate: ${formatCurrency(selectedRoom.monthlyRate, currencyCode)}${
-                  requiredDeposit > 0
-                    ? ` | Required Deposit: ${formatCurrency(requiredDeposit, currencyCode)}`
-                    : ''
-                }${
-                  buildingConfig && requiredAdvance > 0
-                    ? ` | Required Advance: ${formatCurrency(requiredAdvance, currencyCode)}`
-                    : ''
-                }${
-                  buildingConfig && requiredUtility > 0
-                    ? ` | Utility Deposit: ${formatCurrency(requiredUtility, currencyCode)}`
-                    : ''
-                }`
-              : undefined
-          }
-        >
-          <Select
-            id="roomId"
-            name="roomId"
-            required
-            value={formData.roomId}
-            onChange={handleInputChange}
-            isDisabled={loadingRooms}
-          >
-            <option value="">Select a room</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.roomNumber} - {room.buildingName || 'Unknown Building'}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-
-        <FormField label="Tenant" htmlFor="tenantId" required>
-          <div className="flex gap-2">
-            <Select
-              id="tenantId"
-              name="tenantId"
-              required
-              value={formData.tenantId}
-              onChange={handleInputChange}
-              isDisabled={loadingTenants}
-              className="flex-1"
-            >
-              <option value="">Select a tenant</option>
-              {Array.isArray(tenants) && tenants.length > 0 ? (
-                tenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.firstName} {tenant.lastName} ({tenant.email})
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled>
-                  {loadingTenants ? 'Loading tenants...' : 'No tenants available'}
-                </option>
-              )}
-            </Select>
-            <Link
-              href="/admin/tenants/new"
-              target="_blank"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 hover:bg-gray-50"
-            >
-              New Tenant
-            </Link>
-          </div>
-        </FormField>
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Reservation Date" htmlFor="reservationDate" required>
-            <Input
-              type="date"
-              id="reservationDate"
-              name="reservationDate"
-              required
-              value={formData.reservationDate?.toISOString().split('T')[0] || ''}
-              onChange={handleInputChange}
-              min="2000-01-01"
-              max="2099-12-31"
-              style={{ colorScheme: 'light' }}
-            />
-          </FormField>
-
-          <FormField label="Expiry Date" htmlFor="expiryDate" required>
-            <Input
-              type="date"
-              id="expiryDate"
-              name="expiryDate"
-              required
-              value={formData.expiryDate.toISOString().split('T')[0]}
-              onChange={handleInputChange}
-              min={formData.reservationDate?.toISOString().split('T')[0] || '2000-01-01'}
-              max="2099-12-31"
-              style={{ colorScheme: 'light' }}
-            />
-          </FormField>
-        </div>
-
-        <FormField label={`Monthly Rate (${currencySymbol})`} htmlFor="monthlyRate" required>
-          <Input
-            type="number"
-            id="monthlyRate"
-            name="monthlyRate"
-            required
-            min="0"
-            step="0.01"
-            value={formData.monthlyRate ?? ''}
-            onChange={handleInputChange}
-            placeholder="0"
-          />
-        </FormField>
-
-        <FormField
-          label={`Reservation Deposit (${currencySymbol})`}
-          htmlFor="reservationDeposit"
-          required
-          error={
-            (formData.reservationDeposit ?? 0) < 0
-              ? 'Reservation deposit cannot be negative.'
-              : displayRequiredDeposit > 0 &&
-                  (formData.reservationDeposit == null ||
-                    (formData.reservationDeposit >= 0 &&
-                      formData.reservationDeposit < displayRequiredDeposit))
-                ? formData.reservationDeposit == null || formData.reservationDeposit === 0
-                  ? `Reservation deposit is required. Minimum: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
-                  : `Minimum deposit required: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
-                : undefined
-          }
-          hint={
-            buildingConfig && depositValidityDays > 0
-              ? `Deposit valid for ${depositValidityDays} day${depositValidityDays !== 1 ? 's' : ''} from reservation date${
-                  displayRequiredDeposit > 0
-                    ? ` (Min: ${formatCurrency(displayRequiredDeposit, currencyCode)})`
-                    : ''
-                }`
-              : displayRequiredDeposit > 0
-                ? `Minimum: ${formatCurrency(displayRequiredDeposit, currencyCode)}`
-                : undefined
-          }
-        >
-          <Input
-            type="number"
-            id="reservationDeposit"
-            name="reservationDeposit"
-            min={displayRequiredDeposit > 0 ? displayRequiredDeposit : 0}
-            step="0.01"
-            value={formData.reservationDeposit ?? ''}
-            onChange={handleInputChange}
-            placeholder="0"
-            isInvalid={
-              (formData.reservationDeposit ?? 0) < 0 ||
-              (displayRequiredDeposit > 0 &&
-                (formData.reservationDeposit == null ||
-                  (formData.reservationDeposit >= 0 &&
-                    formData.reservationDeposit < displayRequiredDeposit)))
-            }
-          />
-        </FormField>
-
-        {buildingConfig && requiredAdvance > 0 && (
-          <FormField
-            label={`Advance Payment (${currencySymbol}) (Optional)`}
-            htmlFor="advanceAmount"
-            hint={`0 for none, or min ${formatCurrency(requiredAdvance, currencyCode)} if provided. Any advance rent payment made at the start of the lease.`}
-          >
-            <Input
-              type="number"
-              id="advanceAmount"
-              name="advanceAmount"
-              min={0}
-              step="0.01"
-              value={
-                formData.advanceAmount === 0 || Number.isNaN(formData.advanceAmount)
-                  ? ''
-                  : formData.advanceAmount
-              }
-              onChange={handleInputChange}
-              placeholder="0"
-            />
-          </FormField>
-        )}
-
-        {buildingConfig && requiredUtility > 0 && (
-          <FormField
-            label={`Utility Deposit (${currencySymbol}) (Optional)`}
-            htmlFor="utilityDepositAmount"
-            hint={`0 for none, or min ${formatCurrency(requiredUtility, currencyCode)} if provided. Utility deposit amount for this building.`}
-          >
-            <Input
-              type="number"
-              id="utilityDepositAmount"
-              name="utilityDepositAmount"
-              min={0}
-              step="0.01"
-              value={
-                formData.utilityDepositAmount === 0 ||
-                Number.isNaN(formData.utilityDepositAmount)
-                  ? ''
-                  : formData.utilityDepositAmount
-              }
-              onChange={handleInputChange}
-              placeholder="0"
-            />
-          </FormField>
-        )}
-
-        <FormField label="Notes" htmlFor="notes">
-          <Textarea
-            id="notes"
-            name="notes"
-            rows={3}
-            value={formData.notes}
-            onChange={handleInputChange}
-            placeholder="Additional notes about this reservation..."
-          />
-        </FormField>
+        {renderSectionContent()}
       </form>
-    </AdminFullScreenModal>
+    </SectionedFormShell>
   );
 }
 

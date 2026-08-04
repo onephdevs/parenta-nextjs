@@ -53,7 +53,7 @@ export default function AdminDocumentUpload({
     const selected = event.target.files?.[0] || null;
     setFile(selected);
     if (selected && !documentName.trim()) {
-      setDocumentName(selected.name.replace(/\.[^/.]+$/, ''));
+      setDocumentName(selected.name);
     }
   };
 

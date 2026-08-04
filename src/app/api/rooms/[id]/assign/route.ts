@@ -101,14 +101,15 @@ export async function POST(request: Request, { params }: RouteParams) {
           break;
       }
     } else {
-      // Default minimum deposit (3k minimum)
-      requiredDeposit = 3000;
+      requiredDeposit = 0;
     }
-    
-    // Ensure deposit meets minimum requirement (3k minimum)
-    const minimumDeposit = buildingConfig?.minimumDepositAmount || 3000;
-    if (requiredDeposit < minimumDeposit) {
-      requiredDeposit = minimumDeposit;
+
+    // Apply building minimum only when config exists (0 is a valid minimum)
+    if (buildingConfig) {
+      const minimumDeposit = buildingConfig.minimumDepositAmount ?? 0;
+      if (requiredDeposit < minimumDeposit) {
+        requiredDeposit = minimumDeposit;
+      }
     }
     
     // Validate deposit amount

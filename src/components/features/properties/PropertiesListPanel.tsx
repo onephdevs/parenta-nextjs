@@ -76,9 +76,9 @@ export default function PropertiesListPanel({
           <button
             type="button"
             onClick={() => setIsAddOpen(true)}
-            className="inline-flex flex-shrink-0 items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-[#111827] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-black"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
             Add
           </button>
         </div>

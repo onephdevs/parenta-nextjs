@@ -52,7 +52,26 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const { id } = await params;
     const buildingData = await request.json();
     const before = await getBuildingById(id);
-    
+
+    if (buildingData.city != null || buildingData.state != null) {
+      const regionName = buildingData.state ?? before?.state;
+      const cityName = buildingData.city ?? before?.city;
+      if (regionName && cityName) {
+        const { validateCityInRegion } = await import('@/lib/api/addresses');
+        const locationOk = await validateCityInRegion(regionName, cityName);
+        if (!locationOk) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Invalid location',
+              details: 'Please select a valid region and city from the list',
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const building = await updateBuilding(id, buildingData);
 
     logActivitySafe({

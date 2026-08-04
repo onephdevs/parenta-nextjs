@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, X } from 'lucide-react';
 
 interface FullScreenModalProps {
@@ -17,6 +18,7 @@ interface FullScreenModalProps {
 /**
  * Full-viewport admin form modal that sits beside the desktop sidebar
  * (does not slide under it). On mobile it covers the full screen.
+ * Portaled to document.body so overflow/transform ancestors cannot clip it.
  */
 export default function FullScreenModal({
   isOpen,
@@ -28,39 +30,48 @@ export default function FullScreenModal({
   secondaryButton,
   actionButtons,
 }: FullScreenModalProps) {
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+  if (!isOpen || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0 z-[100] h-[100dvh] w-screen overflow-hidden">
       {/* Dim overlay — only over the main content area on desktop */}
       <div
-        className="absolute inset-0 lg:left-64 bg-gray-900/50"
+        className="pointer-events-auto absolute inset-0 bg-gray-900/50 lg:left-64"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel: full width on mobile, inset past sidebar (w-64) on lg+ */}
-      <div className="absolute inset-y-0 right-0 left-0 lg:left-64 bg-white text-gray-900 flex flex-col shadow-xl">
+      {/* Panel: full viewport height; inset past sidebar (w-64) on lg+ */}
+      <div className="pointer-events-auto absolute inset-y-0 bottom-0 left-0 right-0 flex h-[100dvh] max-h-[100dvh] flex-col bg-white text-gray-900 shadow-xl lg:left-64">
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4">
+        <div className="z-10 flex-shrink-0 border-b border-gray-200 bg-white px-6 py-4">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4 min-w-0">
+            <div className="flex min-w-0 items-center gap-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-900 transition-colors flex-shrink-0"
+                className="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-900"
                 aria-label="Back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold text-gray-900 truncate">{title}</h1>
+                <h1 className="truncate text-xl font-semibold text-gray-900">{title}</h1>
                 {subtitle && (
-                  <p className="text-sm text-gray-600 mt-1 truncate">{subtitle}</p>
+                  <p className="mt-1 truncate text-sm text-gray-600">{subtitle}</p>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center gap-3">
               {actionButtons ? (
                 actionButtons
               ) : (
@@ -72,7 +83,7 @@ export default function FullScreenModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-900 transition-colors"
+                className="text-gray-400 transition-colors hover:text-gray-900"
                 aria-label="Close modal"
               >
                 <X className="h-5 w-5" />
@@ -82,12 +93,11 @@ export default function FullScreenModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto p-6 text-gray-900">
-            {children}
-          </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-4xl p-6 pb-10 text-gray-900">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

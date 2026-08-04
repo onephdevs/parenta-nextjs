@@ -50,7 +50,20 @@ export async function POST(request: Request) {
         {
           success: false,
           error: 'Missing required fields',
-          details: 'Name, address, city, state, and postal code are required',
+          details: 'Name, address, city, region, and postal code are required',
+        },
+        { status: 400 }
+      );
+    }
+
+    const { validateCityInRegion } = await import('@/lib/api/addresses');
+    const locationOk = await validateCityInRegion(buildingData.state, buildingData.city);
+    if (!locationOk) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid location',
+          details: 'Please select a valid region and city from the list',
         },
         { status: 400 }
       );

@@ -14,6 +14,7 @@ export interface Document {
   roomId?: string;
   tenantId?: string;
   assetId?: string;
+  pipelineCardId?: string;
   documentName: string;
   fileName: string;
   filePath: string;
@@ -46,6 +47,8 @@ export interface DocumentFilters {
   buildingId?: string;
   roomId?: string;
   tenantId?: string;
+  assetId?: string;
+  pipelineCardId?: string;
   accessLevel?: string;
   hasExpiry?: boolean;
   isExpired?: boolean;
@@ -68,6 +71,7 @@ export interface CreateDocumentData {
   roomId?: string;
   tenantId?: string;
   assetId?: string;
+  pipelineCardId?: string;
   documentName: string;
   documentType?: string;
   description?: string;
@@ -127,6 +131,9 @@ export const SUPPORTED_FILE_TYPES = [
 
 export const DOCUMENT_TYPES = [
   'lease',
+  'id_proof',
+  'income_proof',
+  'background_check',
   'invoice',
   'receipt',
   'photo',

@@ -174,7 +174,7 @@ export default function LeaseManagement() {
                 Generate Alerts
               </Button>
             )}
-            <Link href="/admin/tenants/new">
+            <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
               <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
             </Link>
           </div>
@@ -266,7 +266,7 @@ export default function LeaseManagement() {
               title="No leases found"
               description="Create a tenant with a room assignment to start a lease."
               action={
-                <Link href="/admin/tenants/new">
+                <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
                   <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
                 </Link>
               }

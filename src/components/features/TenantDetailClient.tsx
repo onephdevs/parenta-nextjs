@@ -2,6 +2,7 @@
 
 import ProfilePictureUpload from './ProfilePictureUpload';
 import DocumentUpload from './DocumentUpload';
+import { TenantDocumentsPanel } from './TenantDocumentsPanel';
 
 interface TenantDetailClientProps {
   tenantId: string;
@@ -14,18 +15,19 @@ export default function TenantDetailClient({
   tenantId,
   profilePictureUrl,
   agreementDocumentUrl,
-  agreementDocumentName
+  agreementDocumentName,
 }: TenantDetailClientProps) {
   const handleRefresh = () => {
     window.location.reload();
   };
 
   return (
-    <>
-      {/* Profile Picture */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Profile Picture</h3>
+    <div className="space-y-6">
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
+          <h3 className="text-sm font-semibold text-gray-900">Profile picture</h3>
+        </div>
+        <div className="px-4 py-4 sm:px-5">
           <ProfilePictureUpload
             tenantId={tenantId}
             currentPictureUrl={profilePictureUrl}
@@ -36,10 +38,26 @@ export default function TenantDetailClient({
         </div>
       </div>
 
-      {/* Tenant Agreement */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Tenant Agreement</h3>
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
+          <h3 className="text-sm font-semibold text-gray-900">Documents</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Opportunity uploads (ID, income, screening, lease) and other tenant files.
+          </p>
+        </div>
+        <div className="px-4 py-4 sm:px-5">
+          <TenantDocumentsPanel tenantId={tenantId} />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
+          <h3 className="text-sm font-semibold text-gray-900">Signed lease agreement</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Primary agreement on file for this tenant (optional dedicated upload).
+          </p>
+        </div>
+        <div className="px-4 py-4 sm:px-5">
           <DocumentUpload
             tenantId={tenantId}
             currentDocumentUrl={agreementDocumentUrl}
@@ -49,7 +67,6 @@ export default function TenantDetailClient({
           />
         </div>
       </div>
-    </>
+    </div>
   );
 }
-

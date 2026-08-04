@@ -29,17 +29,8 @@ export default async function EditTenantPage({ params, searchParams }: EditTenan
     }
 
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Edit Tenant</h1>
-            <p className="mt-2 text-sm text-gray-900">
-              Update information for {tenant.firstName} {tenant.lastName}
-            </p>
-          </div>
-
-          <EditTenantForm tenant={tenant} returnTo={returnTo} />
-        </div>
+      <div className="min-h-0 flex-1 bg-white">
+        <EditTenantForm tenant={tenant} returnTo={returnTo} />
       </div>
     );
   } catch (error) {

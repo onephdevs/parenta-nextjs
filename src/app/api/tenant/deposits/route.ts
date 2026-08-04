@@ -16,6 +16,7 @@ export async function GET() {
     
     // Check if deposit_ledger table exists, if not return empty data
     let balance = 0;
+    let advanceBalance = 0;
     let transactionCount = 0;
     let history: any[] = [];
     
@@ -40,6 +41,14 @@ export async function GET() {
       const balanceResult = await pool.query(query, [tenant.id]);
       balance = parseFloat(balanceResult.rows[0]?.balance || 0);
       transactionCount = parseInt(balanceResult.rows[0]?.transaction_count || 0);
+
+      const advanceResult = await pool.query(
+        `SELECT COALESCE(SUM(amount), 0) as balance
+         FROM tenant_credits
+         WHERE tenant_id = $1 AND status = 'available'`,
+        [tenant.id]
+      );
+      advanceBalance = parseFloat(advanceResult.rows[0]?.balance || 0);
       
       // Get transaction history (note: deposit_ledger doesn't have reference_number column)
       // Join with payments to get reference_number if payment_id exists
@@ -77,6 +86,7 @@ export async function GET() {
       console.warn('Deposit ledger table may not exist or query failed:', dbError);
       // Return empty data - this is not critical for the page to function
       balance = 0;
+      advanceBalance = 0;
       transactionCount = 0;
       history = [];
     }
@@ -85,6 +95,7 @@ export async function GET() {
       success: true,
       data: {
         balance,
+        advanceBalance,
         transactionCount,
         history,
       },

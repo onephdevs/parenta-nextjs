@@ -16,6 +16,7 @@ import {
   Star
 } from 'lucide-react';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { HomeContactForm } from '@/components/features/HomeContactForm';
 
 interface Building {
   id: string;
@@ -345,34 +346,45 @@ export default function LandingPage() {
       {/* Contact Section */}
       <section id="contact" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Get In Touch</h2>
             <p className="text-xl text-gray-900 max-w-2xl mx-auto">
-              Have questions? We're here to help
+              Interested in a unit? Leave your name and email — we&apos;ll follow up.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Phone className="h-6 w-6 text-blue-600" />
+
+          <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-2">
+            <div className="grid gap-8 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="flex items-start gap-4 text-left sm:flex-col sm:items-center sm:text-center lg:flex-row lg:items-start lg:text-left">
+                <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center shrink-0">
+                  <Phone className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
+                  <p className="text-gray-700">+63 (2) 1234-5678</p>
+                </div>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Phone</h3>
-              <p className="text-gray-900">+63 (2) 1234-5678</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="h-6 w-6 text-blue-600" />
+              <div className="flex items-start gap-4 text-left sm:flex-col sm:items-center sm:text-center lg:flex-row lg:items-start lg:text-left">
+                <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center shrink-0">
+                  <Mail className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
+                  <p className="text-gray-700">info@parenta.com</p>
+                </div>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Email</h3>
-              <p className="text-gray-900">info@parenta.com</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MapPin className="h-6 w-6 text-blue-600" />
+              <div className="flex items-start gap-4 text-left sm:flex-col sm:items-center sm:text-center lg:flex-row lg:items-start lg:text-left">
+                <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center shrink-0">
+                  <MapPin className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Location</h3>
+                  <p className="text-gray-700">Manila, Philippines</p>
+                </div>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Location</h3>
-              <p className="text-gray-900">Manila, Philippines</p>
             </div>
+
+            <HomeContactForm />
           </div>
         </div>
       </section>

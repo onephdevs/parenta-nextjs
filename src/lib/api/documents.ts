@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import pool from '@/lib/db';
 import { put, del } from '@vercel/blob';
+import { originalUploadFileName } from '@/lib/format/upload-filename';
 
 // Get all documents with filtering and pagination
 export async function getDocuments(
@@ -74,6 +75,12 @@ export async function getDocuments(
   if (filters.tenantId) {
     query += ` AND d.tenant_id = $${paramIndex}`;
     params.push(filters.tenantId);
+    paramIndex++;
+  }
+
+  if (filters.pipelineCardId) {
+    query += ` AND d.pipeline_card_id = $${paramIndex}`;
+    params.push(filters.pipelineCardId);
     paramIndex++;
   }
 
@@ -158,6 +165,7 @@ export async function getDocuments(
     roomId: row.room_id,
     tenantId: row.tenant_id,
     assetId: row.asset_id,
+    pipelineCardId: row.pipeline_card_id,
     documentName: row.document_name,
     fileName: row.file_name,
     filePath: row.file_path,
@@ -198,6 +206,7 @@ function mapDocumentRow(row: Record<string, unknown>): Document {
     roomId: row.room_id as string,
     tenantId: row.tenant_id as string,
     assetId: row.asset_id as string,
+    pipelineCardId: row.pipeline_card_id as string | undefined,
     documentName: row.document_name as string,
     fileName: row.file_name as string,
     filePath: row.file_path as string,
@@ -263,6 +272,7 @@ export async function createDocument(documentData: {
   roomId?: string;
   tenantId?: string;
   assetId?: string;
+  pipelineCardId?: string;
   documentName: string;
   fileName: string;
   filePath: string;
@@ -278,11 +288,11 @@ export async function createDocument(documentData: {
 }): Promise<Document> {
   const query = `
     INSERT INTO documents (
-      category_id, building_id, room_id, tenant_id, asset_id,
+      category_id, building_id, room_id, tenant_id, asset_id, pipeline_card_id,
       document_name, file_name, file_path, file_size, mime_type,
       document_type, description, tags, is_public, expiry_date,
       uploaded_by, access_level
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING *
   `;
 
@@ -292,6 +302,7 @@ export async function createDocument(documentData: {
     documentData.roomId,
     documentData.tenantId,
     documentData.assetId,
+    documentData.pipelineCardId || null,
     documentData.documentName,
     documentData.fileName,
     documentData.filePath,
@@ -460,7 +471,7 @@ export async function deleteDocument(id: string): Promise<boolean> {
       if (filePath && filePath.startsWith('https://') && filePath.includes('blob.vercel-storage.com')) {
         // Extract blob URL and delete from Vercel Blob
         try {
-          await del(filePath);
+          await del(filePath, { token: process.env.BLOB_READ_WRITE_TOKEN });
           console.log('✅ Deleted document from Vercel Blob:', filePath);
         } catch (blobError) {
           console.warn(`Could not delete blob at ${filePath}:`, blobError);
@@ -600,23 +611,27 @@ export async function getDocumentStats(): Promise<DocumentStats> {
 }
 
 // Save uploaded file to Vercel Blob (or local filesystem if no blob token)
+// fileName = original client filename (for display/download)
+// storage uses a unique key in filePath only
 export async function saveUploadedFile(file: File, uploadDir: string = 'uploads/documents'): Promise<{
   fileName: string;
   filePath: string;
   fileSize: number;
 }> {
-  // Generate unique filename
+  const originalName = originalUploadFileName(file, 'document');
+
+  // Unique storage key — never shown as the user-facing name
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 15);
-  const fileExtension = path.extname(file.name);
-  const fileName = `${timestamp}-${randomSuffix}${fileExtension}`;
+  const fileExtension = path.extname(file.name) || path.extname(originalName);
+  const storageFileName = `${timestamp}-${randomSuffix}${fileExtension}`;
   
   // Check if BLOB_READ_WRITE_TOKEN is available (Vercel Blob)
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   
   if (blobToken) {
     // Use Vercel Blob Storage (production/Vercel deployment)
-    const blobPath = `documents/${fileName}`;
+    const blobPath = `documents/${storageFileName}`;
     
     console.log('📤 Uploading document to Vercel Blob:', blobPath);
     
@@ -624,12 +639,13 @@ export async function saveUploadedFile(file: File, uploadDir: string = 'uploads/
       const blob = await put(blobPath, file, {
         access: 'public',
         addRandomSuffix: false, // We already have a unique name
+        token: blobToken,
       });
       
       console.log('✅ Document uploaded to Vercel Blob:', blob.url);
       
       return {
-        fileName,
+        fileName: originalName,
         filePath: blob.url, // Full blob URL for storing in DB
         fileSize: file.size,
       };
@@ -644,7 +660,7 @@ export async function saveUploadedFile(file: File, uploadDir: string = 'uploads/
   try {
     const fullUploadDir = path.join(process.cwd(), 'public', uploadDir);
     await fs.mkdir(fullUploadDir, { recursive: true });
-    const filePath = path.join(fullUploadDir, fileName);
+    const filePath = path.join(fullUploadDir, storageFileName);
 
     // Save file
     const arrayBuffer = await file.arrayBuffer();
@@ -652,8 +668,8 @@ export async function saveUploadedFile(file: File, uploadDir: string = 'uploads/
     await fs.writeFile(filePath, buffer);
 
     return {
-      fileName,
-      filePath: path.join(uploadDir, fileName), // Relative path for storing in DB
+      fileName: originalName,
+      filePath: path.join(uploadDir, storageFileName), // Relative path for storing in DB
       fileSize: file.size,
     };
   } catch (fsError) {

@@ -127,7 +127,7 @@ export async function createReservation(
     
     // When building has config, enforce its minimum (or 3k fallback)
     if (buildingConfig) {
-      const minimumDeposit = buildingConfig.minimumDepositAmount || 3000;
+      const minimumDeposit = buildingConfig.minimumDepositAmount ?? 0;
       if (requiredDeposit < minimumDeposit) {
         requiredDeposit = minimumDeposit;
       }

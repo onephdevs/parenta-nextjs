@@ -8,7 +8,8 @@
     "start": "next start -p 3030",
     "lint": "next lint",
     "clean": "rm -rf .next && echo '✅ Cleared .next cache'",
-    "clear-cache": "rm -rf .next node_modules/.cache && echo '✅ Cleared all caches'"
+    "clear-cache": "rm -rf .next node_modules/.cache && echo '✅ Cleared all caches'",
+    "seed:addresses": "node scripts/seed-address-locations.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

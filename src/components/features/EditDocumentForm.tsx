@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Document, DocumentCategory, DOCUMENT_TYPES } from '@/types/document';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
+import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -13,11 +13,45 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
+import { FileText, Tag, Shield, Calendar, Trash2, Download } from 'lucide-react';
 
 interface EditDocumentFormProps {
   document: Document;
   categories: DocumentCategory[];
 }
+
+type FormSection = 'basic' | 'classification' | 'access' | 'metadata';
+
+const formSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'basic',
+    label: 'Basic Info',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Document Information',
+    subtitle: 'Name and description',
+  },
+  {
+    id: 'classification',
+    label: 'Classification',
+    icon: <Tag className="h-4 w-4" />,
+    title: 'Category & Type',
+    subtitle: 'Document classification',
+  },
+  {
+    id: 'access',
+    label: 'Access',
+    icon: <Shield className="h-4 w-4" />,
+    title: 'Access Control',
+    subtitle: 'Who can access this document',
+  },
+  {
+    id: 'metadata',
+    label: 'Metadata',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'Additional Information',
+    subtitle: 'Tags and expiry date',
+  },
+];
 
 export default function EditDocumentForm({ document, categories }: EditDocumentFormProps) {
   const router = useRouter();
@@ -25,6 +59,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
   const { confirm, dialog } = useAppDialog();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeSection, setActiveSection] = useState<FormSection>('basic');
 
   const [formData, setFormData] = useState({
     documentName: document.documentName,
@@ -261,254 +296,225 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
       (new Date(document.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     ) <= 30;
 
-  return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      {dialog}
-      <div className="mb-8">
-        <div className="flex items-center space-x-4">
-          <Link href="/admin/documents" className="text-gray-900 hover:text-gray-900">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
+  const renderDocumentInfo = () => (
+    <Card className="mb-4">
+      <h3 className="text-md font-medium text-gray-900 mb-4">File Information</h3>
+      
+      <div className="flex items-center space-x-4 mb-4">
+        {getDocumentTypeIcon(document.documentType || 'other')}
+        <div>
+          <p className="text-sm font-medium text-gray-900">{document.fileName}</p>
+          <p className="text-sm text-gray-500">
+            {document.fileSize ? formatFileSize(document.fileSize) : 'Unknown size'}
+          </p>
+        </div>
+      </div>
+
+      <dl className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <dt className="text-gray-500">Type:</dt>
+          <dd className="text-gray-900">{document.mimeType || 'Unknown'}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-gray-500">Version:</dt>
+          <dd className="text-gray-900">v{document.versionNumber}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-gray-500">Uploaded:</dt>
+          <dd className="text-gray-900">{formatDate(document.createdAt)}</dd>
+        </div>
+        {document.uploaderName && (
+          <div className="flex justify-between">
+            <dt className="text-gray-500">By:</dt>
+            <dd className="text-gray-900">{document.uploaderName}</dd>
+          </div>
+        )}
+        {document.expiryDate && (
+          <div className="flex justify-between">
+            <dt className="text-gray-500">Status:</dt>
+            <dd className={`${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-yellow-600' : 'text-green-600'}`}>
+              {isExpired ? 'Expired' : isExpiringSoon ? 'Expiring Soon' : 'Valid'}
+            </dd>
+          </div>
+        )}
+      </dl>
+
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => window.open(`/uploads/documents/${document.fileName}`, '_blank')}
+          leftIcon={<Download className="h-4 w-4" />}
+        >
+          Download File
+        </Button>
+      </div>
+    </Card>
+  );
+
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'basic':
+        return (
+          <div className="space-y-6">
+            {renderDocumentInfo()}
+            
+            <FormField label="Document Name" htmlFor="documentName" required>
+              <Input
+                type="text"
+                id="documentName"
+                name="documentName"
+                required
+                value={formData.documentName}
+                onChange={handleInputChange}
               />
-            </svg>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Document</h1>
-        </div>
-      </div>
+            </FormField>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <Card>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Document Info</h2>
+            <FormField label="Description" htmlFor="description">
+              <Textarea
+                id="description"
+                name="description"
+                rows={4}
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Brief description of the document..."
+              />
+            </FormField>
+          </div>
+        );
 
-            <div className="flex items-center space-x-4 mb-4">
-              {getDocumentTypeIcon(document.documentType || 'other')}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900">{document.fileName}</h3>
-                <p className="text-sm text-gray-900">
-                  {document.fileSize ? formatFileSize(document.fileSize) : 'Unknown size'}
-                </p>
-              </div>
-            </div>
-
-            <dl className="space-y-3">
-              <div>
-                <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  MIME Type
-                </dt>
-                <dd className="text-sm text-gray-900">{document.mimeType || 'Unknown'}</dd>
-              </div>
-
-              <div>
-                <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Version
-                </dt>
-                <dd className="text-sm text-gray-900">v{document.versionNumber}</dd>
-              </div>
-
-              <div>
-                <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">
-                  Uploaded
-                </dt>
-                <dd className="text-sm text-gray-900">{formatDate(document.createdAt)}</dd>
-              </div>
-
-              {document.uploaderName && (
-                <div>
-                  <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Uploaded By
-                  </dt>
-                  <dd className="text-sm text-gray-900">{document.uploaderName}</dd>
-                </div>
-              )}
-
-              {document.expiryDate && (
-                <div>
-                  <dt className="text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Expiry Status
-                  </dt>
-                  <dd
-                    className={`text-sm ${
-                      isExpired ? 'text-red-600' : isExpiringSoon ? 'text-yellow-600' : 'text-green-600'
-                    }`}
-                  >
-                    {isExpired ? 'Expired' : isExpiringSoon ? 'Expiring Soon' : 'Valid'}
-                  </dd>
-                </div>
-              )}
-            </dl>
-
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => window.open(`/uploads/documents/${document.fileName}`, '_blank')}
-                leftIcon={
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                }
+      case 'classification':
+        return (
+          <div className="space-y-6">
+            <FormField label="Category" htmlFor="categoryId">
+              <Select
+                id="categoryId"
+                name="categoryId"
+                value={formData.categoryId}
+                onChange={handleInputChange}
               >
-                Download File
-              </Button>
-            </div>
-          </Card>
-        </div>
+                <option value="">No category</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-        <div className="lg:col-span-2">
-          <Card>
-            <form onSubmit={handleSubmit} className="text-gray-900">
-              <h2 className="text-lg font-medium text-gray-900 mb-6">Document Details</h2>
+            <FormField label="Document Type" htmlFor="documentType">
+              <Select
+                id="documentType"
+                name="documentType"
+                value={formData.documentType}
+                onChange={handleInputChange}
+              >
+                <option value="">No type specified</option>
+                {DOCUMENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+        );
 
-              <div className="grid grid-cols-1 gap-6">
-                <FormField label="Document Name" htmlFor="documentName" required>
-                  <Input
-                    type="text"
-                    id="documentName"
-                    name="documentName"
-                    required
-                    value={formData.documentName}
-                    onChange={handleInputChange}
-                  />
-                </FormField>
+      case 'access':
+        return (
+          <div className="space-y-6">
+            <FormField label="Access Level" htmlFor="accessLevel">
+              <Select
+                id="accessLevel"
+                name="accessLevel"
+                value={formData.accessLevel}
+                onChange={handleInputChange}
+              >
+                <option value="admin">Admin Only</option>
+                <option value="tenant">Tenant Access</option>
+                <option value="public">Public</option>
+              </Select>
+            </FormField>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField label="Category" htmlFor="categoryId">
-                    <Select
-                      id="categoryId"
-                      name="categoryId"
-                      value={formData.categoryId}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">No category</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
+            <Checkbox
+              id="isPublic"
+              name="isPublic"
+              checked={formData.isPublic}
+              onChange={handleInputChange}
+              label="Make document publicly accessible"
+            />
+          </div>
+        );
 
-                  <FormField label="Document Type" htmlFor="documentType">
-                    <Select
-                      id="documentType"
-                      name="documentType"
-                      value={formData.documentType}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">No type specified</option>
-                      {DOCUMENT_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-                </div>
+      case 'metadata':
+        return (
+          <div className="space-y-6">
+            <FormField label="Tags (comma-separated)" htmlFor="tags">
+              <Input
+                type="text"
+                id="tags"
+                name="tags"
+                value={formData.tags}
+                onChange={handleInputChange}
+                placeholder="contract, lease, important..."
+              />
+            </FormField>
 
-                <FormField label="Description" htmlFor="description">
-                  <Textarea
-                    id="description"
-                    name="description"
-                    rows={4}
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    placeholder="Brief description of the document..."
-                  />
-                </FormField>
+            <FormField label="Expiry Date" htmlFor="expiryDate">
+              <Input
+                type="date"
+                id="expiryDate"
+                name="expiryDate"
+                value={formData.expiryDate}
+                onChange={handleInputChange}
+                min="2000-01-01"
+                max="2099-12-31"
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+          </div>
+        );
 
-                <FormField label="Tags (comma-separated)" htmlFor="tags">
-                  <Input
-                    type="text"
-                    id="tags"
-                    name="tags"
-                    value={formData.tags}
-                    onChange={handleInputChange}
-                    placeholder="contract, lease, important..."
-                  />
-                </FormField>
+      default:
+        return null;
+    }
+  };
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField label="Access Level" htmlFor="accessLevel">
-                    <Select
-                      id="accessLevel"
-                      name="accessLevel"
-                      value={formData.accessLevel}
-                      onChange={handleInputChange}
-                    >
-                      <option value="admin">Admin Only</option>
-                      <option value="tenant">Tenant Access</option>
-                      <option value="public">Public</option>
-                    </Select>
-                  </FormField>
-
-                  <FormField label="Expiry Date" htmlFor="expiryDate">
-                    <Input
-                      type="date"
-                      id="expiryDate"
-                      name="expiryDate"
-                      value={formData.expiryDate}
-                      onChange={handleInputChange}
-                      min="2000-01-01"
-                      max="2099-12-31"
-                      style={{ colorScheme: 'light' }}
-                    />
-                  </FormField>
-                </div>
-
-                <Checkbox
-                  id="isPublic"
-                  name="isPublic"
-                  checked={formData.isPublic}
-                  onChange={handleInputChange}
-                  label="Make document publicly accessible"
-                />
-              </div>
-
-              <div className="mt-8 flex justify-between items-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-red-300 text-red-700 hover:bg-red-50"
-                  onClick={handleDelete}
-                  isLoading={isDeleting}
-                  isDisabled={isSubmitting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Document'}
-                </Button>
-
-                <div className="flex space-x-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push('/admin/documents')}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    isLoading={isSubmitting}
-                    isDisabled={isDeleting}
-                  >
-                    {isSubmitting ? 'Updating...' : 'Update Document'}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </Card>
-        </div>
-      </div>
-    </div>
+  return (
+    <>
+      {dialog}
+      <SectionedFormShell
+        mode="page"
+        onCancel={() => router.push('/admin/documents')}
+        eyebrow="Edit Document"
+        entityLabel={document.documentName}
+        sections={formSections}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        primaryLabel="Update Document"
+        primaryLoading={isSubmitting}
+        primaryDisabled={isDeleting}
+        formId="edit-document-form"
+        navFooter={
+          <Button
+            type="button"
+            variant="danger"
+            leftIcon={<Trash2 className="h-4 w-4" />}
+            onClick={handleDelete}
+            isLoading={isDeleting}
+            isDisabled={isSubmitting}
+            className="w-full"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Document'}
+          </Button>
+        }
+      >
+        <form id="edit-document-form" onSubmit={handleSubmit} className="space-y-6">
+          {renderSectionContent()}
+        </form>
+      </SectionedFormShell>
+    </>
   );
 }

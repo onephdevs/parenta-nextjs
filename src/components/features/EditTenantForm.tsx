@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { User, Heart, Briefcase, MapPin, FileText, Trash2, Camera } from 'lucide-react';
 import { TenantWithAssignments } from '@/lib/api/tenants';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import SectionedFormShell, { SectionedFormSection, SectionCard } from '@/components/ui/SectionedFormShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -21,6 +23,53 @@ interface EditTenantFormProps {
   /** When set (e.g. from lease detail), Cancel returns here instead of tenant profile. */
   returnTo?: string | null;
 }
+
+type SectionId = 'personal' | 'emergency' | 'employment' | 'lease' | 'notes' | 'documents';
+
+const SECTIONS: SectionedFormSection<SectionId>[] = [
+  {
+    id: 'personal',
+    label: 'Personal Info',
+    icon: <User className="h-4 w-4" />,
+    title: 'Personal Information',
+    subtitle: 'Basic tenant details and profile',
+  },
+  {
+    id: 'emergency',
+    label: 'Emergency Contact',
+    icon: <Heart className="h-4 w-4" />,
+    title: 'Emergency Contact',
+    subtitle: 'Contact person in case of emergencies',
+  },
+  {
+    id: 'employment',
+    label: 'Employment',
+    icon: <Briefcase className="h-4 w-4" />,
+    title: 'Employment & Financial',
+    subtitle: 'Work and income information',
+  },
+  {
+    id: 'lease',
+    label: 'Lease Info',
+    icon: <MapPin className="h-4 w-4" />,
+    title: 'Lease Information',
+    subtitle: 'Lease dates and move-in details',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional Information',
+    subtitle: 'Optional notes and comments',
+  },
+  {
+    id: 'documents',
+    label: 'Documents',
+    icon: <Camera className="h-4 w-4" />,
+    title: 'Profile & Documents',
+    subtitle: 'Profile picture and tenant agreement',
+  },
+];
 
 interface TenantFormData {
   firstName: string;
@@ -108,6 +157,7 @@ export function EditTenantForm({ tenant, returnTo }: EditTenantFormProps) {
   const { currencySymbol } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeSection, setActiveSection] = useState<SectionId>('personal');
 
   const goBack = () => {
     if (returnTo) {
@@ -411,489 +461,479 @@ export function EditTenantForm({ tenant, returnTo }: EditTenantFormProps) {
     });
   };
 
+  const navFooter = (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={handleDelete}
+      isLoading={isDeleting}
+      isDisabled={loading}
+      className="w-full border-red-300 text-red-700 hover:bg-red-50"
+    >
+      <Trash2 className="mr-2 h-4 w-4" />
+      Delete Tenant
+    </Button>
+  );
+
   return (
-    <Card padding="none">
+    <div className="text-gray-900">
       {dialog}
-      <form onSubmit={handleSubmit} className="p-6 space-y-6 text-gray-900">
-        {/* Current Room Assignment */}
-        {tenant.currentAssignment && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-3">
-              Current Room Assignment
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-900">
-                  <span className="font-medium">Room:</span>{' '}
-                  <span className="font-semibold">Room {tenant.currentAssignment.roomNumber}</span>
-                </p>
-                <p className="text-sm text-gray-900">
-                  <span className="font-medium">Building:</span> {tenant.currentAssignment.buildingName}
-                </p>
-                <p className="text-sm text-gray-900">
-                  <span className="font-medium">Monthly Rate:</span> {formatCurrency(tenant.currentAssignment.monthlyRate)}
-                </p>
-                <p className="text-sm text-gray-900">
-                  <span className="font-medium">Since:</span> {formatDate(tenant.currentAssignment.startDate)}
-                </p>
-              </div>
-              {(tenant.currentAssignment.depositPaid || tenant.currentAssignment.advancePaid || tenant.currentAssignment.utilityDepositPaid) && (
-                <div>
-                  <p className="text-sm font-medium text-gray-900 mb-2">Deposits & Advance:</p>
-                  {tenant.currentAssignment.depositPaid && (
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">Deposit:</span> {formatCurrency(tenant.currentAssignment.depositPaid)}
-                      {tenant.currentAssignment.depositValidUntil && (
-                        <span className="text-xs text-gray-900 ml-2">
-                          (Valid until: {formatDate(tenant.currentAssignment.depositValidUntil)})
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {tenant.currentAssignment.advancePaid && (
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">Advance:</span> {formatCurrency(tenant.currentAssignment.advancePaid)}
-                    </p>
-                  )}
-                  {tenant.currentAssignment.utilityDepositPaid && (
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">Utility Deposit:</span> {formatCurrency(tenant.currentAssignment.utilityDepositPaid)}
-                    </p>
-                  )}
+      <SectionedFormShell
+        mode="page"
+        eyebrow="Edit tenant"
+        entityLabel={`${tenant.firstName} ${tenant.lastName}`}
+        sections={SECTIONS}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        navFooter={navFooter}
+        onCancel={goBack}
+        primaryLabel="Update Tenant"
+        primaryLoading={loading}
+        primaryType="submit"
+        formId="edit-tenant-form"
+      >
+        <form id="edit-tenant-form" onSubmit={handleSubmit} className="space-y-6" noValidate>
+          {activeSection === 'personal' && (
+            <>
+              {/* Current Room Assignment */}
+              {tenant.currentAssignment && (
+                <SectionCard title="Current Room Assignment">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">Room:</span>{' '}
+                        <span className="font-semibold">Room {tenant.currentAssignment.roomNumber}</span>
+                      </p>
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">Building:</span> {tenant.currentAssignment.buildingName}
+                      </p>
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">Monthly Rate:</span> {formatCurrency(tenant.currentAssignment.monthlyRate)}
+                      </p>
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">Since:</span> {formatDate(tenant.currentAssignment.startDate)}
+                      </p>
+                    </div>
+                    {(tenant.currentAssignment.depositPaid || tenant.currentAssignment.advancePaid || tenant.currentAssignment.utilityDepositPaid) && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 mb-2">Deposits & Advance:</p>
+                        {tenant.currentAssignment.depositPaid && (
+                          <p className="text-sm text-gray-900">
+                            <span className="font-medium">Deposit:</span> {formatCurrency(tenant.currentAssignment.depositPaid)}
+                            {tenant.currentAssignment.depositValidUntil && (
+                              <span className="text-xs text-gray-900 ml-2">
+                                (Valid until: {formatDate(tenant.currentAssignment.depositValidUntil)})
+                              </span>
+                            )}
+                          </p>
+                        )}
+                        {tenant.currentAssignment.advancePaid && (
+                          <p className="text-sm text-gray-900">
+                            <span className="font-medium">Advance:</span> {formatCurrency(tenant.currentAssignment.advancePaid)}
+                          </p>
+                        )}
+                        {tenant.currentAssignment.utilityDepositPaid && (
+                          <p className="text-sm text-gray-900">
+                            <span className="font-medium">Utility Deposit:</span> {formatCurrency(tenant.currentAssignment.utilityDepositPaid)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-green-200 flex items-center gap-4">
+                    {tenant.currentAssignment.roomId && (
+                      <>
+                        <Link
+                          href={`/admin/rooms/${tenant.currentAssignment.roomId}`}
+                          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                        >
+                          View Room Details →
+                        </Link>
+                        <span className="text-gray-400">|</span>
+                        <Link
+                          href={`/admin/rooms/${tenant.currentAssignment.roomId}#tenant-management`}
+                          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                        >
+                          Change Room Assignment →
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </SectionCard>
+              )}
+
+              <SectionCard title="Basic Information">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <FormField label="First Name" htmlFor="firstName" required error={errors.firstName}>
+                    <Input
+                      type="text"
+                      name="firstName"
+                      id="firstName"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      isInvalid={Boolean(errors.firstName)}
+                      required
+                    />
+                  </FormField>
+
+                  <FormField label="Last Name" htmlFor="lastName" required error={errors.lastName}>
+                    <Input
+                      type="text"
+                      name="lastName"
+                      id="lastName"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      isInvalid={Boolean(errors.lastName)}
+                      required
+                    />
+                  </FormField>
+
+                  <FormField label="Email" htmlFor="email" required error={errors.email}>
+                    <Input
+                      type="email"
+                      name="email"
+                      id="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      isInvalid={Boolean(errors.email)}
+                      required
+                    />
+                  </FormField>
+
+                  <FormField label="Phone" htmlFor="phone" error={errors.phone}>
+                    <Input
+                      type="tel"
+                      name="phone"
+                      id="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      isInvalid={Boolean(errors.phone)}
+                    />
+                  </FormField>
+
+                  <FormField label="Date of Birth" htmlFor="dateOfBirth">
+                    <Input
+                      type="date"
+                      name="dateOfBirth"
+                      id="dateOfBirth"
+                      value={formData.dateOfBirth}
+                      onChange={handleInputChange}
+                      min="1900-01-01"
+                      max={new Date().toISOString().split('T')[0]}
+                      style={{ colorScheme: 'light' }}
+                    />
+                  </FormField>
+
+                  <FormField label="Status" htmlFor="tenantStatus">
+                    <Select
+                      name="tenantStatus"
+                      id="tenantStatus"
+                      value={formData.tenantStatus}
+                      onChange={handleInputChange}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="terminated">Terminated</option>
+                    </Select>
+                  </FormField>
                 </div>
-              )}
-            </div>
-            <div className="mt-4 pt-4 border-t border-green-200 flex items-center gap-4">
-              {tenant.currentAssignment.roomId && (
-                <>
-                  <Link
-                    href={`/admin/rooms/${tenant.currentAssignment.roomId}`}
-                    className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+
+                <FormField label="Previous Address" htmlFor="previousAddress" className="mt-6">
+                  <Textarea
+                    name="previousAddress"
+                    id="previousAddress"
+                    rows={4}
+                    value={formData.previousAddress}
+                    onChange={handleInputChange}
+                  />
+                </FormField>
+              </SectionCard>
+            </>
+          )}
+
+          {activeSection === 'emergency' && (
+            <SectionCard title="Emergency Contact">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                <FormField label="Name" htmlFor="emergencyContactName">
+                  <Input
+                    type="text"
+                    name="emergencyContactName"
+                    id="emergencyContactName"
+                    value={formData.emergencyContactName}
+                    onChange={handleInputChange}
+                  />
+                </FormField>
+
+                <FormField label="Phone" htmlFor="emergencyContactPhone" error={errors.emergencyContactPhone}>
+                  <Input
+                    type="tel"
+                    name="emergencyContactPhone"
+                    id="emergencyContactPhone"
+                    value={formData.emergencyContactPhone}
+                    onChange={handleInputChange}
+                    isInvalid={Boolean(errors.emergencyContactPhone)}
+                  />
+                </FormField>
+
+                <FormField label="Relationship" htmlFor="emergencyContactRelationship">
+                  <Input
+                    type="text"
+                    name="emergencyContactRelationship"
+                    id="emergencyContactRelationship"
+                    value={formData.emergencyContactRelationship}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Parent, Sibling, Friend"
+                  />
+                </FormField>
+              </div>
+            </SectionCard>
+          )}
+
+          {activeSection === 'employment' && (
+            <SectionCard title="Employment & Financial Information">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <FormField label="Employment Status" htmlFor="employmentStatus">
+                  <Select
+                    name="employmentStatus"
+                    id="employmentStatus"
+                    value={formData.employmentStatus}
+                    onChange={handleInputChange}
                   >
-                    View Room Details →
-                  </Link>
-                  <span className="text-gray-400">|</span>
-                  <Link
-                    href={`/admin/rooms/${tenant.currentAssignment.roomId}#tenant-management`}
-                    className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    <option value="employed">Employed</option>
+                    <option value="unemployed">Unemployed</option>
+                    <option value="student">Student</option>
+                    <option value="retired">Retired</option>
+                    <option value="other">Other</option>
+                  </Select>
+                </FormField>
+
+                <FormField label="Employer Name" htmlFor="employerName">
+                  <Input
+                    type="text"
+                    name="employerName"
+                    id="employerName"
+                    value={formData.employerName}
+                    onChange={handleInputChange}
+                  />
+                </FormField>
+
+                <FormField label="Monthly Income (₱)" htmlFor="monthlyIncome" error={errors.monthlyIncome}>
+                  <Input
+                    type="number"
+                    name="monthlyIncome"
+                    id="monthlyIncome"
+                    min={0}
+                    step={0.01}
+                    value={formData.monthlyIncome ?? ''}
+                    onChange={handleInputChange}
+                    isInvalid={Boolean(errors.monthlyIncome)}
+                  />
+                </FormField>
+
+                <FormField label={`Deposit (${currencySymbol})`} htmlFor="securityDeposit" error={errors.securityDeposit}>
+                  <Input
+                    type="number"
+                    name="securityDeposit"
+                    id="securityDeposit"
+                    min={0}
+                    step={0.01}
+                    value={formData.securityDeposit}
+                    onChange={handleInputChange}
+                    isInvalid={Boolean(errors.securityDeposit)}
+                  />
+                </FormField>
+              </div>
+            </SectionCard>
+          )}
+
+          {activeSection === 'lease' && (
+            <SectionCard title="Lease Information">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <FormField label="Lease Start Date" htmlFor="leaseStartDate">
+                  <Input
+                    type="date"
+                    name="leaseStartDate"
+                    id="leaseStartDate"
+                    value={formData.leaseStartDate}
+                    onChange={handleInputChange}
+                    min="2000-01-01"
+                    max="2099-12-31"
+                    style={{ colorScheme: 'light' }}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Lease Duration"
+                  htmlFor="leaseDurationMonths"
+                  hint="Choose a preset, Custom (enter months below), or Open-ended"
+                >
+                  <Select
+                    name="leaseDurationMonths"
+                    id="leaseDurationMonths"
+                    value={formData.leaseDurationMonths}
+                    onChange={handleInputChange}
                   >
-                    Change Room Assignment →
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+                    {LEASE_DURATION_PRESETS.map((months) => (
+                      <option key={months} value={months}>
+                        {months} month{months !== 1 ? 's' : ''}
+                      </option>
+                    ))}
+                    <option value="0">Custom</option>
+                    <option value="-1">Open-ended</option>
+                  </Select>
+                </FormField>
 
-        {/* Personal Information */}
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Personal Information
-          </h3>
+                {isCustomDuration && (
+                  <FormField
+                    label="Custom Duration (months)"
+                    htmlFor="customLeaseMonths"
+                    required
+                    error={errors.customLeaseMonths}
+                    hint="Enter how many months this lease should run"
+                  >
+                    <Input
+                      type="number"
+                      name="customLeaseMonths"
+                      id="customLeaseMonths"
+                      min={1}
+                      step={1}
+                      value={formData.customLeaseMonths ?? ''}
+                      onChange={handleInputChange}
+                      isInvalid={Boolean(errors.customLeaseMonths)}
+                      placeholder="e.g., 9"
+                    />
+                  </FormField>
+                )}
 
-          {/* Profile Picture Upload */}
-          <div className="mb-6">
-            <ProfilePictureUpload
-              tenantId={tenant.id}
-              currentPictureUrl={(tenant as any).profilePictureUrl}
-              onUploadComplete={() => {
-                // Refresh page to show new picture
-                window.location.reload();
-              }}
-              onDeleteComplete={() => {
-                // Refresh page to remove picture
-                window.location.reload();
-              }}
-              size="md"
-            />
-          </div>
-          
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <FormField label="First Name" htmlFor="firstName" required error={errors.firstName}>
-              <Input
-                type="text"
-                name="firstName"
-                id="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.firstName)}
-                required
-              />
-            </FormField>
+                <FormField
+                  label="Lease End Date"
+                  htmlFor="leaseEndDate"
+                  hint={
+                    isOpenEndedLease
+                      ? 'Open-ended — no end date'
+                      : leaseEndDateLocked && formData.leaseEndDate
+                        ? `Auto-set for ${effectiveLeaseMonths} month${
+                            effectiveLeaseMonths !== 1 ? 's' : ''
+                          } from start`
+                        : undefined
+                  }
+                >
+                  <Input
+                    type="date"
+                    name="leaseEndDate"
+                    id="leaseEndDate"
+                    value={formData.leaseEndDate}
+                    onChange={handleInputChange}
+                    min={formData.leaseStartDate || '2000-01-01'}
+                    max="2099-12-31"
+                    isDisabled={leaseEndDateLocked || isOpenEndedLease}
+                    className={
+                      leaseEndDateLocked || isOpenEndedLease
+                        ? 'bg-gray-100 text-gray-600 border-gray-200'
+                        : undefined
+                    }
+                    style={{ colorScheme: 'light' }}
+                  />
+                </FormField>
 
-            <FormField label="Last Name" htmlFor="lastName" required error={errors.lastName}>
-              <Input
-                type="text"
-                name="lastName"
-                id="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.lastName)}
-                required
-              />
-            </FormField>
+                <FormField
+                  label="Move-in Date"
+                  htmlFor="moveInDate"
+                  error={errors.moveInDate}
+                  hint={
+                    formData.leaseStartDate
+                      ? isOpenEndedLease
+                        ? 'From lease start onward'
+                        : formData.leaseEndDate
+                          ? 'Between lease start and end date'
+                          : 'On or after lease start date'
+                      : undefined
+                  }
+                >
+                  <Input
+                    type="date"
+                    name="moveInDate"
+                    id="moveInDate"
+                    value={formData.moveInDate}
+                    onChange={handleInputChange}
+                    min={formData.leaseStartDate || '2000-01-01'}
+                    max={
+                      isOpenEndedLease
+                        ? '2099-12-31'
+                        : formData.leaseEndDate || '2099-12-31'
+                    }
+                    isInvalid={Boolean(errors.moveInDate)}
+                    style={{ colorScheme: 'light' }}
+                  />
+                </FormField>
 
-            <FormField label="Email" htmlFor="email" required error={errors.email}>
-              <Input
-                type="email"
-                name="email"
-                id="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.email)}
-                required
-              />
-            </FormField>
+                <FormField label="Move-out Date" htmlFor="moveOutDate">
+                  <Input
+                    type="date"
+                    name="moveOutDate"
+                    id="moveOutDate"
+                    value={formData.moveOutDate}
+                    onChange={handleInputChange}
+                    min={formData.moveInDate || '2000-01-01'}
+                    max="2099-12-31"
+                    style={{ colorScheme: 'light' }}
+                  />
+                </FormField>
+              </div>
+            </SectionCard>
+          )}
 
-            <FormField label="Phone" htmlFor="phone" error={errors.phone}>
-              <Input
-                type="tel"
-                name="phone"
-                id="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.phone)}
-              />
-            </FormField>
-
-            <FormField label="Date of Birth" htmlFor="dateOfBirth">
-              <Input
-                type="date"
-                name="dateOfBirth"
-                id="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleInputChange}
-                min="1900-01-01"
-                max={new Date().toISOString().split('T')[0]}
-                style={{ colorScheme: 'light' }}
-              />
-            </FormField>
-
-            <FormField label="Status" htmlFor="tenantStatus">
-              <Select
-                name="tenantStatus"
-                id="tenantStatus"
-                value={formData.tenantStatus}
-                onChange={handleInputChange}
-              >
-                <option value="pending">Pending</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="terminated">Terminated</option>
-              </Select>
-            </FormField>
-          </div>
-
-          <FormField label="Previous Address" htmlFor="previousAddress" className="mt-6">
-            <Textarea
-              name="previousAddress"
-              id="previousAddress"
-              rows={4}
-              value={formData.previousAddress}
-              onChange={handleInputChange}
-            />
-          </FormField>
-        </div>
-
-        {/* Emergency Contact */}
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Emergency Contact
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <FormField label="Name" htmlFor="emergencyContactName">
-              <Input
-                type="text"
-                name="emergencyContactName"
-                id="emergencyContactName"
-                value={formData.emergencyContactName}
-                onChange={handleInputChange}
-              />
-            </FormField>
-
-            <FormField label="Phone" htmlFor="emergencyContactPhone" error={errors.emergencyContactPhone}>
-              <Input
-                type="tel"
-                name="emergencyContactPhone"
-                id="emergencyContactPhone"
-                value={formData.emergencyContactPhone}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.emergencyContactPhone)}
-              />
-            </FormField>
-
-            <FormField label="Relationship" htmlFor="emergencyContactRelationship">
-              <Input
-                type="text"
-                name="emergencyContactRelationship"
-                id="emergencyContactRelationship"
-                value={formData.emergencyContactRelationship}
-                onChange={handleInputChange}
-                placeholder="e.g., Parent, Sibling, Friend"
-              />
-            </FormField>
-          </div>
-        </div>
-
-        {/* Employment & Financial */}
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Employment & Financial Information
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <FormField label="Employment Status" htmlFor="employmentStatus">
-              <Select
-                name="employmentStatus"
-                id="employmentStatus"
-                value={formData.employmentStatus}
-                onChange={handleInputChange}
-              >
-                <option value="employed">Employed</option>
-                <option value="unemployed">Unemployed</option>
-                <option value="student">Student</option>
-                <option value="retired">Retired</option>
-                <option value="other">Other</option>
-              </Select>
-            </FormField>
-
-            <FormField label="Employer Name" htmlFor="employerName">
-              <Input
-                type="text"
-                name="employerName"
-                id="employerName"
-                value={formData.employerName}
-                onChange={handleInputChange}
-              />
-            </FormField>
-
-            <FormField label="Monthly Income (₱)" htmlFor="monthlyIncome" error={errors.monthlyIncome}>
-              <Input
-                type="number"
-                name="monthlyIncome"
-                id="monthlyIncome"
-                min={0}
-                step={0.01}
-                value={formData.monthlyIncome ?? ''}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.monthlyIncome)}
-              />
-            </FormField>
-
-            <FormField label={`Deposit (${currencySymbol})`} htmlFor="securityDeposit" error={errors.securityDeposit}>
-              <Input
-                type="number"
-                name="securityDeposit"
-                id="securityDeposit"
-                min={0}
-                step={0.01}
-                value={formData.securityDeposit}
-                onChange={handleInputChange}
-                isInvalid={Boolean(errors.securityDeposit)}
-              />
-            </FormField>
-          </div>
-        </div>
-
-        {/* Lease Information */}
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Lease Information
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <FormField label="Lease Start Date" htmlFor="leaseStartDate">
-              <Input
-                type="date"
-                name="leaseStartDate"
-                id="leaseStartDate"
-                value={formData.leaseStartDate}
-                onChange={handleInputChange}
-                min="2000-01-01"
-                max="2099-12-31"
-                style={{ colorScheme: 'light' }}
-              />
-            </FormField>
-
-            <FormField
-              label="Lease Duration"
-              htmlFor="leaseDurationMonths"
-              hint="Choose a preset, Custom (enter months below), or Open-ended"
-            >
-              <Select
-                name="leaseDurationMonths"
-                id="leaseDurationMonths"
-                value={formData.leaseDurationMonths}
-                onChange={handleInputChange}
-              >
-                {LEASE_DURATION_PRESETS.map((months) => (
-                  <option key={months} value={months}>
-                    {months} month{months !== 1 ? 's' : ''}
-                  </option>
-                ))}
-                <option value="0">Custom</option>
-                <option value="-1">Open-ended</option>
-              </Select>
-            </FormField>
-
-            {isCustomDuration && (
-              <FormField
-                label="Custom Duration (months)"
-                htmlFor="customLeaseMonths"
-                required
-                error={errors.customLeaseMonths}
-                hint="Enter how many months this lease should run"
-              >
-                <Input
-                  type="number"
-                  name="customLeaseMonths"
-                  id="customLeaseMonths"
-                  min={1}
-                  step={1}
-                  value={formData.customLeaseMonths ?? ''}
+          {activeSection === 'notes' && (
+            <SectionCard title="Notes">
+              <FormField label="Notes" htmlFor="notes">
+                <Textarea
+                  name="notes"
+                  id="notes"
+                  rows={4}
+                  value={formData.notes}
                   onChange={handleInputChange}
-                  isInvalid={Boolean(errors.customLeaseMonths)}
-                  placeholder="e.g., 9"
+                  placeholder="Additional notes about the tenant..."
                 />
               </FormField>
-            )}
+            </SectionCard>
+          )}
 
-            <FormField
-              label="Lease End Date"
-              htmlFor="leaseEndDate"
-              hint={
-                isOpenEndedLease
-                  ? 'Open-ended — no end date'
-                  : leaseEndDateLocked && formData.leaseEndDate
-                    ? `Auto-set for ${effectiveLeaseMonths} month${
-                        effectiveLeaseMonths !== 1 ? 's' : ''
-                      } from start`
-                    : undefined
-              }
-            >
-              <Input
-                type="date"
-                name="leaseEndDate"
-                id="leaseEndDate"
-                value={formData.leaseEndDate}
-                onChange={handleInputChange}
-                min={formData.leaseStartDate || '2000-01-01'}
-                max="2099-12-31"
-                isDisabled={leaseEndDateLocked || isOpenEndedLease}
-                className={
-                  leaseEndDateLocked || isOpenEndedLease
-                    ? 'bg-gray-100 text-gray-600 border-gray-200'
-                    : undefined
-                }
-                style={{ colorScheme: 'light' }}
-              />
-            </FormField>
+          {activeSection === 'documents' && (
+            <>
+              <SectionCard title="Profile Picture">
+                <ProfilePictureUpload
+                  tenantId={tenant.id}
+                  currentPictureUrl={(tenant as any).profilePictureUrl}
+                  onUploadComplete={() => {
+                    // Refresh page to show new picture
+                    window.location.reload();
+                  }}
+                  onDeleteComplete={() => {
+                    // Refresh page to remove picture
+                    window.location.reload();
+                  }}
+                  size="md"
+                />
+              </SectionCard>
 
-            <FormField
-              label="Move-in Date"
-              htmlFor="moveInDate"
-              error={errors.moveInDate}
-              hint={
-                formData.leaseStartDate
-                  ? isOpenEndedLease
-                    ? 'From lease start onward'
-                    : formData.leaseEndDate
-                      ? 'Between lease start and end date'
-                      : 'On or after lease start date'
-                  : undefined
-              }
-            >
-              <Input
-                type="date"
-                name="moveInDate"
-                id="moveInDate"
-                value={formData.moveInDate}
-                onChange={handleInputChange}
-                min={formData.leaseStartDate || '2000-01-01'}
-                max={
-                  isOpenEndedLease
-                    ? '2099-12-31'
-                    : formData.leaseEndDate || '2099-12-31'
-                }
-                isInvalid={Boolean(errors.moveInDate)}
-                style={{ colorScheme: 'light' }}
-              />
-            </FormField>
-
-            <FormField label="Move-out Date" htmlFor="moveOutDate">
-              <Input
-                type="date"
-                name="moveOutDate"
-                id="moveOutDate"
-                value={formData.moveOutDate}
-                onChange={handleInputChange}
-                min={formData.moveInDate || '2000-01-01'}
-                max="2099-12-31"
-                style={{ colorScheme: 'light' }}
-              />
-            </FormField>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <FormField label="Notes" htmlFor="notes">
-          <Textarea
-            name="notes"
-            id="notes"
-            rows={4}
-            value={formData.notes}
-            onChange={handleInputChange}
-            placeholder="Additional notes about the tenant..."
-          />
-        </FormField>
-
-        {/* Tenant Agreement Document */}
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Tenant Agreement
-          </h3>
-          <DocumentUpload
-            tenantId={tenant.id}
-            currentDocumentUrl={(tenant as any).agreementDocumentUrl}
-            currentDocumentName={(tenant as any).agreementDocumentName}
-            onUploadComplete={() => {
-              window.location.reload();
-            }}
-            onDeleteComplete={() => {
-              window.location.reload();
-            }}
-          />
-        </div>
-
-        {/* Form Actions */}
-        <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleDelete}
-            isLoading={isDeleting}
-            isDisabled={loading}
-            className="border-red-300 text-red-700 hover:bg-red-50"
-          >
-            Delete Tenant
-          </Button>
-
-          <div className="flex space-x-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={goBack}
-              isDisabled={loading || isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={loading} isDisabled={isDeleting}>
-              {loading ? 'Updating...' : 'Update Tenant'}
-            </Button>
-          </div>
-        </div>
-      </form>
-    </Card>
+              <SectionCard title="Tenant Agreement">
+                <DocumentUpload
+                  tenantId={tenant.id}
+                  currentDocumentUrl={(tenant as any).agreementDocumentUrl}
+                  currentDocumentName={(tenant as any).agreementDocumentName}
+                  onUploadComplete={() => {
+                    window.location.reload();
+                  }}
+                  onDeleteComplete={() => {
+                    window.location.reload();
+                  }}
+                />
+              </SectionCard>
+            </>
+          )}
+        </form>
+      </SectionedFormShell>
+    </div>
   );
 } 

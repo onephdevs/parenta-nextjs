@@ -6,12 +6,14 @@ import {
   Home,
   MapPin,
   MoreVertical,
+  Plus,
   Users,
 } from 'lucide-react';
 import type { PropertyBuildingDetail } from '@/lib/api/properties';
 import { getImageUrl } from '@/lib/format/image-url';
 import EditBuildingModal from '@/components/features/EditBuildingModal';
 import DeleteBuildingModal from '@/components/features/DeleteBuildingModal';
+import AddRoomModal from '@/components/features/AddRoomModal';
 import {
   formatBuildingAddress,
   googleMapsUrl,
@@ -24,26 +26,40 @@ interface MainPropertyCardProps {
   detail: PropertyBuildingDetail;
   onBuildingUpdated: () => void;
   onBuildingDeleted: () => void;
+  onRoomAdded?: () => void;
 }
 
 export default function MainPropertyCard({
   detail,
   onBuildingUpdated,
   onBuildingDeleted,
+  onRoomAdded,
 }: MainPropertyCardProps) {
   const { building, buildingImages } = detail;
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addRoomOpen, setAddRoomOpen] = useState(false);
 
   const address = formatBuildingAddress(building);
   const hero = buildingImages[0] ? getImageUrl(buildingImages[0].filePath) : null;
   const mapsHref = googleMapsUrl(address);
+  const roomCount = detail.rooms.length || building.totalUnits || 0;
 
   return (
     <>
       <div style={{ fontFamily: LATO }}>
-        <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Main Property</p>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[16px] font-bold leading-none text-gray-900">Main Property</p>
+          <button
+            type="button"
+            onClick={() => setAddRoomOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#111827] px-3 py-2 text-sm font-medium text-white hover:bg-black"
+          >
+            <Plus className="h-4 w-4" />
+            Add Room
+          </button>
+        </div>
         <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col md:flex-row">
             <div className="relative h-48 w-full flex-shrink-0 bg-gray-100 md:h-auto md:min-h-[200px] md:w-[240px] lg:w-[280px]">
@@ -131,7 +147,7 @@ export default function MainPropertyCard({
               <div className="mt-auto flex flex-wrap items-center gap-5 pt-1 text-[12px] font-normal leading-none text-gray-600">
                 <span className="inline-flex items-center gap-1.5">
                   <Home className="h-4 w-4" style={{ color: TEAL }} />
-                  {building.totalUnits || 0} Rooms
+                  {roomCount} Rooms
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Users className="h-4 w-4" style={{ color: TEAL }} />
@@ -146,8 +162,21 @@ export default function MainPropertyCard({
       <EditBuildingModal
         building={building}
         isOpen={editOpen}
+        onImagesChanged={onBuildingUpdated}
         onClose={() => {
           setEditOpen(false);
+          onBuildingUpdated();
+        }}
+      />
+
+      <AddRoomModal
+        buildingId={building.id}
+        building={building}
+        isOpen={addRoomOpen}
+        onClose={() => setAddRoomOpen(false)}
+        onRoomAdded={() => {
+          setAddRoomOpen(false);
+          onRoomAdded?.();
           onBuildingUpdated();
         }}
       />

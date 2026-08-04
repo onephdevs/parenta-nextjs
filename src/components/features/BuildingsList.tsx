@@ -48,7 +48,7 @@ export default function BuildingsList({ buildings }: BuildingsListProps) {
             <Input
               type="text"
               className="pl-10"
-              placeholder="Search buildings by name, city, or state..."
+              placeholder="Search buildings by name, city, or region..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

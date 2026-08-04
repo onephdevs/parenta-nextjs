@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
         // Check if it's a Vercel Blob URL
         if (filePath && filePath.startsWith('https://') && filePath.includes('blob.vercel-storage.com')) {
           const { del } = await import('@vercel/blob');
-          await del(filePath);
+          await del(filePath, { token: process.env.BLOB_READ_WRITE_TOKEN });
         } else if (filePath) {
           // Local filesystem path
           const fs = await import('fs/promises');

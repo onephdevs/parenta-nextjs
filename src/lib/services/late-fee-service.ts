@@ -306,6 +306,71 @@ export async function applyLateFees(
 }
 
 /**
+ * Apply late fees only for settings with auto_apply enabled.
+ * Optionally scoped to a single tenant (e.g. when they load their balance).
+ */
+export async function applyAutoLateFees(options?: {
+  tenantId?: string;
+  dryRun?: boolean;
+  dbPool?: Pool;
+}): Promise<{
+  success: boolean;
+  fees_applied: number;
+  total_fee_amount: number;
+  applications: LateFeeApplication[];
+  errors: { invoice_id: string; error: string }[];
+}> {
+  const dbPool = options?.dbPool ?? pool;
+  const dryRun = options?.dryRun ?? false;
+
+  let invoicesToProcess = await getOverdueInvoicesForLateFees(dbPool);
+
+  if (options?.tenantId) {
+    invoicesToProcess = invoicesToProcess.filter(
+      (inv) => String(inv.tenant_id) === String(options.tenantId)
+    );
+  }
+
+  if (invoicesToProcess.length === 0) {
+    return {
+      success: true,
+      fees_applied: 0,
+      total_fee_amount: 0,
+      applications: [],
+      errors: [],
+    };
+  }
+
+  const settingIds = [
+    ...new Set(invoicesToProcess.map((i) => String(i.applicable_setting_id)).filter(Boolean)),
+  ];
+
+  const settingsResult = await dbPool.query<{ id: string; auto_apply: boolean }>(
+    `SELECT id, auto_apply FROM late_fee_settings WHERE id = ANY($1::uuid[]) AND is_active = true`,
+    [settingIds]
+  );
+  const autoApplyIds = new Set(
+    settingsResult.rows.filter((s) => s.auto_apply).map((s) => String(s.id))
+  );
+
+  const eligibleIds = invoicesToProcess
+    .filter((inv) => autoApplyIds.has(String(inv.applicable_setting_id)))
+    .map((inv) => String(inv.invoice_id));
+
+  if (eligibleIds.length === 0) {
+    return {
+      success: true,
+      fees_applied: 0,
+      total_fee_amount: 0,
+      applications: [],
+      errors: [],
+    };
+  }
+
+  return applyLateFees(eligibleIds, dryRun, dbPool);
+}
+
+/**
  * Waive a late fee application
  */
 export async function waiveLateFee(

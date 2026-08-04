@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Button } from '@/components/ui/Button';
+import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
+import { Home, Zap, Calendar, DollarSign, Settings, FileText } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -39,6 +39,53 @@ interface RoomUtilityBillFormProps {
   onCancel?: () => void;
 }
 
+type FormSection = 'room' | 'type' | 'period' | 'amount' | 'status' | 'notes';
+
+const formSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'room',
+    label: 'Room',
+    icon: <Home className="h-4 w-4" />,
+    title: 'Room Selection',
+    subtitle: 'Select the room for this bill',
+  },
+  {
+    id: 'type',
+    label: 'Utility Type',
+    icon: <Zap className="h-4 w-4" />,
+    title: 'Utility Information',
+    subtitle: 'Type and provider details',
+  },
+  {
+    id: 'period',
+    label: 'Billing Period',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'Billing Dates',
+    subtitle: 'Billing period and due date',
+  },
+  {
+    id: 'amount',
+    label: 'Amount',
+    icon: <DollarSign className="h-4 w-4" />,
+    title: 'Bill Amount',
+    subtitle: 'Cost and usage details',
+  },
+  {
+    id: 'status',
+    label: 'Status',
+    icon: <Settings className="h-4 w-4" />,
+    title: 'Bill Status',
+    subtitle: 'Payment status and document',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Additional Notes',
+    subtitle: 'Additional information',
+  },
+];
+
 export default function RoomUtilityBillForm({
   initialData,
   onSubmit,
@@ -47,6 +94,7 @@ export default function RoomUtilityBillForm({
   const router = useRouter();
   const { showNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState<FormSection>('room');
   const [rooms, setRooms] = useState<Room[]>([]);
 
   const [formData, setFormData] = useState<RoomUtilityBillFormData>({
@@ -235,267 +283,251 @@ export default function RoomUtilityBillForm({
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
-      <Card padding="none" className="shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="md:grid md:grid-cols-3 md:gap-6">
-            <div className="md:col-span-1">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Room Utility Bill</h3>
-              <p className="mt-1 text-sm text-gray-900">
-                Record electric or water bill for a specific room/apartment.
-              </p>
-            </div>
-            <div className="mt-5 md:mt-0 md:col-span-2">
-              <div className="grid grid-cols-6 gap-6">
-                <div className="col-span-6 sm:col-span-3">
-                  <FormField label="Room/Apartment" htmlFor="roomId" required error={errors.roomId}>
-                    <Select
-                      id="roomId"
-                      name="roomId"
-                      size="lg"
-                      value={formData.roomId}
-                      onChange={(e) => handleInputChange('roomId', e.target.value)}
-                      isInvalid={Boolean(errors.roomId)}
-                    >
-                      <option value="">Select a room</option>
-                      {rooms.map((room) => (
-                        <option key={room.id} value={room.id}>
-                          {room.buildingName} - Room {room.roomNumber}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-                </div>
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'room':
+        return (
+          <FormField label="Room/Apartment" htmlFor="roomId" required error={errors.roomId}>
+            <Select
+              id="roomId"
+              name="roomId"
+              value={formData.roomId}
+              onChange={(e) => handleInputChange('roomId', e.target.value)}
+              isInvalid={Boolean(errors.roomId)}
+            >
+              <option value="">Select a room</option>
+              {rooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.buildingName} - Room {room.roomNumber}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        );
 
-                <div className="col-span-6 sm:col-span-3">
-                  <FormField label="Utility Type" htmlFor="utilityType" required>
-                    <Select
-                      id="utilityType"
-                      name="utilityType"
-                      size="lg"
-                      value={formData.utilityType}
-                      onChange={(e) => {
-                        handleInputChange('utilityType', e.target.value);
-                        if (e.target.value === 'electricity') {
-                          handleInputChange('usageUnit', 'kWh');
-                        } else if (e.target.value === 'water') {
-                          handleInputChange('usageUnit', 'gallons');
-                        }
-                      }}
-                    >
-                      <option value="electricity">⚡ Electricity</option>
-                      <option value="water">💧 Water</option>
-                    </Select>
-                  </FormField>
-                </div>
+      case 'type':
+        return (
+          <div className="space-y-6">
+            <FormField label="Utility Type" htmlFor="utilityType" required>
+              <Select
+                id="utilityType"
+                name="utilityType"
+                value={formData.utilityType}
+                onChange={(e) => {
+                  handleInputChange('utilityType', e.target.value);
+                  if (e.target.value === 'electricity') {
+                    handleInputChange('usageUnit', 'kWh');
+                  } else if (e.target.value === 'water') {
+                    handleInputChange('usageUnit', 'gallons');
+                  }
+                }}
+              >
+                <option value="electricity">⚡ Electricity</option>
+                <option value="water">💧 Water</option>
+              </Select>
+            </FormField>
 
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField label="Amount" htmlFor="amount" required error={errors.amount}>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-900 text-base">
-                        ₱
-                      </span>
-                      <Input
-                        type="number"
-                        id="amount"
-                        name="amount"
-                        size="lg"
-                        className="pl-7"
-                        value={formData.amount}
-                        onChange={(e) => handleInputChange('amount', e.target.value)}
-                        step="0.01"
-                        min={0}
-                        placeholder="0.00"
-                        isInvalid={Boolean(errors.amount)}
-                      />
-                    </div>
-                  </FormField>
-                </div>
+            <FormField
+              label="Provider Name"
+              htmlFor="providerName"
+              required
+              error={errors.providerName}
+            >
+              <Input
+                type="text"
+                id="providerName"
+                name="providerName"
+                value={formData.providerName}
+                onChange={(e) => handleInputChange('providerName', e.target.value)}
+                placeholder="e.g., Meralco, Maynilad"
+                isInvalid={Boolean(errors.providerName)}
+              />
+            </FormField>
 
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField label="Usage Amount" htmlFor="usageAmount">
-                    <Input
-                      type="number"
-                      id="usageAmount"
-                      name="usageAmount"
-                      size="lg"
-                      value={formData.usageAmount}
-                      onChange={(e) => handleInputChange('usageAmount', e.target.value)}
-                      step="0.01"
-                      min={0}
-                      placeholder="0.00"
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField label="Usage Unit" htmlFor="usageUnit">
-                    <Input
-                      type="text"
-                      id="usageUnit"
-                      name="usageUnit"
-                      size="lg"
-                      value={formData.usageUnit}
-                      onChange={(e) => handleInputChange('usageUnit', e.target.value)}
-                      placeholder={formData.utilityType === 'electricity' ? 'kWh' : 'gallons'}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField
-                    label="Billing Period Start"
-                    htmlFor="billingPeriodStart"
-                    required
-                    error={errors.billingPeriodStart}
-                  >
-                    <Input
-                      type="date"
-                      id="billingPeriodStart"
-                      name="billingPeriodStart"
-                      size="lg"
-                      value={formData.billingPeriodStart}
-                      onChange={(e) => handleInputChange('billingPeriodStart', e.target.value)}
-                      min="2000-01-01"
-                      max="2099-12-31"
-                      isInvalid={Boolean(errors.billingPeriodStart)}
-                      style={{ colorScheme: 'light' }}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField
-                    label="Billing Period End"
-                    htmlFor="billingPeriodEnd"
-                    required
-                    error={errors.billingPeriodEnd}
-                  >
-                    <Input
-                      type="date"
-                      id="billingPeriodEnd"
-                      name="billingPeriodEnd"
-                      size="lg"
-                      value={formData.billingPeriodEnd}
-                      onChange={(e) => handleInputChange('billingPeriodEnd', e.target.value)}
-                      min={formData.billingPeriodStart || '2000-01-01'}
-                      max="2099-12-31"
-                      isInvalid={Boolean(errors.billingPeriodEnd)}
-                      style={{ colorScheme: 'light' }}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField label="Due Date" htmlFor="dueDate" required error={errors.dueDate}>
-                    <Input
-                      type="date"
-                      id="dueDate"
-                      name="dueDate"
-                      size="lg"
-                      value={formData.dueDate}
-                      onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                      min={formData.billingPeriodEnd || '2000-01-01'}
-                      max="2099-12-31"
-                      isInvalid={Boolean(errors.dueDate)}
-                      style={{ colorScheme: 'light' }}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-3">
-                  <FormField
-                    label="Provider Name"
-                    htmlFor="providerName"
-                    required
-                    error={errors.providerName}
-                  >
-                    <Input
-                      type="text"
-                      id="providerName"
-                      name="providerName"
-                      size="lg"
-                      value={formData.providerName}
-                      onChange={(e) => handleInputChange('providerName', e.target.value)}
-                      placeholder="e.g., Meralco, Maynilad"
-                      isInvalid={Boolean(errors.providerName)}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-3">
-                  <FormField label="Account Number" htmlFor="providerAccountNumber">
-                    <Input
-                      type="text"
-                      id="providerAccountNumber"
-                      name="providerAccountNumber"
-                      size="lg"
-                      value={formData.providerAccountNumber}
-                      onChange={(e) => handleInputChange('providerAccountNumber', e.target.value)}
-                      placeholder="Provider account number"
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-2">
-                  <FormField label="Bill Status" htmlFor="billStatus">
-                    <Select
-                      id="billStatus"
-                      name="billStatus"
-                      size="lg"
-                      value={formData.billStatus}
-                      onChange={(e) => handleInputChange('billStatus', e.target.value)}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="overdue">Overdue</option>
-                      <option value="disputed">Disputed</option>
-                    </Select>
-                  </FormField>
-                </div>
-
-                <div className="col-span-6 sm:col-span-4">
-                  <FormField label="Bill Document URL" htmlFor="billUrl">
-                    <Input
-                      type="url"
-                      id="billUrl"
-                      name="billUrl"
-                      size="lg"
-                      value={formData.billUrl}
-                      onChange={(e) => handleInputChange('billUrl', e.target.value)}
-                      placeholder="URL to bill document (optional)"
-                    />
-                  </FormField>
-                </div>
-
-                <div className="col-span-6">
-                  <FormField label="Notes" htmlFor="notes">
-                    <Textarea
-                      id="notes"
-                      name="notes"
-                      size="lg"
-                      rows={4}
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange('notes', e.target.value)}
-                      placeholder="Additional notes about this bill"
-                    />
-                  </FormField>
-                </div>
-              </div>
-            </div>
+            <FormField label="Account Number" htmlFor="providerAccountNumber">
+              <Input
+                type="text"
+                id="providerAccountNumber"
+                name="providerAccountNumber"
+                value={formData.providerAccountNumber}
+                onChange={(e) => handleInputChange('providerAccountNumber', e.target.value)}
+                placeholder="Provider account number"
+              />
+            </FormField>
           </div>
-        </div>
-      </Card>
+        );
 
-      <div className="flex justify-end space-x-3">
-        <Button type="button" variant="outline" size="lg" onClick={handleCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" size="lg" isLoading={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Bill'}
-        </Button>
-      </div>
-    </form>
+      case 'period':
+        return (
+          <div className="space-y-6">
+            <FormField
+              label="Billing Period Start"
+              htmlFor="billingPeriodStart"
+              required
+              error={errors.billingPeriodStart}
+            >
+              <Input
+                type="date"
+                id="billingPeriodStart"
+                name="billingPeriodStart"
+                value={formData.billingPeriodStart}
+                onChange={(e) => handleInputChange('billingPeriodStart', e.target.value)}
+                min="2000-01-01"
+                max="2099-12-31"
+                isInvalid={Boolean(errors.billingPeriodStart)}
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField
+              label="Billing Period End"
+              htmlFor="billingPeriodEnd"
+              required
+              error={errors.billingPeriodEnd}
+            >
+              <Input
+                type="date"
+                id="billingPeriodEnd"
+                name="billingPeriodEnd"
+                value={formData.billingPeriodEnd}
+                onChange={(e) => handleInputChange('billingPeriodEnd', e.target.value)}
+                min={formData.billingPeriodStart || '2000-01-01'}
+                max="2099-12-31"
+                isInvalid={Boolean(errors.billingPeriodEnd)}
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField label="Due Date" htmlFor="dueDate" required error={errors.dueDate}>
+              <Input
+                type="date"
+                id="dueDate"
+                name="dueDate"
+                value={formData.dueDate}
+                onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                min={formData.billingPeriodEnd || '2000-01-01'}
+                max="2099-12-31"
+                isInvalid={Boolean(errors.dueDate)}
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+          </div>
+        );
+
+      case 'amount':
+        return (
+          <div className="space-y-6">
+            <FormField label="Amount" htmlFor="amount" required error={errors.amount}>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-900 text-base">
+                  ₱
+                </span>
+                <Input
+                  type="number"
+                  id="amount"
+                  name="amount"
+                  className="pl-7"
+                  value={formData.amount}
+                  onChange={(e) => handleInputChange('amount', e.target.value)}
+                  step="0.01"
+                  min={0}
+                  placeholder="0.00"
+                  isInvalid={Boolean(errors.amount)}
+                />
+              </div>
+            </FormField>
+
+            <FormField label="Usage Amount" htmlFor="usageAmount">
+              <Input
+                type="number"
+                id="usageAmount"
+                name="usageAmount"
+                value={formData.usageAmount}
+                onChange={(e) => handleInputChange('usageAmount', e.target.value)}
+                step="0.01"
+                min={0}
+                placeholder="0.00"
+              />
+            </FormField>
+
+            <FormField label="Usage Unit" htmlFor="usageUnit">
+              <Input
+                type="text"
+                id="usageUnit"
+                name="usageUnit"
+                value={formData.usageUnit}
+                onChange={(e) => handleInputChange('usageUnit', e.target.value)}
+                placeholder={formData.utilityType === 'electricity' ? 'kWh' : 'gallons'}
+              />
+            </FormField>
+          </div>
+        );
+
+      case 'status':
+        return (
+          <div className="space-y-6">
+            <FormField label="Bill Status" htmlFor="billStatus">
+              <Select
+                id="billStatus"
+                name="billStatus"
+                value={formData.billStatus}
+                onChange={(e) => handleInputChange('billStatus', e.target.value)}
+              >
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+                <option value="disputed">Disputed</option>
+              </Select>
+            </FormField>
+
+            <FormField label="Bill Document URL" htmlFor="billUrl">
+              <Input
+                type="url"
+                id="billUrl"
+                name="billUrl"
+                value={formData.billUrl}
+                onChange={(e) => handleInputChange('billUrl', e.target.value)}
+                placeholder="URL to bill document (optional)"
+              />
+            </FormField>
+          </div>
+        );
+
+      case 'notes':
+        return (
+          <FormField label="Notes" htmlFor="notes">
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={4}
+              value={formData.notes}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              placeholder="Additional notes about this bill"
+            />
+          </FormField>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <SectionedFormShell
+      mode="page"
+      onCancel={handleCancel}
+      eyebrow="Room Utility Bill"
+      entityLabel="New Utility Bill"
+      sections={formSections}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      primaryLabel="Create Bill"
+      primaryLoading={isLoading}
+      formId="utility-bill-form"
+    >
+      <form id="utility-bill-form" onSubmit={handleSubmit} className="space-y-6">
+        {renderSectionContent()}
+      </form>
+    </SectionedFormShell>
   );
 }

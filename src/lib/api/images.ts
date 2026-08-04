@@ -253,11 +253,14 @@ export async function deleteImage(imageId: string): Promise<boolean> {
     
     // Delete from Vercel Blob
     try {
-      // If filePath is a Blob URL, delete it from Vercel Blob
-      if (image.filePath.startsWith('https://')) {
+      if (image.filePath.startsWith('https://') && process.env.BLOB_READ_WRITE_TOKEN) {
         console.log('🗑️  Deleting from Vercel Blob:', image.filePath);
-        await del(image.filePath);
+        await del(image.filePath, { token: process.env.BLOB_READ_WRITE_TOKEN });
         console.log('✅ Blob deleted successfully');
+      } else if (image.filePath.startsWith('uploads/')) {
+        const { promises: fs } = await import('fs');
+        const absolutePath = path.join(process.cwd(), 'public', image.filePath);
+        await fs.unlink(absolutePath).catch(() => undefined);
       }
     } catch (fileError) {
       console.warn('Failed to delete blob file:', fileError);
@@ -273,7 +276,7 @@ export async function deleteImage(imageId: string): Promise<boolean> {
   }
 }
 
-// Save uploaded image file to Vercel Blob
+// Save uploaded image file to Vercel Blob (or local filesystem if no blob token)
 export async function saveUploadedImage(
   file: File,
   entityType: 'building' | 'room' | 'asset',
@@ -283,28 +286,55 @@ export async function saveUploadedImage(
   filePath: string;
   fileSize: number;
 }> {
-  // Generate unique filename
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 15);
   const fileExtension = path.extname(file.name);
-  const fileName = `${entityId}-${timestamp}-${randomSuffix}${fileExtension}`;
-  
-  // Create blob path: images/{entityType}/{fileName}
-  const blobPath = `images/${entityType}/${fileName}`;
+  const originalName = (file.name || '').trim() || `image${fileExtension || '.jpg'}`;
+  const storageFileName = `${entityId}-${timestamp}-${randomSuffix}${fileExtension}`;
+  const blobPath = `images/${entityType}/${storageFileName}`;
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
 
-  console.log('📤 Uploading to Vercel Blob:', blobPath);
+  if (blobToken) {
+    console.log('📤 Uploading to Vercel Blob:', blobPath);
+    try {
+      const blob = await put(blobPath, file, {
+        access: 'public',
+        addRandomSuffix: false,
+        token: blobToken,
+      });
+      console.log('✅ Blob uploaded successfully:', blob.url);
+      return {
+        fileName: originalName,
+        filePath: blob.url,
+        fileSize: file.size,
+      };
+    } catch (blobError) {
+      console.error('Error uploading to Vercel Blob:', blobError);
+      // Fall through to local filesystem in development only
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'Failed to upload image to Blob storage. Check BLOB_READ_WRITE_TOKEN.'
+        );
+      }
+      console.log('⚠️ Falling back to local filesystem storage');
+    }
+  } else if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'BLOB_READ_WRITE_TOKEN is not configured. Add it in Vercel project env settings.'
+    );
+  }
 
-  // Upload to Vercel Blob
-  const blob = await put(blobPath, file, {
-    access: 'public',
-    addRandomSuffix: false, // We already have a unique name
-  });
-
-  console.log('✅ Blob uploaded successfully:', blob.url);
+  // Local filesystem fallback (dev without blob token, or blob upload failed in dev)
+  const { promises: fs } = await import('fs');
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'images', entityType);
+  await fs.mkdir(uploadDir, { recursive: true });
+  const absolutePath = path.join(uploadDir, storageFileName);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(absolutePath, buffer);
 
   return {
-    fileName,
-    filePath: blob.url, // Store the full blob URL
+    fileName: originalName,
+    filePath: path.join('uploads', 'images', entityType, storageFileName),
     fileSize: file.size,
   };
 }

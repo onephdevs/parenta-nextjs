@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const buildingId = searchParams.get('buildingId') || '';
     const roomId = searchParams.get('roomId') || '';
     const tenantId = searchParams.get('tenantId') || '';
+    const pipelineCardId = searchParams.get('pipelineCardId') || '';
     const accessLevel = searchParams.get('accessLevel') || '';
     const hasExpiry = searchParams.get('hasExpiry');
     const isExpired = searchParams.get('isExpired');
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
     if (buildingId) filters.buildingId = buildingId;
     if (roomId) filters.roomId = roomId;
     if (tenantId) filters.tenantId = tenantId;
+    if (pipelineCardId) filters.pipelineCardId = pipelineCardId;
     if (accessLevel) filters.accessLevel = accessLevel;
     if (hasExpiry) filters.hasExpiry = hasExpiry === 'true';
     if (isExpired) filters.isExpired = isExpired === 'true';
@@ -130,8 +132,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save the uploaded file
-    const { fileName, filePath, fileSize } = await saveUploadedFile(file);
+    // Save the uploaded file (unique storage path; original name for display/download)
+    const { fileName: originalFileName, filePath, fileSize } = await saveUploadedFile(file);
+    const displayName = (documentName || originalFileName).trim();
 
     // Parse optional fields
     const categoryId = formData.get('categoryId') as string || undefined;
@@ -139,6 +142,7 @@ export async function POST(request: NextRequest) {
     const roomId = formData.get('roomId') as string || undefined;
     const tenantId = formData.get('tenantId') as string || undefined;
     const assetId = formData.get('assetId') as string || undefined;
+    const pipelineCardId = formData.get('pipelineCardId') as string || undefined;
     const documentType = formData.get('documentType') as string || undefined;
     const description = formData.get('description') as string || undefined;
     const isPublic = formData.get('isPublic') === 'true';
@@ -155,8 +159,9 @@ export async function POST(request: NextRequest) {
       roomId,
       tenantId,
       assetId,
-      documentName,
-      fileName,
+      pipelineCardId,
+      documentName: displayName,
+      fileName: originalFileName,
       filePath,
       fileSize,
       mimeType: file.type,

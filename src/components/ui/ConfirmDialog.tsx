@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
@@ -72,8 +73,10 @@ export default function ConfirmDialog({
     onConfirm();
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[130] overflow-y-auto">
       <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
         <div
           className="fixed inset-0 bg-gray-500/75 transition-opacity"
@@ -151,6 +154,7 @@ export default function ConfirmDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

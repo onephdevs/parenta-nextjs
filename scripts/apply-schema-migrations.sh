@@ -13,12 +13,17 @@ if [[ -f .env.local ]]; then
   set +a
 fi
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL is not set (load .env.local first)"
+# Prefer session-mode DIRECT_URL for DDL; strip pgbouncer query param (psql rejects it)
+MIGRATE_URL="${DIRECT_URL:-${DATABASE_URL:-}}"
+MIGRATE_URL="${MIGRATE_URL//\?pgbouncer=true/}"
+MIGRATE_URL="${MIGRATE_URL//\&pgbouncer=true/}"
+
+if [[ -z "${MIGRATE_URL}" ]]; then
+  echo "DIRECT_URL/DATABASE_URL is not set (load .env.local first)"
   exit 1
 fi
 
-echo "Using: ${DATABASE_URL//:*@/:***@}"
+echo "Using: ${MIGRATE_URL//:*@/:***@}"
 
 run_file() {
   local file="$1"
@@ -26,9 +31,9 @@ run_file() {
   echo ">>> $(basename "$file")"
   if [[ "$(basename "$file")" == "add-performance-indexes.sql" ]]; then
     sed 's/CREATE INDEX CONCURRENTLY/CREATE INDEX IF NOT EXISTS/g; s/CREATE UNIQUE INDEX CONCURRENTLY/CREATE UNIQUE INDEX IF NOT EXISTS/g' "$file" \
-      | psql "$DATABASE_URL" -v ON_ERROR_STOP=0
+      | psql "$MIGRATE_URL" -v ON_ERROR_STOP=0
   else
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -f "$file"
+    psql "$MIGRATE_URL" -v ON_ERROR_STOP=0 -f "$file"
   fi
 }
 
@@ -59,6 +64,15 @@ MIGRATIONS=(
   add-dashboard-reports.sql
   add-performance-indexes.sql
   make-maintenance-tenant-nullable.sql
+  tenancy-and-asset-location-history.sql
+  activity-log-and-notification-prefs.sql
+  add-background-jobs.sql
+  add-address-locations.sql
+  add-pipeline-tasks.sql
+  add-pipeline-lost-reason.sql
+  add-pipeline-onboarding-flow.sql
+  add-pipeline-onboarding-stages-fix.sql
+  add-pipeline-lease-dates.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

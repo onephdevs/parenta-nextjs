@@ -12,7 +12,8 @@ import { invalidateDashboardCache } from '@/lib/cache/memory-cache';
 export type JobType =
   | 'bulk_invoices_generate'
   | 'notification_queue_process'
-  | 'monthly_invoices_generate';
+  | 'monthly_invoices_generate'
+  | 'late_fees_auto_apply';
 
 export interface BackgroundJob {
   id: string;
@@ -131,6 +132,12 @@ async function executeJob(job: BackgroundJob): Promise<unknown> {
     case 'notification_queue_process': {
       const limit = Number(job.payload.limit) || 50;
       return processNotificationQueue(limit);
+    }
+    case 'late_fees_auto_apply': {
+      const { applyAutoLateFees } = await import('@/lib/services/late-fee-service');
+      const result = await applyAutoLateFees({ dryRun: false });
+      invalidateDashboardCache();
+      return result;
     }
     default:
       throw new Error(`Unknown job type: ${job.jobType}`);

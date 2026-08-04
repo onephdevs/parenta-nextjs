@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantAccess } from '@/lib/api/require-tenant-access';
 import { getTenantCompleteDataByTenantId } from '@/lib/api/tenant-user-link';
+import { contentDispositionHeader, sanitizeDownloadFileName } from '@/lib/format/upload-filename';
 import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
@@ -13,7 +14,7 @@ interface RouteParams {
  * GET /api/tenant/documents/[id]/download
  * Download a document (verify tenant has access)
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const access = await requireTenantAccess();
     if (access.error) return access.error;
@@ -59,7 +60,40 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const document = documentResult.rows[0];
-    const filePath = path.join(process.cwd(), 'public', document.file_path);
+    const storedPath = String(document.file_path || '');
+    const filename = sanitizeDownloadFileName(
+      document.document_name || document.file_name || 'document',
+      'document'
+    );
+
+    if (storedPath.startsWith('http://') || storedPath.startsWith('https://')) {
+      try {
+        const remote = await fetch(storedPath);
+        if (!remote.ok) {
+          return NextResponse.json(
+            { success: false, error: 'Document file not found' },
+            { status: 404 }
+          );
+        }
+        const fileBuffer = Buffer.from(await remote.arrayBuffer());
+        const contentType =
+          document.mime_type || remote.headers.get('content-type') || 'application/octet-stream';
+
+        return new NextResponse(fileBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Disposition': contentDispositionHeader(filename, 'attachment'),
+            'Content-Length': fileBuffer.length.toString(),
+          },
+        });
+      } catch (remoteError) {
+        console.error('Error fetching remote document file:', remoteError);
+        return NextResponse.redirect(storedPath);
+      }
+    }
+
+    const filePath = path.join(process.cwd(), 'public', storedPath.replace(/^\//, ''));
 
     try {
       const fileBuffer = await fs.readFile(filePath);
@@ -69,7 +103,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         status: 200,
         headers: {
           'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${document.file_name || document.document_name}"`,
+          'Content-Disposition': contentDispositionHeader(filename, 'attachment'),
           'Content-Length': fileBuffer.length.toString(),
         },
       });
