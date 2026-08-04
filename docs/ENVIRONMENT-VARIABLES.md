@@ -52,13 +52,13 @@ Or use this online: https://generate-secret.vercel.app/32
 NEXTAUTH_URL="http://localhost:3030"
 
 # Production
-NEXTAUTH_URL="https://parenta.com.mx"
+NEXTAUTH_URL="https://parenta-nextjs.vercel.app"
 ```
 
 **Description:** The base URL of your application  
 **Required:** ✅ YES  
 **Development:** Your local dev URL (usually `http://localhost:3030`)  
-**Production:** Your live domain (e.g., `https://parenta.com.mx`)
+**Production:** Your live domain (e.g., `https://parenta-nextjs.vercel.app`)
 
 ---
 
@@ -187,7 +187,7 @@ DATABASE_URL="postgresql://postgres:password@host:6543/postgres?sslmode=require"
 # ========================================
 # AUTHENTICATION
 # ========================================
-NEXTAUTH_URL="https://parenta.com.mx"
+NEXTAUTH_URL="https://parenta-nextjs.vercel.app"
 NEXTAUTH_SECRET="your-production-secret-key-different-from-dev"
 
 # ========================================

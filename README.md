@@ -16,8 +16,7 @@ See [docs/ENVIRONMENT-VARIABLES.md](./docs/ENVIRONMENT-VARIABLES.md) and [docs/G
 
 | Doc | Purpose |
 |-----|---------|
-| [docs/QUICK-REFERENCE.md](./docs/QUICK-REFERENCE.md) | Common commands |
-| [docs/HOSTINGER-SHARED-DEPLOY-GUIDE.md](./docs/HOSTINGER-SHARED-DEPLOY-GUIDE.md) | Production deploy |
+| [docs/QUICK-REFERENCE.md](./docs/QUICK-REFERENCE.md) | Common commands + Vercel deploy |
 | [docs/UI.md](./docs/UI.md) | Shared UI layer + refactor notes |
 | [docs/archive/](./docs/archive/) | Historical session/audit notes |
 
@@ -26,4 +25,8 @@ See [docs/ENVIRONMENT-VARIABLES.md](./docs/ENVIRONMENT-VARIABLES.md) and [docs/G
 - Next.js 15 App Router, TypeScript, Tailwind
 - Auth: NextAuth
 - DB: PostgreSQL via `pg` (Supabase)
-- Hosting: Hostinger + PM2 (`./scripts/deploy-with-manual-nodejs.sh`)
+- Hosting: **Vercel** (`https://parenta-nextjs.vercel.app`)
+- Uploads: Vercel Blob (`BLOB_READ_WRITE_TOKEN`)
+
+Deploy: `vercel --prod` (see [docs/QUICK-REFERENCE.md](./docs/QUICK-REFERENCE.md)).
+

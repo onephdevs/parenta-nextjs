@@ -1,129 +1,58 @@
-# 🚀 PARENTA - QUICK REFERENCE CARD
+# Alfonso — Quick reference
 
-## 🌐 Access URLs
+## Production
 
-**Current (Direct IP):**
 ```
-http://145.79.25.103:3030
-```
-
-**After DNS Setup:**
-```
-https://parenta.com.mx
+https://parenta-nextjs.vercel.app
 ```
 
----
+Admin sign-in: `/auth/admin/signin`  
+Tenant sign-in: `/auth/tenant/signin`
 
-## 🔐 SSH Access
+## Local development
 
 ```bash
-# One-time: cp scripts/.deploy-secrets.example scripts/.deploy-secrets
-# then set SSH_PASS locally (never commit that file)
-
-./scripts/ssh-hostinger.sh connect
+cp .env.example .env.local   # fill DATABASE_URL, NEXTAUTH_*, etc.
+npm install
+npm run dev                  # http://localhost:3030
 ```
 
----
-
-## 🔧 Common PM2 Commands
+## Deploy (Vercel)
 
 ```bash
-# View logs
-pm2 logs parenta-app
+# From repo root (requires vercel login)
+vercel --prod
 
-# Check status
-pm2 status
-
-# Restart app
-pm2 restart parenta-app
-
-# Stop app
-pm2 stop parenta-app
-
-# Monitor CPU/Memory
-pm2 monit
-
-# View app info
-pm2 info parenta-app
+# Or push to main if GitHub ↔ Vercel integration is connected
+git push origin main
 ```
 
----
+Required production env (Vercel dashboard → Project → Settings → Environment Variables):
 
-## 🚀 Deploy Updates
+- `DATABASE_URL`, `DIRECT_URL`
+- `NEXTAUTH_URL` = `https://parenta-nextjs.vercel.app`
+- `NEXTAUTH_SECRET`
+- `BLOB_READ_WRITE_TOKEN` (uploads)
+- Optional: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `EMAIL_FROM`
+
+## Useful Vercel CLI
 
 ```bash
-# Automatic deployment (reads scripts/.deploy-secrets)
-./scripts/deploy-with-manual-nodejs.sh
-
-# Or helper restart after a local build
-./scripts/ssh-hostinger.sh restart
+vercel whoami
+vercel env ls
+vercel logs parenta-nextjs.vercel.app
+vercel inspect parenta-nextjs.vercel.app
 ```
 
----
+## Database
 
-## 📂 Server Paths
+Supabase PostgreSQL (external). App hosting is Vercel only.
 
-```
-Application: ~/domains/parenta.com.mx/nodejs-app
-Environment: ~/domains/parenta.com.mx/nodejs-app/.env.production
-Logs: ~/.pm2/logs/parenta-app-*.log
-Node.js: ~/.nvm/versions/node/v18.20.8
-```
+## Legacy Hostinger
 
----
-
-## 🗃️ Database
-
-**Initialize Database:**
-```
-http://145.79.25.103:3030/api/init-db
-```
-
-**Connection:**
-- Host: aws-1-ap-southeast-1.pooler.supabase.com
-- Port: 6543 (pooled)
-- Database: postgres
-
----
-
-## 👤 Default Admin
-
-**Email:** admin@parenta.com  
-**Password:** admin123  
-⚠️ Change immediately after first login!
-
----
-
-## 📊 Server Info
-
-- **IP:** 145.79.25.103
-- **Port:** 3030
-- **Node:** v18.20.8
-- **PM2:** 6.0.13
-- **Domain:** parenta.com.mx
-
----
-
-## 🆘 Emergency Restart
+Hostinger/PM2 scripts under `scripts/deploy-*.sh` and `scripts/ssh-hostinger.sh` are **legacy**. Do not use for production. If an old PM2 process is still running on Hostinger, stop it:
 
 ```bash
-ssh -p 65002 u876334876@145.79.25.103
-cd ~/domains/parenta.com.mx/nodejs-app
-export NVM_DIR="$HOME/.nvm"
-source "$NVM_DIR/nvm.sh"
-pm2 restart parenta-app
+# Only if scripts/.deploy-secrets is configured locally
+./scripts/ssh-hostinger.sh stop
 ```
-
----
-
-## 📞 Support
-
-- **Hostinger:** Live chat in hPanel
-- **GitHub:** github.com/onephdevs/parenta-nextjs
-- **Deployment Guide:** DEPLOYMENT-SUCCESS.md
-
----
-
-**Status:** ✅ LIVE  
-**Last Updated:** Nov 13, 2025
-
