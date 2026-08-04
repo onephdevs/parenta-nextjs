@@ -17,12 +17,10 @@ https://parenta.com.mx
 ## 🔐 SSH Access
 
 ```bash
-# Quick connect
-./scripts/ssh-hostinger.sh connect
+# One-time: cp scripts/.deploy-secrets.example scripts/.deploy-secrets
+# then set SSH_PASS locally (never commit that file)
 
-# Or manually
-ssh -p 65002 u876334876@145.79.25.103
-Password: Theanswer001!!!
+./scripts/ssh-hostinger.sh connect
 ```
 
 ---
@@ -54,13 +52,11 @@ pm2 info parenta-app
 ## 🚀 Deploy Updates
 
 ```bash
-# Automatic deployment
+# Automatic deployment (reads scripts/.deploy-secrets)
 ./scripts/deploy-with-manual-nodejs.sh
 
-# Manual deployment
-npm run build
-sshpass -p 'Theanswer001!!!' rsync -avz -e "ssh -p 65002" .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 'pm2 restart parenta-app'
+# Or helper restart after a local build
+./scripts/ssh-hostinger.sh restart
 ```
 
 ---

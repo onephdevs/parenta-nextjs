@@ -34,7 +34,7 @@ Go to: **https://hpanel.hostinger.com/**
    ```
    DATABASE_URL = (use Supabase - see below)
    NEXTAUTH_URL = https://parenta.com.mx
-   NEXTAUTH_SECRET = CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+   NEXTAUTH_SECRET = YOUR_NEXTAUTH_SECRET
    NODE_ENV = production
    PORT = 3030
    ```
@@ -175,7 +175,7 @@ Before running deployment:
 - [ ] Supabase account created
 - [ ] Database schema loaded in Supabase
 - [ ] DATABASE_URL updated in hPanel with Supabase connection string
-- [ ] You have the SSH password ready: `Theanswer001!!!`
+- [ ] You have the SSH password ready: `(set SSH_PASS in scripts/.deploy-secrets)`
 
 ---
 
@@ -240,7 +240,7 @@ npm run build
 ```
 hPanel:           https://hpanel.hostinger.com/
 SSH:              ssh -p 65002 u876334876@145.79.25.103
-Password:         Theanswer001!!!
+Password:         (set SSH_PASS in scripts/.deploy-secrets)
 App Directory:    ~/domains/parenta.com.mx/nodejs-app
 ```
 

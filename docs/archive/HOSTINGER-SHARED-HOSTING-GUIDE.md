@@ -101,7 +101,7 @@ In hPanel Node.js Manager:
 ```
 DATABASE_URL=postgresql://parenta_user:password@localhost:5432/parenta_db
 NEXTAUTH_URL=https://parenta.com.mx
-NEXTAUTH_SECRET=CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+NEXTAUTH_SECRET=YOUR_NEXTAUTH_SECRET
 NODE_ENV=production
 PORT=3030
 ```
@@ -206,7 +206,7 @@ Upload `parenta-deployment.zip` via hPanel File Manager and extract it.
 
 ```bash
 # Connect via SSH
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103
+sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103
 
 # If psql is available
 psql -h localhost -U parenta_user -d parenta_db -f ~/domains/parenta.com.mx/public_html/src/lib/schema.sql
@@ -347,7 +347,7 @@ Use Supabase:
 ```
 DATABASE_URL=your-supabase-connection-string
 NEXTAUTH_URL=https://your-app.vercel.app
-NEXTAUTH_SECRET=CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+NEXTAUTH_SECRET=YOUR_NEXTAUTH_SECRET
 NODE_ENV=production
 ```
 

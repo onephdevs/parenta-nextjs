@@ -93,11 +93,11 @@ pm2 logs parenta-app --lines 30
 npm run build
 
 # Upload
-sshpass -p 'Theanswer001!!!' rsync -avz -e "ssh -p 65002" \
+sshpass -p "$SSH_PASS" rsync -avz -e "ssh -p 65002" \
   .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
 
 # Restart
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
+sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103 \
   'cd ~/domains/parenta.com.mx/nodejs-app && pm2 restart parenta-app'
 ```
 - **Time:** ~3-4 minutes

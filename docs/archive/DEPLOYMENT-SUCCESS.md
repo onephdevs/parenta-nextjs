@@ -172,10 +172,10 @@ This script will:
 npm run build
 
 # 2. Upload .next folder
-sshpass -p 'Theanswer001!!!' rsync -avz -e "ssh -p 65002" .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
+sshpass -p "$SSH_PASS" rsync -avz -e "ssh -p 65002" .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
 
 # 3. Restart
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 'pm2 restart parenta-app'
+sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103 'pm2 restart parenta-app'
 ```
 
 ---
@@ -231,10 +231,10 @@ pm2 logs parenta-app --err
 Located at: `~/domains/parenta.com.mx/nodejs-app/.env.production`
 
 ```env
-DATABASE_URL="postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
 NEXTAUTH_URL="https://parenta.com.mx"
-NEXTAUTH_SECRET="CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM="
+NEXTAUTH_SECRET="YOUR_NEXTAUTH_SECRET"
 NODE_ENV="production"
 PORT=3030
 ```

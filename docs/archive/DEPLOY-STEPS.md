@@ -51,7 +51,7 @@ cd /Users/adrianestopace/Documents/oneph/parenta-nextjs
 - ✅ Installs dependencies
 - ✅ All automatic!
 
-**You'll be prompted for password:** `Theanswer001!!!`
+**You'll be prompted for password:** `(set SSH_PASS in scripts/.deploy-secrets)`
 
 ---
 

@@ -200,16 +200,10 @@ cd /Users/adrianestopace/Documents/oneph/parenta-nextjs
 # 1. Build locally
 npm run build
 
-# 2. Upload built files
-sshpass -p 'Theanswer001!!!' rsync -avz -e "ssh -p 65002" \
-  .next/ u876334876@145.79.25.103:~/domains/parenta.com.mx/nodejs-app/.next/
-
-# 3. Restart application
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
-  'cd ~/domains/parenta.com.mx/nodejs-app && \
-   export NVM_DIR="$HOME/.nvm" && \
-   source "$NVM_DIR/nvm.sh" && \
-   pm2 restart parenta-app'
+# 2. Upload + restart (uses SSH_PASS from scripts/.deploy-secrets)
+./scripts/ssh-hostinger.sh connect
+# Or: source scripts/deploy-env.sh && require_ssh_pass
+# then rsync/ssh with "$SSH_PASS" — never commit passwords
 ```
 
 **Method 3: Git-Based Deployment**

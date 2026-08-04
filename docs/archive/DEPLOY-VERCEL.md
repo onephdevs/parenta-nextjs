@@ -54,13 +54,13 @@ Click **"Environment Variables"** and add these (copy-paste):
 
 ```bash
 DATABASE_URL
-postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true
 
 DIRECT_URL
-postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
+postgresql://USER:PASSWORD@HOST:5432/postgres
 
 NEXTAUTH_SECRET
-CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+YOUR_NEXTAUTH_SECRET
 
 NEXTAUTH_URL
 https://parenta.com.mx

@@ -74,7 +74,7 @@ NEXTAUTH_URL
 Value: https://parenta.com.mx
 
 NEXTAUTH_SECRET
-Value: CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+Value: (generate with: openssl rand -base64 32)
 
 NODE_ENV
 Value: production
@@ -256,7 +256,7 @@ ssh user@host "cd domains/parenta.com.mx/nodejs-app && npm install"
 SSH Host:     145.79.25.103
 SSH Port:     65002
 SSH User:     u876334876
-SSH Pass:     Theanswer001!!!
+SSH Pass:     (scripts/.deploy-secrets → SSH_PASS)
 ```
 
 ### Application Paths

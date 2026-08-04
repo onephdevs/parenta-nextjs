@@ -67,7 +67,7 @@ cd /Users/adrianestopace/Documents/oneph/parenta-nextjs
 ./scripts/deploy-to-hostinger-shared.sh
 ```
 
-**Password when prompted:** `Theanswer001!!!`
+**Password when prompted:** `(set SSH_PASS in scripts/.deploy-secrets)`
 
 Script will:
 - Build app
@@ -297,7 +297,7 @@ Before deploying:
 ## 📞 Quick Reference
 
 **Server:** u876334876@145.79.25.103:65002  
-**Password:** Theanswer001!!!  
+**Password:** (set SSH_PASS in scripts/.deploy-secrets)  
 **App Path:** ~/domains/parenta.com.mx/nodejs-app  
 **Live URL:** https://parenta.com.mx  
 **hPanel:** https://hpanel.hostinger.com/  

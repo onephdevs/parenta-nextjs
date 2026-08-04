@@ -38,6 +38,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local deploy secrets (never commit)
+scripts/.deploy-secrets
+**/.deploy-secrets
+
 # vercel
 .vercel
 

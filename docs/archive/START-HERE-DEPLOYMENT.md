@@ -420,7 +420,7 @@ crontab -e
 IP:       145.79.25.103
 Port:     65002
 User:     u876334876
-Password: Theanswer001!!!
+Password: (from scripts/.deploy-secrets SSH_PASS)
 ```
 
 ### Application

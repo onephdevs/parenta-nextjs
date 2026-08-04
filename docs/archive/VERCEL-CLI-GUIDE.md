@@ -134,7 +134,7 @@ vercel env ls
 # Output shows:
 # name                value            environments
 # DATABASE_URL        postgres://...   Production, Preview, Development
-# NEXTAUTH_SECRET     CMgu1S5/...      Production
+# NEXTAUTH_SECRET     (set in Vercel/server env)
 ```
 
 ---

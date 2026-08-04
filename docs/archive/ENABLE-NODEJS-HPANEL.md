@@ -52,13 +52,13 @@ Add each of these:
 
 ```bash
 Variable Name: DATABASE_URL
-Value: postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+Value: postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true
 
 Variable Name: NEXTAUTH_URL
 Value: https://parenta.com.mx
 
 Variable Name: NEXTAUTH_SECRET
-Value: CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+Value: YOUR_NEXTAUTH_SECRET
 
 Variable Name: NODE_ENV
 Value: production
@@ -113,7 +113,7 @@ You should see:
 Environment Variables (5)
   DATABASE_URL = postgresql://postgres.lttvkueyip...
   NEXTAUTH_URL = https://parenta.com.mx
-  NEXTAUTH_SECRET = CMgu1S5/GQqa...
+  NEXTAUTH_SECRET = (set in server env)
   NODE_ENV = production
   PORT = 3030
   

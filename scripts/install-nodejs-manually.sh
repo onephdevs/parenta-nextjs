@@ -1,14 +1,16 @@
 #!/bin/bash
 
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/deploy-env.sh"
+require_ssh_pass
+
 # 🔧 Manual Node.js Installation on Hostinger Shared Hosting
 # This script installs Node.js via NVM when hPanel doesn't have Node.js option
 
 set -e
 
-SSH_USER="u876334876"
-SSH_HOST="145.79.25.103"
-SSH_PORT="65002"
-SSH_PASS="Theanswer001!!!"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'

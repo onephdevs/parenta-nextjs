@@ -1,5 +1,11 @@
 #!/bin/bash
 
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/deploy-env.sh"
+require_ssh_pass
+
 # 🚀 Deploy Parenta to Hostinger Shared Hosting
 # Based on your stagecards.com deployment pattern
 
@@ -13,15 +19,12 @@ echo "   1. Enable Node.js 18 in hPanel (https://hpanel.hostinger.com/)"
 echo "   2. Go to: Websites → parenta.com.mx → Advanced → Node.js"
 echo "   3. Create Node.js application"
 echo ""
-echo "SSH Password: Theanswer001!!!"
+echo "SSH: uses SSH_PASS from scripts/.deploy-secrets (not printed)"
 echo ""
 echo "Press ENTER to continue..."
 read
 
 # SSH Details
-SSH_USER="u876334876"
-SSH_HOST="145.79.25.103"
-SSH_PORT="65002"
 REMOTE_PATH="domains/parenta.com.mx"
 APP_NAME="parenta-app"
 
@@ -168,7 +171,7 @@ echo "=========================================="
 echo ""
 
 echo -e "${YELLOW}Creating remote application directory...${NC}"
-sshpass -p 'Theanswer001!!!' ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST} "mkdir -p ${REMOTE_PATH}/nodejs-app"
+sshpass -p "$SSH_PASS" ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST} "mkdir -p ${REMOTE_PATH}/nodejs-app"
 
 echo -e "${YELLOW}Uploading deployment package...${NC}"
 echo -e "${YELLOW}This may take a few minutes...${NC}"
@@ -178,7 +181,7 @@ cd $DEPLOY_DIR
 tar -czf ../parenta-app.tar.gz .
 cd ..
 
-sshpass -p 'Theanswer001!!!' scp -P $SSH_PORT parenta-app.tar.gz ${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/nodejs-app/
+sshpass -p "$SSH_PASS" scp -P $SSH_PORT parenta-app.tar.gz ${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/nodejs-app/
 
 echo -e "${GREEN}✅ Files uploaded${NC}"
 echo ""
@@ -189,7 +192,7 @@ echo -e "${BLUE}PHASE 4: Setting Up Application on Server${NC}"
 echo "=========================================="
 echo ""
 
-sshpass -p 'Theanswer001!!!' ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+sshpass -p "$SSH_PASS" ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
 cd domains/parenta.com.mx/nodejs-app
 
 echo "📦 Extracting files..."

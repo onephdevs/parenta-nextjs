@@ -38,7 +38,7 @@ Your Parenta application keeps stopping on Hostinger shared hosting, causing **i
 **From your Mac (one command):**
 ```bash
 cd /Users/adrianestopace/Documents/oneph/parenta-nextjs && \
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
+sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103 \
 'export NVM_DIR="$HOME/.nvm" && \
  source "$NVM_DIR/nvm.sh" && \
  cd ~/domains/parenta.com.mx/nodejs-app && \
@@ -303,7 +303,7 @@ Then manually restart when you get the alert.
 1. **Quick restart:**
    ```bash
    cd /Users/adrianestopace/Documents/oneph/parenta-nextjs && \
-   sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
+   sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103 \
    'export NVM_DIR="$HOME/.nvm" && \
     source "$NVM_DIR/nvm.sh" && \
     cd ~/domains/parenta.com.mx/nodejs-app && \

@@ -21,7 +21,7 @@ Your app **randomly stops** on shared hosting and shows **502 errors** because:
 
 ```bash
 cd /Users/adrianestopace/Documents/oneph/parenta-nextjs && \
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103 \
+sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103 \
 'export NVM_DIR="$HOME/.nvm" && \
  source "$NVM_DIR/nvm.sh" && \
  cd ~/domains/parenta.com.mx/nodejs-app && \

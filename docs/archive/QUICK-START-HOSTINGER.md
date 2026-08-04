@@ -351,7 +351,7 @@ pg_dump -U parenta_user parenta_db > backup_$(date +%Y%m%d).sql
 
 # Download backup to local machine
 # (Run from local machine)
-sshpass -p 'Theanswer001!!!' scp -P 65002 u876334876@145.79.25.103:~/backup_*.sql ./backups/
+sshpass -p "$SSH_PASS" scp -P 65002 u876334876@145.79.25.103:~/backup_*.sql ./backups/
 ```
 
 ### Automated Daily Backups
@@ -406,7 +406,7 @@ pm2 save
 IP Address:  145.79.25.103
 SSH Port:    65002
 Username:    u876334876
-Password:    Theanswer001!!!
+Password:    (scripts/.deploy-secrets → SSH_PASS)
 
 App Directory: /home/u876334876/apps/parenta-nextjs
 Logs: pm2 logs parenta-app

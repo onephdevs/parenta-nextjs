@@ -120,11 +120,11 @@ In Vercel dashboard (https://vercel.com/dashboard):
 3. Add these:
 
 ```
-DATABASE_URL = postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+DATABASE_URL = postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true
 
 NEXTAUTH_URL = https://your-app.vercel.app (Vercel gives you this URL)
 
-NEXTAUTH_SECRET = CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM=
+NEXTAUTH_SECRET = YOUR_NEXTAUTH_SECRET
 
 NODE_ENV = production
 ```

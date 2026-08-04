@@ -1,5 +1,16 @@
 #!/bin/bash
 
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/deploy-env.sh"
+require_ssh_pass
+
+SERVER_IP="${SSH_HOST}"
+SERVER_PORT="${SSH_PORT}"
+SERVER_USER="${SSH_USER}"
+SERVER_PASS="${SSH_PASS}"
+
 # Parenta Deployment Script to Hostinger
 # This script automates the deployment process to Hostinger VPS
 
@@ -13,10 +24,6 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Server configuration
-SERVER_IP="145.79.25.103"
-SERVER_PORT="65002"
-SERVER_USER="u876334876"
-SERVER_PASS="Theanswer001!!!"
 APP_DIR="/home/u876334876/apps/parenta-nextjs"
 
 # Functions

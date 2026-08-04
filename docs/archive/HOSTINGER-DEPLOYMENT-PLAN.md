@@ -15,12 +15,12 @@
 IP Address:  145.79.25.103
 SSH Port:    65002
 Username:    u876334876
-Password:    Theanswer001!!!
+Password:    (scripts/.deploy-secrets → SSH_PASS)
 ```
 
 **SSH Connection Command:**
 ```bash
-sshpass -p 'Theanswer001!!!' ssh -p 65002 u876334876@145.79.25.103
+sshpass -p "$SSH_PASS" ssh -p 65002 u876334876@145.79.25.103
 ```
 
 ---
@@ -149,7 +149,7 @@ git clone YOUR_REPO_URL parenta-nextjs
 cd parenta-nextjs
 
 # Option B: Upload via SCP (from local machine)
-# sshpass -p 'Theanswer001!!!' scp -P 65002 -r ./parenta-nextjs u876334876@145.79.25.103:/home/u876334876/apps/
+# sshpass -p "$SSH_PASS" scp -P 65002 -r ./parenta-nextjs u876334876@145.79.25.103:/home/u876334876/apps/
 
 # Install dependencies
 npm install --production

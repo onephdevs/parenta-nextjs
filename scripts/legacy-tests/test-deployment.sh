@@ -8,7 +8,7 @@ echo "=========================================="
 echo ""
 
 # Database connection
-DB_URL="postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+DB_URL="postgresql://USER:PASSWORD@HOST:5432/postgres"
 
 # Test data from your database
 TENANT_ID="d87a4d66-0b1b-4548-8a58-ff8f2c2b8bc7"  # Juan Dela Cruz

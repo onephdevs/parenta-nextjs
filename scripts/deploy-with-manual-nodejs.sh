@@ -1,14 +1,16 @@
 #!/bin/bash
 
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/deploy-env.sh"
+require_ssh_pass
+
 # 🚀 Deploy Parenta with Manual Node.js Installation
 # For Hostinger servers with manually installed Node.js via NVM
 
 set -e
 
-SSH_USER="u876334876"
-SSH_HOST="145.79.25.103"
-SSH_PORT="65002"
-SSH_PASS="Theanswer001!!!"
 GIT_REPO="git@github.com:onephdevs/parenta-nextjs.git"
 APP_DIR="domains/parenta.com.mx/nodejs-app"
 
@@ -88,14 +90,9 @@ echo ""
 if [ ! -f ".env.production" ]; then
     echo "⚠️  .env.production not found, creating..."
     
-    cat > .env.production << 'ENVFILE'
-DATABASE_URL="postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.lttvkueyiptqzhubaydg:Theanswer001!!!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
-NEXTAUTH_URL="https://parenta.com.mx"
-NEXTAUTH_SECRET="CMgu1S5/GQqa6PXJQBTiSaAD3gaTOzYbtIbV5MZcLKM="
-NODE_ENV="production"
-PORT=3030
-ENVFILE
+    echo "Create .env.production on the server from your password manager / Hostinger panel."
+    echo "Do not embed secrets in deploy scripts."
+    exit 1
     
     echo "✅ .env.production created"
 fi
