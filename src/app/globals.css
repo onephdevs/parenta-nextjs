@@ -34,3 +34,29 @@ body {
     transform: translateY(-8px);
   }
 }
+
+@keyframes auth-hero-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-hero-float {
+  animation: auth-float 4.5s ease-in-out infinite;
+}
+
+.auth-hero-fade {
+  animation: auth-hero-fade 450ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-hero-float,
+  .auth-hero-fade {
+    animation: none;
+  }
+}

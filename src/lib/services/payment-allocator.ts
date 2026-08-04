@@ -330,32 +330,62 @@ export async function applyCreditToRentInvoice(
 
     // Get available credit records
     const creditsResult = await client.query(
-      `SELECT id, amount FROM tenant_credits 
+      `SELECT id, amount, description, source, payment_id FROM tenant_credits 
        WHERE tenant_id = $1 AND status = 'available'
        ORDER BY created_at ASC`,
       [tenantId]
     );
 
     let remainingToApply = amountToApply;
-    const creditsToUpdate: string[] = [];
 
     for (const credit of creditsResult.rows) {
       if (remainingToApply <= 0) break;
 
-      const creditToUse = Math.min(remainingToApply, parseFloat(credit.amount));
-      
-      // Mark credit as applied
-      await client.query(
-        `UPDATE tenant_credits 
-         SET status = 'applied',
-             applied_to_invoice_id = $1,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2`,
-        [invoiceId, credit.id]
-      );
+      const creditAmountAvailable = parseFloat(credit.amount);
+      const creditToUse = Math.min(remainingToApply, creditAmountAvailable);
+      const leftover = Number((creditAmountAvailable - creditToUse).toFixed(2));
 
-      creditsToUpdate.push(credit.id);
-      remainingToApply -= creditToUse;
+      if (leftover > 0) {
+        // Partial use: shrink this row to the applied portion, keep leftover available
+        await client.query(
+          `UPDATE tenant_credits
+           SET amount = $1,
+               status = 'applied',
+               applied_to_invoice_id = $2,
+               description = COALESCE(description, 'Advance') || $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [
+            creditToUse,
+            invoiceId,
+            ` — applied to invoice ${invoice.invoice_number}`,
+            credit.id,
+          ]
+        );
+        await client.query(
+          `INSERT INTO tenant_credits (
+             tenant_id, amount, source, description, payment_id, status
+           ) VALUES ($1, $2, $3, $4, $5, 'available')`,
+          [
+            tenantId,
+            leftover,
+            credit.source || 'manual',
+            `Unused advance balance (from ₱${creditAmountAvailable.toFixed(2)} prepaid rent)`,
+            credit.payment_id || null,
+          ]
+        );
+      } else {
+        await client.query(
+          `UPDATE tenant_credits 
+           SET status = 'applied',
+               applied_to_invoice_id = $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [invoiceId, credit.id]
+        );
+      }
+
+      remainingToApply = Number((remainingToApply - creditToUse).toFixed(2));
     }
 
     // Update invoice

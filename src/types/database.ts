@@ -977,6 +977,14 @@ export interface PipelineCard {
   leaseStartDate?: string;
   leaseEndDate?: string;
   moveInDate?: string;
+  /** Move-in deposit amount collected before Generate lease */
+  depositAmount?: number;
+  /** Move-in advance rent amount collected before Generate lease */
+  advanceAmount?: number;
+  moveInPaymentStatus?: 'unpaid' | 'paid';
+  moveInPaidAt?: string;
+  moveInPaymentMethod?: string;
+  moveInPaymentNotes?: string;
   position: number;
   wonAt?: string;
   lostAt?: string;

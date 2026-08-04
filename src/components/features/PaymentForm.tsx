@@ -32,6 +32,8 @@ interface PaymentFormData {
   description: string;
   paymentMethod: string;
   transactionId: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
 }
 
 interface PaymentFormProps {
@@ -72,7 +74,10 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
   const [isLoading, setIsLoading] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionId>('tenant');
+  const hasInvoiceContext = Boolean(initialData?.invoiceId || initialData?.amount);
+  const [activeSection, setActiveSection] = useState<SectionId>(
+    initialData?.tenantId && hasInvoiceContext ? 'payment' : 'tenant'
+  );
   
   const [formData, setFormData] = useState<PaymentFormData>({
     tenantId: initialData?.tenantId || '',
@@ -83,6 +88,8 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
     description: initialData?.description || '',
     paymentMethod: initialData?.paymentMethod || 'cash',
     transactionId: initialData?.transactionId || '',
+    invoiceId: initialData?.invoiceId,
+    invoiceNumber: initialData?.invoiceNumber,
   });
 
   const [errors, setErrors] = useState<Partial<PaymentFormData>>({});
@@ -328,6 +335,13 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
       <SectionedFormShell
         mode="page"
         eyebrow="Record payment"
+        entityLabel={
+          formData.invoiceNumber
+            ? formData.invoiceNumber
+            : selectedTenant
+              ? `${selectedTenant.firstName} ${selectedTenant.lastName}`
+              : undefined
+        }
         sections={SECTIONS}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
@@ -340,6 +354,15 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         <form id="payment-form" onSubmit={handleSubmit} className="space-y-6" noValidate>
           {activeSection === 'tenant' && (
             <SectionCard title="Tenant Selection">
+              {formData.invoiceNumber && (
+                <Alert variant="info" title="Paying invoice" className="mb-4">
+                  Prefilling from <span className="font-medium">{formData.invoiceNumber}</span>
+                  {formData.amount
+                    ? ` — balance due ₱${Number(formData.amount).toLocaleString('en-PH')}`
+                    : ''}
+                  .
+                </Alert>
+              )}
               <FormField
                 label="Tenant"
                 htmlFor="tenantId"
@@ -380,6 +403,16 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
 
           {activeSection === 'payment' && (
             <SectionCard title="Payment Details">
+              {formData.invoiceNumber && (
+                <Alert variant="info" title="Invoice payment" className="mb-4">
+                  Amount and notes are prefilled from{' '}
+                  <span className="font-medium">{formData.invoiceNumber}</span>
+                  {formData.amount
+                    ? ` (balance due ₱${Number(formData.amount).toLocaleString('en-PH')})`
+                    : ''}
+                  . You can adjust before recording.
+                </Alert>
+              )}
               <div className="grid grid-cols-6 gap-6">
                 <FormField
                   label="Total Amount Paid"

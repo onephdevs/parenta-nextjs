@@ -1,6 +1,18 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import bcrypt from 'bcryptjs';
 import type { CreateUserData, User, DatabaseUser, UserRole } from '@/types/auth.types';
+
+/**
+ * TIMESTAMP WITHOUT TIME ZONE is stored in UTC (DB session TimeZone = UTC),
+ * but node-pg otherwise treats values as the Node process local zone (e.g. UTC+8),
+ * which makes "just now" show as "~8h ago" in the Philippines.
+ */
+types.setTypeParser(types.builtins.TIMESTAMP, (value: string) => {
+  if (!value) return value;
+  // "2026-08-04 15:43:53.514772" → treat as UTC
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  return new Date(normalized.endsWith('Z') ? normalized : `${normalized}Z`);
+});
 
 /**
  * Shared PostgreSQL pool (singleton).

@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { createTenantWithUser, DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
+import { ensureTenantForLease, DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
 import type {
   CreatePipelineCardData,
   PipelineBackgroundCheckStatus,
@@ -68,6 +68,12 @@ interface DbCard {
   lease_start_date?: Date | string | null;
   lease_end_date?: Date | string | null;
   move_in_date?: Date | string | null;
+  deposit_amount?: string | number | null;
+  advance_amount?: string | number | null;
+  move_in_payment_status?: string | null;
+  move_in_paid_at?: Date | string | null;
+  move_in_payment_method?: string | null;
+  move_in_payment_notes?: string | null;
   position: number;
   won_at: Date | string | null;
   lost_at: Date | string | null;
@@ -150,6 +156,13 @@ function mapCard(row: DbCard): PipelineCard {
     leaseStartDate: toIsoDateOnly(row.lease_start_date),
     leaseEndDate: toIsoDateOnly(row.lease_end_date),
     moveInDate: toIsoDateOnly(row.move_in_date),
+    depositAmount: row.deposit_amount != null ? Number(row.deposit_amount) : undefined,
+    advanceAmount: row.advance_amount != null ? Number(row.advance_amount) : undefined,
+    moveInPaymentStatus:
+      row.move_in_payment_status === 'paid' ? 'paid' : 'unpaid',
+    moveInPaidAt: toIso(row.move_in_paid_at),
+    moveInPaymentMethod: row.move_in_payment_method || undefined,
+    moveInPaymentNotes: row.move_in_payment_notes || undefined,
     position: row.position,
     wonAt: toIso(row.won_at),
     lostAt: toIso(row.lost_at),
@@ -538,6 +551,27 @@ export async function convertOnboardingCardToLeaseSigned(
   if (!startDate) {
     throw new Error('Lease start date is required');
   }
+
+  if (card.moveInPaymentStatus !== 'paid') {
+    throw new Error(
+      'Mark deposit and advance as paid under Payment before generating a lease'
+    );
+  }
+
+  const depositPaid =
+    card.depositAmount != null && Number(card.depositAmount) >= 0
+      ? Number(card.depositAmount)
+      : 0;
+  const advancePaid =
+    card.advanceAmount != null && Number(card.advanceAmount) >= 0
+      ? Number(card.advanceAmount)
+      : 0;
+  if (depositPaid <= 0 && advancePaid <= 0) {
+    throw new Error(
+      'Enter deposit and/or advance amounts and mark them paid before generating a lease'
+    );
+  }
+
   const endDate =
     (options?.leaseEndDate !== undefined
       ? options.leaseEndDate
@@ -552,51 +586,31 @@ export async function convertOnboardingCardToLeaseSigned(
     card.notes,
     card.source ? `Source: ${card.source}` : null,
     'Created from onboarding → Generate lease',
+    card.moveInPaymentMethod
+      ? `Move-in payment method: ${card.moveInPaymentMethod}`
+      : null,
+    card.moveInPaymentNotes ? `Move-in payment notes: ${card.moveInPaymentNotes}` : null,
   ]
     .filter(Boolean)
     .join('\n');
 
+  // Deposit/advance already confirmed on the opportunity Payment section.
+
   let tenantId = card.tenantId || null;
 
   if (!tenantId) {
-    const existingTenant = await pool.query<{ id: string }>(
-      `SELECT id FROM tenants WHERE LOWER(email) = $1 LIMIT 1`,
-      [email]
-    );
-    if (existingTenant.rows[0]) {
-      tenantId = existingTenant.rows[0].id;
-    } else {
-      try {
-        const created = await createTenantWithUser({
-          email,
-          password: DEFAULT_TENANT_PASSWORD,
-          sendInvitation: false,
-          firstName,
-          lastName,
-          phone: card.contactPhone || undefined,
-          leaseStartDate: startDate,
-          leaseEndDate: endDate || undefined,
-          notes,
-        });
-        tenantId = created.tenantId;
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('already exists')) {
-          const byEmail = await pool.query<{ id: string }>(
-            `SELECT id FROM tenants WHERE LOWER(email) = $1 LIMIT 1`,
-            [email]
-          );
-          if (byEmail.rows[0]) {
-            tenantId = byEmail.rows[0].id;
-          } else {
-            throw new Error(
-              'A user with this email already exists but has no tenant profile. Link or fix the account first.'
-            );
-          }
-        } else {
-          throw err;
-        }
-      }
-    }
+    const ensured = await ensureTenantForLease({
+      email,
+      password: DEFAULT_TENANT_PASSWORD,
+      sendInvitation: false,
+      firstName,
+      lastName,
+      phone: card.contactPhone || undefined,
+      leaseStartDate: startDate,
+      leaseEndDate: endDate || undefined,
+      notes,
+    });
+    tenantId = ensured.tenantId;
   }
 
   const client = await pool.connect();
@@ -625,9 +639,10 @@ export async function convertOnboardingCardToLeaseSigned(
 
     const assignmentResult = await client.query(
       `INSERT INTO tenant_room_assignments
-         (tenant_id, room_id, start_date, end_date, monthly_rate, assignment_status,
+         (tenant_id, room_id, start_date, end_date, monthly_rate,
+          deposit_paid, advance_paid, assignment_status,
           notes, tenant_name_snapshot, tenant_email_snapshot)
-       VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10)
        RETURNING id`,
       [
         tenantId,
@@ -635,6 +650,8 @@ export async function convertOnboardingCardToLeaseSigned(
         startDate,
         endDate,
         monthlyRate,
+        depositPaid > 0 ? depositPaid : null,
+        advancePaid > 0 ? advancePaid : null,
         notes,
         tenantNameSnapshot,
         snap?.email || email || null,
@@ -648,9 +665,16 @@ export async function convertOnboardingCardToLeaseSigned(
            move_in_date = $1,
            lease_start_date = $2,
            lease_end_date = $3,
+           security_deposit = COALESCE($4, security_deposit),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4`,
-      [moveInDate, startDate, endDate, tenantId]
+       WHERE id = $5`,
+      [
+        moveInDate,
+        startDate,
+        endDate,
+        depositPaid > 0 ? depositPaid : null,
+        tenantId,
+      ]
     );
 
     await client.query(
@@ -660,12 +684,16 @@ export async function convertOnboardingCardToLeaseSigned(
       [card.roomId]
     );
 
-    // Attach opportunity docs to the new tenant
+    // Attach opportunity docs to the new tenant (always, including re-link after cleanup)
     await client.query(
       `UPDATE documents
-       SET tenant_id = COALESCE(tenant_id, $1),
+       SET tenant_id = $1,
            building_id = COALESCE(building_id, $2),
            room_id = COALESCE(room_id, $3),
+           access_level = CASE
+             WHEN access_level IN ('public', 'tenant') THEN access_level
+             ELSE 'tenant'
+           END,
            updated_at = CURRENT_TIMESTAMP
        WHERE pipeline_card_id = $4`,
       [tenantId, room.building_id, card.roomId, cardId]
@@ -759,7 +787,15 @@ export async function convertOnboardingCardToLeaseSigned(
         wonStageId,
         card.boardId,
         options?.note || 'Lease generated — tenant and lease created',
-        JSON.stringify({ tenantId, assignmentId, startDate, endDate, moveInDate }),
+        JSON.stringify({
+          tenantId,
+          assignmentId,
+          startDate,
+          endDate,
+          moveInDate,
+          depositPaid,
+          advancePaid,
+        }),
         options?.userId || null,
       ]
     );
@@ -772,7 +808,7 @@ export async function convertOnboardingCardToLeaseSigned(
     client.release();
   }
 
-  // Schedule rent invoices aligned to the lease (draft until issue_date)
+  // Schedule rent invoices; record deposit + apply advance (prepaid rent)
   try {
     const { ensureRentInvoicesForLease } = await import('@/lib/services/invoice-generator');
     await ensureRentInvoicesForLease({
@@ -781,9 +817,78 @@ export async function convertOnboardingCardToLeaseSigned(
       leaseStartDate: startDate,
       leaseEndDate: endDate,
       monthlyRent: monthlyRate,
+      depositAmount: depositPaid > 0 ? depositPaid : undefined,
+      advanceAmount: advancePaid > 0 ? advancePaid : undefined,
     });
   } catch (invoiceError) {
     console.error('Lease created but invoice scheduling failed:', invoiceError);
+  }
+
+  // Payment history rows so the tenant portal shows deposit/advance as paid
+  try {
+    const { createPayment } = await import('@/lib/api/payments');
+    const paymentDate = new Date(`${startDate}T00:00:00`);
+    if (depositPaid > 0) {
+      await createPayment({
+        tenantId: String(tenantId),
+        roomAssignmentId: assignmentId,
+        amount: depositPaid,
+        paymentType: 'deposit',
+        paymentMethod: 'cash',
+        paymentStatus: 'completed',
+        paymentDate,
+        notes: 'Security deposit collected on lease generation',
+      });
+    }
+    if (advancePaid > 0) {
+      await createPayment({
+        tenantId: String(tenantId),
+        roomAssignmentId: assignmentId,
+        amount: advancePaid,
+        paymentType: 'advance',
+        paymentMethod: 'cash',
+        paymentStatus: 'completed',
+        paymentDate,
+        notes: 'Advance rent collected on lease generation',
+      });
+    }
+  } catch (paymentError) {
+    console.error('Lease created but deposit/advance payment history failed:', paymentError);
+  }
+
+  // Signed lease agreement: link opportunity lease upload, or generate one
+  try {
+    const buildingNameResult = await pool.query<{ name: string }>(
+      `SELECT name FROM buildings WHERE id = $1`,
+      [room.building_id]
+    );
+    const roomNumberResult = await pool.query<{ room_number: string }>(
+      `SELECT room_number FROM rooms WHERE id = $1`,
+      [card.roomId]
+    );
+    const { ensureTenantLeaseAgreementDocument } = await import(
+      '@/lib/services/lease-agreement-document'
+    );
+    await ensureTenantLeaseAgreementDocument({
+      tenantId: String(tenantId),
+      pipelineCardId: cardId,
+      buildingId: room.building_id,
+      roomId: String(card.roomId),
+      tenantName: `${firstName} ${lastName}`.trim(),
+      tenantEmail: email,
+      tenantPhone: card.contactPhone || null,
+      buildingName: buildingNameResult.rows[0]?.name || 'Property',
+      roomNumber: roomNumberResult.rows[0]?.room_number || '—',
+      monthlyRent: monthlyRate,
+      depositPaid,
+      advancePaid,
+      leaseStartDate: startDate,
+      leaseEndDate: endDate,
+      moveInDate,
+      uploadedBy: options?.userId || null,
+    });
+  } catch (agreementError) {
+    console.error('Lease created but agreement document setup failed:', agreementError);
   }
 
   // Keep Payments board in sync with the new lease
@@ -1219,6 +1324,12 @@ export interface UpdatePipelineCardData {
   leaseStartDate?: string | null;
   leaseEndDate?: string | null;
   moveInDate?: string | null;
+  depositAmount?: number | null;
+  advanceAmount?: number | null;
+  moveInPaymentStatus?: 'unpaid' | 'paid';
+  moveInPaidAt?: string | null;
+  moveInPaymentMethod?: string | null;
+  moveInPaymentNotes?: string | null;
   markLeaseSigned?: boolean;
   generateLease?: boolean;
 }
@@ -1321,6 +1432,33 @@ export async function updatePipelineCard(
       ? data.moveInDate?.slice(0, 10) || null
       : existing.moveInDate || null;
 
+  const depositAmount =
+    data.depositAmount !== undefined
+      ? data.depositAmount
+      : existing.depositAmount ?? null;
+  const advanceAmount =
+    data.advanceAmount !== undefined
+      ? data.advanceAmount
+      : existing.advanceAmount ?? null;
+  const moveInPaymentStatus: 'unpaid' | 'paid' =
+    data.moveInPaymentStatus !== undefined
+      ? data.moveInPaymentStatus
+      : existing.moveInPaymentStatus || 'unpaid';
+  const moveInPaymentMethod =
+    data.moveInPaymentMethod !== undefined
+      ? data.moveInPaymentMethod?.trim() || null
+      : existing.moveInPaymentMethod || null;
+  const moveInPaymentNotes =
+    data.moveInPaymentNotes !== undefined
+      ? data.moveInPaymentNotes?.trim() || null
+      : existing.moveInPaymentNotes || null;
+  const moveInPaidAt =
+    moveInPaymentStatus === 'paid'
+      ? data.moveInPaidAt !== undefined && data.moveInPaidAt
+        ? data.moveInPaidAt
+        : existing.moveInPaidAt || new Date().toISOString()
+      : null;
+
   if (data.markLeaseSigned) {
     // Fall through: save fields first, then convert at end
   }
@@ -1349,8 +1487,14 @@ export async function updatePipelineCard(
        lease_end_date = $20,
        move_in_date = $21,
        assignment_id = COALESCE($22, assignment_id),
+       deposit_amount = $23,
+       advance_amount = $24,
+       move_in_payment_status = $25,
+       move_in_paid_at = $26,
+       move_in_payment_method = $27,
+       move_in_payment_notes = $28,
        updated_at = CURRENT_TIMESTAMP
-     WHERE id = $23`,
+     WHERE id = $29`,
     [
       title,
       firstName,
@@ -1378,6 +1522,12 @@ export async function updatePipelineCard(
       leaseEndDate,
       moveInDate,
       data.assignmentId !== undefined ? data.assignmentId : null,
+      depositAmount,
+      advanceAmount,
+      moveInPaymentStatus,
+      moveInPaidAt,
+      moveInPaymentMethod,
+      moveInPaymentNotes,
       cardId,
     ]
   );
@@ -1454,6 +1604,8 @@ export async function updatePipelineCard(
       leaseStatus === 'awaiting_signature'
     ) {
       await moveToSlug('awaiting_signature', 'Lease generated / awaiting signature');
+    } else if (moveInPaymentStatus === 'paid') {
+      await moveToSlug('payment', 'Move-in payment confirmed');
     } else if (
       backgroundCheckStatus === 'pending' ||
       backgroundCheckStatus === 'approved' ||
@@ -1681,6 +1833,21 @@ export async function createPipelineStage(data: {
   );
 
   return mapStage(result.rows[0]);
+}
+
+export async function deletePipelineCard(cardId: string): Promise<PipelineCard> {
+  const existing = await getPipelineCardById(cardId);
+  if (!existing) throw new Error('Card not found');
+
+  const result = await pool.query(
+    `DELETE FROM pipeline_cards WHERE id = $1 RETURNING id`,
+    [cardId]
+  );
+  if (!result.rows[0]) {
+    throw new Error('Card not found');
+  }
+
+  return existing;
 }
 
 export async function deletePipelineStage(

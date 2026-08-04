@@ -221,8 +221,9 @@ export default function TenantCreditsManager({ tenantId, tenantName }: TenantCre
             <p className="mt-1 text-sm text-gray-900">Manage prepaid rent advance for {tenantName}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-900">Total Advance</p>
+            <p className="text-sm text-gray-900">Available advance</p>
             <p className="text-3xl font-bold text-purple-600">{formatCurrency(balance)}</p>
+            <p className="mt-1 text-xs text-gray-500">Prepaid rent left to apply</p>
           </div>
         </div>
       </div>

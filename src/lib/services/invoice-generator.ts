@@ -188,21 +188,11 @@ export async function generateInvoicesForTenant(
 
       const dueDate = new Date(invoiceMonth);
       dueDate.setDate(5); // Due on the 5th of each month
-      
-      // For the first month, if start date is after the 1st, prorate the rent
-      let invoiceAmount = monthlyRent;
-      let description = `Monthly Rent - ${invoiceMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
-      
-      if (i === 0 && startDate.getDate() > 1) {
-        const daysInMonth = new Date(
-          invoiceMonth.getFullYear(),
-          invoiceMonth.getMonth() + 1,
-          0
-        ).getDate();
-        const daysRemaining = daysInMonth - startDate.getDate() + 1;
-        invoiceAmount = (monthlyRent / daysInMonth) * daysRemaining;
-        description = `Prorated Rent - ${invoiceMonth.toLocaleString('default', { month: 'long', year: 'numeric' })} (${daysRemaining} days)`;
-      }
+
+      // Always bill full monthly rent (no day-based proration).
+      // Move-in mid-month still charges one full month; advance covers that month.
+      const invoiceAmount = monthlyRent;
+      const description = `Monthly Rent - ${invoiceMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
 
       // Generate invoice number
       const invoiceNumber = `INV-${Date.now()}-${invoiceCounter}`;
@@ -212,8 +202,10 @@ export async function generateInvoicesForTenant(
       const billingPeriodStart = i === 0 ? startDate : new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth(), 1);
       const billingPeriodEnd = new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth() + 1, 0);
 
-      // Create invoice — future months stay draft until issue_date is reached
-      const invoiceStatus = initialInvoiceStatusForIssueDate(invoiceMonth);
+      // Create invoice — future months stay draft until issue_date is reached.
+      // First month: issue on lease start (not the 1st) so mid-month move-ins match reality.
+      const issueDate = i === 0 ? startDate : invoiceMonth;
+      const invoiceStatus = initialInvoiceStatusForIssueDate(issueDate);
 
       const invoiceResult = await client.query(
         `INSERT INTO invoices (
@@ -234,7 +226,7 @@ export async function generateInvoicesForTenant(
         [
           tenantId,
           invoiceNumber,
-          invoiceMonth,
+          issueDate,
           dueDate,
           billingPeriodStart,
           billingPeriodEnd,

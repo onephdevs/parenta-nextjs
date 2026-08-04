@@ -141,6 +141,148 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
   }
 }
 
+export interface EnsureTenantForLeaseResult {
+  tenantId: string;
+  userId: string | null;
+  /** True when email belongs to admin/staff — portal login was not created */
+  portalLoginSkipped: boolean;
+}
+
+/**
+ * Resolve or create a tenant profile for lease generation.
+ * - Existing tenant by email → reuse
+ * - Existing tenant-role user without profile → create + link
+ * - Existing admin/staff user → create tenant profile without portal login
+ *   (emails are unique on users; one address cannot be both admin and tenant)
+ * - Otherwise → create tenant user + profile
+ */
+export async function ensureTenantForLease(
+  data: CreateTenantWithUserData
+): Promise<EnsureTenantForLeaseResult> {
+  const email = data.email.toLowerCase().trim();
+  const firstName = data.firstName.trim();
+  const lastName = data.lastName.trim();
+
+  const existingTenant = await pool.query<{ id: string; user_id: string | null }>(
+    `SELECT id, user_id FROM tenants WHERE LOWER(email) = $1 AND is_active = true
+     ORDER BY CASE WHEN user_id IS NOT NULL THEN 0 ELSE 1 END, created_at ASC
+     LIMIT 1`,
+    [email]
+  );
+  if (existingTenant.rows[0]) {
+    return {
+      tenantId: String(existingTenant.rows[0].id),
+      userId: existingTenant.rows[0].user_id,
+      portalLoginSkipped: false,
+    };
+  }
+
+  const existingUser = await pool.query<{
+    id: string;
+    role: string;
+  }>(`SELECT id, role FROM users WHERE LOWER(email) = $1 LIMIT 1`, [email]);
+
+  if (existingUser.rows[0]) {
+    const user = existingUser.rows[0];
+
+    if (user.role === 'tenant') {
+      const linked = await getTenantByUserId(user.id);
+      if (linked?.id) {
+        return {
+          tenantId: String(linked.id),
+          userId: user.id,
+          portalLoginSkipped: false,
+        };
+      }
+
+      const created = await createTenantProfileOnly({
+        ...data,
+        email,
+        firstName,
+        lastName,
+        userId: user.id,
+      });
+      return { tenantId: created.tenantId, userId: user.id, portalLoginSkipped: false };
+    }
+
+    // Admin/staff (or other non-tenant roles): email is taken — create tenant without portal user
+    const noteParts = [
+      data.notes,
+      `Portal login skipped: ${email} is already a ${user.role} account. Assign a different tenant email later for portal access.`,
+    ].filter(Boolean);
+
+    const created = await createTenantProfileOnly({
+      ...data,
+      email,
+      firstName,
+      lastName,
+      userId: null,
+      notes: noteParts.join('\n'),
+    });
+    return {
+      tenantId: created.tenantId,
+      userId: null,
+      portalLoginSkipped: true,
+    };
+  }
+
+  const created = await createTenantWithUser({
+    ...data,
+    email,
+    firstName,
+    lastName,
+  });
+  return {
+    tenantId: created.tenantId,
+    userId: created.userId,
+    portalLoginSkipped: false,
+  };
+}
+
+async function createTenantProfileOnly(data: CreateTenantWithUserData & {
+  userId: string | null;
+  email: string;
+  firstName: string;
+  lastName: string;
+}): Promise<{ tenantId: string }> {
+  const result = await pool.query(
+    `INSERT INTO tenants (
+       user_id, first_name, last_name, email, phone,
+       date_of_birth, emergency_contact_name, emergency_contact_phone,
+       emergency_contact_relationship, employment_status, employer_name,
+       monthly_income, previous_address, security_deposit,
+       lease_start_date, lease_end_date, tenant_status, notes, is_active
+     ) VALUES (
+       $1, $2, $3, $4, $5,
+       $6, $7, $8,
+       $9, $10, $11,
+       $12, $13, $14,
+       $15, $16, 'pending', $17, true
+     )
+     RETURNING id`,
+    [
+      data.userId,
+      data.firstName,
+      data.lastName,
+      data.email,
+      data.phone || null,
+      data.dateOfBirth || null,
+      data.emergencyContactName || null,
+      data.emergencyContactPhone || null,
+      data.emergencyContactRelationship || null,
+      data.employmentStatus || null,
+      data.employerName || null,
+      data.monthlyIncome || null,
+      data.previousAddress || null,
+      data.securityDeposit || null,
+      data.leaseStartDate || null,
+      data.leaseEndDate || null,
+      data.notes || null,
+    ]
+  );
+  return { tenantId: String(result.rows[0].id) };
+}
+
 /**
  * Links an existing user account to an existing tenant profile
  */

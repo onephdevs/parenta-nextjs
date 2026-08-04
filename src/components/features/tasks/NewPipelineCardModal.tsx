@@ -10,12 +10,14 @@ import {
   FileText,
   ShieldCheck,
   Tag,
+  Trash2,
   User,
   Wallet,
 } from 'lucide-react';
 import SectionedFormShell, {
   type SectionedFormSection,
 } from '@/components/ui/SectionedFormShell';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/forms/FormField';
 import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
 import { Input } from '@/components/ui/Input';
@@ -23,6 +25,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Button } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Alert';
 import type {
   PipelineBackgroundCheckStatus,
   PipelineBoard,
@@ -71,6 +74,7 @@ type FormSection =
   | 'schedule'
   | 'documents'
   | 'screening'
+  | 'payment'
   | 'lease'
   | 'status'
   | 'tags'
@@ -120,11 +124,18 @@ const onboardingSections: SectionedFormSection<FormSection>[] = [
     subtitle: 'Track screening status before generating a lease.',
   },
   {
+    id: 'payment',
+    label: 'Payment',
+    icon: <Wallet className="h-4 w-4" />,
+    title: 'Payment details',
+    subtitle: 'Enter any deposit/advance amounts, then confirm payment received.',
+  },
+  {
     id: 'lease',
     label: 'Lease',
     icon: <FileCheck2 className="h-4 w-4" />,
     title: 'Lease information',
-    subtitle: 'Set dates, then Generate lease to create the tenant and assignment.',
+    subtitle: 'Set dates, then Generate lease after payment is marked paid.',
   },
   {
     id: 'status',
@@ -234,7 +245,11 @@ function sectionsForBoard(
     return isEditing
       ? onboardingSections
       : onboardingSections.filter(
-          (s) => s.id !== 'documents' && s.id !== 'screening' && s.id !== 'lease'
+          (s) =>
+            s.id !== 'documents' &&
+            s.id !== 'screening' &&
+            s.id !== 'payment' &&
+            s.id !== 'lease'
         );
   }
 
@@ -293,10 +308,22 @@ export function AddOpportunityModal({
   const [leaseDurationMonths, setLeaseDurationMonths] = useState(12);
   const [customLeaseMonths, setCustomLeaseMonths] = useState<number | ''>('');
   const [generatingLease, setGeneratingLease] = useState(false);
+  const [moveInTotalPaid, setMoveInTotalPaid] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [moveInPaymentType, setMoveInPaymentType] = useState('rent');
+  const [moveInPaymentDate, setMoveInPaymentDate] = useState(() => todayLocalISO());
+  const [moveInPaymentStatus, setMoveInPaymentStatus] = useState<'unpaid' | 'paid'>(
+    'unpaid'
+  );
+  const [moveInPaymentMethod, setMoveInPaymentMethod] = useState('cash');
+  const [moveInTransactionId, setMoveInTransactionId] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
   const [moveBoardId, setMoveBoardId] = useState('');
   const [moveStageId, setMoveStageId] = useState('');
   const [movingBoard, setMovingBoard] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const todayISO = todayLocalISO();
   const isCustomDuration = leaseDurationMonths === 0;
@@ -343,6 +370,23 @@ export function AddOpportunityModal({
       setMoveInDate(card.moveInDate?.slice(0, 10) || card.leaseStartDate?.slice(0, 10) || '');
       setLeaseDurationMonths(12);
       setCustomLeaseMonths('');
+      const savedDeposit = card.depositAmount != null ? Number(card.depositAmount) : null;
+      const savedAdvance = card.advanceAmount != null ? Number(card.advanceAmount) : null;
+      setDepositAmount(savedDeposit != null && savedDeposit > 0 ? String(savedDeposit) : '');
+      setMoveInTotalPaid(
+        savedDeposit != null || savedAdvance != null
+          ? String((savedDeposit || 0) + (savedAdvance || 0) || '')
+          : ''
+      );
+      setMoveInPaymentStatus(card.moveInPaymentStatus === 'paid' ? 'paid' : 'unpaid');
+      setMoveInPaymentMethod(card.moveInPaymentMethod || 'cash');
+      setMoveInTransactionId(card.moveInPaymentNotes || '');
+      setMoveInPaymentType('rent');
+      setMoveInPaymentDate(
+        card.moveInPaidAt
+          ? card.moveInPaidAt.slice(0, 10)
+          : todayLocalISO()
+      );
     } else {
       setFirstName('');
       setLastName('');
@@ -368,6 +412,13 @@ export function AddOpportunityModal({
       setMoveInDate('');
       setLeaseDurationMonths(12);
       setCustomLeaseMonths('');
+      setMoveInTotalPaid('');
+      setDepositAmount('');
+      setMoveInPaymentStatus('unpaid');
+      setMoveInPaymentMethod('cash');
+      setMoveInTransactionId('');
+      setMoveInPaymentType('rent');
+      setMoveInPaymentDate(todayLocalISO());
     }
   }, [isOpen, board.id, card]);
 
@@ -399,10 +450,16 @@ export function AddOpportunityModal({
     }
     void (async () => {
       try {
-        const res = await fetch(`/api/rooms?buildingId=${buildingId}`);
+        // Onboarding opportunities: only offer vacant rooms (no active tenant).
+        // Keep the card's current room in the list when editing so saves still work.
+        const params = new URLSearchParams({ buildingId });
+        if (isOnboarding) {
+          params.set('roomStatus', 'vacant');
+        }
+        const res = await fetch(`/api/rooms?${params.toString()}`);
         const json = await res.json();
         if (json.success) {
-          const list = (json.data || []).map(
+          const list: RoomOption[] = (json.data || []).map(
             (r: {
               id: string;
               roomNumber: string;
@@ -415,13 +472,38 @@ export function AddOpportunityModal({
               buildingId: r.buildingId,
             })
           );
+
+          const selectedId = roomId || card?.roomId || '';
+          if (
+            isOnboarding &&
+            selectedId &&
+            !list.some((r) => r.id === selectedId)
+          ) {
+            const detailRes = await fetch(`/api/rooms/${selectedId}`);
+            const detailJson = await detailRes.json();
+            const current = detailJson?.data;
+            if (detailJson.success && current && current.buildingId === buildingId) {
+              list.unshift({
+                id: current.id,
+                roomNumber: `${current.roomNumber} (current)`,
+                monthlyRate: Number(current.monthlyRate),
+                buildingId: current.buildingId,
+              });
+            }
+          }
+
           setRooms(list);
+          if (selectedId && !list.some((r) => r.id === selectedId)) {
+            setRoomId('');
+          }
         }
       } catch {
         setRooms([]);
       }
     })();
-  }, [buildingId, isEditing]);
+    // roomId/card intentionally omitted from deps — only reload when building changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildingId, isEditing, isOnboarding]);
 
   useEffect(() => {
     if (!roomId || rooms.length === 0) return;
@@ -470,6 +552,120 @@ export function AddOpportunityModal({
     return computeLeaseEndDate(start, months);
   }
 
+  function getMoveInSplit(overrides?: { total?: string; deposit?: string }) {
+    const total = Number(overrides?.total ?? moveInTotalPaid);
+    const deposit = Number(overrides?.deposit ?? depositAmount);
+    const safeTotal = Number.isFinite(total) && total > 0 ? total : 0;
+    const safeDeposit =
+      Number.isFinite(deposit) && deposit > 0
+        ? Math.min(deposit, safeTotal)
+        : 0;
+    const advance = Math.max(0, safeTotal - safeDeposit);
+    return { total: safeTotal, deposit: safeDeposit, advance };
+  }
+
+  function buildMoveInPaymentNotes() {
+    const parts: string[] = [];
+    if (moveInPaymentType && moveInPaymentType !== 'rent') {
+      parts.push(`Type: ${moveInPaymentType}`);
+    }
+    if (moveInTransactionId.trim()) {
+      parts.push(moveInTransactionId.trim());
+    }
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }
+
+  async function handleMarkMoveInPaid(overrides?: {
+    total?: string;
+    deposit?: string;
+  }) {
+    if (!card?.id) return;
+    setError(null);
+
+    const { total, deposit, advance } = getMoveInSplit(overrides);
+    if (total <= 0) {
+      setError('Enter a total amount paid greater than zero');
+      return;
+    }
+    if (deposit > total) {
+      setError('Deposit amount cannot exceed total amount paid');
+      return;
+    }
+    if (!buildingId || !roomId) {
+      setActiveSection('property');
+      setError('Select building and room before recording payment');
+      return;
+    }
+    if (!moveInPaymentDate) {
+      setError('Payment date is required');
+      return;
+    }
+
+    setMoveInTotalPaid(String(total));
+    setDepositAmount(String(deposit));
+
+    setSavingPayment(true);
+    try {
+      const res = await fetch(`/api/pipeline/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          buildingId,
+          roomId,
+          amount: amount.trim() !== '' ? Number(amount) : undefined,
+          depositAmount: deposit,
+          advanceAmount: advance,
+          moveInPaymentStatus: 'paid',
+          moveInPaidAt: new Date(`${moveInPaymentDate}T12:00:00`).toISOString(),
+          moveInPaymentMethod,
+          moveInPaymentNotes: buildMoveInPaymentNotes(),
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to mark payment as paid');
+      }
+      setMoveInPaymentStatus('paid');
+      onSaved?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark payment as paid');
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
+  async function handleMarkMoveInUnpaid() {
+    if (!card?.id) return;
+    setSavingPayment(true);
+    setError(null);
+    const { deposit, advance } = getMoveInSplit();
+    try {
+      const res = await fetch(`/api/pipeline/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          depositAmount: deposit > 0 ? deposit : null,
+          advanceAmount: advance > 0 ? advance : null,
+          moveInPaymentStatus: 'unpaid',
+          moveInPaymentMethod,
+          moveInPaymentNotes: buildMoveInPaymentNotes(),
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to update payment status');
+      }
+      setMoveInPaymentStatus('unpaid');
+      onSaved?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update payment status');
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
   async function handleGenerateLease() {
     if (!card?.id) return;
     setError(null);
@@ -482,6 +678,11 @@ export function AddOpportunityModal({
     if (!buildingId || !roomId) {
       setActiveSection('property');
       setError('Select building and room before generating a lease');
+      return;
+    }
+    if (moveInPaymentStatus !== 'paid') {
+      setActiveSection('payment');
+      setError('Confirm payment under Payment before generating a lease');
       return;
     }
     if (!leaseStartDate) {
@@ -503,6 +704,8 @@ export function AddOpportunityModal({
             ? Number(room.monthlyRate)
             : null;
 
+      const { deposit, advance } = getMoveInSplit();
+
       const res = await fetch(`/api/pipeline/cards/${card.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -515,6 +718,14 @@ export function AddOpportunityModal({
           buildingId,
           roomId,
           amount: rentAmount,
+          depositAmount: deposit,
+          advanceAmount: advance,
+          moveInPaymentStatus: 'paid',
+          moveInPaidAt: moveInPaymentDate
+            ? new Date(`${moveInPaymentDate}T12:00:00`).toISOString()
+            : undefined,
+          moveInPaymentMethod,
+          moveInPaymentNotes: buildMoveInPaymentNotes(),
           leaseStartDate,
           leaseEndDate: isOpenEndedLease ? null : leaseEndDate || null,
           moveInDate: moveInDate || leaseStartDate,
@@ -582,6 +793,18 @@ export function AddOpportunityModal({
           leaseStartDate: leaseStartDate || null,
           leaseEndDate: isOpenEndedLease ? null : leaseEndDate || null,
           moveInDate: moveInDate || leaseStartDate || null,
+          depositAmount: depositAmount.trim() !== '' ? Number(depositAmount) : null,
+          advanceAmount: (() => {
+            const { advance } = getMoveInSplit();
+            return moveInTotalPaid.trim() !== '' ? advance : null;
+          })(),
+          moveInPaymentStatus,
+          moveInPaidAt:
+            moveInPaymentStatus === 'paid' && moveInPaymentDate
+              ? new Date(`${moveInPaymentDate}T12:00:00`).toISOString()
+              : undefined,
+          moveInPaymentMethod,
+          moveInPaymentNotes: buildMoveInPaymentNotes(),
           title:
             title.trim() ||
             `${firstName.trim()} ${lastName.trim()}`.trim() ||
@@ -680,12 +903,35 @@ export function AddOpportunityModal({
     }
   }
 
+  async function handleDelete() {
+    if (!card?.id) return;
+    setIsDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/pipeline/cards/${card.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to delete opportunity');
+      }
+      setShowDeleteConfirm(false);
+      onSaved?.();
+      onCreated();
+      onClose();
+    } catch (err) {
+      setShowDeleteConfirm(false);
+      setError(err instanceof Error ? err.message : 'Failed to delete opportunity');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const entityLabel =
     firstName || lastName
       ? `${firstName} ${lastName}`.trim()
       : title.trim() || (isEditing ? 'Opportunity' : 'New opportunity');
 
   return (
+    <>
     <SectionedFormShell
       mode="dialog"
       isOpen={isOpen}
@@ -706,7 +952,21 @@ export function AddOpportunityModal({
       formId="add-opportunity-form"
       primaryLabel={isEditing ? 'Save changes' : 'Create opportunity'}
       primaryLoading={submitting}
+      primaryDisabled={isDeleting}
       errorBanner={error ? <FormErrorBanner message={error} className="mb-6" /> : null}
+      navFooter={
+        isEditing ? (
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting || submitting}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete opportunity
+          </button>
+        ) : undefined
+      }
     >
       <form id="add-opportunity-form" onSubmit={handleSubmit} className="space-y-5">
         {isOnboarding ? (
@@ -924,6 +1184,237 @@ export function AddOpportunityModal({
               </div>
             )}
 
+            {activeSection === 'payment' && (
+              <div className="space-y-5">
+                {!buildingId || !roomId ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Select a building and room under Property first so amounts can default from
+                    monthly rent.
+                  </div>
+                ) : null}
+
+                {card?.assignmentId || moveInPaymentStatus === 'paid' ? (
+                  <Alert variant="success" title="Move-in payment confirmed">
+                    <p className="mt-1">
+                      Total ₱{Number(moveInTotalPaid || 0).toLocaleString('en-PH')}
+                      {' · '}
+                      Deposit ₱{Number(depositAmount || 0).toLocaleString('en-PH')}
+                      {' · '}
+                      To invoices ₱
+                      {getMoveInSplit().advance.toLocaleString('en-PH')}
+                      {moveInPaymentMethod ? ` · ${moveInPaymentMethod.replace(/_/g, ' ')}` : ''}
+                    </p>
+                    {!card?.assignmentId && (
+                      <button
+                        type="button"
+                        className="mt-3 text-sm font-medium text-green-800 underline"
+                        onClick={() => void handleMarkMoveInUnpaid()}
+                        disabled={savingPayment}
+                      >
+                        Uncheck / mark as unpaid again
+                      </button>
+                    )}
+                  </Alert>
+                ) : (
+                  <Alert variant="warning" title="Payment required before Generate lease">
+                    Enter payment details below, then check &quot;Payment received&quot; to confirm.
+                    Deposit goes to the deposit ledger; the remainder applies as advance to
+                    invoices.
+                  </Alert>
+                )}
+
+                <div className="grid grid-cols-6 gap-5">
+                  <FormField
+                    label="Total Amount Paid"
+                    htmlFor="opp-total-paid"
+                    required
+                    hint="Total amount received from tenant"
+                    className="col-span-6 sm:col-span-3"
+                  >
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
+                        ₱
+                      </span>
+                      <Input
+                        id="opp-total-paid"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={moveInTotalPaid === '0' ? '' : moveInTotalPaid}
+                        disabled={Boolean(card?.assignmentId)}
+                        onChange={(e) => setMoveInTotalPaid(e.target.value)}
+                        placeholder="0.00"
+                        className="pl-8"
+                      />
+                    </div>
+                  </FormField>
+
+                  <FormField
+                    label="Deposit Amount"
+                    htmlFor="opp-deposit"
+                    hint="Amount to add to deposit ledger (remainder goes to invoices)"
+                    className="col-span-6 sm:col-span-3"
+                  >
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
+                        ₱
+                      </span>
+                      <Input
+                        id="opp-deposit"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={depositAmount === '0' ? '' : depositAmount}
+                        disabled={Boolean(card?.assignmentId)}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="pl-8"
+                      />
+                    </div>
+                  </FormField>
+
+                  {(parseFloat(moveInTotalPaid) || 0) > 0 && (
+                    <Alert variant="info" title="Payment Breakdown" className="col-span-6">
+                      <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span>To Deposit Ledger:</span>
+                          <span className="ml-2 font-semibold">
+                            ₱{getMoveInSplit().deposit.toLocaleString('en-PH')}
+                          </span>
+                        </div>
+                        <div>
+                          <span>To Invoice Payment:</span>
+                          <span className="ml-2 font-semibold">
+                            ₱{getMoveInSplit().advance.toLocaleString('en-PH')}
+                          </span>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
+
+                  <FormField
+                    label="Payment Type"
+                    htmlFor="opp-pay-type"
+                    required
+                    className="col-span-6 sm:col-span-3"
+                  >
+                    <Select
+                      id="opp-pay-type"
+                      value={moveInPaymentType}
+                      disabled={Boolean(card?.assignmentId)}
+                      onChange={(e) => setMoveInPaymentType(e.target.value)}
+                    >
+                      <option value="rent">Rent</option>
+                      <option value="deposit">Deposit</option>
+                      <option value="advance">Advance</option>
+                      <option value="fee">Fee</option>
+                      <option value="utilities">Utilities</option>
+                      <option value="other">Other</option>
+                    </Select>
+                  </FormField>
+
+                  <FormField
+                    label="Payment Date"
+                    htmlFor="opp-pay-date"
+                    required
+                    className="col-span-6 sm:col-span-3"
+                  >
+                    <Input
+                      id="opp-pay-date"
+                      type="date"
+                      value={moveInPaymentDate}
+                      disabled={Boolean(card?.assignmentId)}
+                      onChange={(e) => setMoveInPaymentDate(e.target.value)}
+                      min="2000-01-01"
+                      max={todayISO}
+                      style={{ colorScheme: 'light' }}
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Payment Method"
+                    htmlFor="opp-pay-method"
+                    required
+                    className="col-span-6 sm:col-span-3"
+                  >
+                    <Select
+                      id="opp-pay-method"
+                      value={moveInPaymentMethod}
+                      disabled={Boolean(card?.assignmentId)}
+                      onChange={(e) => setMoveInPaymentMethod(e.target.value)}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="check">Check</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="credit_card">Credit Card</option>
+                      <option value="online">Online Payment</option>
+                    </Select>
+                  </FormField>
+
+                  <FormField
+                    label="Transaction ID"
+                    htmlFor="opp-txn-id"
+                    className="col-span-6 sm:col-span-3"
+                  >
+                    <Input
+                      id="opp-txn-id"
+                      value={moveInTransactionId}
+                      disabled={Boolean(card?.assignmentId)}
+                      onChange={(e) => setMoveInTransactionId(e.target.value)}
+                      placeholder="Optional transaction reference"
+                    />
+                  </FormField>
+                </div>
+
+                {!card?.assignmentId && (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <Checkbox
+                        id="opp-payment-received"
+                        checked={moveInPaymentStatus === 'paid'}
+                        disabled={savingPayment}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            void handleMarkMoveInPaid();
+                          } else {
+                            void handleMarkMoveInUnpaid();
+                          }
+                        }}
+                        label={
+                          <span className="font-medium text-gray-900">
+                            Payment received — confirm as paid
+                          </span>
+                        }
+                      />
+                      <p className="mt-2 text-xs text-gray-600">
+                        Enter any amounts above (admin sets the price), then check this to unlock
+                        Generate lease.
+                      </p>
+                    </div>
+
+                    {moveInPaymentStatus !== 'paid' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const monthly =
+                            amount.trim() !== ''
+                              ? Number(amount)
+                              : rooms.find((r) => r.id === roomId)?.monthlyRate;
+                          if (monthly) {
+                            setMoveInTotalPaid(String(monthly * 2));
+                            setDepositAmount(String(monthly));
+                          }
+                        }}
+                      >
+                        Suggest 1 month deposit + 1 month advance from rent
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeSection === 'lease' && (
               <div className="space-y-5">
                 {!buildingId || !roomId ? (
@@ -1091,20 +1582,39 @@ export function AddOpportunityModal({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-                    <p className="text-sm text-gray-600">
-                      Generate lease creates the tenant account (login: their registered email /
-                      password <span className="font-mono text-gray-800">tenant123</span>), assigns
-                      the room, and adds the lease in Lease management. Requires contact email,
-                      building, room, and lease start.
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={() => void handleGenerateLease()}
-                      isDisabled={generatingLease || !buildingId || !roomId}
-                      isLoading={generatingLease}
-                    >
-                      {generatingLease ? 'Generating…' : 'Generate lease'}
-                    </Button>
+                    {moveInPaymentStatus !== 'paid' ? (
+                      <>
+                        <p className="text-sm text-amber-900">
+                          Payment required first. Open the <strong>Payment</strong> section, enter
+                          payment details, then check &quot;Payment received&quot;. After that,
+                          Generate lease will be available.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setActiveSection('payment')}
+                        >
+                          Go to Payment
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-600">
+                          Generate lease creates the tenant, assigns the room, posts the paid
+                          deposit/advance to the portal, and schedules rent invoices. Login for new
+                          contacts: their email / password{' '}
+                          <span className="font-mono text-gray-800">tenant123</span>.
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={() => void handleGenerateLease()}
+                          isDisabled={generatingLease || !buildingId || !roomId}
+                          isLoading={generatingLease}
+                        >
+                          {generatingLease ? 'Generating…' : 'Generate lease'}
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -1494,6 +2004,19 @@ export function AddOpportunityModal({
         )}
       </form>
     </SectionedFormShell>
+
+    <ConfirmDialog
+      isOpen={showDeleteConfirm}
+      onClose={() => setShowDeleteConfirm(false)}
+      onConfirm={handleDelete}
+      title="Delete opportunity"
+      message={`Delete "${entityLabel}"? This cannot be undone. Linked documents will be unlinked, not removed.`}
+      confirmText="Delete opportunity"
+      cancelText="Cancel"
+      variant="danger"
+      isLoading={isDeleting}
+    />
+    </>
   );
 }
 

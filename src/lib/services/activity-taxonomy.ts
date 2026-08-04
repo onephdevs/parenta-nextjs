@@ -151,6 +151,14 @@ const ACTION_TITLES: Record<string, string> = {
   'settings.updated': 'Settings updated',
   'job.completed': 'Job completed',
   'job.failed': 'Job failed',
+  'pipeline.website_inquiry': 'Website inquiry',
+  'pipeline.card_created': 'Opportunity created',
+  'pipeline.card_updated': 'Opportunity updated',
+  'pipeline.card_moved': 'Opportunity moved',
+  'pipeline.card_deleted': 'Opportunity deleted',
+  'pipeline.moved_to_nurture': 'Moved to nurture',
+  'pipeline.resumed_onboarding': 'Resumed onboarding',
+  'pipeline.moved_to_board': 'Moved to another pipeline',
 };
 
 export function getActionTitle(actionType: string): string {

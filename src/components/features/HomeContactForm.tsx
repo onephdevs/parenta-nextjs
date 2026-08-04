@@ -9,8 +9,12 @@ export function HomeContactForm() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
-  /** Honeypot — leave empty. Bots often autofill this. */
-  const [website, setWebsite] = useState('');
+  /**
+   * Honeypot — must stay empty.
+   * Avoid names like "website" / "url" / "company": password managers autofill them
+   * and the API then returns a fake success without creating the opportunity.
+   */
+  const [honeypot, setHoneypot] = useState('');
   const formStartedAt = useRef<number>(Date.now());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +40,7 @@ export function HomeContactForm() {
           email,
           phone,
           message,
-          website,
+          hp_confirm: honeypot,
           formStartedAt: formStartedAt.current,
         }),
       });
@@ -50,7 +54,7 @@ export function HomeContactForm() {
       setEmail('');
       setPhone('');
       setMessage('');
-      setWebsite('');
+      setHoneypot('');
       formStartedAt.current = Date.now();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -85,6 +89,7 @@ export function HomeContactForm() {
     <form
       onSubmit={handleSubmit}
       className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
+      autoComplete="on"
     >
       <h3 className="text-lg font-semibold text-gray-900">Send an inquiry</h3>
       <p className="mt-1 text-sm text-gray-500">
@@ -94,18 +99,21 @@ export function HomeContactForm() {
       <div className="mt-6 space-y-4">
         {/* Honeypot: hidden from users, visible to naive bots */}
         <div
-          className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
+          className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
           aria-hidden="true"
         >
-          <label htmlFor="contact-website">Website</label>
+          <label htmlFor="contact-hp-confirm">Leave blank</label>
           <input
-            id="contact-website"
-            name="website"
+            id="contact-hp-confirm"
+            name="hp_confirm"
             type="text"
             tabIndex={-1}
             autoComplete="off"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-form-type="other"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
           />
         </div>
 

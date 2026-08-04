@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import {
+  deletePipelineCard,
   getPipelineCardById,
   movePipelineCard,
   resumeCardToOnboarding,
@@ -201,6 +202,32 @@ export async function PATCH(request: Request, context: RouteContext) {
           leaseStartDate: body.leaseStartDate !== undefined ? body.leaseStartDate : undefined,
           leaseEndDate: body.leaseEndDate !== undefined ? body.leaseEndDate : undefined,
           moveInDate: body.moveInDate !== undefined ? body.moveInDate : undefined,
+          depositAmount:
+            body.depositAmount === undefined
+              ? undefined
+              : body.depositAmount === null || body.depositAmount === ''
+                ? null
+                : Number(body.depositAmount),
+          advanceAmount:
+            body.advanceAmount === undefined
+              ? undefined
+              : body.advanceAmount === null || body.advanceAmount === ''
+                ? null
+                : Number(body.advanceAmount),
+          moveInPaymentStatus:
+            body.moveInPaymentStatus === 'paid' || body.moveInPaymentStatus === 'unpaid'
+              ? body.moveInPaymentStatus
+              : undefined,
+          moveInPaidAt:
+            body.moveInPaidAt !== undefined
+              ? body.moveInPaidAt === null || body.moveInPaidAt === ''
+                ? null
+                : String(body.moveInPaidAt)
+              : undefined,
+          moveInPaymentMethod:
+            body.moveInPaymentMethod !== undefined ? body.moveInPaymentMethod : undefined,
+          moveInPaymentNotes:
+            body.moveInPaymentNotes !== undefined ? body.moveInPaymentNotes : undefined,
           markLeaseSigned: body.markLeaseSigned === true,
           generateLease: body.generateLease === true,
         },
@@ -238,5 +265,33 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const { session, error } = await requireAdmin();
+    if (error) return error;
+
+    const { id } = await context.params;
+    const card = await deletePipelineCard(id);
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'pipeline.card_deleted',
+      category: 'leases',
+      entityType: 'pipeline_card',
+      entityId: card.id,
+      entityLabel: card.title,
+      link: '/admin/tasks',
+    });
+
+    return NextResponse.json({ success: true, data: { id: card.id } });
+  } catch (err) {
+    console.error('Pipeline card DELETE error:', err);
+    const message = err instanceof Error ? err.message : 'Failed to delete card';
+    const status = message === 'Card not found' ? 404 : 500;
+    return NextResponse.json({ success: false, error: message }, { status });
   }
 }

@@ -38,12 +38,15 @@ export async function POST(request: Request) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    // Prefer obscure honeypot name; still accept legacy "website"/"company" from old clients/bots
     const honeypot =
-      typeof body.website === 'string'
-        ? body.website
-        : typeof body.company === 'string'
-          ? body.company
-          : '';
+      typeof body.hp_confirm === 'string'
+        ? body.hp_confirm
+        : typeof body.website === 'string'
+          ? body.website
+          : typeof body.company === 'string'
+            ? body.company
+            : '';
 
     if (!firstName || firstName.length < 1) {
       return NextResponse.json(

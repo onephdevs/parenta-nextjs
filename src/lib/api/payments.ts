@@ -88,13 +88,15 @@ const mapPaymentStatusToDb = (status?: string): string => {
   }
 };
 
-// Map app payment type to DB enum (schema: rent, deposit, late_fee, utility, asset_rental, other)
+// Map app payment type to DB enum (schema: rent, deposit, advance, late_fee, utility, asset_rental, other)
 const mapPaymentTypeToDb = (type: string): string => {
   switch (type) {
-    case 'utilities': return 'utility';
-    case 'advance':
-    case 'fee': return 'other';
-    default: return type;
+    case 'utilities':
+      return 'utility';
+    case 'fee':
+      return 'other';
+    default:
+      return type;
   }
 };
 
