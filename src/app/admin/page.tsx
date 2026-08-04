@@ -1,138 +1,69 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
-import { 
-  Building2, 
-  Home, 
-  Users, 
-  DollarSign,
-  TrendingUp,
-  ArrowRight,
-  BarChart3,
-  Package
-} from 'lucide-react';
+import { Users, Percent, Banknote, DoorOpen } from 'lucide-react';
 import ActiveTenantsList from '@/components/features/dashboard/ActiveTenantsList';
 import NotificationsWidget from '@/components/features/dashboard/NotificationsWidget';
 import ActivityLogsWidget from '@/components/features/dashboard/ActivityLogsWidget';
+import NeedsAttentionWidget from '@/components/features/dashboard/NeedsAttentionWidget';
+import DashboardReportsHub from '@/components/features/dashboard/DashboardReportsHub';
 
-// Force fresh data on every page load (no caching)
 export const revalidate = 0;
 
 interface DashboardStats {
-  buildings: {
-    total: number;
-    active: number;
-    totalUnits: number;
-    activeUnits: number;
-  };
-  rooms: {
-    total: number;
-    occupied: number;
-    vacant: number;
-    maintenance: number;
-    occupancyRate: number;
-  };
-  tenants: {
-    total: number;
-    active: number;
-    pending: number;
-  };
-  financial: {
-    totalPayments: number;
-    paidPayments: number;
-    pendingPayments: number;
-    overduePayments: number;
-    totalRevenue: number;
-    pendingRevenue: number;
-  };
-  summary: {
-    occupancyRate: number;
-    activeBuildings: number;
-    activeTenants: number;
-    monthlyRevenue: number;
-  };
+  activeTenants: number;
+  occupancyRate: number;
+  collectedThisMonth: number;
+  vacantRooms: number;
+  monthLabel: string;
 }
 
 async function getDashboardStats(): Promise<DashboardStats | null> {
   try {
-    const { getBuildingStats, getOccupancyStats } = await import('@/lib/api/buildings');
+    const { getOccupancyStats } = await import('@/lib/api/buildings');
     const pool = (await import('@/lib/db')).default;
 
     const tenantStatsQuery = `
-      SELECT 
-        COUNT(*) as total_tenants,
-        COUNT(*) FILTER (WHERE tenant_status = 'active') as active_tenants,
-        COUNT(*) FILTER (WHERE tenant_status = 'pending') as pending_tenants
-      FROM tenants 
+      SELECT COUNT(*) FILTER (WHERE tenant_status = 'active')::int AS active_tenants
+      FROM tenants
       WHERE is_active = true
     `;
 
-    const financialStatsQuery = `
-      SELECT 
-        COUNT(*) as total_payments,
-        COUNT(*) FILTER (WHERE payment_status = 'paid') as paid_payments,
-        COUNT(*) FILTER (WHERE payment_status = 'pending') as pending_payments,
-        COUNT(*) FILTER (WHERE payment_status = 'overdue') as overdue_payments,
-        COALESCE(SUM(amount) FILTER (WHERE payment_status = 'paid'), 0) as total_revenue,
-        COALESCE(SUM(amount) FILTER (WHERE payment_status = 'pending'), 0) as pending_revenue
+    const collectedQuery = `
+      SELECT COALESCE(SUM(amount), 0) AS collected
       FROM payments
+      WHERE payment_date >= DATE_TRUNC('month', CURRENT_DATE)
+        AND payment_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+        AND payment_status IN ('paid', 'pending')
     `;
 
-    const [buildingStats, occupancyStats, tenantStatsResult, financialStatsResult] =
-      await Promise.all([
-        getBuildingStats(),
-        getOccupancyStats(),
-        pool.query(tenantStatsQuery),
-        pool.query(financialStatsQuery),
-      ]);
+    const [occupancyStats, tenantStatsResult, collectedResult] = await Promise.all([
+      getOccupancyStats(),
+      pool.query(tenantStatsQuery),
+      pool.query(collectedQuery),
+    ]);
 
-    const tenantStats = tenantStatsResult.rows[0];
-    const financialStats = financialStatsResult.rows[0];
+    const monthLabel = new Date().toLocaleDateString('en-PH', { month: 'short' });
 
-    // Calculate metrics
-    const occupancyRate = parseFloat(occupancyStats.occupancy_rate || '0');
-    const activeTenantsCount = parseInt(tenantStats.active_tenants || '0');
-    const totalRevenue = parseFloat(financialStats.total_revenue || '0');
-    
     return {
-      buildings: {
-        total: parseInt(buildingStats.total_buildings || '0'),
-        active: parseInt(buildingStats.active_buildings || '0'),
-        totalUnits: parseInt(buildingStats.total_units || '0'),
-        activeUnits: parseInt(buildingStats.active_units || '0')
-      },
-      rooms: {
-        total: parseInt(occupancyStats.total_rooms || '0'),
-        occupied: parseInt(occupancyStats.occupied_rooms || '0'),
-        vacant: parseInt(occupancyStats.vacant_rooms || '0'),
-        maintenance: parseInt(occupancyStats.maintenance_rooms || '0'),
-        occupancyRate: occupancyRate
-      },
-      tenants: {
-        total: parseInt(tenantStats.total_tenants || '0'),
-        active: activeTenantsCount,
-        pending: parseInt(tenantStats.pending_tenants || '0')
-      },
-      financial: {
-        totalPayments: parseInt(financialStats.total_payments || '0'),
-        paidPayments: parseInt(financialStats.paid_payments || '0'),
-        pendingPayments: parseInt(financialStats.pending_payments || '0'),
-        overduePayments: parseInt(financialStats.overdue_payments || '0'),
-        totalRevenue: totalRevenue,
-        pendingRevenue: parseFloat(financialStats.pending_revenue || '0')
-      },
-      summary: {
-        occupancyRate: occupancyRate,
-        activeBuildings: parseInt(buildingStats.active_buildings || '0'),
-        activeTenants: activeTenantsCount,
-        monthlyRevenue: totalRevenue
-      }
+      activeTenants: parseInt(tenantStatsResult.rows[0]?.active_tenants || '0', 10),
+      occupancyRate: parseFloat(occupancyStats.occupancy_rate || '0'),
+      collectedThisMonth: parseFloat(collectedResult.rows[0]?.collected || '0'),
+      vacantRooms: parseInt(occupancyStats.vacant_rooms || '0', 10),
+      monthLabel,
     };
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     return null;
   }
+}
+
+function formatPhp(amount: number): string {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export default async function AdminDashboard() {
@@ -144,282 +75,95 @@ export default async function AdminDashboard() {
 
   const stats = await getDashboardStats();
 
-  const quickActions = [
-    {
-      title: 'Add Building',
-      description: 'Create a new property',
-      href: '/admin/properties',
-      icon: Building2,
-      bgColor: 'bg-blue-100',
-      iconColor: 'text-blue-600'
-    },
-    {
-      title: 'Add Room',
-      description: 'Add a new unit',
-      href: '/admin/rooms',
-      icon: Home,
-      bgColor: 'bg-green-100',
-      iconColor: 'text-green-600'
-    },
-    {
-      title: 'Add Tenant',
-      description: 'Register new tenant',
-      href: '/admin/tenants',
-      icon: Users,
-      bgColor: 'bg-purple-100',
-      iconColor: 'text-purple-600'
-    },
-    {
-      title: 'Record Payment',
-      description: 'Log a payment',
-      href: '/admin/financial/payments/new',
-      icon: DollarSign,
-      bgColor: 'bg-yellow-100',
-      iconColor: 'text-yellow-600'
-    },
-    {
-      title: 'Add Asset',
-      description: 'Track new asset',
-      href: '/admin/assets',
-      icon: Package,
-      bgColor: 'bg-indigo-100',
-      iconColor: 'text-indigo-600'
-    },
-    {
-      title: 'View Reports',
-      description: 'Financial reports',
-      href: '/admin/reports',
-      icon: BarChart3,
-      bgColor: 'bg-pink-100',
-      iconColor: 'text-pink-600'
-    }
-  ];
+  const statCards = stats
+    ? [
+        {
+          label: 'Active tenants',
+          value: String(stats.activeTenants),
+          icon: Users,
+          iconWrap: 'bg-purple-50 text-purple-600',
+        },
+        {
+          label: 'Occupancy rate',
+          value: `${Math.round(stats.occupancyRate)}%`,
+          icon: Percent,
+          iconWrap: 'bg-emerald-50 text-emerald-600',
+        },
+        {
+          label: `Collected (${stats.monthLabel})`,
+          value: formatPhp(stats.collectedThisMonth),
+          icon: Banknote,
+          iconWrap: 'bg-blue-50 text-blue-600',
+        },
+        {
+          label: 'Vacant rooms',
+          value: String(stats.vacantRooms),
+          icon: DoorOpen,
+          iconWrap: 'bg-amber-50 text-amber-600',
+        },
+      ]
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {session.user.firstName}! 👋
+          <h2 className="mb-1 text-2xl font-bold text-gray-900 sm:text-3xl">
+            Welcome back, {session.user.firstName}
           </h2>
-          <p className="text-gray-900">
-            Here's what's happening with your properties today.
-                </p>
-              </div>
+          <p className="text-sm text-gray-600">
+            Monitor what needs attention, then generate reports when you need them.
+          </p>
+        </div>
 
-          {/* Stats Grid */}
-        {stats ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* Buildings */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-blue-100 p-3 rounded-lg">
-                  <Building2 className="h-6 w-6 text-blue-600" />
+        {/* Top stat strip */}
+        {statCards ? (
+          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {statCards.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <span
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${card.iconWrap}`}
+                  >
+                    <card.icon className="h-4 w-4" />
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  Active
-                </span>
+                <p className="text-2xl font-bold tabular-nums text-gray-900">{card.value}</p>
+                <p className="mt-1 text-sm text-gray-500">{card.label}</p>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                {stats.buildings.total}
-              </h3>
-              <p className="text-sm text-gray-900 mb-3">Total Buildings</p>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-900">{stats.buildings.totalUnits} units</span>
-                <Link href="/admin/properties" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                  View <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Occupancy */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <Home className="h-6 w-6 text-green-600" />
-                </div>
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                  {stats.rooms.occupancyRate}%
-                </span>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                {stats.rooms.occupied}
-              </h3>
-              <p className="text-sm text-gray-900 mb-3">Occupied Units</p>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-900">{stats.rooms.vacant} vacant</span>
-                <Link href="/admin/rooms" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                  View <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Tenants */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-purple-100 p-3 rounded-lg">
-                  <Users className="h-6 w-6 text-purple-600" />
-                </div>
-                <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-                  Active
-                </span>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                {stats.tenants.active}
-              </h3>
-              <p className="text-sm text-gray-900 mb-3">Active Tenants</p>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-900">{stats.tenants.pending} pending</span>
-                <Link href="/admin/tenants" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                  View <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Revenue */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-yellow-100 p-3 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-yellow-600" />
-                </div>
-                <TrendingUp className="h-5 w-5 text-green-500" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                ₱{stats.summary.monthlyRevenue.toLocaleString()}
-              </h3>
-              <p className="text-sm text-gray-900 mb-3">Monthly Revenue</p>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-900">{stats.financial.paidPayments} payments</span>
-                <Link href="/admin/financial/payments" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                  View <ArrowRight className="h-3 w-3 ml-1" />
-                </Link>
-              </div>
-            </div>
+            ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
-                <div className="h-12 w-12 bg-gray-200 rounded-lg mb-4"></div>
-                <div className="h-8 bg-gray-200 rounded w-20 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-32"></div>
-              </div>
+              <div
+                key={i}
+                className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white"
+              />
             ))}
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Quick Actions</h3>
+        {/* Actionable monitoring */}
+        <NeedsAttentionWidget />
+
+        {/* Monitoring: table + side panels */}
+        <div className="mb-10 grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <ActiveTenantsList />
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickActions.map((action) => (
-              <Link
-                key={action.title}
-                href={action.href}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition group"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className={`${action.bgColor} p-2 rounded-lg w-fit mb-3 group-hover:scale-110 transition`}>
-                      <action.icon className={`h-5 w-5 ${action.iconColor}`} />
-                    </div>
-                    <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
-                    <p className="text-sm text-gray-900">{action.description}</p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition" />
-                </div>
-              </Link>
-            ))}
+          <div className="flex flex-col gap-6">
+            <NotificationsWidget />
+            <ActivityLogsWidget />
           </div>
         </div>
 
-        {/* Dashboard Widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Active Tenants List */}
-          <ActiveTenantsList />
-
-          {/* Notifications Widget */}
-          <NotificationsWidget />
-        </div>
-
-        {/* Activity Logs */}
-        <div className="mb-8">
-          <ActivityLogsWidget />
-        </div>
-
-        {/* Additional Info */}
-        {stats && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Financial Overview */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
-                Financial Overview
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-900">Total Payments</span>
-                  <span className="font-semibold text-gray-900">{stats.financial.totalPayments}</span>
-                </div>
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-900">Paid Payments</span>
-                  <span className="font-semibold text-green-600">{stats.financial.paidPayments}</span>
-                </div>
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-900">Pending Payments</span>
-                  <span className="font-semibold text-yellow-600">{stats.financial.pendingPayments}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-900">Overdue Payments</span>
-                  <span className="font-semibold text-red-600">{stats.financial.overduePayments}</span>
-                </div>
-              </div>
-              <Link 
-                href="/admin/reports"
-                className="mt-6 w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium text-center block"
-              >
-                View Full Report
-              </Link>
-            </div>
-
-            {/* Property Status */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                <Home className="h-5 w-5 mr-2 text-blue-600" />
-                Property Status
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-900">Total Units</span>
-                  <span className="font-semibold text-gray-900">{stats.rooms.total}</span>
-                </div>
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-900">Occupied</span>
-                  <span className="font-semibold text-green-600">{stats.rooms.occupied}</span>
-                </div>
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-sm text-gray-900">Vacant</span>
-                  <span className="font-semibold text-blue-600">{stats.rooms.vacant}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-900">Under Maintenance</span>
-                  <span className="font-semibold text-orange-600">{stats.rooms.maintenance}</span>
-                </div>
-              </div>
-              <Link 
-                href="/admin/analytics"
-                className="mt-6 w-full bg-gray-100 text-gray-900 py-3 px-4 rounded-lg hover:bg-gray-200 transition font-medium text-center block"
-              >
-                View Analytics
-              </Link>
-            </div>
-          </div>
-        )}
+        {/* On-demand reporting — visually distinct */}
+        <DashboardReportsHub />
       </div>
     </div>
   );
-} 
+}

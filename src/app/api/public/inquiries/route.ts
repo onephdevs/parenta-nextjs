@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createPipelineCard } from '@/lib/api/pipeline';
 import { logActivitySafe } from '@/lib/services/activity-logger';
+import pool from '@/lib/db';
+import {
+  checkInquirySpam,
+  getClientIp,
+  releaseInquiryAttempt,
+} from '@/lib/public-inquiry-guard';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,6 +17,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const ip = getClientIp(request);
 
     // Prefer explicit first/last; fall back to legacy single `name`
     let firstName =
@@ -31,6 +38,12 @@ export async function POST(request: Request) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const honeypot =
+      typeof body.website === 'string'
+        ? body.website
+        : typeof body.company === 'string'
+          ? body.company
+          : '';
 
     if (!firstName || firstName.length < 1) {
       return NextResponse.json(
@@ -53,20 +66,70 @@ export async function POST(request: Request) {
       );
     }
 
+    const spam = checkInquirySpam({
+      honeypot,
+      formStartedAt: body.formStartedAt,
+      firstName,
+      lastName,
+      email,
+      phone,
+      message,
+      ip,
+    });
+
+    if (!spam.ok) {
+      if (spam.silent) {
+        return NextResponse.json({
+          success: true,
+          message: 'Thanks! We received your inquiry and will get back to you soon.',
+        });
+      }
+      return NextResponse.json(
+        { success: false, error: spam.error },
+        { status: spam.status }
+      );
+    }
+
+    // Extra DB cooldown: same email already opened an inquiry in the last hour
+    const recent = await pool.query<{ id: string }>(
+      `SELECT c.id
+       FROM pipeline_cards c
+       INNER JOIN pipeline_boards b ON b.id = c.board_id
+       WHERE b.slug = 'onboarding'
+         AND LOWER(COALESCE(c.contact_email, '')) = $1
+         AND c.created_at > NOW() - INTERVAL '1 hour'
+       LIMIT 1`,
+      [email]
+    );
+    if (recent.rows[0]) {
+      return NextResponse.json({
+        success: true,
+        message:
+          'Thanks! We already have your inquiry and will get back to you soon.',
+        data: { id: recent.rows[0].id, duplicate: true },
+      });
+    }
+
     const fullName = `${firstName} ${lastName}`.trim();
 
-    const card = await createPipelineCard({
-      boardSlug: 'onboarding',
-      stageSlug: 'new_inquiry',
-      title: fullName,
-      contactFirstName: firstName,
-      contactLastName: lastName,
-      contactEmail: email,
-      contactPhone: phone || undefined,
-      source: 'Website',
-      tags: ['Website inquiry'],
-      notes: message || undefined,
-    });
+    let card;
+    try {
+      card = await createPipelineCard({
+        boardSlug: 'onboarding',
+        stageSlug: 'new_inquiry',
+        title: fullName,
+        contactFirstName: firstName,
+        contactLastName: lastName,
+        contactEmail: email,
+        contactPhone: phone || undefined,
+        source: 'Website',
+        tags: ['Website inquiry'],
+        notes: message || undefined,
+      });
+    } catch (err) {
+      releaseInquiryAttempt(ip, email);
+      throw err;
+    }
 
     logActivitySafe({
       actorUserId: null,
@@ -81,6 +144,7 @@ export async function POST(request: Request) {
         phone: phone || null,
         hasMessage: Boolean(message),
         source: 'website_contact',
+        ip,
       },
       link: '/admin/tasks',
       skipNotifications: false,

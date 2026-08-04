@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
+import { ReceiptUploadPanel, type ReceiptLinkOption } from '@/components/features/tenant/ReceiptUploadPanel';
 import PaymentForm from '@/components/features/tenant/PaymentForm';
 import DepositPaymentForm from '@/components/features/tenant/DepositPaymentForm';
 import UtilityDepositForm from '@/components/features/tenant/UtilityDepositForm';
@@ -93,8 +94,12 @@ interface PaymentSummary {
 
 interface BalanceData {
   outstanding: number;
+  pastDue: number;
+  pastDueCount: number;
+  upcoming: number;
   lateFees: number;
   total: number;
+  pastDueTotal: number;
   outstandingCount: number;
   nextDueDate: string | null;
   nextAmount: number;
@@ -196,9 +201,12 @@ export default function PaymentsPage() {
 
   const fetchPaymentData = async (force = false) => {
     try {
+      const cachedBalance = getCached<BalanceData>('balance');
+      const balanceNeedsRefresh =
+        force || cachedBalance == null || typeof cachedBalance.pastDue !== 'number';
       const [paymentsRaw, balanceRaw] = await Promise.all([
         load('payments', fetchTenantPayments, { force }),
-        load('balance', fetchTenantBalance, { force }),
+        load('balance', fetchTenantBalance, { force: balanceNeedsRefresh }),
       ]);
       setPaymentData(mapPaymentSummary(paymentsRaw));
       setBalanceData(balanceRaw as unknown as BalanceData);
@@ -370,6 +378,33 @@ export default function PaymentsPage() {
 
   const summaryCardClass = theme.card;
   const panelClass = cn(theme.formPanel, 'overflow-hidden');
+
+  const receiptLinkOptions: ReceiptLinkOption[] = [];
+  if (paymentData?.schedule?.length) {
+    for (const item of paymentData.schedule) {
+      receiptLinkOptions.push({
+        value: `invoice:${item.id}`,
+        label: `Invoice due ${formatDate(item.dueDate)} · ${formatCurrency(item.balanceDue)} (${item.invoiceNumber || 'invoice'})`,
+        kind: 'invoice',
+        invoiceId: item.id,
+        defaultAmount: item.balanceDue,
+        defaultDate: item.dueDate,
+      });
+    }
+  }
+  if (paymentData?.recentPayments?.length) {
+    for (const payment of paymentData.recentPayments) {
+      receiptLinkOptions.push({
+        value: `payment:${payment.id}`,
+        label: `Payment ${formatDate(payment.paymentDate)} · ${formatCurrency(payment.amount)} · ${payment.type || 'payment'}`,
+        kind: 'payment',
+        paymentId: payment.id,
+        defaultAmount: payment.amount,
+        defaultDate: payment.paymentDate,
+      });
+    }
+  }
+
   const paymentScheduleSection =
     paymentData && paymentData.schedule && paymentData.schedule.length > 0 ? (
       <div className={panelClass}>
@@ -674,17 +709,18 @@ export default function PaymentsPage() {
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
                         <AlertCircle
-                          className={`h-6 w-6 ${(balanceData?.total || 0) > 0 ? 'text-red-400' : 'text-emerald-400'}`}
+                          className={`h-6 w-6 ${(balanceData?.pastDueTotal ?? balanceData?.total ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'}`}
                         />
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
-                          <dt className={theme.label}>
-                            Total Balance
-                          </dt>
+                          <dt className={theme.label}>Past due</dt>
                           <dd className={theme.value}>
                             {formatCurrency(
-                              balanceData?.total || paymentData?.outstandingBalance || 0
+                              balanceData?.pastDueTotal ??
+                                balanceData?.total ??
+                                paymentData?.totalOverdue ??
+                                0
                             )}
                           </dd>
                         </dl>
@@ -729,63 +765,6 @@ export default function PaymentsPage() {
                   </div>
                 </div>
               </div>
-
-              {balanceData && (
-                <div className={theme.cardPad}>
-                  <h3 className={cn('mb-3', theme.sectionTitle)}>Balance breakdown</h3>
-                  <dl className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className={theme.listLabel}>Rent / invoices outstanding</dt>
-                      <dd className={theme.listValue}>
-                        {formatCurrency(balanceData.outstanding)}
-                      </dd>
-                    </div>
-                    {(balanceData.lateFees > 0 ||
-                      (balanceData.lateFeeDetails && balanceData.lateFeeDetails.length > 0)) && (
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between gap-4">
-                          <dt className={theme.listLabel}>Late fee applied</dt>
-                          <dd className={cn('font-medium', theme.iconDanger)}>
-                            {formatCurrency(balanceData.lateFees)}
-                          </dd>
-                        </div>
-                        {balanceData.lateFeeDetails && balanceData.lateFeeDetails.length > 0 && (
-                          <ul
-                            className={cn(
-                              'ml-1 space-y-1 border-l pl-3 text-xs',
-                              theme.shellNavBorder,
-                              theme.shellMuted
-                            )}
-                          >
-                            {balanceData.lateFeeDetails.map((detail) => (
-                              <li key={detail.invoiceId} className="flex justify-between gap-3">
-                                <span>
-                                  Invoice overdue {detail.daysOverdue} day
-                                  {detail.daysOverdue === 1 ? '' : 's'}
-                                </span>
-                                <span className={theme.iconDanger}>
-                                  {formatCurrency(detail.lateFee)}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        'flex items-center justify-between gap-4 border-t pt-2',
-                        theme.divider
-                      )}
-                    >
-                      <dt className={theme.listTotalLabel}>Total balance</dt>
-                      <dd className={theme.listTotalValue}>
-                        {formatCurrency(balanceData.total)}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              )}
 
               {!isPreview && (
                 <div className="flex justify-end">
@@ -1035,14 +1014,19 @@ export default function PaymentsPage() {
             </div>
           )}
 
-          {/* Upload: history rows with Upload/Print */}
+          {/* Upload: dedicated panel to attach receipt + link payment date */}
           {activeTab === 'upload' && (
-            <>
-              <div className={cn(theme.cardPad, 'text-sm', theme.body)}>
-                Select a payment below to upload a receipt image, or print an existing receipt.
-              </div>
-              {paymentHistorySection}
-            </>
+            <div className="space-y-6">
+              <ReceiptUploadPanel
+                options={receiptLinkOptions}
+                onUploadComplete={handleReceiptUploadComplete}
+              />
+              {paymentData.recentPayments.length > 0 && (
+                <div className={cn(theme.cardPad, 'text-sm', theme.body)}>
+                  You can also upload against an existing payment from History after it appears below.
+                </div>
+              )}
+            </div>
           )}
 
           {/* History: schedule + history */}

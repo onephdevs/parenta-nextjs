@@ -6,6 +6,9 @@
 import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
+/** Default portal password for tenants created from lease generation / admin setup. */
+export const DEFAULT_TENANT_PASSWORD = 'tenant123';
+
 export interface CreateTenantWithUserData {
   // User account fields
   email: string;

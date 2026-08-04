@@ -374,7 +374,9 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p className="mt-2 text-sm text-gray-900">No invoices found</p>
-              <p className="text-xs text-gray-400">Invoices will be automatically generated when the tenant is assigned to a room</p>
+              <p className="text-xs text-gray-400">
+                Invoices are scheduled when a lease is created (admin assign, opportunity Generate lease, or reservation convert). Future months stay draft until their issue date.
+              </p>
             </div>
           )}
         </div>

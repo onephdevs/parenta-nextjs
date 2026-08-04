@@ -106,11 +106,15 @@ export async function generateNextMonthRentInvoice(
 
     const billingPeriodStart = new Date(nextMonth);
     const billingPeriodEnd = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0);
+    const { initialInvoiceStatusForIssueDate } = await import(
+      '@/lib/services/invoice-issue-timing'
+    );
+    const invoiceStatus = initialInvoiceStatusForIssueDate(billingPeriodStart);
 
     // Generate invoice number
     const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // Create invoice
+    // Create invoice — stays draft until the billing month's issue_date
     const invoiceResult = await client.query(
       `INSERT INTO invoices (
         tenant_id,
@@ -130,7 +134,7 @@ export async function generateNextMonthRentInvoice(
       [
         tenantId,
         invoiceNumber,
-        new Date(),
+        billingPeriodStart,
         dueDate,
         billingPeriodStart,
         billingPeriodEnd,
@@ -138,7 +142,7 @@ export async function generateNextMonthRentInvoice(
         0, // No tax
         monthlyRent,
         0, // Not paid yet
-        'sent',
+        invoiceStatus,
         `Auto-generated rent invoice for ${assignment.building_name} - ${assignment.room_number}`
       ]
     );
@@ -165,17 +169,19 @@ export async function generateNextMonthRentInvoice(
 
     await client.query('COMMIT');
 
-    // Automatically apply available advance to this newly created rent invoice
+    // Automatically apply available advance only once the invoice is issued
     let advanceApplied = false;
     let advanceAmount = 0;
-    try {
-      const advanceResult = await autoApplyAdvanceToUnpaidRentInvoices(tenantId);
-      if (advanceResult.success && advanceResult.totalApplied > 0) {
-        advanceApplied = true;
-        advanceAmount = advanceResult.totalApplied;
+    if (invoiceStatus === 'sent') {
+      try {
+        const advanceResult = await autoApplyAdvanceToUnpaidRentInvoices(tenantId);
+        if (advanceResult.success && advanceResult.totalApplied > 0) {
+          advanceApplied = true;
+          advanceAmount = advanceResult.totalApplied;
+        }
+      } catch (advanceError) {
+        console.warn('Could not auto-apply advance to newly created invoice:', advanceError);
       }
-    } catch (advanceError) {
-      console.warn('Could not auto-apply advance to newly created invoice:', advanceError);
     }
 
     return {

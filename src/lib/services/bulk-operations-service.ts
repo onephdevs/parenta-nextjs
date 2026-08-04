@@ -145,6 +145,12 @@ export async function generateMonthlyInvoicesForAllTenants(
         const dueDate = new Date(targetDate);
         dueDate.setDate(5);
         const dueDateStr = dueDate.toISOString().slice(0, 10);
+        const issueDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+        const issueDateStr = issueDate.toISOString().slice(0, 10);
+        const { initialInvoiceStatusForIssueDate } = await import(
+          '@/lib/services/invoice-issue-timing'
+        );
+        const invoiceStatus = initialInvoiceStatusForIssueDate(issueDate);
 
         const insertValues: unknown[] = [];
         const placeholders: string[] = [];
@@ -154,11 +160,13 @@ export async function generateMonthlyInvoicesForAllTenants(
           nextNum += 1;
           const invoiceNumber = `INV-${String(nextNum).padStart(6, '0')}`;
           placeholders.push(
-            `($${p++}, $${p++}, 'sent', CURRENT_DATE, $${p++}, $${p++}, 0, $${p++})`
+            `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, 0, $${p++})`
           );
           insertValues.push(
             tenant.tenant_id,
             invoiceNumber,
+            invoiceStatus,
+            issueDateStr,
             dueDateStr,
             tenant.monthly_rent,
             `Monthly rent for ${targetMonth}`

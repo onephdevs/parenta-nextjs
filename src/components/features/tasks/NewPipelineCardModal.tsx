@@ -1,7 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Building2, Calendar, CircleX, FileCheck2, FileText, ShieldCheck, Tag, User } from 'lucide-react';
+import {
+  Building2,
+  Calendar,
+  CircleX,
+  ExternalLink,
+  FileCheck2,
+  FileText,
+  ShieldCheck,
+  Tag,
+  User,
+  Wallet,
+} from 'lucide-react';
 import SectionedFormShell, {
   type SectionedFormSection,
 } from '@/components/ui/SectionedFormShell';
@@ -131,6 +142,44 @@ const onboardingSections: SectionedFormSection<FormSection>[] = [
   },
 ];
 
+const paymentsSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'contact',
+    label: 'Tenant',
+    icon: <User className="h-4 w-4" />,
+    title: 'Tenant contact',
+    subtitle: 'Who owes rent — confirm phone/email before you chase payment.',
+  },
+  {
+    id: 'property',
+    label: 'Lease',
+    icon: <Building2 className="h-4 w-4" />,
+    title: 'Unit & rent',
+    subtitle: 'Building, room, and monthly amount for this follow-up.',
+  },
+  {
+    id: 'schedule',
+    label: 'Due date',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'When payment is due',
+    subtitle: 'Set due / next action so you know when to remind or escalate.',
+  },
+  {
+    id: 'notes',
+    label: 'Follow-up',
+    icon: <Wallet className="h-4 w-4" />,
+    title: 'Follow-up notes',
+    subtitle: 'What you said, promised, or need to do next (call, SMS, visit).',
+  },
+  {
+    id: 'tags',
+    label: 'Tags',
+    icon: <Tag className="h-4 w-4" />,
+    title: 'Tags',
+    subtitle: 'e.g. Partial paid, Promise-to-pay, Hard to reach.',
+  },
+];
+
 const genericSections: SectionedFormSection<FormSection>[] = [
   {
     id: 'contact',
@@ -177,6 +226,26 @@ const boardMoveSection: SectionedFormSection<FormSection> = {
   subtitle: 'Send this card to a different pipeline.',
 };
 
+function sectionsForBoard(
+  board: PipelineBoard,
+  isEditing: boolean
+): SectionedFormSection<FormSection>[] {
+  if (board.slug === 'onboarding') {
+    return isEditing
+      ? onboardingSections
+      : onboardingSections.filter(
+          (s) => s.id !== 'documents' && s.id !== 'screening' && s.id !== 'lease'
+        );
+  }
+
+  const base = board.slug === 'payments' ? paymentsSections : genericSections;
+  if (!isEditing) return base;
+
+  const tagsIdx = base.findIndex((s) => s.id === 'tags');
+  if (tagsIdx < 0) return [...base, boardMoveSection];
+  return [...base.slice(0, tagsIdx), boardMoveSection, ...base.slice(tagsIdx)];
+}
+
 export function AddOpportunityModal({
   isOpen,
   board,
@@ -189,19 +258,8 @@ export function AddOpportunityModal({
 }: AddOpportunityModalProps) {
   const isEditing = Boolean(card?.id);
   const isOnboarding = board.slug === 'onboarding';
-  const sections = isOnboarding
-    ? isEditing
-      ? onboardingSections
-      : onboardingSections.filter(
-          (s) => s.id !== 'documents' && s.id !== 'screening' && s.id !== 'lease'
-        )
-    : isEditing
-      ? [
-          ...genericSections.slice(0, genericSections.findIndex((s) => s.id === 'tags')),
-          boardMoveSection,
-          ...genericSections.slice(genericSections.findIndex((s) => s.id === 'tags')),
-        ]
-      : genericSections;
+  const isPayments = board.slug === 'payments';
+  const sections = sectionsForBoard(board, isEditing);
 
   const [activeSection, setActiveSection] = useState<FormSection>('contact');
   const [submitting, setSubmitting] = useState(false);
@@ -221,6 +279,7 @@ export function AddOpportunityModal({
   const [title, setTitle] = useState('');
   const [viewingAt, setViewingAt] = useState('');
   const [dueAt, setDueAt] = useState('');
+  const [nextActionAt, setNextActionAt] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [markAsLost, setMarkAsLost] = useState(false);
   const [lostReason, setLostReason] = useState('');
@@ -268,6 +327,7 @@ export function AddOpportunityModal({
       setTitle(card.title || '');
       setViewingAt(toDatetimeLocal(card.viewingAt));
       setDueAt(toDatetimeLocal(card.dueAt));
+      setNextActionAt(toDatetimeLocal(card.nextActionAt));
       setTags(card.tags || []);
       setMarkAsLost(
         card.cardStatus === 'lost' ||
@@ -296,6 +356,7 @@ export function AddOpportunityModal({
       setTitle('');
       setViewingAt('');
       setDueAt('');
+      setNextActionAt('');
       setTags([]);
       setMarkAsLost(false);
       setLostReason('');
@@ -512,6 +573,7 @@ export function AddOpportunityModal({
           notes: notes.trim() || null,
           viewingAt: viewingAt ? new Date(viewingAt).toISOString() : null,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+          nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
           lostReason: markAsLost ? lostReason.trim() : lostReason.trim() || null,
           markAsLost,
           backgroundCheckStatus,
@@ -578,7 +640,12 @@ export function AddOpportunityModal({
           contactEmail: email.trim() || undefined,
           contactPhone: phone.trim() || undefined,
           buildingId: buildingId || undefined,
+          roomId: roomId || undefined,
+          amount: amount ? Number(amount) : undefined,
           dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+          nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : undefined,
+          notes: notes.trim() || undefined,
+          tags: tags.length > 0 ? tags : undefined,
         });
       } else {
         Object.assign(body, {
@@ -623,7 +690,15 @@ export function AddOpportunityModal({
       mode="dialog"
       isOpen={isOpen}
       onCancel={onClose}
-      eyebrow={isEditing ? 'Edit opportunity' : 'Add opportunity'}
+      eyebrow={
+        isEditing
+          ? isPayments
+            ? 'Payment follow-up'
+            : 'Edit opportunity'
+          : isPayments
+            ? 'Add payment follow-up'
+            : 'Add opportunity'
+      }
       entityLabel={entityLabel}
       sections={sections}
       activeSection={activeSection}
@@ -1017,8 +1092,10 @@ export function AddOpportunityModal({
                 ) : (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
                     <p className="text-sm text-gray-600">
-                      Generate lease creates the tenant account, assigns the room, and adds the lease
-                      in Lease management. Requires contact email, building, room, and lease start.
+                      Generate lease creates the tenant account (login: their registered email /
+                      password <span className="font-mono text-gray-800">tenant123</span>), assigns
+                      the room, and adds the lease in Lease management. Requires contact email,
+                      building, room, and lease start.
                     </p>
                     <Button
                       type="button"
@@ -1153,6 +1230,31 @@ export function AddOpportunityModal({
           </>
         ) : (
           <>
+            {isPayments && isEditing && activeSection === 'contact' && (
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                <p className="font-medium">How to use Payments cards</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-4 text-indigo-800">
+                  <li>
+                    Drag the card across stages: Upcoming → Due → Reminder sent → Overdue → Paid
+                    (or Escalation).
+                  </li>
+                  <li>Set the due date, then log what you did in Follow-up notes.</li>
+                  <li>Record the actual money in Payments / Financial — this board tracks chase work.</li>
+                </ol>
+                {card?.tenantId && (
+                  <a
+                    href={`/admin/tenants/${card.tenantId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700 underline"
+                  >
+                    Open tenant profile
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            )}
+
             {activeSection === 'contact' && (
               <>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -1213,7 +1315,37 @@ export function AddOpportunityModal({
                     ))}
                   </Select>
                 </FormField>
-                <FormField label="Amount (₱)" htmlFor="opp-amount">
+                {isPayments && (
+                  <FormField label="Room" htmlFor="opp-room-payments">
+                    <Select
+                      id="opp-room-payments"
+                      value={roomId}
+                      onChange={(e) => {
+                        const nextRoomId = e.target.value;
+                        setRoomId(nextRoomId);
+                        const room = rooms.find((r) => r.id === nextRoomId);
+                        if (room) setAmount(String(room.monthlyRate));
+                      }}
+                      disabled={!buildingId}
+                    >
+                      <option value="">Select room</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomNumber} — ₱{r.monthlyRate.toLocaleString('en-PH')}/mo
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                )}
+                <FormField
+                  label={isPayments ? 'Monthly rent (₱)' : 'Amount (₱)'}
+                  htmlFor="opp-amount"
+                  hint={
+                    isPayments
+                      ? 'Rent you are following up on this cycle.'
+                      : undefined
+                  }
+                >
                   <Input
                     id="opp-amount"
                     type="number"
@@ -1227,12 +1359,60 @@ export function AddOpportunityModal({
             )}
 
             {activeSection === 'schedule' && (
-              <FormField label="Due" htmlFor="opp-due">
-                <Input
-                  id="opp-due"
-                  type="datetime-local"
-                  value={dueAt}
-                  onChange={(e) => setDueAt(e.target.value)}
+              <>
+                <FormField
+                  label={isPayments ? 'Rent due' : 'Due'}
+                  htmlFor="opp-due"
+                  hint={
+                    isPayments
+                      ? 'When this month’s rent should be paid. Drag the card to Due when that day arrives.'
+                      : undefined
+                  }
+                >
+                  <Input
+                    id="opp-due"
+                    type="datetime-local"
+                    value={dueAt}
+                    onChange={(e) => setDueAt(e.target.value)}
+                  />
+                </FormField>
+                {isPayments && (
+                  <FormField
+                    label="Next follow-up"
+                    htmlFor="opp-next-action"
+                    hint="When you plan to call / message again."
+                  >
+                    <Input
+                      id="opp-next-action"
+                      type="datetime-local"
+                      value={nextActionAt}
+                      onChange={(e) => setNextActionAt(e.target.value)}
+                    />
+                  </FormField>
+                )}
+              </>
+            )}
+
+            {activeSection === 'notes' && (
+              <FormField
+                label={isPayments ? 'Follow-up notes' : 'Notes'}
+                htmlFor="opp-notes-generic"
+                hint={
+                  isPayments
+                    ? 'Example: Called 8/4 — promised to pay Friday. Reminder SMS sent.'
+                    : undefined
+                }
+              >
+                <Textarea
+                  id="opp-notes-generic"
+                  rows={5}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={
+                    isPayments
+                      ? 'Log calls, promises, partial payments…'
+                      : 'Follow-up context'
+                  }
                 />
               </FormField>
             )}

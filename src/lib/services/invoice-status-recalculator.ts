@@ -35,9 +35,14 @@ interface InvoicePaymentTotalsRow {
   balance_due: string | number;
   invoice_status: string;
   due_date: Date | string | null;
+  issue_date: Date | string | null;
   total_allocated: string | number;
   total_advance: string | number;
   total_deposit: string | number;
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 /** Pure status derivation — shared by single + batch paths for identical outcomes. */
@@ -45,12 +50,34 @@ export function deriveInvoiceStatus(params: {
   totalAmount: number;
   totalPaid: number;
   dueDate: Date | string | null;
+  issueDate?: Date | string | null;
+  currentStatus?: string;
   now?: Date;
 }): { newStatus: string; balanceDue: number } {
-  const { totalAmount, totalPaid, dueDate, now = new Date() } = params;
+  const {
+    totalAmount,
+    totalPaid,
+    dueDate,
+    issueDate = null,
+    currentStatus,
+    now = new Date(),
+  } = params;
   const balanceDue = totalAmount - totalPaid;
   const due = dueDate ? new Date(dueDate) : null;
   const isOverdue = Boolean(due && due < now && balanceDue > 0);
+
+  // Preserve cancelled
+  if (currentStatus === 'cancelled') {
+    return { newStatus: 'cancelled', balanceDue };
+  }
+
+  // Keep future-dated drafts hidden until issue_date
+  const issue = issueDate ? new Date(issueDate) : null;
+  const issueInFuture =
+    Boolean(issue) && startOfLocalDay(issue!).getTime() > startOfLocalDay(now).getTime();
+  if ((currentStatus === 'draft' || issueInFuture) && totalPaid <= 0 && issueInFuture) {
+    return { newStatus: 'draft', balanceDue };
+  }
 
   let newStatus: string;
   if (balanceDue <= 0) {
@@ -75,6 +102,8 @@ function rowToResult(row: InvoicePaymentTotalsRow, now: Date): RecalculationResu
     totalAmount,
     totalPaid,
     dueDate: row.due_date,
+    issueDate: row.issue_date,
+    currentStatus: oldStatus,
     now,
   });
   const updated =
@@ -136,6 +165,7 @@ async function fetchInvoicePaymentTotals(
       i.balance_due,
       i.invoice_status,
       i.due_date,
+      i.issue_date,
       COALESCE(pa.total_allocated, 0) AS total_allocated,
       COALESCE(tc.total_advance, 0) AS total_advance,
       COALESCE(dl.total_deposit, 0) AS total_deposit

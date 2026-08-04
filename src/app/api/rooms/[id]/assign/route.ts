@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { generateInvoicesForTenant } from '@/lib/services/invoice-generator';
 import {
   getBuildingDepositConfig,
   calculateRequiredDeposit,
@@ -234,26 +233,23 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     await client.query('COMMIT');
 
-    // Always generate rent invoices for new assignments if end date is provided
-    // This ensures all new tenant assignments automatically get rent invoices
-    // Note: This is forward-looking only - does not retroactively create invoices for existing assignments
+    // Schedule rent invoices for the lease (draft until issue_date is met).
+    // Open-ended leases get the next 12 months scheduled.
     let invoiceResult;
-    if (endDate) {
-      try {
-        invoiceResult = await generateInvoicesForTenant({
-          tenantId,
-          roomId,
-          leaseStartDate: new Date(startDate),
-          leaseEndDate: new Date(endDate),
-          monthlyRent: parseFloat(monthlyRate),
-          depositAmount: depositPaid ? parseFloat(depositPaid) : undefined,
-          advanceAmount: advanceAmount ? parseFloat(advanceAmount) : undefined
-        });
-      } catch (invoiceError) {
-        console.error('Error generating invoices:', invoiceError);
-        // Don't fail the assignment if invoice generation fails
-        // Just log the error and continue
-      }
+    try {
+      const { ensureRentInvoicesForLease } = await import('@/lib/services/invoice-generator');
+      invoiceResult = await ensureRentInvoicesForLease({
+        tenantId,
+        roomId,
+        leaseStartDate: startDate,
+        leaseEndDate: endDate || null,
+        monthlyRent: parseFloat(monthlyRate),
+        depositAmount: depositPaid ? parseFloat(depositPaid) : undefined,
+        advanceAmount: advanceAmount ? parseFloat(advanceAmount) : undefined,
+      });
+    } catch (invoiceError) {
+      console.error('Error generating invoices:', invoiceError);
+      // Don't fail the assignment if invoice generation fails
     }
 
     logActivitySafe({

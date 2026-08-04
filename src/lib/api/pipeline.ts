@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { createTenantWithUser } from '@/lib/api/tenant-user-link';
+import { createTenantWithUser, DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
 import type {
   CreatePipelineCardData,
   PipelineBackgroundCheckStatus,
@@ -569,7 +569,8 @@ export async function convertOnboardingCardToLeaseSigned(
       try {
         const created = await createTenantWithUser({
           email,
-          sendInvitation: true,
+          password: DEFAULT_TENANT_PASSWORD,
+          sendInvitation: false,
           firstName,
           lastName,
           phone: card.contactPhone || undefined,
@@ -771,9 +772,218 @@ export async function convertOnboardingCardToLeaseSigned(
     client.release();
   }
 
+  // Schedule rent invoices aligned to the lease (draft until issue_date)
+  try {
+    const { ensureRentInvoicesForLease } = await import('@/lib/services/invoice-generator');
+    await ensureRentInvoicesForLease({
+      tenantId: String(tenantId),
+      roomId: String(card.roomId),
+      leaseStartDate: startDate,
+      leaseEndDate: endDate,
+      monthlyRent: monthlyRate,
+    });
+  } catch (invoiceError) {
+    console.error('Lease created but invoice scheduling failed:', invoiceError);
+  }
+
+  // Keep Payments board in sync with the new lease
+  try {
+    await ensurePaymentFollowUpCard({
+      tenantId: String(tenantId),
+      assignmentId,
+      buildingId: room.building_id,
+      roomId: String(card.roomId),
+      amount: monthlyRate,
+      contactFirstName: firstName,
+      contactLastName: lastName,
+      contactEmail: email,
+      contactPhone: card.contactPhone || undefined,
+    });
+  } catch (syncError) {
+    console.error('Lease created but payments card sync failed:', syncError);
+  }
+
   const updated = await getPipelineCardById(cardId);
   if (!updated) throw new Error('Failed to reload card after lease generation');
   return updated;
+}
+
+export interface SyncLeasesResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  paymentCardIds: string[];
+}
+
+interface LeaseSyncRow {
+  tenant_id: string;
+  assignment_id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  building_id: string;
+  room_id: string;
+  monthly_rate: string;
+  start_date: string;
+  end_date: string | null;
+}
+
+/**
+ * Ensure an open Payments-board follow-up card exists for an active lease.
+ * Dedupes on tenant_id within the payments board.
+ */
+export async function ensurePaymentFollowUpCard(input: {
+  tenantId: string;
+  assignmentId: string;
+  buildingId: string;
+  roomId: string;
+  amount: number;
+  contactFirstName: string;
+  contactLastName: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  source?: string;
+}): Promise<{ card: PipelineCard; created: boolean }> {
+  const existing = await pool.query<{ id: string }>(
+    `SELECT c.id
+     FROM pipeline_cards c
+     INNER JOIN pipeline_boards b ON b.id = c.board_id
+     WHERE b.slug = 'payments'
+       AND c.tenant_id = $1
+       AND c.card_status = 'open'
+     ORDER BY c.updated_at DESC
+     LIMIT 1`,
+    [input.tenantId]
+  );
+
+  if (existing.rows[0]) {
+    const updated = await updatePipelineCard(existing.rows[0].id, {
+      assignmentId: input.assignmentId,
+      buildingId: input.buildingId,
+      roomId: input.roomId,
+      amount: input.amount,
+      contactFirstName: input.contactFirstName,
+      contactLastName: input.contactLastName,
+      contactEmail: input.contactEmail || null,
+      contactPhone: input.contactPhone || null,
+      title: `${input.contactFirstName} ${input.contactLastName}`.trim(),
+    });
+    return { card: updated, created: false };
+  }
+
+  const card = await createPipelineCard({
+    boardSlug: 'payments',
+    stageSlug: 'upcoming',
+    title: `${input.contactFirstName} ${input.contactLastName}`.trim(),
+    contactFirstName: input.contactFirstName,
+    contactLastName: input.contactLastName,
+    contactEmail: input.contactEmail,
+    contactPhone: input.contactPhone,
+    buildingId: input.buildingId,
+    roomId: input.roomId,
+    tenantId: input.tenantId,
+    assignmentId: input.assignmentId,
+    amount: input.amount,
+    source: input.source || 'Lease',
+    tags: ['Active lease'],
+    notes: 'Synced from active lease assignment',
+  });
+
+  return { card, created: true };
+}
+
+/**
+ * Sync all active tenant room assignments into pipeline cards:
+ * - Payments board: open follow-up card per tenant (create/update)
+ * - Onboarding won cards: fill missing building/room/assignment links
+ */
+export async function syncActiveLeasesToPipelineCards(): Promise<SyncLeasesResult> {
+  const leases = await pool.query<LeaseSyncRow>(
+    `SELECT
+       t.id AS tenant_id,
+       tra.id AS assignment_id,
+       t.first_name,
+       t.last_name,
+       t.email,
+       t.phone,
+       r.building_id,
+       tra.room_id,
+       tra.monthly_rate::text AS monthly_rate,
+       tra.start_date::text AS start_date,
+       tra.end_date::text AS end_date
+     FROM tenant_room_assignments tra
+     INNER JOIN tenants t ON t.id = tra.tenant_id
+     INNER JOIN rooms r ON r.id = tra.room_id
+     WHERE tra.assignment_status = 'active'
+       AND t.is_active = true
+       AND (tra.end_date IS NULL OR tra.end_date::date >= CURRENT_DATE)
+     ORDER BY tra.start_date DESC`
+  );
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const paymentCardIds: string[] = [];
+
+  for (const lease of leases.rows) {
+    const firstName = (lease.first_name || '').trim() || 'Tenant';
+    const lastName = (lease.last_name || '').trim() || 'Lease';
+    const amount = Number(lease.monthly_rate) || 0;
+
+    try {
+      const result = await ensurePaymentFollowUpCard({
+        tenantId: lease.tenant_id,
+        assignmentId: lease.assignment_id,
+        buildingId: lease.building_id,
+        roomId: lease.room_id,
+        amount,
+        contactFirstName: firstName,
+        contactLastName: lastName,
+        contactEmail: lease.email || undefined,
+        contactPhone: lease.phone || undefined,
+        source: 'Lease sync',
+      });
+      paymentCardIds.push(result.card.id);
+      if (result.created) created += 1;
+      else updated += 1;
+    } catch (err) {
+      console.error('Failed to sync payment card for tenant', lease.tenant_id, err);
+      skipped += 1;
+      continue;
+    }
+
+    // Enrich any onboarding card already linked to this tenant
+    await pool.query(
+      `UPDATE pipeline_cards c
+       SET building_id = COALESCE(c.building_id, $1),
+           room_id = COALESCE(c.room_id, $2),
+           assignment_id = COALESCE(c.assignment_id, $3),
+           amount = COALESCE(c.amount, $4),
+           contact_email = COALESCE(c.contact_email, $5),
+           contact_phone = COALESCE(c.contact_phone, $6),
+           lease_start_date = COALESCE(c.lease_start_date, $7::date),
+           lease_end_date = COALESCE(c.lease_end_date, $8::date),
+           updated_at = CURRENT_TIMESTAMP
+       FROM pipeline_boards b
+       WHERE c.board_id = b.id
+         AND b.slug = 'onboarding'
+         AND c.tenant_id = $9`,
+      [
+        lease.building_id,
+        lease.room_id,
+        lease.assignment_id,
+        amount,
+        lease.email,
+        lease.phone,
+        lease.start_date,
+        lease.end_date,
+        lease.tenant_id,
+      ]
+    );
+  }
+
+  return { created, updated, skipped, paymentCardIds };
 }
 
 export async function transferCardToBoard(
@@ -993,6 +1203,7 @@ export interface UpdatePipelineCardData {
   contactPhone?: string | null;
   buildingId?: string | null;
   roomId?: string | null;
+  assignmentId?: string | null;
   amount?: number | null;
   source?: string | null;
   tags?: string[];
@@ -1137,8 +1348,9 @@ export async function updatePipelineCard(
        lease_start_date = $19,
        lease_end_date = $20,
        move_in_date = $21,
+       assignment_id = COALESCE($22, assignment_id),
        updated_at = CURRENT_TIMESTAMP
-     WHERE id = $22`,
+     WHERE id = $23`,
     [
       title,
       firstName,
@@ -1165,6 +1377,7 @@ export async function updatePipelineCard(
       leaseStartDate,
       leaseEndDate,
       moveInDate,
+      data.assignmentId !== undefined ? data.assignmentId : null,
       cardId,
     ]
   );

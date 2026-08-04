@@ -181,12 +181,20 @@ function applyBalance(
   data: Record<string, unknown>,
   setters: {
     setOutstandingBalance: (v: number | null) => void;
+    setPastDueTotal: (v: number | null) => void;
     setNextDueDate: (v: string | null) => void;
     setNextDueAmount: (v: number | null) => void;
   }
 ) {
+  const pastDueTotal =
+    data.pastDueTotal != null
+      ? Number(data.pastDueTotal)
+      : data.total != null
+        ? Number(data.total)
+        : 0;
+  setters.setPastDueTotal(pastDueTotal);
   setters.setOutstandingBalance(
-    typeof data.total === 'number' ? data.total : Number(data.total) || 0
+    typeof data.outstanding === 'number' ? data.outstanding : Number(data.outstanding) || 0
   );
   setters.setNextDueDate(data.nextDueDate ? String(data.nextDueDate) : null);
   setters.setNextDueAmount(data.nextAmount != null ? Number(data.nextAmount) : null);
@@ -234,6 +242,11 @@ export default function TenantDashboard() {
   });
   const [outstandingBalance, setOutstandingBalance] = useState<number | null>(() => {
     const bal = getCached<Record<string, unknown>>('balance');
+    return bal?.outstanding != null ? Number(bal.outstanding) : null;
+  });
+  const [pastDueTotal, setPastDueTotal] = useState<number | null>(() => {
+    const bal = getCached<Record<string, unknown>>('balance');
+    if (bal?.pastDueTotal != null) return Number(bal.pastDueTotal);
     return bal?.total != null ? Number(bal.total) : null;
   });
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>(() => {
@@ -253,9 +266,17 @@ export default function TenantDashboard() {
         .then((data) => setTenantData(data as unknown as TenantDashboardData))
         .catch((err) => console.error('Error fetching tenant data:', err));
 
-      void load('balance', fetchTenantBalance)
+      const cachedBalance = getCached<Record<string, unknown>>('balance');
+      const balanceNeedsRefresh =
+        cachedBalance == null || typeof cachedBalance.pastDue !== 'number';
+      void load('balance', fetchTenantBalance, { force: balanceNeedsRefresh })
         .then((data) =>
-          applyBalance(data, { setOutstandingBalance, setNextDueDate, setNextDueAmount })
+          applyBalance(data, {
+            setOutstandingBalance,
+            setPastDueTotal,
+            setNextDueDate,
+            setNextDueAmount,
+          })
         )
         .catch((err) => console.error('Error fetching balance:', err));
 
@@ -408,11 +429,13 @@ export default function TenantDashboard() {
                 : formatCurrency(0)}
             </p>
             <p className={cn('mt-2 text-sm', heroTextClass, 'opacity-80')}>
-              {outstandingBalance != null && outstandingBalance > 0
-                ? `${formatCurrency(outstandingBalance)} total outstanding`
+              {pastDueTotal != null && pastDueTotal > 0
+                ? `${formatCurrency(pastDueTotal)} past due`
                 : dueStatus.hasAmountDue
                   ? 'Next invoice due'
-                  : 'Nothing outstanding'}
+                  : outstandingBalance != null && outstandingBalance > 0
+                    ? 'Nothing past due'
+                    : 'Nothing outstanding'}
             </p>
           </div>
 

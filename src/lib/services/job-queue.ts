@@ -13,7 +13,8 @@ export type JobType =
   | 'bulk_invoices_generate'
   | 'notification_queue_process'
   | 'monthly_invoices_generate'
-  | 'late_fees_auto_apply';
+  | 'late_fees_auto_apply'
+  | 'invoices_release_due';
 
 export interface BackgroundJob {
   id: string;
@@ -122,10 +123,18 @@ async function executeJob(job: BackgroundJob): Promise<unknown> {
       return result;
     }
     case 'monthly_invoices_generate': {
+      const { releaseDueInvoices } = await import('@/lib/services/invoice-issue-timing');
+      await releaseDueInvoices();
       const { generateMonthlyRentInvoicesForAllTenants } = await import(
         '@/lib/services/monthly-invoice-generator'
       );
       const result = await generateMonthlyRentInvoicesForAllTenants();
+      invalidateDashboardCache();
+      return result;
+    }
+    case 'invoices_release_due': {
+      const { releaseDueInvoices } = await import('@/lib/services/invoice-issue-timing');
+      const result = await releaseDueInvoices();
       invalidateDashboardCache();
       return result;
     }

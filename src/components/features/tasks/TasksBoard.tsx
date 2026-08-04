@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Columns3, Pencil, Plus } from 'lucide-react';
+import { ChevronDown, Columns3, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type {
   PipelineBoard,
@@ -65,6 +65,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropStageId, setDropStageId] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const boardTitleInputRef = useRef<HTMLInputElement>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
 
@@ -286,6 +288,31 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     setDropStageId(null);
   }
 
+  async function handleSyncLeases() {
+    setSyncing(true);
+    setError(null);
+    setSyncMessage(null);
+    try {
+      const res = await fetch('/api/pipeline/sync', { method: 'POST' });
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to sync leases');
+      }
+      setSyncMessage(json.message || 'Leases synced to cards');
+      await loadBoard(activeSlug === 'payments' ? 'payments' : activeSlug);
+      if (activeSlug !== 'payments') {
+        // Soft nudge: payments board is where lease cards land
+        setSyncMessage(
+          `${json.message || 'Synced.'} Open the Payments pipeline to see lease follow-up cards.`
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync leases');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   const showMoney =
     activeSlug === 'onboarding' || activeSlug === 'nurture' || activeSlug === 'payments';
 
@@ -443,6 +470,17 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
           <Button
             type="button"
             variant="outline"
+            onClick={() => void handleSyncLeases()}
+            isDisabled={syncing}
+            isLoading={syncing}
+            title="Create/update Payments cards from active leases"
+          >
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            Sync leases
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => setShowManageStages(true)}
             isDisabled={!activeBoard}
           >
@@ -458,6 +496,12 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         </Button>
         </div>
       </div>
+
+      {syncMessage && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {syncMessage}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

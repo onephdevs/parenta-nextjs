@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle, Loader2 } from 'lucide-react';
 
 export function HomeContactForm() {
@@ -9,9 +9,16 @@ export function HomeContactForm() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  /** Honeypot — leave empty. Bots often autofill this. */
+  const [website, setWebsite] = useState('');
+  const formStartedAt = useRef<number>(Date.now());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    formStartedAt.current = Date.now();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +36,8 @@ export function HomeContactForm() {
           email,
           phone,
           message,
+          website,
+          formStartedAt: formStartedAt.current,
         }),
       });
       const json = await res.json();
@@ -41,6 +50,8 @@ export function HomeContactForm() {
       setEmail('');
       setPhone('');
       setMessage('');
+      setWebsite('');
+      formStartedAt.current = Date.now();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -57,7 +68,10 @@ export function HomeContactForm() {
           <p className="mt-2 text-sm text-gray-600">{success}</p>
           <button
             type="button"
-            onClick={() => setSuccess(null)}
+            onClick={() => {
+              setSuccess(null);
+              formStartedAt.current = Date.now();
+            }}
             className="mt-6 text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             Send another
@@ -70,7 +84,7 @@ export function HomeContactForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
+      className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
     >
       <h3 className="text-lg font-semibold text-gray-900">Send an inquiry</h3>
       <p className="mt-1 text-sm text-gray-500">
@@ -78,6 +92,23 @@ export function HomeContactForm() {
       </p>
 
       <div className="mt-6 space-y-4">
+        {/* Honeypot: hidden from users, visible to naive bots */}
+        <div
+          className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
+          aria-hidden="true"
+        >
+          <label htmlFor="contact-website">Website</label>
+          <input
+            id="contact-website"
+            name="website"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+          />
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="contact-first-name" className="block text-sm font-medium text-gray-700">
@@ -91,6 +122,7 @@ export function HomeContactForm() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               placeholder="Maria"
               autoComplete="given-name"
+              maxLength={80}
             />
           </div>
           <div>
@@ -105,6 +137,7 @@ export function HomeContactForm() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               placeholder="Lopez"
               autoComplete="family-name"
+              maxLength={80}
             />
           </div>
         </div>
@@ -123,6 +156,7 @@ export function HomeContactForm() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               placeholder="maria@email.com"
               autoComplete="email"
+              maxLength={160}
             />
           </div>
           <div>
@@ -137,6 +171,7 @@ export function HomeContactForm() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               placeholder="+63…"
               autoComplete="tel"
+              maxLength={40}
             />
           </div>
         </div>
@@ -152,6 +187,7 @@ export function HomeContactForm() {
             onChange={(e) => setMessage(e.target.value)}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             placeholder="Which building or unit are you interested in?"
+            maxLength={2000}
           />
         </div>
       </div>

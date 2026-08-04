@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { convertReservationToAssignment } from '@/lib/api/reservations';
-import { generateInvoicesForTenant } from '@/lib/services/invoice-generator';
+import { ensureRentInvoicesForLease } from '@/lib/services/invoice-generator';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logActivitySafe } from '@/lib/services/activity-logger';
@@ -48,18 +48,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       generateInvoices: assignmentData.generateInvoices !== false, // Default to true
     });
 
-    // Generate invoices if requested
+    // Generate invoices if requested (open-ended leases get the next 12 months as drafts)
     let invoiceResult;
-    if (assignmentData.generateInvoices !== false && assignmentData.endDate) {
+    if (assignmentData.generateInvoices !== false) {
       try {
-        // Get reservation details to get tenant and room info
         const reservation = result.reservation;
         
-        invoiceResult = await generateInvoicesForTenant({
+        invoiceResult = await ensureRentInvoicesForLease({
           tenantId: reservation.tenantId,
           roomId: reservation.roomId,
           leaseStartDate: new Date(assignmentData.startDate),
-          leaseEndDate: new Date(assignmentData.endDate),
+          leaseEndDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
           monthlyRent: reservation.monthlyRate,
           depositAmount: assignmentData.depositPaid || reservation.reservationDeposit,
           advanceAmount: assignmentData.advanceAmount,

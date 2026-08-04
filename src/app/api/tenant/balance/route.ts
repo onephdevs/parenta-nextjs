@@ -22,11 +22,19 @@ export async function GET() {
     } catch (autoApplyError) {
       console.warn('Auto late fee apply skipped:', autoApplyError);
     }
+
+    // Promote draft invoices whose issue_date has arrived (and demote future-dated sent ones)
+    try {
+      const { releaseDueInvoices } = await import('@/lib/services/invoice-issue-timing');
+      await releaseDueInvoices();
+    } catch (releaseError) {
+      console.warn('Invoice release skipped:', releaseError);
+    }
     
     // Get tenant's complete data including building info
     const tenantData = await getTenantCompleteDataByTenantId(String(tenant.id));
     
-    // Calculate outstanding invoices (unpaid + partial)
+    // Outstanding = all unpaid invoices (includes not-yet-due)
     const outstandingQuery = `
       SELECT 
         COALESCE(SUM(balance_due), 0) as outstanding_amount,
@@ -40,8 +48,25 @@ export async function GET() {
     const outstandingResult = await pool.query(outstandingQuery, [tenant.id]);
     const outstandingAmount = parseFloat(outstandingResult.rows[0].outstanding_amount || 0);
     const outstandingCount = parseInt(outstandingResult.rows[0].outstanding_count || 0);
+
+    // Past due = only invoices whose due date has already passed
+    const pastDueQuery = `
+      SELECT 
+        COALESCE(SUM(balance_due), 0) as past_due_amount,
+        COUNT(*) as past_due_count
+      FROM invoices
+      WHERE tenant_id = $1
+        AND invoice_status IN ('sent', 'partial', 'overdue')
+        AND balance_due > 0
+        AND due_date < CURRENT_DATE
+    `;
+    const pastDueResult = await pool.query(pastDueQuery, [tenant.id]);
+    const pastDueAmount = parseFloat(pastDueResult.rows[0].past_due_amount || 0);
+    const pastDueCount = parseInt(pastDueResult.rows[0].past_due_count || 0);
+    const upcomingAmount = Math.max(0, outstandingAmount - pastDueAmount);
     
-    // Get next due date and amount
+    // Get next due date and amount (soonest unpaid invoice that is not past due first;
+    // if all are past due, still return the oldest overdue as next actionable)
     const nextDueQuery = `
       SELECT 
         due_date,
@@ -120,14 +145,21 @@ export async function GET() {
       // Continue without late fees if calculation fails
     }
     
-    const totalBalance = outstandingAmount + totalLateFees;
+    // Amount that needs attention now (past-due invoices + late fees).
+    // Do not treat not-yet-due invoices as "balance owed" in the primary metric.
+    const pastDueTotal = pastDueAmount + totalLateFees;
     
     return NextResponse.json({
       success: true,
       data: {
         outstanding: outstandingAmount,
+        pastDue: pastDueAmount,
+        pastDueCount,
+        upcoming: upcomingAmount,
         lateFees: totalLateFees,
-        total: totalBalance,
+        /** @deprecated Prefer pastDueTotal — kept for older clients */
+        total: pastDueTotal,
+        pastDueTotal,
         outstandingCount,
         nextDueDate: nextDue?.due_date || null,
         nextAmount: parseFloat(nextDue?.balance_due || nextDue?.total_amount || 0),

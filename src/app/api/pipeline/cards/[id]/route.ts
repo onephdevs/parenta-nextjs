@@ -188,6 +188,8 @@ export async function PATCH(request: Request, context: RouteContext) {
           source: body.source !== undefined ? body.source : undefined,
           tags: Array.isArray(body.tags) ? body.tags : undefined,
           dueAt: body.dueAt !== undefined ? body.dueAt || null : undefined,
+          nextActionAt:
+            body.nextActionAt !== undefined ? body.nextActionAt || null : undefined,
           viewingAt: body.viewingAt !== undefined ? body.viewingAt || null : undefined,
           notes: body.notes !== undefined ? body.notes : undefined,
           lostReason: body.lostReason !== undefined ? body.lostReason : undefined,

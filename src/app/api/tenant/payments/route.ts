@@ -12,9 +12,17 @@ export async function GET() {
     if (access.error) return access.error;
 
     const { tenant } = access;
+
+    // Release invoices whose issue_date has arrived before building the schedule
+    try {
+      const { releaseDueInvoices } = await import('@/lib/services/invoice-issue-timing');
+      await releaseDueInvoices();
+    } catch (releaseError) {
+      console.warn('Invoice release skipped:', releaseError);
+    }
     
     // Fetch upcoming invoices (payment schedule)
-    // Status: sent, partial, or overdue (not paid)
+    // Status: sent, partial, or overdue (not paid) — drafts stay hidden until issued
     const scheduleQuery = `
       SELECT 
         i.id,
@@ -38,7 +46,7 @@ export async function GET() {
       LEFT JOIN rooms r ON tra.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       WHERE i.tenant_id = $1
-        AND i.invoice_status IN ('draft', 'sent', 'partial', 'overdue')
+        AND i.invoice_status IN ('sent', 'partial', 'overdue')
         AND i.balance_due > 0
       ORDER BY i.due_date ASC
       LIMIT 50
