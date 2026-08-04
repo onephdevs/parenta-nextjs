@@ -210,10 +210,9 @@ export default function PaymentForm({
         />
       </FormField>
 
-      <Alert variant="info" title="Verification required">
-        Submitting records your payment claim. The office will confirm it before your invoice
-        balance is updated. Card gateways are not live yet — use bank/GCash with a reference when
-        possible.
+      <Alert variant="info" title="Online payment">
+        Submit your payment online with a reference number. Once the office verifies it, your
+        invoice balance updates automatically.
       </Alert>
 
       <FormField label="Notes (Optional)" htmlFor="notes">

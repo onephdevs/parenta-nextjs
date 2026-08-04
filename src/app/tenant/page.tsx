@@ -6,30 +6,26 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Home,
-  CreditCard,
   FileText,
   Wrench,
-  DollarSign,
   Calendar,
   User,
-  ArrowRight,
-  Bell,
   MapPin,
+  BarChart3,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/features/LogoutButton';
-import { PageHeader } from '@/components/layout/PageHeader';
-import SkeletonCard from '@/components/ui/SkeletonCard';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardBody, CardFooter } from '@/components/ui/Card';
-import { StatCard } from '@/components/ui/StatCard';
-import { Avatar } from '@/components/ui/Avatar';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { IconButton } from '@/components/ui/IconButton';
-import {
-  PaymentStatusBadge,
-  MaintenanceStatusBadge,
-} from '@/components/domain/StatusBadges';
+import { PaymentStatusBadge } from '@/components/domain/StatusBadges';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
+import {
+  useTenantData,
+  fetchTenantProfile,
+  fetchTenantBalance,
+  fetchTenantPayments,
+  fetchTenantMaintenance,
+} from '@/hooks/useTenantPortalData';
+import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
+import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 
 interface TenantDashboardData {
@@ -72,35 +68,19 @@ interface MaintenanceItem {
   date: string;
 }
 
+type DueTone = 'ok' | 'upcoming' | 'warning' | 'danger';
+
+interface DueStatus {
+  label: string;
+  tone: DueTone;
+  hasAmountDue: boolean;
+}
+
 const QUICK_ACTIONS = [
-  {
-    title: 'Pay Rent',
-    description: 'Make a payment',
-    href: '/tenant/payments',
-    icon: CreditCard,
-    iconClass: 'bg-green-100 text-green-600',
-  },
-  {
-    title: 'Request Maintenance',
-    description: 'Submit a request',
-    href: '/tenant/maintenance',
-    icon: Wrench,
-    iconClass: 'bg-blue-100 text-blue-600',
-  },
-  {
-    title: 'View Documents',
-    description: 'Access your files',
-    href: '/tenant/documents',
-    icon: FileText,
-    iconClass: 'bg-purple-100 text-purple-600',
-  },
-  {
-    title: 'My Profile',
-    description: 'Update your details',
-    href: '/tenant/profile',
-    icon: User,
-    iconClass: 'bg-yellow-100 text-yellow-700',
-  },
+  { title: 'Documents', href: '/tenant/documents', icon: FileText },
+  { title: 'Maintenance', href: '/tenant/maintenance', icon: Wrench },
+  { title: 'My profile', href: '/tenant/profile?section=personal', icon: User },
+  { title: 'Statements', href: '/tenant/payments?tab=statements', icon: BarChart3 },
 ] as const;
 
 function formatCurrency(amount: number) {
@@ -119,95 +99,173 @@ function formatDate(value: string) {
   });
 }
 
+function formatDateShort(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).toUpperCase();
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function daysUntil(dueDate: string) {
+  const due = startOfLocalDay(new Date(dueDate));
+  const today = startOfLocalDay(new Date());
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getDueStatus(dueDate: string | null, dueAmount: number | null): DueStatus {
+  if (dueAmount == null || dueAmount <= 0 || !dueDate) {
+    return {
+      label: 'ALL CAUGHT UP',
+      tone: 'ok',
+      hasAmountDue: false,
+    };
+  }
+
+  const days = daysUntil(dueDate);
+  const dateLabel = formatDateShort(dueDate);
+
+  if (days < 0) {
+    const overdue = Math.abs(days);
+    return {
+      label: `OVERDUE BY ${overdue} DAY${overdue === 1 ? '' : 'S'} · ${dateLabel}`,
+      tone: 'danger',
+      hasAmountDue: true,
+    };
+  }
+  if (days === 0) {
+    return {
+      label: `DUE TODAY · ${dateLabel}`,
+      tone: 'danger',
+      hasAmountDue: true,
+    };
+  }
+  if (days === 1) {
+    return {
+      label: `DUE TOMORROW · ${dateLabel}`,
+      tone: 'warning',
+      hasAmountDue: true,
+    };
+  }
+  if (days <= 7) {
+    return {
+      label: `DUE IN ${days} DAYS · ${dateLabel}`,
+      tone: 'warning',
+      hasAmountDue: true,
+    };
+  }
+  return {
+    label: `DUE ${dateLabel}`,
+    tone: 'upcoming',
+    hasAmountDue: true,
+  };
+}
+
+function leaseMonthsLeft(endDate?: string | null) {
+  if (!endDate) return null;
+  const end = startOfLocalDay(new Date(endDate));
+  const today = startOfLocalDay(new Date());
+  if (end < today) return 0;
+  const months =
+    (end.getFullYear() - today.getFullYear()) * 12 +
+    (end.getMonth() - today.getMonth()) -
+    (end.getDate() < today.getDate() ? 1 : 0);
+  return Math.max(0, months);
+}
+
+function applyBalance(
+  data: Record<string, unknown>,
+  setters: {
+    setOutstandingBalance: (v: number | null) => void;
+    setNextDueDate: (v: string | null) => void;
+    setNextDueAmount: (v: number | null) => void;
+  }
+) {
+  setters.setOutstandingBalance(
+    typeof data.total === 'number' ? data.total : Number(data.total) || 0
+  );
+  setters.setNextDueDate(data.nextDueDate ? String(data.nextDueDate) : null);
+  setters.setNextDueAmount(data.nextAmount != null ? Number(data.nextAmount) : null);
+}
+
+function mapRecentPayments(paymentsData: Record<string, unknown>): RecentPayment[] {
+  const history = Array.isArray(paymentsData.history) ? paymentsData.history : [];
+  return history.slice(0, 3).map((p: Record<string, unknown>) => ({
+    id: String(p.id),
+    date: String(p.paymentDate || p.payment_date || ''),
+    amount: Number(p.amount) || 0,
+    status: String(p.paymentStatus || p.payment_status || 'pending'),
+    type: String(p.paymentType || p.payment_type || 'Rent'),
+  }));
+}
+
+function mapMaintenancePreview(data: { requests: unknown[] }): MaintenanceItem[] {
+  return (data.requests || []).slice(0, 2).map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      id: String(row.id),
+      title: String(row.title),
+      status: String(row.status || 'open'),
+      date: String(row.createdAt || row.created_at || ''),
+    };
+  });
+}
+
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
   const { canAccess, isPreview, isLoading: gateLoading, exitPreview } = useTenantPortalGate();
+  const { load, getCached, isLoading: cacheLoading } = useTenantData();
+  const theme = useTenantTheme();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-  const [tenantData, setTenantData] = useState<TenantDashboardData | null>(null);
-  const [nextDueDate, setNextDueDate] = useState<string | null>(null);
-  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
-  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceItem[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  const fetchTenantData = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/tenant/profile');
-      const data = await response.json();
-
-      if (data.success) {
-        setTenantData(data.data);
-
-        if (data.data.roomAssignment?.assignmentStart) {
-          const startDate = new Date(data.data.roomAssignment.assignmentStart);
-          const nextDue = new Date(startDate);
-          nextDue.setMonth(nextDue.getMonth() + 1);
-          nextDue.setDate(1);
-          setNextDueDate(nextDue.toISOString().split('T')[0]);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching tenant data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchPaymentHistory = async () => {
-    try {
-      const response = await fetch('/api/tenant/payments');
-      const data = await response.json();
-
-      if (data.success && data.data?.history) {
-        setRecentPayments(
-          data.data.history.slice(0, 3).map((p: Record<string, unknown>) => ({
-            id: String(p.id),
-            date: String(p.paymentDate || p.payment_date || ''),
-            amount: Number(p.amount) || 0,
-            status: String(p.paymentStatus || p.payment_status || 'pending'),
-            type: String(p.paymentType || p.payment_type || 'Rent'),
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Error fetching payment history:', error);
-    }
-  };
-
-  const fetchMaintenanceRequests = async () => {
-    try {
-      const response = await fetch('/api/tenant/maintenance');
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        const requestsArray = Array.isArray(data.data.requests)
-          ? data.data.requests
-          : Array.isArray(data.data)
-            ? data.data
-            : [];
-
-        setMaintenanceRequests(
-          requestsArray.slice(0, 3).map((r: Record<string, unknown>) => ({
-            id: String(r.id),
-            title: String(r.title),
-            status: String(r.status || 'open'),
-            date: String(r.createdAt || r.created_at || ''),
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Error fetching maintenance requests:', error);
-    }
-  };
+  const [tenantData, setTenantData] = useState<TenantDashboardData | null>(
+    () => getCached<TenantDashboardData>('profile') ?? null
+  );
+  const [nextDueDate, setNextDueDate] = useState<string | null>(() => {
+    const bal = getCached<Record<string, unknown>>('balance');
+    return bal?.nextDueDate ? String(bal.nextDueDate) : null;
+  });
+  const [nextDueAmount, setNextDueAmount] = useState<number | null>(() => {
+    const bal = getCached<Record<string, unknown>>('balance');
+    return bal?.nextAmount != null ? Number(bal.nextAmount) : null;
+  });
+  const [outstandingBalance, setOutstandingBalance] = useState<number | null>(() => {
+    const bal = getCached<Record<string, unknown>>('balance');
+    return bal?.total != null ? Number(bal.total) : null;
+  });
+  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>(() => {
+    const payments = getCached<Record<string, unknown>>('payments');
+    return payments ? mapRecentPayments(payments) : [];
+  });
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceItem[]>(() => {
+    const maint = getCached<{ requests: unknown[] }>('maintenance');
+    return maint ? mapMaintenancePreview(maint) : [];
+  });
 
   useEffect(() => {
     if (gateLoading || status === 'loading') return;
 
     if (canAccess) {
-      void fetchTenantData();
-      void fetchPaymentHistory();
-      void fetchMaintenanceRequests();
+      void load('profile', fetchTenantProfile)
+        .then((data) => setTenantData(data as unknown as TenantDashboardData))
+        .catch((err) => console.error('Error fetching tenant data:', err));
+
+      void load('balance', fetchTenantBalance)
+        .then((data) =>
+          applyBalance(data, { setOutstandingBalance, setNextDueDate, setNextDueAmount })
+        )
+        .catch((err) => console.error('Error fetching balance:', err));
+
+      void load('payments', fetchTenantPayments)
+        .then((data) => setRecentPayments(mapRecentPayments(data)))
+        .catch((err) => console.error('Error fetching payment history:', err));
+
+      void load('maintenance', fetchTenantMaintenance)
+        .then((data) => setMaintenanceRequests(mapMaintenancePreview(data)))
+        .catch((err) => console.error('Error fetching maintenance requests:', err));
       return;
     }
 
@@ -221,393 +279,307 @@ export default function TenantDashboard() {
     }
   }, [status, session, router, canAccess, gateLoading, isPreview]);
 
-  if (status === 'loading' || gateLoading || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-          <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonCard key={i} showHeader={false} lines={2} />
-            ))}
-          </div>
-          <SkeletonCard showHeader lines={5} />
-        </div>
-      </div>
-    );
+  const showSkeleton =
+    status === 'loading' ||
+    gateLoading ||
+    (!tenantData && cacheLoading('profile'));
+
+  if (showSkeleton) {
+    return <TenantPageSkeleton variant="home" />;
   }
 
-  if (!canAccess) {
-    return null;
-  }
+  if (!canAccess) return null;
 
-  const displayName =
-    tenantData?.profile?.firstName && tenantData?.profile?.lastName
-      ? `${tenantData.profile.firstName} ${tenantData.profile.lastName}`
-      : session?.user?.name || session?.user?.email || 'Tenant';
+  const firstName = tenantData?.profile?.firstName || session?.user?.firstName || 'Tenant';
 
   const assignment = tenantData?.roomAssignment;
   const hasAssignment = Boolean(assignment?.roomId);
   const monthlyRent =
     hasAssignment && typeof assignment?.monthlyRate === 'number' ? assignment.monthlyRate : null;
-  const securityDeposit =
-    hasAssignment && typeof assignment?.depositPaid === 'number'
+  const depositPaid =
+    hasAssignment && typeof assignment?.depositPaid === 'number' && assignment.depositPaid > 0
       ? assignment.depositPaid
       : null;
-  const dueDate = hasAssignment ? nextDueDate : null;
-  const leaseEnd = hasAssignment ? assignment?.assignmentEnd || null : null;
-  const activeMaintenance = maintenanceRequests.filter((r) =>
+  const advancePaid =
+    hasAssignment && typeof assignment?.advancePaid === 'number' && assignment.advancePaid > 0
+      ? assignment.advancePaid
+      : null;
+
+  const dueStatus = getDueStatus(nextDueDate, nextDueAmount);
+  const monthsLeft = leaseMonthsLeft(assignment?.assignmentEnd);
+  const openMaintenance = maintenanceRequests.filter((r) =>
     ['open', 'pending', 'scheduled', 'in_progress'].includes(r.status.toLowerCase())
-  ).length;
-  const hasNotificationItems =
-    maintenanceRequests.some((r) => r.status.toLowerCase() !== 'completed') ||
-    recentPayments.length > 0;
+  );
+
+  const heroToneClass =
+    theme.mode === 'light'
+      ? dueStatus.tone === 'danger'
+        ? 'bg-red-50 border-red-200'
+        : dueStatus.tone === 'warning'
+          ? 'bg-amber-50 border-amber-200'
+          : dueStatus.tone === 'upcoming'
+            ? 'bg-amber-50/80 border-amber-100'
+            : 'bg-emerald-50 border-emerald-200'
+      : dueStatus.tone === 'danger'
+        ? 'bg-red-950/80 border-red-800/60'
+        : dueStatus.tone === 'warning'
+          ? 'bg-amber-950/70 border-amber-800/50'
+          : dueStatus.tone === 'upcoming'
+            ? 'bg-amber-950/40 border-amber-900/40'
+            : 'bg-emerald-950/50 border-emerald-800/40';
+
+  const heroTextClass =
+    theme.mode === 'light'
+      ? dueStatus.tone === 'danger'
+        ? 'text-red-700'
+        : dueStatus.tone === 'ok'
+          ? 'text-emerald-700'
+          : 'text-amber-700'
+      : dueStatus.tone === 'danger'
+        ? 'text-red-300'
+        : dueStatus.tone === 'ok'
+          ? 'text-emerald-300'
+          : 'text-amber-300';
+
+  const heroAmountClass =
+    theme.mode === 'light'
+      ? dueStatus.tone === 'danger'
+        ? 'text-red-800'
+        : dueStatus.tone === 'ok'
+          ? 'text-emerald-800'
+          : 'text-amber-800'
+      : dueStatus.tone === 'danger'
+        ? 'text-red-200'
+        : dueStatus.tone === 'ok'
+          ? 'text-emerald-200'
+          : 'text-amber-200';
+
+  const payButtonClass =
+    dueStatus.tone === 'danger'
+      ? 'bg-red-500 text-white hover:bg-red-400'
+      : dueStatus.tone === 'ok'
+        ? theme.primaryButton
+        : 'bg-emerald-500 text-white hover:bg-emerald-400';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-green-600 p-2">
-              <Home className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-gray-900">Tenant Portal</p>
-              <p className="text-xs text-gray-500">Your home dashboard</p>
+    <div className={theme.page}>
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className={cn('text-3xl font-semibold tracking-tight', theme.shellHeader)}>
+              Welcome, {firstName}
+            </h1>
+            <p className={cn('mt-1', theme.muted)}>
+              {hasAssignment
+                ? `Room ${assignment?.roomNumber} · ${assignment?.buildingName}`
+                : 'No room assigned yet'}
+            </p>
+          </div>
+
+          {isPreview ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void exitPreview()}
+              className={theme.outlineButton}
+            >
+              Exit preview
+            </Button>
+          ) : (
+            <LogoutButton />
+          )}
+        </div>
+
+        {/* Amount due hero */}
+        <section
+          className={cn(
+            'flex flex-col gap-5 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6',
+            heroToneClass
+          )}
+        >
+          <div>
+            <p className={cn('text-xs font-semibold uppercase tracking-wider', heroTextClass)}>
+              {dueStatus.label}
+            </p>
+            <p className={cn('mt-2 text-4xl font-bold tracking-tight sm:text-5xl', heroAmountClass)}>
+              {dueStatus.hasAmountDue && nextDueAmount != null
+                ? formatCurrency(nextDueAmount)
+                : formatCurrency(0)}
+            </p>
+            <p className={cn('mt-2 text-sm', heroTextClass, 'opacity-80')}>
+              {outstandingBalance != null && outstandingBalance > 0
+                ? `${formatCurrency(outstandingBalance)} total outstanding`
+                : dueStatus.hasAmountDue
+                  ? 'Next invoice due'
+                  : 'Nothing outstanding'}
+            </p>
+          </div>
+
+          <Link href="/tenant/payments?tab=pay" className="shrink-0">
+            <button
+              type="button"
+              className={cn(
+                'w-full rounded-xl px-6 py-3 text-sm font-semibold transition sm:w-auto',
+                payButtonClass
+              )}
+            >
+              {dueStatus.hasAmountDue ? 'Pay now' : 'View payments'}
+            </button>
+          </Link>
+        </section>
+
+        {/* Unit + rent — shown once */}
+        <section className="grid gap-4 sm:grid-cols-2">
+          <div className={theme.cardPad}>
+            <p className={cn('mb-3 text-xs font-medium uppercase tracking-wide', theme.shellMuted)}>
+              Your unit
+            </p>
+            <div className={cn('space-y-3', theme.body)}>
+              <div className="flex items-start gap-2.5">
+                <MapPin className={cn('mt-0.5 h-4 w-4 shrink-0', theme.iconInfo)} />
+                <p>{hasAssignment ? assignment?.address || 'Address not set' : 'Not assigned'}</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <Calendar className={cn('mt-0.5 h-4 w-4 shrink-0', theme.iconPending)} />
+                <p>
+                  {assignment?.assignmentStart ? (
+                    <>
+                      Lease: {formatDate(assignment.assignmentStart)}
+                      {assignment.assignmentEnd
+                        ? ` – ${formatDate(assignment.assignmentEnd)}`
+                        : ''}
+                      {monthsLeft != null && (
+                        <span className={theme.listValue}>
+                          {' '}
+                          · {monthsLeft} month{monthsLeft === 1 ? '' : 's'} left
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    'No active lease'
+                  )}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <IconButton
-                label="Notifications"
-                onClick={() => setShowNotifications((open) => !open)}
-                className="relative"
-              >
-                <Bell className="h-5 w-5" />
-                {hasNotificationItems && (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
-                )}
-              </IconButton>
-
-              {showNotifications && (
-                <Card
-                  padding="none"
-                  className="absolute right-0 z-50 mt-2 w-80 overflow-hidden shadow-lg"
-                >
-                  <div className="border-b border-gray-100 px-4 py-3">
-                    <p className="text-sm font-semibold text-gray-900">Recent updates</p>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto">
-                    {!hasNotificationItems ? (
-                      <p className="px-4 py-6 text-center text-sm text-gray-500">
-                        No recent updates
-                      </p>
-                    ) : (
-                      <>
-                        {maintenanceRequests.map((req) => (
-                          <Link
-                            key={req.id}
-                            href="/tenant/maintenance"
-                            onClick={() => setShowNotifications(false)}
-                            className="block border-b border-gray-50 px-4 py-3 hover:bg-gray-50"
-                          >
-                            <p className="text-sm font-medium text-gray-900">
-                              Maintenance: {req.title}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500">{req.status}</p>
-                          </Link>
-                        ))}
-                        {recentPayments.map((payment) => (
-                          <Link
-                            key={payment.id}
-                            href="/tenant/payments"
-                            onClick={() => setShowNotifications(false)}
-                            className="block border-b border-gray-50 px-4 py-3 hover:bg-gray-50"
-                          >
-                            <p className="text-sm font-medium text-gray-900">
-                              Payment: {formatCurrency(payment.amount)}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500">{payment.type}</p>
-                          </Link>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex gap-3 border-t border-gray-100 px-4 py-2 text-xs">
-                    <Link
-                      href="/tenant/maintenance"
-                      className="text-green-700 hover:underline"
-                      onClick={() => setShowNotifications(false)}
-                    >
-                      Maintenance
-                    </Link>
-                    <Link
-                      href="/tenant/payments"
-                      className="text-green-700 hover:underline"
-                      onClick={() => setShowNotifications(false)}
-                    >
-                      Payments
-                    </Link>
-                  </div>
-                </Card>
-              )}
-            </div>
-
-            <div className="hidden items-center gap-3 border-l border-gray-200 pl-4 md:flex">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{displayName}</p>
-                <p className="text-xs text-gray-500">Tenant</p>
-              </div>
-              <Avatar name={displayName} size="md" className="bg-green-600" />
-            </div>
-
-            {isPreview ? (
-              <Button variant="outline" size="sm" onClick={() => void exitPreview()}>
-                Exit preview
-              </Button>
-            ) : (
-              <LogoutButton />
+          <div className={cn(theme.cardPad, 'flex flex-col justify-center')}>
+            <p className={theme.label}>Monthly rent</p>
+            <p className={cn('mt-1 text-3xl font-semibold', theme.shellHeader)}>
+              {monthlyRent != null ? formatCurrency(monthlyRent) : '—'}
+            </p>
+            {(depositPaid != null || advancePaid != null) && (
+              <p className={cn('mt-2', theme.muted)}>
+                {[
+                  depositPaid != null ? `Deposit ${formatCurrency(depositPaid)}` : null,
+                  advancePaid != null ? `Advance ${formatCurrency(advancePaid)}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
             )}
           </div>
-        </div>
-      </header>
+        </section>
 
-      <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-        <PageHeader
-          title={`Welcome, ${tenantData?.profile?.firstName || displayName}`}
-          description="Manage your rental and stay updated with your property information."
-          actions={
-            <Link href="/tenant/profile">
-              <Button variant="outline" size="sm" leftIcon={<User className="h-4 w-4" />}>
-                Profile
-              </Button>
-            </Link>
-          }
-        />
-
-        <Card className="overflow-hidden border-0 bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <h2 className="mb-4 text-xl font-bold">Your Unit</h2>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Home className="mt-0.5 h-5 w-5 opacity-80" />
-                  <div>
-                    <p className="text-sm opacity-80">Unit</p>
-                    <p className="font-semibold">
-                      {hasAssignment ? assignment?.roomNumber : 'Not assigned'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="mt-0.5 h-5 w-5 opacity-80" />
-                  <div>
-                    <p className="text-sm opacity-80">Building</p>
-                    <p className="font-semibold">
-                      {hasAssignment ? assignment?.buildingName || '—' : '—'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="mt-0.5 h-5 w-5 opacity-80" />
-                  <div>
-                    <p className="text-sm opacity-80">Address</p>
-                    <p className="font-semibold">
-                      {hasAssignment ? assignment?.address || '—' : '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h2 className="mb-4 text-xl font-bold">Lease Details</h2>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <DollarSign className="mt-0.5 h-5 w-5 opacity-80" />
-                  <div>
-                    <p className="text-sm opacity-80">Monthly rent</p>
-                    <p className="font-semibold">
-                      {monthlyRent != null ? formatCurrency(monthlyRent) : '—'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Calendar className="mt-0.5 h-5 w-5 opacity-80" />
-                  <div>
-                    <p className="text-sm opacity-80">Next due date</p>
-                    <p className="font-semibold">{dueDate ? formatDate(dueDate) : '—'}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Calendar className="mt-0.5 h-5 w-5 opacity-80" />
-                  <div>
-                    <p className="text-sm opacity-80">Lease ends</p>
-                    <p className="font-semibold">
-                      {hasAssignment ? (leaseEnd ? formatDate(leaseEnd) : 'Ongoing') : '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Next payment"
-            value={monthlyRent != null ? formatCurrency(monthlyRent) : '—'}
-            subtitle={
-              dueDate
-                ? `Due ${formatDate(dueDate)}`
-                : hasAssignment
-                  ? 'No due date set'
-                  : 'No active lease'
-            }
-            tone="green"
-            icon={<DollarSign className="h-5 w-5" />}
-          />
-          <StatCard
-            title="Recent payments"
-            value={recentPayments.length}
-            subtitle="Last recorded payments"
-            tone="blue"
-            icon={<CreditCard className="h-5 w-5" />}
-          />
-          <StatCard
-            title="Active requests"
-            value={activeMaintenance}
-            subtitle={`${maintenanceRequests.length} shown`}
-            tone="purple"
-            icon={<Wrench className="h-5 w-5" />}
-          />
-          <StatCard
-            title="Security deposit"
-            value={securityDeposit != null ? formatCurrency(securityDeposit) : '—'}
-            subtitle={hasAssignment ? 'On file' : 'No active lease'}
-            tone="yellow"
-            icon={<FileText className="h-5 w-5" />}
-          />
-        </div>
-
+        {/* Quick actions — neutral icons */}
         <section>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-xl font-bold text-gray-900">Quick actions</h2>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <h2 className={cn('mb-3', theme.sectionTitle)}>Quick actions</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {QUICK_ACTIONS.map((action) => (
-              <Link key={action.title} href={action.href} className="group block">
-                <Card className="h-full transition hover:border-green-300 hover:shadow-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className={cn('mb-3 w-fit rounded-lg p-2', action.iconClass)}>
-                        <action.icon className="h-5 w-5" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900">{action.title}</h3>
-                      <p className="mt-1 text-sm text-gray-500">{action.description}</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-gray-400 transition group-hover:translate-x-0.5 group-hover:text-green-600" />
-                  </div>
-                </Card>
+              <Link
+                key={action.title}
+                href={action.href}
+                className={cn(
+                  theme.card,
+                  'flex flex-col items-start gap-3 p-4 transition',
+                  theme.mode === 'dark' ? 'hover:border-zinc-600' : 'hover:border-zinc-300'
+                )}
+              >
+                <action.icon className={cn('h-5 w-5', theme.iconMoney)} strokeWidth={1.75} />
+                <span className={cn('text-sm font-medium', theme.listValue)}>{action.title}</span>
               </Link>
             ))}
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <h2 className="flex items-center text-lg font-bold text-gray-900">
-                <CreditCard className="mr-2 h-5 w-5 text-green-600" />
-                Recent payments
-              </h2>
-            </CardHeader>
-            <CardBody>
-              {recentPayments.length > 0 ? (
-                <div className="space-y-3">
-                  {recentPayments.map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="flex items-center justify-between border-b border-gray-100 py-3 last:border-0"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">{payment.type}</p>
-                        <p className="text-xs text-gray-500">
-                          {payment.date ? formatDate(payment.date) : '—'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">
-                          {formatCurrency(payment.amount)}
-                        </p>
-                        <div className="mt-1 flex justify-end">
-                          <PaymentStatusBadge status={payment.status} />
-                        </div>
+        {/* Compact activity */}
+        <section className="grid gap-3 sm:grid-cols-2">
+          <div className={theme.cardPad}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className={theme.sectionTitle}>Recent payments</h2>
+              <Link
+                href="/tenant/payments?tab=history"
+                className="text-xs text-emerald-400 hover:text-emerald-300"
+              >
+                View all
+              </Link>
+            </div>
+            {recentPayments.length > 0 ? (
+              <ul className="space-y-2.5">
+                {recentPayments.map((payment) => (
+                  <li key={payment.id} className="flex items-center justify-between gap-2 text-sm">
+                    <div className="min-w-0">
+                      <p className={cn('truncate', theme.listValue)}>{payment.type}</p>
+                      <p className={theme.subtle}>
+                        {payment.date ? formatDate(payment.date) : '—'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className={cn('font-medium', theme.shellHeader)}>
+                        {formatCurrency(payment.amount)}
+                      </p>
+                      <div className="mt-0.5 flex justify-end">
+                        <PaymentStatusBadge status={payment.status} />
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<CreditCard className="h-10 w-10" />}
-                  title="No recent payments"
-                  description="Payment history will appear here."
-                  className="py-8"
-                />
-              )}
-            </CardBody>
-            <CardFooter>
-              <Link href="/tenant/payments" className="block w-full">
-                <Button variant="success" className="w-full">
-                  View all payments
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={theme.muted}>No payments yet. History will appear here.</p>
+            )}
+          </div>
 
-          <Card>
-            <CardHeader>
-              <h2 className="flex items-center text-lg font-bold text-gray-900">
-                <Wrench className="mr-2 h-5 w-5 text-green-600" />
-                Maintenance requests
-              </h2>
-            </CardHeader>
-            <CardBody>
-              {maintenanceRequests.length > 0 ? (
-                <div className="space-y-3">
-                  {maintenanceRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between border-b border-gray-100 py-3 last:border-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-gray-900">{request.title}</p>
-                        <p className="text-xs text-gray-500">
-                          {request.date ? formatDate(request.date) : '—'}
-                        </p>
-                      </div>
-                      <MaintenanceStatusBadge status={request.status} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<Wrench className="h-10 w-10" />}
-                  title="No maintenance requests"
-                  description="Submit a request when something needs attention."
-                  className="py-8"
-                />
-              )}
-            </CardBody>
-            <CardFooter>
-              <Link href="/tenant/maintenance" className="block w-full">
-                <Button variant="outline" className="w-full">
-                  {isPreview ? 'View maintenance' : 'Submit new request'}
-                </Button>
+          <div className={theme.cardPad}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className={theme.sectionTitle}>Maintenance requests</h2>
+              <Link
+                href="/tenant/maintenance"
+                className="text-xs text-emerald-400 hover:text-emerald-300"
+              >
+                View all
               </Link>
-            </CardFooter>
-          </Card>
-        </div>
+            </div>
+            {openMaintenance.length > 0 ? (
+              <ul className="space-y-2.5">
+                {openMaintenance.map((request) => (
+                  <li key={request.id} className="text-sm">
+                    <p className={cn('truncate', theme.listValue)}>{request.title}</p>
+                    <p className={cn('capitalize', theme.subtle)}>{request.status}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={theme.muted}>No open requests.</p>
+            )}
+            <Link href="/tenant/maintenance" className="mt-4 block">
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn('w-full', theme.outlineButton)}
+              >
+                {isPreview ? 'View requests' : 'Submit request'}
+              </Button>
+            </Link>
+          </div>
+        </section>
+
+        {/* Quiet brand footer cue */}
+        <p className={cn('flex items-center justify-center gap-2 pb-4 text-xs', theme.shellMuted)}>
+          <Home className="h-3.5 w-3.5" />
+          Maintenance and other requests stay available from quick actions
+        </p>
       </main>
     </div>
   );

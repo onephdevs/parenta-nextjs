@@ -17,11 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import SkeletonList from '@/components/ui/SkeletonList';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { StatCard } from '@/components/ui/StatCard';
-import SkeletonCard from '@/components/ui/SkeletonCard';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
@@ -31,7 +27,12 @@ import { MaintenanceStatusBadge } from '@/components/domain/StatusBadges';
 import { Badge, BadgeTone } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
+import { useTenantData, fetchTenantMaintenance } from '@/hooks/useTenantPortalData';
+import { useTenantTheme } from '@/hooks/useTenantTheme';
+import { cn } from '@/lib/utils';
 
 interface MaintenanceRequest {
   id: string;
@@ -53,12 +54,31 @@ interface MaintenanceData {
   requests: MaintenanceRequest[];
 }
 
+function mapMaintenance(raw: { requests: unknown[] } | Record<string, unknown>): MaintenanceData {
+  const requests = Array.isArray((raw as { requests?: unknown[] }).requests)
+    ? ((raw as { requests: MaintenanceRequest[] }).requests)
+    : [];
+  const active = requests.filter(
+    (r) => !['completed', 'cancelled', 'closed'].includes(String(r.status).toLowerCase())
+  ).length;
+  return {
+    active: typeof (raw as MaintenanceData).active === 'number' ? (raw as MaintenanceData).active : active,
+    total: typeof (raw as MaintenanceData).total === 'number' ? (raw as MaintenanceData).total : requests.length,
+    requests,
+  };
+}
+
 export default function MaintenancePage() {
   const { data: session, status } = useSession();
   const { canAccess, isPreview, isLoading: gateLoading } = useTenantPortalGate();
+  const { load, getCached, isLoading: cacheLoading, invalidate } = useTenantData();
+  const theme = useTenantTheme();
   const router = useRouter();
-  const [maintenanceData, setMaintenanceData] = useState<MaintenanceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { showNotification } = useNotifications();
+  const [maintenanceData, setMaintenanceData] = useState<MaintenanceData | null>(() => {
+    const cached = getCached<{ requests: unknown[] }>('maintenance');
+    return cached ? mapMaintenance(cached) : null;
+  });
   const [showNewRequestForm, setShowNewRequestForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
@@ -73,70 +93,33 @@ export default function MaintenancePage() {
     priority: 'medium'
   });
 
-  const fetchMaintenanceData = async () => {
+  const fetchMaintenanceData = async (force = false) => {
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/tenant/maintenance');
-      const data = await response.json();
-
-      if (data.success) {
-        setMaintenanceData(data.data);
-      } else {
-        // Check if it's a "No tenant profile found" error
-        if (data.error === 'No tenant profile found' || response.status === 404) {
-          showNotification({
-            type: 'error',
-            title: 'Profile Not Found',
-            message: 'No tenant profile found. Please contact admin to link your account to a tenant profile.'
-          });
-        } else {
-          showNotification({
-            type: 'error',
-            title: 'Error',
-            message: data.error || 'Failed to load maintenance requests'
-          });
-        }
-      }
+      const raw = await load('maintenance', fetchTenantMaintenance, { force });
+      setMaintenanceData(mapMaintenance(raw));
     } catch (error) {
       console.error('Error fetching maintenance data:', error);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load maintenance requests'
-      });
-    } finally {
-      setIsLoading(false);
+      if (!getCached('maintenance')) {
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: error instanceof Error ? error.message : 'Failed to load maintenance requests',
+        });
+      }
     }
   };
 
   useEffect(() => {
     if (gateLoading || status === 'loading') return;
     if (canAccess) {
-      fetchMaintenanceData();
+      void fetchMaintenanceData();
     } else if (status === 'unauthenticated') {
       router.push('/auth/signin?role=tenant');
     }
   }, [status, session, router, canAccess, gateLoading]);
 
-  // Show loading state while checking authentication
-  if (status === 'loading' || gateLoading || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-        </header>
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="space-y-6">
-              <SkeletonCard showHeader={true} lines={3} />
-              <SkeletonList items={5} showAvatar={true} />
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+  if (status === 'loading' || gateLoading || (!maintenanceData && cacheLoading('maintenance'))) {
+    return <TenantPageSkeleton variant="list" />;
   }
 
   if (!canAccess) {
@@ -180,7 +163,8 @@ export default function MaintenancePage() {
           priority: 'medium'
         });
         setShowNewRequestForm(false);
-        fetchMaintenanceData(); // Refresh the list
+        invalidate('maintenance');
+        void fetchMaintenanceData(true);
       } else {
         showNotification({
           type: 'error',
@@ -245,28 +229,23 @@ export default function MaintenancePage() {
     'other'
   ];
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center min-h-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
-            <p className="text-gray-900">Loading maintenance requests...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 p-6">
+    <div className={theme.pagePad}>
       <Link
         href="/tenant"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+        className="inline-flex items-center text-sm text-emerald-400 hover:text-emerald-300"
       >
-        <ArrowLeft className="h-4 w-4 mr-1" />
-        Back to Dashboard
+        <ArrowLeft className="mr-1 h-4 w-4" />
+        Back to Home
       </Link>
+      <div>
+        <h1 className={theme.title}>Maintenance</h1>
+        <p className={cn('mt-1', theme.muted)}>
+          Submit and track maintenance requests
+        </p>
+      </div>
+      <div className={cn(theme.formPanel, 'overflow-hidden')}>
+      <div className="p-4 sm:p-6">
       <PageHeader
         title="Maintenance Requests"
         description="Manage your maintenance requests and submit new ones"
@@ -276,6 +255,7 @@ export default function MaintenancePage() {
               variant="success"
               leftIcon={<Plus className="h-4 w-4" />}
               onClick={() => setShowNewRequestForm(true)}
+              className={theme.primaryButton}
             >
               New Request
             </Button>
@@ -560,14 +540,22 @@ export default function MaintenancePage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" variant="success" isLoading={isSubmitting} disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                <Button
+                  type="submit"
+                  variant="success"
+                  isLoading={isSubmitting}
+                  disabled={isSubmitting}
+                  className={theme.primaryButton}
+                >
+                  Submit request
                 </Button>
               </div>
             </form>
           </Card>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 } 

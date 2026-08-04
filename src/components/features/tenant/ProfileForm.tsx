@@ -28,9 +28,13 @@ interface ProfileData {
 interface ProfileFormProps {
   initialData?: ProfileData;
   onSave?: () => void;
+  /** Show only a subset of fields for sectioned profile nav */
+  section?: 'personal' | 'emergency' | 'all';
 }
 
-export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
+export default function ProfileForm({ initialData, onSave, section = 'all' }: ProfileFormProps) {
+  const showPersonal = section === 'all' || section === 'personal';
+  const showEmergency = section === 'all' || section === 'emergency';
   const [formData, setFormData] = useState<ProfileData>({
     firstName: '',
     lastName: '',
@@ -131,6 +135,7 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
+      {showPersonal && (
       <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <User className="h-5 w-5 mr-2" />
@@ -200,7 +205,9 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
           </FormField>
         </div>
       </Card>
+      )}
 
+      {showEmergency && (
       <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -245,7 +252,10 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
           </FormField>
         </div>
       </Card>
+      )}
 
+      {showPersonal && (
+      <>
       <Card>
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
           <Briefcase className="h-5 w-5 mr-2" />
@@ -305,6 +315,8 @@ export default function ProfileForm({ initialData, onSave }: ProfileFormProps) {
           />
         </FormField>
       </Card>
+      </>
+      )}
 
       <div className="flex justify-end">
         <Button

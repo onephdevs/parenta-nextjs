@@ -3,14 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
   FileText, 
   Download, 
-  ArrowLeft,
   Calendar,
   Search,
-  Filter,
   Eye,
   File,
   FileImage,
@@ -19,16 +16,15 @@ import {
   FileCode
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import SkeletonList from '@/components/ui/SkeletonList';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
-import { StatCard } from '@/components/ui/StatCard';
-import SkeletonCard from '@/components/ui/SkeletonCard';
+import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
+import { useTenantData, fetchTenantDocuments } from '@/hooks/useTenantPortalData';
+import { useTenantTheme } from '@/hooks/useTenantTheme';
+import { cn } from '@/lib/utils';
 
 interface Document {
   id: string;
@@ -47,93 +43,64 @@ interface DocumentsData {
   categories?: Record<string, number>;
 }
 
+function mapDocuments(raw: Record<string, unknown>): DocumentsData {
+  const docs = Array.isArray(raw.documents) ? raw.documents : [];
+  return {
+    totalDocuments: Number(raw.totalDocuments) || docs.length,
+    documents: docs.map((doc: Record<string, unknown>) => ({
+      id: String(doc.id),
+      name: String(doc.name),
+      category: String(doc.category),
+      uploadedAt: String(doc.uploadedAt),
+      size: Number(doc.size) || 0,
+      fileType: String(doc.fileType),
+      url: doc.url as string | undefined,
+      description: doc.description as string | undefined,
+    })),
+  };
+}
+
 export default function DocumentsPage() {
   const { data: session, status } = useSession();
   const { canAccess, isLoading: gateLoading } = useTenantPortalGate();
+  const { load, getCached, isLoading: cacheLoading } = useTenantData();
+  const theme = useTenantTheme();
   const router = useRouter();
-  const [documentsData, setDocumentsData] = useState<DocumentsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [documentsData, setDocumentsData] = useState<DocumentsData | null>(() => {
+    const cached = getCached<Record<string, unknown>>('documents');
+    return cached ? mapDocuments(cached) : null;
+  });
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const { showNotification } = useNotifications();
 
   const fetchDocuments = async () => {
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/tenant/documents');
-      const data = await response.json();
-
-      if (data.success) {
-        // Map API response to component format
-        setDocumentsData({
-          totalDocuments: data.data.totalDocuments,
-          documents: data.data.documents.map((doc: any) => ({
-            id: doc.id,
-            name: doc.name,
-            category: doc.category,
-            uploadedAt: doc.uploadedAt,
-            size: doc.size,
-            fileType: doc.fileType,
-            url: doc.url,
-            description: doc.description,
-          })),
-        });
-      } else {
-        // Check if it's a "No tenant profile found" error
-        if (data.error === 'No tenant profile found' || response.status === 404) {
-          showNotification({
-            type: 'error',
-            title: 'Profile Not Found',
-            message: 'No tenant profile found. Please contact admin to link your account to a tenant profile.'
-          });
-        } else {
-          showNotification({
-            type: 'error',
-            title: 'Error',
-            message: data.error || 'Failed to load documents'
-          });
-        }
-      }
+      const raw = await load('documents', fetchTenantDocuments);
+      setDocumentsData(mapDocuments(raw));
     } catch (error) {
       console.error('Error fetching documents:', error);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load documents'
-      });
-    } finally {
-      setIsLoading(false);
+      if (!getCached('documents')) {
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: error instanceof Error ? error.message : 'Failed to load documents',
+        });
+      }
     }
   };
 
   useEffect(() => {
     if (gateLoading || status === 'loading') return;
     if (canAccess) {
-      fetchDocuments();
+      void fetchDocuments();
     } else if (status === 'unauthenticated') {
       router.push('/auth/signin?role=tenant');
     }
   }, [status, session, router, canAccess, gateLoading]);
 
-  // Show loading state while checking authentication
-  if (status === 'loading' || gateLoading || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-        </header>
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="space-y-6">
-              <SkeletonCard showHeader={true} lines={3} />
-              <SkeletonList items={5} showAvatar={true} />
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+  if (status === 'loading' || gateLoading || (!documentsData && cacheLoading('documents'))) {
+    return <TenantPageSkeleton variant="documents" />;
   }
 
   if (!canAccess) {
@@ -241,45 +208,27 @@ export default function DocumentsPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center min-h-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-gray-900">Loading your documents...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 p-6">
-      <Link
-        href="/tenant"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4 mr-1" />
-        Back to Dashboard
-      </Link>
-      <PageHeader
-        title="Documents"
-        description="Access and download your property documents"
-      />
+    <div className={theme.pagePad}>
+      <div>
+        <h1 className={theme.title}>Documents</h1>
+        <p className={cn('mt-1', theme.muted)}>
+          Lease agreement, addenda, and files shared with you
+        </p>
+      </div>
           {documentsData && (
             <div className="space-y-6">
               {/* Document Categories Overview */}
               {documentsData.categories && (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                   {Object.entries(documentsData.categories).map(([category, count]) => (
-                    <div key={category} className="bg-white overflow-hidden shadow rounded-lg">
+                    <div key={category} className={theme.card}>
                       <div className="p-4">
                         <div className="text-center">
-                          <dt className="text-sm font-medium text-gray-900 truncate capitalize">
+                          <dt className={cn('capitalize', theme.label)}>
                             {category}
                           </dt>
-                          <dd className="text-2xl font-semibold text-gray-900">{count}</dd>
+                          <dd className={theme.value}>{count}</dd>
                         </div>
                       </div>
                     </div>
@@ -288,8 +237,8 @@ export default function DocumentsPage() {
               )}
 
               {/* Search and Filter */}
-              <Card>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className={cn(theme.formPanel, 'p-4 sm:p-5')}>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <FormField htmlFor="document-search" className="mb-0 flex-1">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -317,12 +266,12 @@ export default function DocumentsPage() {
                     </Select>
                   </FormField>
                 </div>
-              </Card>
+              </div>
 
               {/* Documents List */}
-              <div className="bg-white shadow rounded-lg">
+              <div className={cn(theme.formPanel, 'overflow-hidden')}>
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  <h3 className="mb-4 text-lg font-medium leading-6 text-gray-900">
                     Your Documents ({filteredDocuments.length} of {documentsData.totalDocuments})
                   </h3>
 

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { readPreviewCookie } from '@/lib/tenant-preview';
 import { TenantPortalGateProvider } from '@/hooks/useTenantPortalGate';
 import { TenantPreviewBanner } from '@/components/features/tenant/TenantPreviewBanner';
+import { TenantPortalShellProvider } from '@/components/features/tenant/TenantPortalShellProvider';
 
 export default async function TenantLayout({
   children,
@@ -20,7 +21,7 @@ export default async function TenantLayout({
   if (session.user.role === 'tenant') {
     return (
       <TenantPortalGateProvider>
-        <div className="min-h-screen bg-gray-50">{children}</div>
+        <TenantPortalShellProvider>{children}</TenantPortalShellProvider>
       </TenantPortalGateProvider>
     );
   }
@@ -30,10 +31,8 @@ export default async function TenantLayout({
     if (preview && preview.adminUserId === session.user.id) {
       return (
         <TenantPortalGateProvider>
-          <div className="min-h-screen bg-gray-50">
-            <TenantPreviewBanner />
-            {children}
-          </div>
+          <TenantPreviewBanner />
+          <TenantPortalShellProvider>{children}</TenantPortalShellProvider>
         </TenantPortalGateProvider>
       );
     }
