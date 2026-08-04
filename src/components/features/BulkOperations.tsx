@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -14,6 +15,7 @@ type TabType = 'invoices' | 'payments' | 'tenants';
 
 export default function BulkOperations() {
   const { showSuccess, showError, showInfo } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [activeTab, setActiveTab] = useState<TabType>('invoices');
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +29,14 @@ export default function BulkOperations() {
   const [newStatus, setNewStatus] = useState<'active' | 'inactive' | 'terminated'>('active');
 
   const handleGenerateInvoices = async () => {
-    if (!confirm('Generate monthly invoices for all active tenants?')) {
+    if (
+      !(await confirm({
+        title: 'Generate invoices?',
+        message: 'Generate monthly invoices for all active tenants?',
+        confirmText: 'Generate',
+        variant: 'warning',
+      }))
+    ) {
       return;
     }
 
@@ -92,7 +101,14 @@ export default function BulkOperations() {
       return;
     }
 
-    if (!confirm(`Import ${csvPreview.length}+ payments from CSV?`)) {
+    if (
+      !(await confirm({
+        title: 'Import payments?',
+        message: `Import ${csvPreview.length}+ payments from CSV?`,
+        confirmText: 'Import',
+        variant: 'warning',
+      }))
+    ) {
       return;
     }
 
@@ -164,7 +180,14 @@ export default function BulkOperations() {
       return;
     }
 
-    if (!confirm(`Update ${ids.length} tenant(s) to status: ${newStatus}?`)) {
+    if (
+      !(await confirm({
+        title: 'Update tenant statuses?',
+        message: `Update ${ids.length} tenant(s) to status: ${newStatus}?`,
+        confirmText: 'Update',
+        variant: 'warning',
+      }))
+    ) {
       return;
     }
 
@@ -205,6 +228,7 @@ export default function BulkOperations() {
 
   return (
     <div className="p-6">
+      {dialog}
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Bulk Operations</h2>
 
       <div className="border-b border-gray-300 mb-6">

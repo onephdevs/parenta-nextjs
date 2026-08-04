@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     const accessLevel = searchParams.get('accessLevel') || '';
     const hasExpiry = searchParams.get('hasExpiry');
     const isExpired = searchParams.get('isExpired');
+    const isUnlinked = searchParams.get('isUnlinked');
+    const status = searchParams.get('status') || '';
     const dateFrom = searchParams.get('dateFrom') || '';
     const dateTo = searchParams.get('dateTo') || '';
 
@@ -41,6 +43,8 @@ export async function GET(request: NextRequest) {
     if (accessLevel) filters.accessLevel = accessLevel;
     if (hasExpiry) filters.hasExpiry = hasExpiry === 'true';
     if (isExpired) filters.isExpired = isExpired === 'true';
+    if (isUnlinked) filters.isUnlinked = isUnlinked === 'true';
+    if (status) filters.status = status;
     if (dateFrom) filters.dateFrom = dateFrom;
     if (dateTo) filters.dateTo = dateTo;
 

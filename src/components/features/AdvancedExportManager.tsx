@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ExportRequest, ReportBuilder } from '@/types/documents';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
@@ -25,6 +26,7 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
   const [showExportForm, setShowExportForm] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { addNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
 
   useEffect(() => {
     fetchData();
@@ -70,7 +72,15 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
   };
 
   const handleDeleteExport = async (exportId: string) => {
-    if (!confirm('Are you sure you want to delete this export?')) return;
+    if (
+      !(await confirm({
+        title: 'Delete export?',
+        message: 'Are you sure you want to delete this export?',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    )
+      return;
 
     try {
       const response = await fetch(`/api/export?type=export&id=${exportId}`, {
@@ -223,6 +233,7 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
 
   return (
     <div className="space-y-6">
+      {dialog}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Advanced Export Manager</h2>

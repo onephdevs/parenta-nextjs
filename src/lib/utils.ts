@@ -10,10 +10,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format date to readable string
+ * Format date to readable string.
+ * Date-only values (YYYY-MM-DD) are parsed at noon local time to avoid UTC day shifts.
  */
 export function formatDate(date: Date | string): string {
-  const d = new Date(date);
+  const d =
+    typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())
+      ? new Date(`${date.trim()}T12:00:00`)
+      : new Date(date);
+  if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",

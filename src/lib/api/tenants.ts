@@ -87,19 +87,19 @@ export async function getAllTenants(options?: {
 
     if (options?.status) {
       paramCount++;
-      whereClause += ` WHERE tenant_status = $${paramCount}`;
+      whereClause += ` WHERE t.tenant_status = $${paramCount}`;
       values.push(options.status);
     }
 
     if (options?.search) {
       paramCount++;
       whereClause += whereClause ? ' AND' : ' WHERE';
-      whereClause += ` (first_name ILIKE $${paramCount} OR last_name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+      whereClause += ` (t.first_name ILIKE $${paramCount} OR t.last_name ILIKE $${paramCount} OR t.email ILIKE $${paramCount})`;
       values.push(`%${options.search}%`);
     }
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) FROM tenants${whereClause}`;
+    const countQuery = `SELECT COUNT(*) FROM tenants t${whereClause}`;
     const countResult = await pool.query(countQuery, values);
     const total = parseInt(countResult.rows[0].count);
 
@@ -109,6 +109,7 @@ export async function getAllTenants(options?: {
         t.*,
         tra.monthly_rate as current_monthly_rent,
         r.room_number as current_room_number,
+        b.id as current_building_id,
         b.name as current_building_name
       FROM tenants t
       LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id 
@@ -342,6 +343,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
     // Add current monthly rent from active assignment
     currentMonthlyRent: row.current_monthly_rent ? parseFloat(row.current_monthly_rent as string) : undefined,
     currentRoomNumber: row.current_room_number as string | undefined,
+    currentBuildingId: row.current_building_id as string | undefined,
     currentBuildingName: row.current_building_name as string | undefined,
   };
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 
 interface ProfilePictureUploadProps {
@@ -20,6 +21,7 @@ export default function ProfilePictureUpload({
   size = 'md'
 }: ProfilePictureUploadProps) {
   const { showNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [preview, setPreview] = useState<string | null>(currentPictureUrl || null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -82,7 +84,7 @@ export default function ProfilePictureUpload({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.details || data.error || 'Upload failed');
       }
 
       setPreview(data.data.url);
@@ -109,7 +111,14 @@ export default function ProfilePictureUpload({
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this profile picture?')) {
+    if (
+      !(await confirm({
+        title: 'Delete profile picture?',
+        message: 'Are you sure you want to delete this profile picture?',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -155,6 +164,7 @@ export default function ProfilePictureUpload({
 
   return (
     <div className="flex flex-col items-center space-y-4">
+      {dialog}
       <div className="relative">
         <div className={`${sizeClasses[size]} rounded-full overflow-hidden border-4 border-gray-200 bg-gray-100 flex items-center justify-center`}>
           {preview ? (

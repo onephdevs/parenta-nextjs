@@ -116,6 +116,11 @@ export interface Tenant {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  /** Present on list queries with active assignment join */
+  currentMonthlyRent?: number;
+  currentRoomNumber?: string;
+  currentBuildingName?: string;
+  currentBuildingId?: string;
 }
 
 export interface DatabaseTenant {

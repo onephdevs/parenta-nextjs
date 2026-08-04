@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -21,6 +22,7 @@ interface ActivityItem {
   entityLabel: string | null;
   description: string;
   createdAt: string;
+  link?: string | null;
 }
 
 interface ActivityDetail {
@@ -74,6 +76,10 @@ function entityHref(item: { entityType: string; entityId: string | null; link?: 
 }
 
 export default function ActivityFeedClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const deepLinkId = searchParams.get('id');
+
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -84,9 +90,25 @@ export default function ActivityFeedClient() {
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(deepLinkId);
   const [detail, setDetail] = useState<ActivityDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const selectActivity = useCallback(
+    (id: string | null) => {
+      setSelectedId(id);
+      const params = new URLSearchParams(searchParams.toString());
+      if (id) params.set('id', id);
+      else params.delete('id');
+      const qs = params.toString();
+      router.replace(qs ? `/admin/activity?${qs}` : '/admin/activity', { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  useEffect(() => {
+    if (deepLinkId) setSelectedId(deepLinkId);
+  }, [deepLinkId]);
 
   const fetchFeed = useCallback(async () => {
     setLoading(true);
@@ -242,7 +264,7 @@ export default function ActivityFeedClient() {
                   <li key={item.id}>
                     <button
                       type="button"
-                      onClick={() => setSelectedId(item.id)}
+                      onClick={() => selectActivity(item.id)}
                       className={`w-full border-b border-gray-50 px-4 py-3 text-left hover:bg-gray-50 ${
                         selectedId === item.id ? 'bg-purple-50' : ''
                       }`}

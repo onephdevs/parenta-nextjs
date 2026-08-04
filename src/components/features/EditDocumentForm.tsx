@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Document, DocumentCategory, DOCUMENT_TYPES } from '@/types/document';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -21,6 +22,7 @@ interface EditDocumentFormProps {
 export default function EditDocumentForm({ document, categories }: EditDocumentFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -117,9 +119,12 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
   const handleDelete = async () => {
     if (
-      !confirm(
-        `Are you sure you want to delete "${document.documentName}"? This action cannot be undone.`
-      )
+      !(await confirm({
+        title: 'Delete document?',
+        message: `Are you sure you want to delete "${document.documentName}"? This action cannot be undone.`,
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
     ) {
       return;
     }
@@ -258,6 +263,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {dialog}
       <div className="mb-8">
         <div className="flex items-center space-x-4">
           <Link href="/admin/documents" className="text-gray-900 hover:text-gray-900">

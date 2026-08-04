@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -42,6 +43,7 @@ interface RoomUtilityBill {
 
 export default function RoomUtilityBillsPage() {
   const { showNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [bills, setBills] = useState<RoomUtilityBill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [buildings, setBuildings] = useState<any[]>([]);
@@ -165,7 +167,14 @@ export default function RoomUtilityBillsPage() {
   }, [buildingFilter, utilityTypeFilter, statusFilter, dateFromFilter, dateToFilter, roomFilter]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this bill?')) {
+    if (
+      !(await confirm({
+        title: 'Delete bill?',
+        message: 'Are you sure you want to delete this bill?',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -267,6 +276,7 @@ export default function RoomUtilityBillsPage() {
 
   return (
     <div className="space-y-6 p-6">
+      {dialog}
       <Link
         href="/admin/bills-expenses"
         className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"

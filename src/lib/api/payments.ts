@@ -70,6 +70,7 @@ export interface PaymentFilters {
   paymentType?: string;
   paymentStatus?: string;
   paymentMethod?: string;
+  buildingId?: string;
   startDate?: Date;
   endDate?: Date;
   minAmount?: number;
@@ -211,9 +212,15 @@ export async function getPayments(
       OR t.email ILIKE $${paramIndex}
       OR p.notes ILIKE $${paramIndex}
       OR p.reference_number ILIKE $${paramIndex}
+      OR r.room_number ILIKE $${paramIndex}
+      OR b.name ILIKE $${paramIndex}
     )`);
     queryParams.push(`%${filters.search.trim()}%`);
     paramIndex++;
+  }
+  if (filters.buildingId) {
+    whereConditions.push(`b.id = $${paramIndex++}`);
+    queryParams.push(filters.buildingId);
   }
 
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
@@ -223,6 +230,9 @@ export async function getPayments(
     SELECT COUNT(*) as total
     FROM payments p
     INNER JOIN tenants t ON p.tenant_id = t.id
+    LEFT JOIN tenant_room_assignments ra ON p.assignment_id = ra.id
+    LEFT JOIN rooms r ON ra.room_id = r.id
+    LEFT JOIN buildings b ON r.building_id = b.id
     ${whereClause}
   `;
   

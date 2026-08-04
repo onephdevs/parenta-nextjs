@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { UtilityBill } from '../../types/database';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import UtilityBillForm from './UtilityBillForm';
 import UtilityBillsList from './UtilityBillsList';
 import UtilityStatsCards from './UtilityStatsCards';
@@ -69,6 +70,7 @@ export default function UtilitiesDashboard() {
   const [totalBills, setTotalBills] = useState(0);
 
   const { addNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const ITEMS_PER_PAGE = 10;
 
   const fetchUtilityData = async () => {
@@ -123,7 +125,14 @@ export default function UtilitiesDashboard() {
   };
 
   const handleDeleteBill = async (billId: string) => {
-    if (!confirm('Are you sure you want to delete this utility bill?')) {
+    if (
+      !(await confirm({
+        title: 'Delete utility bill?',
+        message: 'Are you sure you want to delete this utility bill?',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -228,6 +237,7 @@ export default function UtilitiesDashboard() {
 
   return (
     <div className="space-y-6">
+      {dialog}
       {/* Statistics Cards */}
       {stats && <UtilityStatsCards stats={stats} />}
 

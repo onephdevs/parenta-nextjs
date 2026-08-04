@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TenantWithAssignments } from '@/lib/api/tenants';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +18,8 @@ import DocumentUpload from './DocumentUpload';
 
 interface EditTenantFormProps {
   tenant: TenantWithAssignments;
+  /** When set (e.g. from lease detail), Cancel returns here instead of tenant profile. */
+  returnTo?: string | null;
 }
 
 interface TenantFormData {
@@ -36,19 +39,93 @@ interface TenantFormData {
   employerName?: string;
   monthlyIncome?: number;
   securityDeposit?: number;
+  leaseDurationMonths: number;
+  customLeaseMonths?: number;
   leaseStartDate?: string;
   leaseEndDate?: string;
   notes?: string;
 }
 
-export function EditTenantForm({ tenant }: EditTenantFormProps) {
+const LEASE_DURATION_PRESETS = [1, 3, 6, 12, 18, 24] as const;
+
+/** End date = start + N months − 1 day (e.g. Aug 17 + 6 mo → Feb 16). */
+function computeLeaseEndDate(startIso: string, months: number): string {
+  if (!startIso || months <= 0) return '';
+  const [year, month, day] = startIso.split('-').map(Number);
+  if (!year || !month || !day) return '';
+
+  const end = new Date(year, month - 1, day);
+  end.setMonth(end.getMonth() + months);
+  end.setDate(end.getDate() - 1);
+
+  const yy = end.getFullYear();
+  const mm = String(end.getMonth() + 1).padStart(2, '0');
+  const dd = String(end.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function findMonthsMatchingEnd(startIso: string, endIso: string): number {
+  for (let months = 1; months <= 60; months++) {
+    if (computeLeaseEndDate(startIso, months) === endIso) return months;
+  }
+  return 0;
+}
+
+function inferLeaseDuration(
+  startIso?: string,
+  endIso?: string
+): { leaseDurationMonths: number; customLeaseMonths?: number } {
+  if (!startIso || !endIso) {
+    return { leaseDurationMonths: -1 };
+  }
+  const matched = findMonthsMatchingEnd(startIso, endIso);
+  if (LEASE_DURATION_PRESETS.includes(matched as (typeof LEASE_DURATION_PRESETS)[number])) {
+    return { leaseDurationMonths: matched };
+  }
+  if (matched > 0) {
+    return { leaseDurationMonths: 0, customLeaseMonths: matched };
+  }
+  return { leaseDurationMonths: 0, customLeaseMonths: undefined };
+}
+
+function getEffectiveLeaseMonths(data: Pick<TenantFormData, 'leaseDurationMonths' | 'customLeaseMonths'>): number {
+  if (data.leaseDurationMonths === -1) return 0;
+  if (data.leaseDurationMonths === 0) return Number(data.customLeaseMonths) || 0;
+  return Number(data.leaseDurationMonths) || 0;
+}
+
+function applyLeaseEndDate(data: TenantFormData): string {
+  const start = data.leaseStartDate || '';
+  const months = getEffectiveLeaseMonths(data);
+  if (!start || months <= 0) return '';
+  return computeLeaseEndDate(start, months);
+}
+
+export function EditTenantForm({ tenant, returnTo }: EditTenantFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const { currencySymbol } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const goBack = () => {
+    if (returnTo) {
+      router.push(returnTo);
+      return;
+    }
+    router.push(`/admin/tenants/${tenant.id}`);
+  };
+
   // Initialize form data with tenant values
+  const initialStart = tenant.leaseStartDate
+    ? new Date(tenant.leaseStartDate).toISOString().split('T')[0]
+    : '';
+  const initialEnd = tenant.leaseEndDate
+    ? new Date(tenant.leaseEndDate).toISOString().split('T')[0]
+    : '';
+  const inferredDuration = inferLeaseDuration(initialStart, initialEnd);
+
   const [formData, setFormData] = useState<TenantFormData>({
     firstName: tenant.firstName,
     lastName: tenant.lastName,
@@ -66,8 +143,10 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     employerName: tenant.employerName || '',
     monthlyIncome: tenant.monthlyIncome ?? undefined,
     securityDeposit: tenant.securityDeposit || 0,
-    leaseStartDate: tenant.leaseStartDate ? new Date(tenant.leaseStartDate).toISOString().split('T')[0] : '',
-    leaseEndDate: tenant.leaseEndDate ? new Date(tenant.leaseEndDate).toISOString().split('T')[0] : '',
+    leaseStartDate: initialStart,
+    leaseEndDate: initialEnd,
+    leaseDurationMonths: inferredDuration.leaseDurationMonths,
+    customLeaseMonths: inferredDuration.customLeaseMonths,
     notes: tenant.notes || '',
   });
 
@@ -104,6 +183,25 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
     if (formData.securityDeposit && formData.securityDeposit < 0) {
       newErrors.securityDeposit = 'Deposit cannot be negative';
+    }
+
+    if (formData.leaseDurationMonths === 0) {
+      if (formData.customLeaseMonths == null || Number(formData.customLeaseMonths) <= 0) {
+        newErrors.customLeaseMonths = 'Enter how many months for the custom lease duration';
+      }
+    }
+
+    if (formData.moveInDate && formData.leaseStartDate && formData.moveInDate < formData.leaseStartDate) {
+      newErrors.moveInDate = 'Move-in date cannot be earlier than lease start date';
+    }
+
+    if (
+      formData.leaseDurationMonths !== -1 &&
+      formData.moveInDate &&
+      formData.leaseEndDate &&
+      formData.moveInDate > formData.leaseEndDate
+    ) {
+      newErrors.moveInDate = 'Move-in date cannot be later than lease end date';
     }
 
     setErrors(newErrors);
@@ -154,7 +252,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         message: `${formData.firstName} ${formData.lastName} has been updated.`
       });
       
-      router.push(`/admin/tenants/${tenant.id}`);
+      goBack();
     } catch (error) {
       console.error('Error updating tenant:', error);
       updateNotification(loadingNotificationId, {
@@ -168,7 +266,14 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${tenant.firstName} ${tenant.lastName}? This action cannot be undone.`)) {
+    if (
+      !(await confirm({
+        title: 'Delete tenant?',
+        message: `Are you sure you want to delete ${tenant.firstName} ${tenant.lastName}? This action cannot be undone.`,
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -215,23 +320,79 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    const optionalNumberFields = ['monthlyIncome'];
+    const optionalNumberFields = ['monthlyIncome', 'customLeaseMonths'];
+    const selectNumberFields = ['leaseDurationMonths'];
     const isOptionalNumber = type === 'number' && optionalNumberFields.includes(name);
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number'
-        ? (isOptionalNumber ? (value === '' ? undefined : (Number.isNaN(Number(value)) ? prev[name as keyof TenantFormData] : Number(value))) : (value === '' ? 0 : Number(value)))
-        : value,
-    }));
+
+    setFormData((prev) => {
+      let fieldValue: string | number | undefined;
+      if (type === 'number') {
+        if (isOptionalNumber) {
+          fieldValue =
+            value === ''
+              ? undefined
+              : Number.isNaN(Number(value))
+                ? (prev[name as keyof TenantFormData] as number | undefined)
+                : Number(value);
+        } else {
+          fieldValue = value === '' ? 0 : Number(value);
+        }
+      } else if (selectNumberFields.includes(name)) {
+        fieldValue = value === '' ? 0 : Number(value);
+      } else {
+        fieldValue = value;
+      }
+
+      const next: TenantFormData = {
+        ...prev,
+        [name]: fieldValue,
+      };
+
+      if (name === 'leaseDurationMonths' && Number(fieldValue) === 0) {
+        if (prev.customLeaseMonths == null || prev.customLeaseMonths <= 0) {
+          const previousPreset = Number(prev.leaseDurationMonths);
+          next.customLeaseMonths = previousPreset > 0 ? previousPreset : 12;
+        }
+      }
+
+      if (
+        name === 'leaseStartDate' ||
+        name === 'leaseDurationMonths' ||
+        name === 'customLeaseMonths'
+      ) {
+        next.leaseEndDate = applyLeaseEndDate(next);
+        if (
+          next.leaseEndDate &&
+          next.moveInDate &&
+          next.moveInDate > next.leaseEndDate
+        ) {
+          next.moveInDate = next.leaseEndDate;
+        }
+      }
+
+      if (name === 'leaseStartDate') {
+        const start = String(fieldValue ?? '');
+        if (start && next.moveInDate && next.moveInDate < start) {
+          next.moveInDate = start;
+        }
+      }
+
+      return next;
+    });
 
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
         [name]: '',
       }));
     }
   };
+
+  const effectiveLeaseMonths = getEffectiveLeaseMonths(formData);
+  const isCustomDuration = formData.leaseDurationMonths === 0;
+  const isOpenEndedLease = formData.leaseDurationMonths === -1;
+  const leaseEndDateLocked = effectiveLeaseMonths > 0;
 
   const formatCurrency = (amount?: number) => {
     if (!amount) return 'Not specified';
@@ -252,6 +413,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
 
   return (
     <Card padding="none">
+      {dialog}
       <form onSubmit={handleSubmit} className="p-6 space-y-6 text-gray-900">
         {/* Current Room Assignment */}
         {tenant.currentAssignment && (
@@ -554,7 +716,62 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
               />
             </FormField>
 
-            <FormField label="Lease End Date" htmlFor="leaseEndDate">
+            <FormField
+              label="Lease Duration"
+              htmlFor="leaseDurationMonths"
+              hint="Choose a preset, Custom (enter months below), or Open-ended"
+            >
+              <Select
+                name="leaseDurationMonths"
+                id="leaseDurationMonths"
+                value={formData.leaseDurationMonths}
+                onChange={handleInputChange}
+              >
+                {LEASE_DURATION_PRESETS.map((months) => (
+                  <option key={months} value={months}>
+                    {months} month{months !== 1 ? 's' : ''}
+                  </option>
+                ))}
+                <option value="0">Custom</option>
+                <option value="-1">Open-ended</option>
+              </Select>
+            </FormField>
+
+            {isCustomDuration && (
+              <FormField
+                label="Custom Duration (months)"
+                htmlFor="customLeaseMonths"
+                required
+                error={errors.customLeaseMonths}
+                hint="Enter how many months this lease should run"
+              >
+                <Input
+                  type="number"
+                  name="customLeaseMonths"
+                  id="customLeaseMonths"
+                  min={1}
+                  step={1}
+                  value={formData.customLeaseMonths ?? ''}
+                  onChange={handleInputChange}
+                  isInvalid={Boolean(errors.customLeaseMonths)}
+                  placeholder="e.g., 9"
+                />
+              </FormField>
+            )}
+
+            <FormField
+              label="Lease End Date"
+              htmlFor="leaseEndDate"
+              hint={
+                isOpenEndedLease
+                  ? 'Open-ended — no end date'
+                  : leaseEndDateLocked && formData.leaseEndDate
+                    ? `Auto-set for ${effectiveLeaseMonths} month${
+                        effectiveLeaseMonths !== 1 ? 's' : ''
+                      } from start`
+                    : undefined
+              }
+            >
               <Input
                 type="date"
                 name="leaseEndDate"
@@ -563,19 +780,43 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={handleInputChange}
                 min={formData.leaseStartDate || '2000-01-01'}
                 max="2099-12-31"
+                isDisabled={leaseEndDateLocked || isOpenEndedLease}
+                className={
+                  leaseEndDateLocked || isOpenEndedLease
+                    ? 'bg-gray-100 text-gray-600 border-gray-200'
+                    : undefined
+                }
                 style={{ colorScheme: 'light' }}
               />
             </FormField>
 
-            <FormField label="Move-in Date" htmlFor="moveInDate">
+            <FormField
+              label="Move-in Date"
+              htmlFor="moveInDate"
+              error={errors.moveInDate}
+              hint={
+                formData.leaseStartDate
+                  ? isOpenEndedLease
+                    ? 'From lease start onward'
+                    : formData.leaseEndDate
+                      ? 'Between lease start and end date'
+                      : 'On or after lease start date'
+                  : undefined
+              }
+            >
               <Input
                 type="date"
                 name="moveInDate"
                 id="moveInDate"
                 value={formData.moveInDate}
                 onChange={handleInputChange}
-                min="2000-01-01"
-                max="2099-12-31"
+                min={formData.leaseStartDate || '2000-01-01'}
+                max={
+                  isOpenEndedLease
+                    ? '2099-12-31'
+                    : formData.leaseEndDate || '2099-12-31'
+                }
+                isInvalid={Boolean(errors.moveInDate)}
                 style={{ colorScheme: 'light' }}
               />
             </FormField>
@@ -642,7 +883,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
+              onClick={goBack}
               isDisabled={loading || isDeleting}
             >
               Cancel

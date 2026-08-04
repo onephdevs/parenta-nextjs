@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ReactNode } from 'react';
-import { Phone, Calendar, User, Mail, PhilippinePeso } from 'lucide-react';
+import { Building2, Phone, Calendar, User, Mail, PhilippinePeso } from 'lucide-react';
 import { Tenant } from '@/types/database';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
@@ -11,38 +11,36 @@ import { TenantStatusBadge } from '@/components/domain/StatusBadges';
 import { cn } from '@/lib/utils';
 
 interface TenantCardProps {
-  tenant: Tenant & {
-    currentMonthlyRent?: number | null;
-  };
+  tenant: Tenant;
 }
 
 function StatRow({
   icon,
   label,
   children,
-  isEmpty = false,
 }: {
   icon: ReactNode;
   label: string;
   children: ReactNode;
-  isEmpty?: boolean;
 }) {
   return (
-    <div className="flex min-h-[1.5rem] items-center justify-between gap-3 text-sm">
+    <div className="flex items-center justify-between gap-3 text-sm">
       <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
         <span className="text-gray-400">{icon}</span>
         {label}
       </span>
-      <span
-        className={cn(
-          'min-w-0 text-right font-medium',
-          isEmpty ? 'italic text-gray-400' : 'text-gray-900'
-        )}
-      >
-        {children}
-      </span>
+      <span className="min-w-0 text-right font-medium text-gray-900">{children}</span>
     </div>
   );
+}
+
+function propertyUnitLabel(tenant: Tenant): string | null {
+  const room = tenant.currentRoomNumber?.trim();
+  const building = tenant.currentBuildingName?.trim();
+  if (room && building) return `Unit ${room} · ${building}`;
+  if (room) return `Unit ${room}`;
+  if (building) return building;
+  return null;
 }
 
 export default function TenantCard({ tenant }: TenantCardProps) {
@@ -55,6 +53,7 @@ export default function TenantCard({ tenant }: TenantCardProps) {
   const hasMoveIn = Boolean(tenant.moveInDate);
   const hasEmergency = Boolean(tenant.emergencyContactName?.trim());
   const hasNotes = Boolean(tenant.notes?.trim());
+  const propertyLabel = propertyUnitLabel(tenant);
   const detailHref = `/admin/tenants/${tenant.id}`;
 
   const formatCurrency = (amount: number) =>
@@ -70,23 +69,19 @@ export default function TenantCard({ tenant }: TenantCardProps) {
       day: 'numeric',
     });
 
-  const rentDisplay = hasRent
-    ? `${formatCurrency(monthlyRent!)}/mo`
-    : hasIncome
-      ? formatCurrency(tenant.monthlyIncome!)
-      : 'No rent set';
+  const showStats = hasPhone || hasRent || hasIncome || hasMoveIn;
+  const showTertiary = hasEmergency || hasNotes;
 
   return (
     <Card
       padding="none"
       className={cn(
         'flex h-full flex-col border border-gray-100 shadow-sm',
-        'transition-all duration-200 hover:border-purple-100 hover:shadow-md'
+        'transition-all duration-200 hover:border-gray-200 hover:shadow-md'
       )}
     >
       <div className="flex h-full flex-col p-6">
-        {/* Header — same structure as Building/Room cards */}
-        <div className="min-h-[5.5rem]">
+        <div>
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <Avatar
@@ -98,26 +93,34 @@ export default function TenantCard({ tenant }: TenantCardProps) {
                 <h3 className="text-xl font-bold leading-snug text-gray-900">
                   <Link
                     href={detailHref}
-                    className="line-clamp-2 break-words hover:text-purple-700"
+                    className="line-clamp-2 break-words hover:text-gray-700"
                     title={fullName}
                   >
                     {fullName}
                   </Link>
                 </h3>
-                <p
-                  className="mt-2 flex items-start gap-1.5 text-sm leading-snug text-gray-500"
-                  title={hasEmail ? tenant.email! : undefined}
-                >
-                  <Mail className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                  <span
-                    className={cn(
-                      'line-clamp-2 break-words',
-                      !hasEmail && 'italic text-gray-400'
-                    )}
+
+                {propertyLabel ? (
+                  <p
+                    className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-md bg-[#E2E5F7] px-2 py-1 text-[12px] font-semibold leading-none text-gray-800"
+                    title={propertyLabel}
                   >
-                    {hasEmail ? tenant.email : 'No email'}
-                  </span>
-                </p>
+                    <Building2 className="h-3.5 w-3.5 flex-shrink-0 text-[#39CCCC]" />
+                    <span className="truncate">{propertyLabel}</span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[12px] font-medium text-gray-400">No unit assigned</p>
+                )}
+
+                {hasEmail && (
+                  <p
+                    className="mt-2 flex items-start gap-1.5 text-sm leading-snug text-gray-500"
+                    title={tenant.email}
+                  >
+                    <Mail className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                    <span className="line-clamp-2 break-words">{tenant.email}</span>
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-shrink-0 items-center gap-2.5 pt-0.5">
@@ -126,56 +129,60 @@ export default function TenantCard({ tenant }: TenantCardProps) {
           </div>
         </div>
 
-        {/* Stats — label left / value right like RoomCard */}
-        <div className="mt-5 space-y-3">
-          <StatRow icon={<Phone className="h-3.5 w-3.5" />} label="Phone" isEmpty={!hasPhone}>
-            {hasPhone ? tenant.phone : 'Not set'}
-          </StatRow>
+        {showStats && (
+          <div className="mt-5 space-y-3">
+            {hasPhone && (
+              <StatRow icon={<Phone className="h-3.5 w-3.5" />} label="Phone">
+                {tenant.phone}
+              </StatRow>
+            )}
 
-          <StatRow
-            icon={<PhilippinePeso className="h-3.5 w-3.5" />}
-            label={hasRent ? 'Rent' : hasIncome ? 'Income' : 'Rent'}
-            isEmpty={!hasRent && !hasIncome}
-          >
-            {rentDisplay}
-          </StatRow>
+            {hasRent && (
+              <StatRow icon={<PhilippinePeso className="h-3.5 w-3.5" />} label="Rent">
+                {formatCurrency(monthlyRent!)}/mo
+              </StatRow>
+            )}
 
-          <StatRow
-            icon={<Calendar className="h-3.5 w-3.5" />}
-            label="Move-in"
-            isEmpty={!hasMoveIn}
-          >
-            {hasMoveIn ? formatDate(tenant.moveInDate!) : 'Not set'}
-          </StatRow>
-        </div>
+            {!hasRent && hasIncome && (
+              <StatRow icon={<PhilippinePeso className="h-3.5 w-3.5" />} label="Income">
+                {formatCurrency(tenant.monthlyIncome!)}
+              </StatRow>
+            )}
 
-        {/* Tertiary block — fixed height like Amenities on Building/Room */}
-        <div className="mt-4 min-h-[3.5rem]">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
-            Emergency / Notes
-          </p>
-          {hasEmergency ? (
-            <div className="space-y-1">
-              <p className="flex items-start gap-1.5 text-sm text-gray-700">
-                <User className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                <span className="line-clamp-2 break-words">
-                  {tenant.emergencyContactName}
-                  {tenant.emergencyContactRelationship
-                    ? ` · ${tenant.emergencyContactRelationship}`
-                    : ''}
-                  {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
-                </span>
-              </p>
-              {hasNotes && (
-                <p className="line-clamp-1 text-sm text-gray-500">{tenant.notes}</p>
-              )}
-            </div>
-          ) : hasNotes ? (
-            <p className="line-clamp-2 text-sm text-gray-600">{tenant.notes}</p>
-          ) : (
-            <p className="text-sm italic text-gray-400">No details listed</p>
-          )}
-        </div>
+            {hasMoveIn && (
+              <StatRow icon={<Calendar className="h-3.5 w-3.5" />} label="Move-in">
+                {formatDate(tenant.moveInDate!)}
+              </StatRow>
+            )}
+          </div>
+        )}
+
+        {showTertiary && (
+          <div className="mt-4">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+              Emergency / Notes
+            </p>
+            {hasEmergency ? (
+              <div className="space-y-1">
+                <p className="flex items-start gap-1.5 text-sm text-gray-700">
+                  <User className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                  <span className="line-clamp-2 break-words">
+                    {tenant.emergencyContactName}
+                    {tenant.emergencyContactRelationship
+                      ? ` · ${tenant.emergencyContactRelationship}`
+                      : ''}
+                    {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
+                  </span>
+                </p>
+                {hasNotes && (
+                  <p className="line-clamp-1 text-sm text-gray-500">{tenant.notes}</p>
+                )}
+              </div>
+            ) : (
+              <p className="line-clamp-2 text-sm text-gray-600">{tenant.notes}</p>
+            )}
+          </div>
+        )}
 
         <div className="mt-auto flex gap-3 pt-6">
           <Link href={detailHref} className="flex-1">

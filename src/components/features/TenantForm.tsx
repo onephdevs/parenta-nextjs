@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Check, Copy } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -11,6 +13,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { FormField } from '@/components/forms/FormField';
 import { Alert } from '@/components/ui/Alert';
+import { Dialog } from '@/components/ui/Dialog';
 import { cn } from '@/lib/utils';
 
 /** Assign API enforces this floor when no building deposit config exists */
@@ -52,6 +55,12 @@ interface TenantFormData {
   monthlyRent?: number;
   depositMonths: number;
   advanceMonths: number;
+  /**
+   * Duration preset: 1–24 = months, 0 = custom (use customLeaseMonths), -1 = open-ended.
+   */
+  leaseDurationMonths: number;
+  /** Used when leaseDurationMonths === 0 (Custom). */
+  customLeaseMonths?: number;
   leaseStartDate?: string;
   leaseEndDate?: string;
   notes?: string;
@@ -68,7 +77,7 @@ const STEPS = [
 const STEP_FIELDS: Record<number, string[]> = {
   1: ['firstName', 'lastName', 'email', 'phone', 'emergencyContactPhone'],
   2: ['monthlyIncome'],
-  3: ['monthlyRent', 'depositMonths', 'advanceMonths', 'leaseStartDate'],
+  3: ['monthlyRent', 'depositMonths', 'advanceMonths', 'leaseStartDate', 'customLeaseMonths'],
 };
 
 const INITIAL_FORM_DATA: TenantFormData = {
@@ -90,10 +99,54 @@ const INITIAL_FORM_DATA: TenantFormData = {
   monthlyRent: undefined,
   depositMonths: 1,
   advanceMonths: 1,
+  leaseDurationMonths: 12,
+  customLeaseMonths: undefined,
   leaseStartDate: '',
   leaseEndDate: '',
   notes: '',
 };
+
+const LEASE_DURATION_PRESETS = [1, 3, 6, 12, 18, 24] as const;
+
+function todayLocalISO(): string {
+  const d = new Date();
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** End date = start + N months − 1 day (e.g. Aug 17 + 6 mo → Feb 16). */
+function computeLeaseEndDate(startIso: string, months: number): string {
+  if (!startIso || months <= 0) return '';
+  const [year, month, day] = startIso.split('-').map(Number);
+  if (!year || !month || !day) return '';
+
+  const end = new Date(year, month - 1, day);
+  end.setMonth(end.getMonth() + months);
+  end.setDate(end.getDate() - 1);
+
+  const yy = end.getFullYear();
+  const mm = String(end.getMonth() + 1).padStart(2, '0');
+  const dd = String(end.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function getEffectiveLeaseMonths(data: Pick<TenantFormData, 'leaseDurationMonths' | 'customLeaseMonths'>): number {
+  if (data.leaseDurationMonths === -1) return 0; // open-ended
+  if (data.leaseDurationMonths === 0) return Number(data.customLeaseMonths) || 0;
+  return Number(data.leaseDurationMonths) || 0;
+}
+
+function applyLeaseEndDate(
+  data: TenantFormData,
+  startOverride?: string
+): string {
+  const start = startOverride ?? data.leaseStartDate ?? '';
+  const months = getEffectiveLeaseMonths(data);
+  if (!start || months <= 0) return '';
+  return computeLeaseEndDate(start, months);
+}
 
 function getFieldError(name: string, data: TenantFormData): string {
   switch (name) {
@@ -129,14 +182,43 @@ function getFieldError(name: string, data: TenantFormData): string {
       }
       return '';
     case 'depositMonths':
+      if (data.depositMonths == null || Number.isNaN(Number(data.depositMonths))) {
+        return 'Deposit months is required';
+      }
       if (data.depositMonths < 0) return 'Deposit months cannot be negative';
       return '';
     case 'advanceMonths':
+      if (data.advanceMonths == null || Number.isNaN(Number(data.advanceMonths))) {
+        return 'Advance months is required';
+      }
       if (data.advanceMonths < 0) return 'Advance months cannot be negative';
       return '';
     case 'leaseStartDate':
       if (data.roomId && !data.leaseStartDate) {
         return 'Lease start date is required when assigning a room';
+      }
+      if (data.leaseStartDate && data.leaseStartDate < todayLocalISO()) {
+        return 'Lease start date cannot be in the past';
+      }
+      return '';
+    case 'moveInDate':
+      if (data.moveInDate && data.leaseStartDate && data.moveInDate < data.leaseStartDate) {
+        return 'Move-in date cannot be earlier than lease start date';
+      }
+      if (
+        data.leaseDurationMonths !== -1 &&
+        data.moveInDate &&
+        data.leaseEndDate &&
+        data.moveInDate > data.leaseEndDate
+      ) {
+        return 'Move-in date cannot be later than lease end date';
+      }
+      return '';
+    case 'customLeaseMonths':
+      if (data.leaseDurationMonths === 0) {
+        if (data.customLeaseMonths == null || Number(data.customLeaseMonths) <= 0) {
+          return 'Enter how many months for the custom lease duration';
+        }
       }
       return '';
     default:
@@ -176,6 +258,7 @@ function SectionCard({
 export default function TenantForm() {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [loading, setLoading] = useState(false);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -191,6 +274,12 @@ export default function TenantForm() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const skipNextDraftSave = useRef(false);
+  const [credentialsModal, setCredentialsModal] = useState<{
+    tenantId: string;
+    email: string;
+    temporaryPassword: string;
+  } | null>(null);
+  const [passwordCopied, setPasswordCopied] = useState(false);
 
   // Restore draft once on mount
   useEffect(() => {
@@ -267,12 +356,15 @@ export default function TenantForm() {
     sessionStorage.setItem(DIRTY_FLAG_KEY, '1');
   }, []);
 
-  const confirmLeave = useCallback(() => {
+  const confirmLeave = useCallback(async () => {
     if (!isDirty || submitted) return true;
-    return window.confirm(
-      'You have unsaved changes. Leave this page and discard the draft in progress?'
-    );
-  }, [isDirty, submitted]);
+    return confirm({
+      title: 'Unsaved changes',
+      message: 'You have unsaved changes. Leave this page and discard the draft in progress?',
+      confirmText: 'Leave',
+      variant: 'warning',
+    });
+  }, [isDirty, submitted, confirm]);
 
   // Load buildings and rooms
   useEffect(() => {
@@ -315,7 +407,7 @@ export default function TenantForm() {
     loadData();
   }, []);
 
-  // Filter rooms when building is selected
+  // Filter rooms when building is selected (property first, then room)
   useEffect(() => {
     if (formData.buildingId) {
       const filtered = rooms.filter(
@@ -327,7 +419,10 @@ export default function TenantForm() {
         setFormData((prev) => ({ ...prev, roomId: '' }));
       }
     } else {
-      setFilteredRooms(rooms.filter((r) => r.roomStatus === 'vacant'));
+      setFilteredRooms([]);
+      if (formData.roomId) {
+        setFormData((prev) => ({ ...prev, roomId: '' }));
+      }
     }
   }, [formData.buildingId, rooms, formData.roomId]);
 
@@ -357,6 +452,11 @@ export default function TenantForm() {
   const hasRentForTotal = Boolean(formData.monthlyRent && formData.monthlyRent > 0);
   const rentLocked = !overrideMonthlyRent && Boolean(formData.roomId);
   const rentDisabled = !overrideMonthlyRent && !formData.roomId;
+  const todayISO = todayLocalISO();
+  const effectiveLeaseMonths = getEffectiveLeaseMonths(formData);
+  const isCustomDuration = formData.leaseDurationMonths === 0;
+  const isOpenEndedLease = formData.leaseDurationMonths === -1;
+  const leaseEndDateLocked = effectiveLeaseMonths > 0;
 
   const collectErrors = useCallback((fields?: string[]): FormErrors => {
     const names =
@@ -630,40 +730,35 @@ export default function TenantForm() {
           }
         }
 
-        if (temporaryPassword) {
-          detailMessage += `\n\n🔑 Temporary login password (copy now — shown once):\n${temporaryPassword}`;
-        }
-
         updateNotification(loadingNotificationId, {
           type: 'success',
           title: 'Tenant Created & Room Assigned!',
           message: detailMessage,
         });
       } else {
-        let message = `${formData.firstName} ${formData.lastName} has been added. You can assign a room later.`;
-        if (temporaryPassword) {
-          message += `\n\n🔑 Temporary login password (copy now — shown once):\n${temporaryPassword}`;
-        }
         updateNotification(loadingNotificationId, {
           type: 'success',
           title: 'Tenant created successfully!',
-          message,
+          message: `${formData.firstName} ${formData.lastName} has been added. You can assign a room later.`,
         });
-      }
-
-      if (temporaryPassword) {
-        window.alert(
-          `Tenant account created.\n\nEmail: ${formData.email}\nTemporary password: ${temporaryPassword}\n\nCopy this password now — it will not be shown again.`
-        );
       }
 
       setSubmitted(true);
       setIsDirty(false);
       clearDraft();
 
-      setTimeout(() => {
-        router.push(`/admin/tenants/${tenantId}`);
-      }, temporaryPassword ? 2500 : 1500);
+      if (temporaryPassword) {
+        setPasswordCopied(false);
+        setCredentialsModal({
+          tenantId,
+          email: formData.email,
+          temporaryPassword,
+        });
+      } else {
+        setTimeout(() => {
+          router.push(`/admin/tenants/${tenantId}`);
+        }, 1500);
+      }
     } catch (error) {
       console.error('Error creating tenant:', error);
       const message = error instanceof Error ? error.message : 'An error occurred';
@@ -684,24 +779,75 @@ export default function TenantForm() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    const optionalNumberFields = ['monthlyIncome', 'monthlyRent'];
+    const optionalNumberFields = ['monthlyIncome', 'monthlyRent', 'customLeaseMonths'];
+    const selectNumberFields = ['leaseDurationMonths'];
     const numValue = value === '' ? undefined : Number(value);
     const isOptionalNumber = type === 'number' && optionalNumberFields.includes(name);
-    setFormData((prev) => ({
-      ...prev,
-      [name]:
-        type === 'number'
-          ? isOptionalNumber
-            ? value === ''
-              ? undefined
-              : Number.isNaN(numValue)
-                ? prev[name as keyof TenantFormData]
-                : numValue
-            : value === ''
-              ? 0
-              : Number(value)
-          : value,
-    }));
+
+    setFormData((prev) => {
+      let fieldValue: string | number | undefined;
+      if (type === 'number') {
+        if (isOptionalNumber) {
+          if (value === '') {
+            fieldValue = undefined;
+          } else if (Number.isNaN(numValue)) {
+            fieldValue = prev[name as keyof TenantFormData] as number | undefined;
+          } else {
+            fieldValue = numValue;
+          }
+        } else {
+          fieldValue = value === '' ? 0 : Number(value);
+        }
+      } else if (selectNumberFields.includes(name)) {
+        fieldValue = value === '' ? 0 : Number(value);
+      } else {
+        fieldValue = value;
+      }
+
+      const next: TenantFormData = {
+        ...prev,
+        [name]: fieldValue,
+      };
+
+      // Switching to Custom: seed months input from previous preset when empty
+      if (name === 'leaseDurationMonths' && Number(fieldValue) === 0) {
+        if (prev.customLeaseMonths == null || prev.customLeaseMonths <= 0) {
+          const previousPreset = Number(prev.leaseDurationMonths);
+          next.customLeaseMonths =
+            previousPreset > 0 ? previousPreset : 12;
+        }
+      }
+
+      if (name === 'leaseStartDate') {
+        const start = String(fieldValue ?? '');
+        const previousStart = prev.leaseStartDate || '';
+        // Auto-fill move-in when empty or still matching the previous start
+        if (!prev.moveInDate || prev.moveInDate === previousStart) {
+          next.moveInDate = start;
+        } else if (start && prev.moveInDate && prev.moveInDate < start) {
+          // Move-in cannot be before lease start
+          next.moveInDate = start;
+        }
+      }
+
+      if (
+        name === 'leaseStartDate' ||
+        name === 'leaseDurationMonths' ||
+        name === 'customLeaseMonths'
+      ) {
+        next.leaseEndDate = applyLeaseEndDate(next);
+        // Keep move-in inside the lease window after end date recalculates
+        if (
+          next.leaseEndDate &&
+          next.moveInDate &&
+          next.moveInDate > next.leaseEndDate
+        ) {
+          next.moveInDate = next.leaseEndDate;
+        }
+      }
+
+      return next;
+    });
     markDirty();
 
     if (errors[name]) {
@@ -712,24 +858,48 @@ export default function TenantForm() {
     }
   };
 
-  const handleCancel = () => {
-    if (!confirmLeave()) return;
+  const handleCancel = async () => {
+    if (!(await confirmLeave())) return;
     clearDraft();
     setIsDirty(false);
     router.push('/admin/tenants');
   };
 
-  const handleBackLink = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!confirmLeave()) {
-      e.preventDefault();
-      return;
-    }
+  const handleBackLink = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (!(await confirmLeave())) return;
     clearDraft();
     setIsDirty(false);
+    router.push('/admin/tenants');
+  };
+
+  const handleCopyTemporaryPassword = async () => {
+    if (!credentialsModal?.temporaryPassword) return;
+    try {
+      await navigator.clipboard.writeText(credentialsModal.temporaryPassword);
+      setPasswordCopied(true);
+    } catch {
+      // Fallback for older browsers / denied clipboard permission
+      const textarea = document.createElement('textarea');
+      textarea.value = credentialsModal.temporaryPassword;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setPasswordCopied(true);
+    }
+  };
+
+  const handleCredentialsModalContinue = () => {
+    if (!credentialsModal) return;
+    const { tenantId } = credentialsModal;
+    setCredentialsModal(null);
+    router.push(`/admin/tenants/${tenantId}`);
   };
 
   return (
     <div ref={formTopRef} className="text-gray-900">
+      {dialog}
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 mb-6 border-b border-gray-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <Link
@@ -813,8 +983,16 @@ export default function TenantForm() {
           <button
             type="button"
             className="font-medium underline"
-            onClick={() => {
-              if (!window.confirm('Clear the saved draft and start over?')) return;
+            onClick={async () => {
+              if (
+                !(await confirm({
+                  title: 'Clear draft?',
+                  message: 'Clear the saved draft and start over?',
+                  confirmText: 'Clear draft',
+                  variant: 'danger',
+                }))
+              )
+                return;
               clearDraft();
               skipNextDraftSave.current = true;
               setFormData(INITIAL_FORM_DATA);
@@ -834,7 +1012,7 @@ export default function TenantForm() {
           <>
             <SectionCard
               title="Personal Information"
-              description="Required identity details for the tenant account."
+              description="Required identity details for the tenant account. Fields marked * are required."
             >
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <FormField label="First Name" htmlFor="firstName" required error={errors.firstName}>
@@ -1053,9 +1231,11 @@ export default function TenantForm() {
                   label="Room"
                   htmlFor="roomId"
                   hint={
-                    formData.roomId
-                      ? 'Invoices will be auto-generated after tenant creation'
-                      : 'You can assign a room later from the tenant detail page'
+                    !formData.buildingId
+                      ? 'Select a property first'
+                      : formData.roomId
+                        ? 'Invoices will be auto-generated after tenant creation'
+                        : 'You can assign a room later from the tenant detail page'
                   }
                 >
                   <Select
@@ -1063,17 +1243,23 @@ export default function TenantForm() {
                     id="roomId"
                     value={formData.roomId}
                     onChange={handleInputChange}
-                    isDisabled={!filteredRooms.length}
-                    className={!filteredRooms.length ? 'bg-gray-50 text-gray-400' : undefined}
+                    isDisabled={!formData.buildingId || !filteredRooms.length}
+                    className={
+                      !formData.buildingId || !filteredRooms.length
+                        ? 'bg-gray-50 text-gray-400'
+                        : undefined
+                    }
                   >
                     <option value="">
-                      {formData.buildingId && !filteredRooms.length
-                        ? 'No available rooms in this property'
-                        : 'Select a room'}
+                      {!formData.buildingId
+                        ? 'Select a property first'
+                        : !filteredRooms.length
+                          ? 'No available rooms in this property'
+                          : 'Select a room'}
                     </option>
                     {filteredRooms.map((room) => (
                       <option key={room.id} value={room.id}>
-                        {room.buildingName} - Room {room.roomNumber} (₱
+                        Room {room.roomNumber} (₱
                         {Number(room.monthlyRate).toLocaleString()}/month)
                       </option>
                     ))}
@@ -1096,7 +1282,7 @@ export default function TenantForm() {
               title="Rent & Payment Details"
               description="Defaults below match common 1-month deposit + 1-month advance practice."
             >
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <FormField
                   label="Monthly Rent (₱)"
                   htmlFor="monthlyRent"
@@ -1109,6 +1295,7 @@ export default function TenantForm() {
                         ? "Using the selected room's rate. Check 'Override monthly rent' to set a custom amount."
                         : 'Enter amount in Philippine Pesos'
                   }
+                  className="sm:col-span-2 lg:col-span-3"
                 >
                   <Checkbox
                     id="overrideMonthlyRent"
@@ -1157,21 +1344,21 @@ export default function TenantForm() {
                   hint={
                     hasRentForTotal
                       ? `Deposit: ₱${computedDeposit.toLocaleString()}`
-                      : 'Default: 1 month'
+                      : 'Enter any number of months (default 1)'
                   }
                 >
-                  <Select
+                  <Input
+                    type="number"
                     name="depositMonths"
                     id="depositMonths"
+                    min={0}
+                    step={0.5}
                     value={formData.depositMonths}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                  >
-                    <option value="0">0 month</option>
-                    <option value="1">1 month (default)</option>
-                    <option value="2">2 months</option>
-                    <option value="3">3 months</option>
-                  </Select>
+                    isInvalid={Boolean(errors.depositMonths)}
+                    placeholder="e.g., 1"
+                  />
                   {depositRaisedToMinimum && (
                     <p className="mt-1 text-xs text-amber-700">
                       Building minimum of ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} will be charged
@@ -1188,29 +1375,29 @@ export default function TenantForm() {
                   hint={
                     hasRentForTotal
                       ? `Advance: ₱${computedAdvance.toLocaleString()}`
-                      : 'Default: 1 month'
+                      : 'Enter any number of months (default 1)'
                   }
                 >
-                  <Select
+                  <Input
+                    type="number"
                     name="advanceMonths"
                     id="advanceMonths"
+                    min={0}
+                    step={0.5}
                     value={formData.advanceMonths}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                  >
-                    <option value="0">0 month</option>
-                    <option value="1">1 month (default)</option>
-                    <option value="2">2 months</option>
-                    <option value="3">3 months</option>
-                  </Select>
+                    isInvalid={Boolean(errors.advanceMonths)}
+                    placeholder="e.g., 1"
+                  />
                 </FormField>
 
-                <div className="sm:col-span-2 rounded-md border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col justify-center rounded-md border border-gray-200 bg-gray-50 p-4">
                   {hasRentForTotal ? (
                     <>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <span className="text-sm font-medium text-gray-900">
-                          Total Initial Payment:
+                          Total Initial Payment
                         </span>
                         <span className="text-lg font-bold text-gray-900">
                           ₱{(effectiveDeposit + computedAdvance).toLocaleString()}
@@ -1220,7 +1407,7 @@ export default function TenantForm() {
                         (₱{(formData.monthlyRent || 0).toLocaleString()} × {formData.depositMonths}{' '}
                         month{formData.depositMonths !== 1 ? 's' : ''} deposit
                         {depositRaisedToMinimum
-                          ? ` → ₱${MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} minimum`
+                          ? ` → ₱${MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} min`
                           : ''}
                         ) + (₱{(formData.monthlyRent || 0).toLocaleString()} ×{' '}
                         {formData.advanceMonths} month{formData.advanceMonths !== 1 ? 's' : ''}{' '}
@@ -1231,8 +1418,7 @@ export default function TenantForm() {
                           Room rent × deposit months is below the ₱
                           {MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} building minimum. Create Tenant
                           will charge ₱{MINIMUM_DEPOSIT_AMOUNT.toLocaleString()} deposit so
-                          assignment can proceed. For real units, set a realistic monthly rent
-                          (e.g. ₱5,000+).
+                          assignment can proceed.
                         </p>
                       )}
                     </>
@@ -1249,8 +1435,8 @@ export default function TenantForm() {
               title="Lease Information"
               description={
                 formData.roomId
-                  ? 'Lease start is required when a room is assigned.'
-                  : 'Optional until a room is assigned.'
+                  ? 'Pick start date and duration — end date updates automatically.'
+                  : 'Optional until a room is assigned. End date updates from start + duration.'
               }
               optional={!formData.roomId}
             >
@@ -1260,6 +1446,7 @@ export default function TenantForm() {
                   htmlFor="leaseStartDate"
                   required={Boolean(formData.roomId)}
                   error={errors.leaseStartDate}
+                  hint="Cannot be earlier than today"
                 >
                   <Input
                     type="date"
@@ -1268,35 +1455,124 @@ export default function TenantForm() {
                     value={formData.leaseStartDate}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                    min="2000-01-01"
+                    min={todayISO}
                     max="2099-12-31"
                     isInvalid={Boolean(errors.leaseStartDate)}
                     style={{ colorScheme: 'light' }}
                   />
                 </FormField>
 
-                <FormField label="Lease End Date" htmlFor="leaseEndDate">
+                <FormField
+                  label="Lease Duration"
+                  htmlFor="leaseDurationMonths"
+                  required={Boolean(formData.roomId)}
+                  hint={
+                    isCustomDuration
+                      ? 'Enter the month count in the field that appears below'
+                      : 'Presets auto-set the end date. Choose Custom for other lengths.'
+                  }
+                >
+                  <Select
+                    name="leaseDurationMonths"
+                    id="leaseDurationMonths"
+                    value={formData.leaseDurationMonths}
+                    onChange={handleInputChange}
+                  >
+                    {LEASE_DURATION_PRESETS.map((months) => (
+                      <option key={months} value={months}>
+                        {months} month{months !== 1 ? 's' : ''}
+                        {months === 12 ? ' (default)' : ''}
+                      </option>
+                    ))}
+                    <option value="0">Custom</option>
+                    <option value="-1">Open-ended</option>
+                  </Select>
+                </FormField>
+
+                {isCustomDuration ? (
+                  <FormField
+                    label="Custom Duration (months)"
+                    htmlFor="customLeaseMonths"
+                    required
+                    error={errors.customLeaseMonths}
+                    hint="End date updates from start + this many months"
+                  >
+                    <Input
+                      type="number"
+                      name="customLeaseMonths"
+                      id="customLeaseMonths"
+                      min={1}
+                      step={1}
+                      value={formData.customLeaseMonths ?? ''}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
+                      isInvalid={Boolean(errors.customLeaseMonths)}
+                      placeholder="e.g., 9"
+                    />
+                  </FormField>
+                ) : null}
+
+                <FormField
+                  label="Lease End Date"
+                  htmlFor="leaseEndDate"
+                  required={Boolean(formData.roomId) && !isOpenEndedLease}
+                  hint={
+                    isOpenEndedLease
+                      ? 'Open-ended — no end date'
+                      : leaseEndDateLocked && formData.leaseEndDate
+                        ? `Auto-set for ${effectiveLeaseMonths} month${
+                            effectiveLeaseMonths !== 1 ? 's' : ''
+                          } from start`
+                        : isCustomDuration
+                          ? 'Enter custom months above to calculate end date'
+                          : 'Select a start date to calculate end date'
+                  }
+                >
                   <Input
                     type="date"
                     name="leaseEndDate"
                     id="leaseEndDate"
                     value={formData.leaseEndDate}
                     onChange={handleInputChange}
-                    min={formData.leaseStartDate || '2000-01-01'}
+                    min={formData.leaseStartDate || todayISO}
                     max="2099-12-31"
+                    isDisabled={leaseEndDateLocked || isOpenEndedLease}
+                    className={
+                      leaseEndDateLocked || isOpenEndedLease
+                        ? 'bg-gray-100 text-gray-600 border-gray-200'
+                        : undefined
+                    }
                     style={{ colorScheme: 'light' }}
                   />
                 </FormField>
 
-                <FormField label="Move In Date" htmlFor="moveInDate">
+                <FormField
+                  label="Move In Date"
+                  htmlFor="moveInDate"
+                  error={errors.moveInDate}
+                  hint={
+                    formData.leaseStartDate
+                      ? isOpenEndedLease
+                        ? 'From lease start onward'
+                        : formData.leaseEndDate
+                          ? 'Between lease start and end date'
+                          : 'On or after lease start date'
+                      : 'Defaults to lease start date; you can change it'
+                  }
+                >
                   <Input
                     type="date"
                     name="moveInDate"
                     id="moveInDate"
                     value={formData.moveInDate}
                     onChange={handleInputChange}
-                    min="2000-01-01"
-                    max="2099-12-31"
+                    min={formData.leaseStartDate || todayISO}
+                    max={
+                      isOpenEndedLease
+                        ? '2099-12-31'
+                        : formData.leaseEndDate || '2099-12-31'
+                    }
+                    isInvalid={Boolean(errors.moveInDate)}
                     style={{ colorScheme: 'light' }}
                   />
                 </FormField>
@@ -1341,6 +1617,63 @@ export default function TenantForm() {
           </div>
         </div>
       </form>
+
+      <Dialog
+        isOpen={Boolean(credentialsModal)}
+        onClose={handleCredentialsModalContinue}
+        title="Tenant account created"
+        description="Save these login details before continuing."
+        size="sm"
+        footer={
+          <Button type="button" onClick={handleCredentialsModalContinue}>
+            Continue to tenant
+          </Button>
+        }
+      >
+        {credentialsModal && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Email</p>
+              <p className="mt-1 break-all text-sm font-medium text-gray-900">
+                {credentialsModal.email}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Temporary password
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="min-w-0 flex-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+                  {credentialsModal.temporaryPassword}
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCopyTemporaryPassword}
+                  className="shrink-0"
+                >
+                  {passwordCopied ? (
+                    <>
+                      <Check className="mr-1.5 h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-1.5 h-4 w-4" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <Alert variant="warning" title="Shown once">
+              Copy this password now — it will not be shown again.
+            </Alert>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

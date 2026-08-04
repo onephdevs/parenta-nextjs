@@ -149,6 +149,8 @@ const ACTION_TITLES: Record<string, string> = {
   'bulk.invoices_generated': 'Bulk invoices generated',
   'bulk.tenants_status_updated': 'Bulk tenant status update',
   'settings.updated': 'Settings updated',
+  'job.completed': 'Job completed',
+  'job.failed': 'Job failed',
 };
 
 export function getActionTitle(actionType: string): string {
@@ -167,12 +169,20 @@ export function formatActorName(params: {
   lastName?: string | null;
   email?: string | null;
   actorRole?: string | null;
+  /** When false/null, treat as a system actor if no name is available. */
+  hasActorUserId?: boolean | null;
 }): string | null {
   const name = `${params.firstName || ''} ${params.lastName || ''}`.trim();
   if (name) return name;
   if (params.email) return params.email;
-  if (params.actorRole === 'system') return 'System';
+  if (params.actorRole === 'system' || params.hasActorUserId === false) return 'System';
   return null;
+}
+
+/** Strip trailing status words already implied by the action type (e.g. "… completed"). */
+function cleanJobLabel(label: string, verb: string): string {
+  const pattern = new RegExp(`\\s+${verb.replace(/_/g, ' ')}$`, 'i');
+  return label.replace(pattern, '').trim() || label;
 }
 
 export function formatActivityDescription(params: {
@@ -185,6 +195,14 @@ export function formatActivityDescription(params: {
   const [entity, verb] = params.actionType.split('.');
   const entityWords = (entity || 'item').replace(/_/g, ' ');
   const verbWords = (verb || 'updated').replace(/_/g, ' ');
+
+  // Background jobs: "System completed job: notification_queue_process"
+  if (entity === 'job') {
+    const jobName = label ? cleanJobLabel(label, verbWords) : null;
+    const phrase = `${actor} ${verbWords} job`;
+    if (jobName) return `${phrase}: ${jobName}`;
+    return phrase;
+  }
 
   // Prefer natural phrasing: "Ada created tenant: Juan"
   const phrase = `${actor} ${verbWords} ${entityWords}`;

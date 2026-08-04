@@ -3,14 +3,15 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getDocuments, getDocumentStats, getDocumentCategories } from '@/lib/api/documents';
+import { getAllBuildings } from '@/lib/api/buildings';
+import { getAllTenants } from '@/lib/api/tenants';
 import DocumentsList from '@/components/features/DocumentsList';
-import DocumentUpload from '@/components/features/DocumentUpload';
+import AdminDocumentUpload from '@/components/features/AdminDocumentUpload';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
-import { AlertTriangle, FileText, HardDrive, Tags } from 'lucide-react';
+import { AlertTriangle, FileSignature, FileText, Link2Off, Tags } from 'lucide-react';
 
-// Enable ISR (Incremental Static Regeneration) with 60 second revalidation
 export const revalidate = 60;
 
 interface DocumentsPageProps {
@@ -25,6 +26,8 @@ interface DocumentsPageProps {
     accessLevel?: string;
     hasExpiry?: string;
     isExpired?: string;
+    isUnlinked?: string;
+    status?: string;
   }>;
 }
 
@@ -39,19 +42,37 @@ async function getDocumentsData(searchParams: Record<string, string | undefined>
       roomId: searchParams.roomId,
       tenantId: searchParams.tenantId,
       accessLevel: searchParams.accessLevel,
-      hasExpiry: searchParams.hasExpiry === 'true' ? true : searchParams.hasExpiry === 'false' ? false : undefined,
-      isExpired: searchParams.isExpired === 'true' ? true : searchParams.isExpired === 'false' ? false : undefined,
+      hasExpiry:
+        searchParams.hasExpiry === 'true'
+          ? true
+          : searchParams.hasExpiry === 'false'
+            ? false
+            : undefined,
+      isExpired:
+        searchParams.isExpired === 'true'
+          ? true
+          : searchParams.isExpired === 'false'
+            ? false
+            : undefined,
+      isUnlinked: searchParams.isUnlinked === 'true' ? true : undefined,
+      status: searchParams.status as
+        | 'signed'
+        | 'on_file'
+        | 'expiring_soon'
+        | 'needs_review'
+        | undefined,
     };
 
-    // Remove undefined values
     const cleanFilters = Object.fromEntries(
       Object.entries(filters).filter(([, value]) => value !== undefined)
     );
 
-    const [documentsResult, stats, categories] = await Promise.all([
+    const [documentsResult, stats, categories, buildingsResult, tenantsResult] = await Promise.all([
       getDocuments(cleanFilters, page, 20),
       getDocumentStats(),
       getDocumentCategories(),
+      getAllBuildings({ limit: 200 }),
+      getAllTenants({ limit: 200 }),
     ]);
 
     return {
@@ -61,6 +82,12 @@ async function getDocumentsData(searchParams: Record<string, string | undefined>
       limit: documentsResult.limit,
       stats,
       categories,
+      buildings: buildingsResult.buildings.map((b) => ({ id: b.id, name: b.name })),
+      tenants: tenantsResult.tenants.map((t) => ({
+        id: t.id,
+        firstName: t.firstName,
+        lastName: t.lastName,
+      })),
     };
   } catch (error) {
     console.error('Error fetching documents data:', error);
@@ -75,31 +102,27 @@ async function getDocumentsData(searchParams: Record<string, string | undefined>
         documentsByType: {},
         documentsByCategory: {},
         expiringDocuments: 0,
+        unlinkedDocuments: 0,
+        pendingSignature: 0,
         storageUsed: 0,
       },
       categories: [],
+      buildings: [],
+      tenants: [],
     };
   }
 }
 
 export default async function DocumentsPage({ searchParams }: DocumentsPageProps) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/admin/signin');
   }
 
   const resolvedSearchParams = await searchParams;
-  const { documents, total, page, limit, stats, categories } = await getDocumentsData(resolvedSearchParams);
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
+  const { documents, total, page, limit, stats, categories, buildings, tenants } =
+    await getDocumentsData(resolvedSearchParams);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -110,7 +133,11 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
         description="Manage and organize all property-related documents"
         actions={
           <>
-            <DocumentUpload />
+            <AdminDocumentUpload
+              categories={categories}
+              buildings={buildings}
+              tenants={tenants}
+            />
             <Link href="/admin/documents/categories">
               <Button variant="outline" leftIcon={<Tags className="h-4 w-4" />}>
                 Manage Categories
@@ -120,45 +147,43 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          title="Total Documents"
+          title="Total documents"
           value={stats.totalDocuments}
-          subtitle={`${stats.documentsThisMonth} added this month`}
           tone="blue"
           icon={<FileText className="h-5 w-5" />}
         />
         <StatCard
-          title="Storage Used"
-          value={formatFileSize(stats.storageUsed)}
-          subtitle="Across all documents"
-          tone="green"
-          icon={<HardDrive className="h-5 w-5" />}
+          title="Pending signature"
+          value={stats.pendingSignature}
+          tone="default"
+          icon={<FileSignature className="h-5 w-5" />}
         />
         <StatCard
-          title="Expiring Soon"
+          title="Expiring soon"
           value={stats.expiringDocuments}
-          subtitle="Within 30 days"
           tone="yellow"
           icon={<AlertTriangle className="h-5 w-5" />}
         />
         <StatCard
-          title="Categories"
-          value={categories.length}
-          subtitle="Document categories"
-          tone="purple"
-          icon={<Tags className="h-5 w-5" />}
+          title="Unlinked"
+          value={stats.unlinkedDocuments}
+          tone="red"
+          icon={<Link2Off className="h-5 w-5" />}
         />
       </div>
 
-        {/* Documents List */}
       <DocumentsList
         documents={documents}
         categories={categories}
+        buildings={buildings}
+        tenants={tenants}
         searchParams={resolvedSearchParams}
         totalPages={totalPages}
         currentPage={page}
+        total={total}
       />
     </div>
   );
-} 
+}

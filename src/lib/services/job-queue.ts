@@ -155,13 +155,13 @@ export async function processPendingJobs(maxJobs = 1): Promise<{
       await completeJob(job.id, result);
 
       logActivitySafe({
-        actorUserId: job.createdBy,
-        actorRole: 'admin',
+        actorUserId: job.createdBy || null,
+        actorRole: job.createdBy ? 'admin' : 'system',
         actionType: 'job.completed',
         category: 'system',
         entityType: 'background_job',
         entityId: job.id,
-        entityLabel: `${job.jobType} completed`,
+        entityLabel: job.jobType,
         afterData: { jobType: job.jobType, result },
         link: '/admin/bulk-operations',
         metadata: { link: '/admin/bulk-operations', jobId: job.id },
@@ -173,13 +173,13 @@ export async function processPendingJobs(maxJobs = 1): Promise<{
       await failJob(job.id, message);
 
       logActivitySafe({
-        actorUserId: job.createdBy,
-        actorRole: 'admin',
+        actorUserId: job.createdBy || null,
+        actorRole: job.createdBy ? 'admin' : 'system',
         actionType: 'job.failed',
         category: 'system',
         entityType: 'background_job',
         entityId: job.id,
-        entityLabel: `${job.jobType} failed`,
+        entityLabel: job.jobType,
         afterData: { jobType: job.jobType, error: message },
         link: '/admin/bulk-operations',
         metadata: { link: '/admin/bulk-operations', jobId: job.id },

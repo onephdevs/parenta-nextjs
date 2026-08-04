@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { useAppDialog } from '@/hooks/useAppDialog';
 
 interface AssetTrackQuickActionsProps {
   assetId: string;
@@ -17,6 +18,7 @@ export default function AssetTrackQuickActions({
 }: AssetTrackQuickActionsProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const { prompt, dialog } = useAppDialog();
 
   const runAction = async (action: 'report_issue' | 'request_maintenance' | 'update_location') => {
     setBusy(action);
@@ -24,7 +26,11 @@ export default function AssetTrackQuickActions({
     try {
       let location: string | undefined;
       if (action === 'update_location') {
-        const input = window.prompt('Enter new location description:', '');
+        const input = await prompt({
+          title: 'Update location',
+          message: 'Enter new location description:',
+          defaultValue: '',
+        });
         if (input === null) {
           setBusy(null);
           return;
@@ -56,6 +62,7 @@ export default function AssetTrackQuickActions({
 
   return (
     <Card padding="none" className="mt-8">
+      {dialog}
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Quick Actions</h3>
       </div>

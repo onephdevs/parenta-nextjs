@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { LateFeeCalculationResult } from '@/types/financial';
+import { useAppDialog } from '@/hooks/useAppDialog';
+import { Button } from '@/components/ui/Button';
 
 export default function LateFeeApplication() {
+  const { alert, confirm, dialog } = useAppDialog();
   const [loading, setLoading] = useState(false);
   const [calculations, setCalculations] = useState<any[]>([]);
   const [hasCalculated, setHasCalculated] = useState(false);
@@ -19,20 +21,40 @@ export default function LateFeeApplication() {
       if (data.success) {
         setCalculations(data.calculations || []);
         setHasCalculated(true);
-        alert(data.message);
+        await alert({
+          title: 'Late fee calculation',
+          message: data.message || 'Calculation complete.',
+          variant: (data.calculations || []).length > 0 ? 'success' : 'info',
+        });
       } else {
-        alert(data.error || 'Failed to calculate late fees');
+        await alert({
+          title: 'Calculation failed',
+          message: data.error || 'Failed to calculate late fees',
+          variant: 'danger',
+        });
       }
     } catch (error) {
       console.error('Error calculating late fees:', error);
-      alert('Failed to calculate late fees');
+      await alert({
+        title: 'Calculation failed',
+        message: 'Failed to calculate late fees',
+        variant: 'danger',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleApply = async (dryRun: boolean = false) => {
-    if (!dryRun && !confirm('Are you sure you want to apply late fees to all eligible invoices?')) {
+    if (
+      !dryRun &&
+      !(await confirm({
+        title: 'Apply late fees?',
+        message: 'Are you sure you want to apply late fees to all eligible invoices?',
+        confirmText: 'Apply late fees',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -48,19 +70,30 @@ export default function LateFeeApplication() {
       const data = await response.json();
 
       if (data.success || data.partial_success) {
-        alert(data.message);
-        
+        await alert({
+          title: dryRun ? 'Dry run complete' : 'Late fees applied',
+          message: data.message,
+          variant: 'success',
+        });
+
         if (!dryRun) {
-          // Refresh calculations
           setHasCalculated(false);
           setCalculations([]);
         }
       } else {
-        alert(data.error || 'Failed to apply late fees');
+        await alert({
+          title: 'Apply failed',
+          message: data.error || 'Failed to apply late fees',
+          variant: 'danger',
+        });
       }
     } catch (error) {
       console.error('Error applying late fees:', error);
-      alert('Failed to apply late fees');
+      await alert({
+        title: 'Apply failed',
+        message: 'Failed to apply late fees',
+        variant: 'danger',
+      });
     } finally {
       setLoading(false);
     }
@@ -68,43 +101,32 @@ export default function LateFeeApplication() {
 
   return (
     <div className="p-6">
+      {dialog}
       <h2 className="text-2xl font-bold mb-6 text-gray-900">Late Fee Application</h2>
 
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
         <h3 className="font-semibold mb-2 text-gray-900">How It Works</h3>
         <ol className="list-decimal list-inside text-sm space-y-1 text-gray-900">
-          <li>Click "Calculate Eligible Fees" to see which invoices are eligible for late fees</li>
+          <li>Click &quot;Calculate Eligible Fees&quot; to see which invoices are eligible for late fees</li>
           <li>Review the list of invoices and calculated fees</li>
-          <li>Click "Apply Late Fees" to create late fee invoices for all eligible tenants</li>
+          <li>Click &quot;Apply Late Fees&quot; to create late fee invoices for all eligible tenants</li>
           <li>Late fee invoices will be automatically generated and sent to tenants</li>
         </ol>
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <button
-          onClick={handleCalculate}
-          disabled={loading}
-          className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-        >
+      <div className="flex flex-wrap gap-3 mb-6">
+        <Button onClick={handleCalculate} isDisabled={loading} isLoading={loading}>
           {loading ? 'Calculating...' : 'Calculate Eligible Fees'}
-        </button>
-        
+        </Button>
+
         {hasCalculated && calculations.length > 0 && (
           <>
-            <button
-              onClick={() => handleApply(true)}
-              disabled={loading}
-              className="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:bg-gray-400"
-            >
+            <Button variant="outline" onClick={() => handleApply(true)} isDisabled={loading}>
               {loading ? 'Processing...' : 'Dry Run (Preview)'}
-            </button>
-            <button
-              onClick={() => handleApply(false)}
-              disabled={loading}
-              className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-400"
-            >
+            </Button>
+            <Button variant="danger" onClick={() => handleApply(false)} isDisabled={loading}>
               {loading ? 'Applying...' : 'Apply Late Fees'}
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -177,4 +199,3 @@ export default function LateFeeApplication() {
     </div>
   );
 }
-

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Users, Save } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -40,6 +41,7 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const { showNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
 
   const [formData, setFormData] = useState<Partial<Occupant>>({
     firstName: '',
@@ -186,7 +188,14 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this occupant?')) {
+    if (
+      !(await confirm({
+        title: 'Remove occupant?',
+        message: 'Are you sure you want to remove this occupant?',
+        confirmText: 'Remove',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -281,6 +290,7 @@ export default function OccupantList({ roomId, onOccupantChange }: OccupantListP
 
   return (
     <Card>
+      {dialog}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-gray-900 flex items-center">
           <Users className="h-5 w-5 mr-2" />

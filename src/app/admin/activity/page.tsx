@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
@@ -11,7 +12,16 @@ export default async function ActivityPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <ActivityFeedClient />
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <div className="h-8 w-48 animate-pulse rounded bg-gray-100" />
+            <div className="h-40 animate-pulse rounded bg-gray-100" />
+          </div>
+        }
+      >
+        <ActivityFeedClient />
+      </Suspense>
     </div>
   );
 }

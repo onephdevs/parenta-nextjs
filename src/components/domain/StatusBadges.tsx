@@ -25,13 +25,23 @@ function InvoiceStatusBadge({ status }: { status: string }) {
   const map: Record<string, BadgeTone> = {
     paid: 'success',
     issued: 'info',
+    sent: 'info',
+    partial: 'warning',
     pending: 'warning',
+    due: 'warning',
     overdue: 'danger',
     draft: 'neutral',
     cancelled: 'neutral',
     void: 'neutral',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  const labels: Record<string, string> = {
+    due: 'Due',
+    overdue: 'Overdue',
+    sent: 'Sent',
+    partial: 'Partial',
+  };
+  const key = status.toLowerCase();
+  return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
 }
 
 function RoomStatusBadge({ status }: { status: string }) {
@@ -113,6 +123,42 @@ function BuildingStatusBadge({ isActive }: { isActive: boolean }) {
   );
 }
 
+function LeaseStatusBadge({ status }: { status: string }) {
+  const map: Record<string, BadgeTone> = {
+    active: 'success',
+    expiring_soon: 'warning',
+    draft: 'neutral',
+    pending: 'neutral',
+    terminated: 'danger',
+  };
+  const labels: Record<string, string> = {
+    active: 'Active',
+    expiring_soon: 'Expiring soon',
+    draft: 'Draft',
+    pending: 'Draft',
+    terminated: 'Terminated',
+  };
+  const key = status.toLowerCase();
+  return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
+}
+
+function DocumentStatusBadge({ status }: { status: string }) {
+  const map: Record<string, BadgeTone> = {
+    signed: 'success',
+    on_file: 'neutral',
+    expiring_soon: 'warning',
+    needs_review: 'danger',
+  };
+  const labels: Record<string, string> = {
+    signed: 'Signed',
+    on_file: 'On file',
+    expiring_soon: 'Expiring soon',
+    needs_review: 'Needs review',
+  };
+  const key = status.toLowerCase();
+  return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
+}
+
 export {
   PaymentStatusBadge,
   InvoiceStatusBadge,
@@ -123,4 +169,6 @@ export {
   AssetConditionBadge,
   MaintenanceStatusBadge,
   ReservationStatusBadge,
+  LeaseStatusBadge,
+  DocumentStatusBadge,
 };

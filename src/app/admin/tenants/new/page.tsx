@@ -13,7 +13,7 @@ export default async function NewTenantPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 lg:px-8">
           <h1 className="text-2xl font-bold text-gray-900">Add New Tenant</h1>
           <p className="mt-1 text-sm text-gray-600">
             Complete the steps below. Your progress is saved as a draft in this browser until you
@@ -22,9 +22,9 @@ export default async function NewTenantPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg bg-white shadow">
-          <div className="px-4 py-5 sm:p-6">
+          <div className="px-4 py-5 sm:p-6 lg:p-8">
             <TenantForm />
           </div>
         </div>

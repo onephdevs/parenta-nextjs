@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FileText, Download, X, Upload } from 'lucide-react';
@@ -28,6 +29,7 @@ export default function DocumentUpload({
   accept = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 }: DocumentUploadProps) {
   const { showNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isUploading, setIsUploading] = useState(false);
@@ -178,7 +180,14 @@ export default function DocumentUpload({
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this document?')) {
+    if (
+      !(await confirm({
+        title: 'Delete document?',
+        message: 'Are you sure you want to delete this document?',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -258,6 +267,7 @@ export default function DocumentUpload({
 
   return (
     <div className="space-y-4">
+      {dialog}
       {currentDocumentUrl && currentDocumentName ? (
         <Card padding="md" className="bg-gray-50 border-gray-300">
           <div className="flex items-center justify-between">

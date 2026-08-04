@@ -38,7 +38,10 @@ export async function getDocuments(
       d.document_name ILIKE $${paramIndex} OR
       d.description ILIKE $${paramIndex} OR
       d.file_name ILIKE $${paramIndex} OR
-      $${paramIndex} = ANY(d.tags)
+      $${paramIndex} = ANY(d.tags) OR
+      CONCAT(t.first_name, ' ', t.last_name) ILIKE $${paramIndex} OR
+      t.first_name ILIKE $${paramIndex} OR
+      t.last_name ILIKE $${paramIndex}
     )`;
     params.push(`%${filters.search}%`);
     paramIndex++;
@@ -93,6 +96,31 @@ export async function getDocuments(
       query += ` AND d.expiry_date IS NOT NULL AND d.expiry_date < CURRENT_DATE`;
     } else {
       query += ` AND (d.expiry_date IS NULL OR d.expiry_date >= CURRENT_DATE)`;
+    }
+  }
+
+  if (filters.isUnlinked !== undefined) {
+    if (filters.isUnlinked) {
+      query += ` AND d.building_id IS NULL AND d.room_id IS NULL AND d.tenant_id IS NULL AND d.asset_id IS NULL`;
+    } else {
+      query += ` AND (d.building_id IS NOT NULL OR d.room_id IS NOT NULL OR d.tenant_id IS NOT NULL OR d.asset_id IS NOT NULL)`;
+    }
+  }
+
+  if (filters.status) {
+    const unlinkedSql = `(d.building_id IS NULL AND d.room_id IS NULL AND d.tenant_id IS NULL AND d.asset_id IS NULL)`;
+    const needsReviewSql = `(d.category_id IS NULL OR ${unlinkedSql} OR (d.expiry_date IS NOT NULL AND d.expiry_date < CURRENT_DATE))`;
+    const expiringSoonSql = `(d.expiry_date IS NOT NULL AND d.expiry_date >= CURRENT_DATE AND d.expiry_date <= CURRENT_DATE + INTERVAL '30 days')`;
+    const leaseLikeSql = `(LOWER(COALESCE(d.document_type, '')) IN ('lease', 'contract') OR LOWER(COALESCE(dc.name, '')) LIKE '%lease%' OR LOWER(COALESCE(dc.name, '')) LIKE '%agreement%' OR LOWER(COALESCE(dc.name, '')) LIKE '%contract%')`;
+
+    if (filters.status === 'needs_review') {
+      query += ` AND ${needsReviewSql}`;
+    } else if (filters.status === 'expiring_soon') {
+      query += ` AND ${expiringSoonSql} AND NOT ${needsReviewSql}`;
+    } else if (filters.status === 'signed') {
+      query += ` AND ${leaseLikeSql} AND NOT ${needsReviewSql} AND NOT ${expiringSoonSql}`;
+    } else if (filters.status === 'on_file') {
+      query += ` AND NOT ${needsReviewSql} AND NOT ${expiringSoonSql} AND NOT ${leaseLikeSql}`;
     }
   }
 
@@ -513,7 +541,15 @@ export async function getDocumentStats(): Promise<DocumentStats> {
       COUNT(*) as total_documents,
       COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as documents_this_month,
       COALESCE(SUM(file_size), 0) as storage_used,
-      COUNT(CASE WHEN expiry_date IS NOT NULL AND expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 1 END) as expiring_documents
+      COUNT(CASE WHEN expiry_date IS NOT NULL AND expiry_date >= CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 1 END) as expiring_documents,
+      COUNT(CASE WHEN building_id IS NULL AND room_id IS NULL AND tenant_id IS NULL AND asset_id IS NULL THEN 1 END) as unlinked_documents,
+      COUNT(CASE WHEN (
+        LOWER(COALESCE(document_type, '')) IN ('lease', 'contract')
+        AND (
+          category_id IS NULL
+          OR (building_id IS NULL AND room_id IS NULL AND tenant_id IS NULL AND asset_id IS NULL)
+        )
+      ) THEN 1 END) as pending_signature
     FROM documents
   `;
 
@@ -557,6 +593,8 @@ export async function getDocumentStats(): Promise<DocumentStats> {
     documentsByType,
     documentsByCategory,
     expiringDocuments: parseInt(stats.expiring_documents),
+    unlinkedDocuments: parseInt(stats.unlinked_documents),
+    pendingSignature: parseInt(stats.pending_signature),
     storageUsed: parseInt(stats.storage_used),
   };
 }

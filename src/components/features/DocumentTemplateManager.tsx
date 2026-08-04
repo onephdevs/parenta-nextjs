@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentTemplate } from '@/types/documents';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { FileText, Settings, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -31,6 +32,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
     variables: {},
   });
   const { addNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
 
   useEffect(() => {
     fetchTemplates();
@@ -89,7 +91,15 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
+    if (
+      !(await confirm({
+        title: 'Delete template?',
+        message: 'Are you sure you want to delete this template?',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    )
+      return;
 
     try {
       const response = await fetch(`/api/documents/templates?id=${templateId}`, {
@@ -135,6 +145,7 @@ export default function DocumentTemplateManager({ onTemplateCreated }: DocumentT
 
   return (
     <div className="space-y-6">
+      {dialog}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Document Templates</h2>

@@ -7,6 +7,7 @@ import { ReservationWithDetails } from '@/types/database';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import ConvertReservationModal from './ConvertReservationModal';
 
 interface ReservationDetailProps {
@@ -18,11 +19,19 @@ export default function ReservationDetail({ reservation, showConvertModal = fals
   const router = useRouter();
   const { currencyCode } = useCurrency();
   const { showNotification, updateNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(showConvertModal);
   const [isCancelling, setIsCancelling] = useState(false);
 
   const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel this reservation? This action cannot be undone.')) {
+    if (
+      !(await confirm({
+        title: 'Cancel reservation?',
+        message: 'Are you sure you want to cancel this reservation? This action cannot be undone.',
+        confirmText: 'Cancel reservation',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -84,6 +93,7 @@ export default function ReservationDetail({ reservation, showConvertModal = fals
 
   return (
     <div className="space-y-6">
+      {dialog}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

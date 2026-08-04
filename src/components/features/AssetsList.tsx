@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Edit, Trash2, Eye, MapPin, Calendar, X, Package, AlertCircle, DollarSign, Info, History } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -68,6 +69,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
   const [locationHistory, setLocationHistory] = useState<LocationHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const { addNotification, showLoading, dismissToast } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
 
   const itemsPerPage = 10;
 
@@ -135,7 +137,14 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
   }, [filters, refreshTrigger, currentPage, addNotification]);
 
   const handleDeleteAsset = async (assetId: string, assetName: string) => {
-    if (!confirm(`Are you sure you want to delete "${assetName}"? This action cannot be undone.`)) {
+    if (
+      !(await confirm({
+        title: 'Delete asset?',
+        message: `Are you sure you want to delete "${assetName}"? This action cannot be undone.`,
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -199,6 +208,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
+      {dialog}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">

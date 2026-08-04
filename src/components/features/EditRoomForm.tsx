@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Room, CreateRoomData, Building } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -24,6 +25,7 @@ interface EditRoomFormProps {
 export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = false }: EditRoomFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [isEditing, setIsEditing] = useState(startInEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -169,7 +171,14 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) {
+    if (
+      !(await confirm({
+        title: 'Delete room?',
+        message: 'Are you sure you want to delete this room? This action cannot be undone.',
+        confirmText: 'Delete',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -241,6 +250,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
 
   return (
     <Card padding="none">
+      {dialog}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">

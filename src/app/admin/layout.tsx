@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
@@ -15,9 +16,10 @@ export default async function AdminLayout({
   }
 
   return (
-    <AdminLayoutClient session={session}>
-      {children}
-    </AdminLayoutClient>
+    <Suspense
+      fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading…</div>}
+    >
+      <AdminLayoutClient session={session}>{children}</AdminLayoutClient>
+    </Suspense>
   );
 }
-

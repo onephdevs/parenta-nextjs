@@ -12,6 +12,7 @@ interface ActivityLog {
   createdAt: string;
   user: string;
   description?: string;
+  link?: string | null;
 }
 
 export default function ActivityLogsWidget() {
@@ -46,6 +47,7 @@ export default function ActivityLogsWidget() {
             createdAt: string;
             actorName: string;
             description: string;
+            link?: string | null;
           }) => ({
             id: item.id,
             action: item.actionType,
@@ -54,6 +56,7 @@ export default function ActivityLogsWidget() {
             createdAt: item.createdAt,
             user: item.actorName,
             description: item.description,
+            link: item.link,
           }))
         );
       } else {
@@ -69,13 +72,13 @@ export default function ActivityLogsWidget() {
   };
 
   const getActionIcon = (action: string) => {
-    if (/\.(created|requested|recorded|uploaded|generated|imported)$/.test(action) || action === 'CREATE') {
+    if (/\.(created|requested|recorded|uploaded|generated|imported|completed)$/.test(action) || action === 'CREATE') {
       return <Plus className="h-4 w-4 text-green-600" />;
     }
     if (/\.(updated|status_changed|assigned|allocated|converted)$/.test(action) || action === 'UPDATE') {
       return <Edit className="h-4 w-4 text-blue-600" />;
     }
-    if (/\.(deleted|cancelled|unassigned)$/.test(action) || action === 'DELETE') {
+    if (/\.(deleted|cancelled|unassigned|failed)$/.test(action) || action === 'DELETE') {
       return <Trash2 className="h-4 w-4 text-red-600" />;
     }
     if (action === 'READ') return <Eye className="h-4 w-4 text-gray-600" />;
@@ -83,13 +86,13 @@ export default function ActivityLogsWidget() {
   };
 
   const getActionColor = (action: string) => {
-    if (/\.(created|requested|recorded|uploaded|generated|imported)$/.test(action) || action === 'CREATE') {
+    if (/\.(created|requested|recorded|uploaded|generated|imported|completed)$/.test(action) || action === 'CREATE') {
       return 'text-green-700 bg-green-50';
     }
     if (/\.(updated|status_changed|assigned|allocated|converted)$/.test(action) || action === 'UPDATE') {
       return 'text-blue-700 bg-blue-50';
     }
-    if (/\.(deleted|cancelled|unassigned)$/.test(action) || action === 'DELETE') {
+    if (/\.(deleted|cancelled|unassigned|failed)$/.test(action) || action === 'DELETE') {
       return 'text-red-700 bg-red-50';
     }
     return 'text-gray-700 bg-gray-50';
@@ -170,9 +173,10 @@ export default function ActivityLogsWidget() {
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {activityLogs.map((log) => (
-            <div
+            <Link
               key={log.id}
-              className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition"
+              href={`/admin/activity?id=${log.id}`}
+              className="block p-3 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50/40 transition"
             >
               <div className="flex items-start space-x-3">
                 <div className="mt-0.5">
@@ -196,7 +200,7 @@ export default function ActivityLogsWidget() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

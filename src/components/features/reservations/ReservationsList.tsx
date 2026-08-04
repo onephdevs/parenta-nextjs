@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ReservationWithDetails } from '@/types/database';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -23,6 +24,7 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
   const router = useRouter();
   const { formatCurrency: formatCurrencyUtil } = useCurrency();
   const { showNotification, updateNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [sortBy, setSortBy] = useState('expiryDate');
@@ -108,7 +110,14 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
   };
 
   const handleCancelReservation = async (reservationId: string) => {
-    if (!confirm('Are you sure you want to cancel this reservation? This action cannot be undone.')) {
+    if (
+      !(await confirm({
+        title: 'Cancel reservation?',
+        message: 'Are you sure you want to cancel this reservation? This action cannot be undone.',
+        confirmText: 'Cancel reservation',
+        variant: 'danger',
+      }))
+    ) {
       return;
     }
 
@@ -152,6 +161,7 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
 
   return (
     <Card padding="none" className="overflow-hidden">
+      {dialog}
       <div className="border-b border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="relative flex-1 max-w-md">

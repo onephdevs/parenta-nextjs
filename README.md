@@ -10,16 +10,16 @@ npm install
 npm run dev                  # http://localhost:3030
 ```
 
-See [ENVIRONMENT-VARIABLES.md](./ENVIRONMENT-VARIABLES.md) and [GMAIL-EMAIL-SETUP.md](./GMAIL-EMAIL-SETUP.md).
+See [docs/ENVIRONMENT-VARIABLES.md](./docs/ENVIRONMENT-VARIABLES.md) and [docs/GMAIL-EMAIL-SETUP.md](./docs/GMAIL-EMAIL-SETUP.md).
 
 ## Docs
 
 | Doc | Purpose |
 |-----|---------|
-| [QUICK-REFERENCE.md](./QUICK-REFERENCE.md) | Common commands |
-| [HOSTINGER-SHARED-DEPLOY-GUIDE.md](./HOSTINGER-SHARED-DEPLOY-GUIDE.md) | Production deploy |
+| [docs/QUICK-REFERENCE.md](./docs/QUICK-REFERENCE.md) | Common commands |
+| [docs/HOSTINGER-SHARED-DEPLOY-GUIDE.md](./docs/HOSTINGER-SHARED-DEPLOY-GUIDE.md) | Production deploy |
 | [docs/UI.md](./docs/UI.md) | Shared UI layer + refactor notes |
-| [docs/archive/](./docs/archive/) | Historical session/audit notes (archived) |
+| [docs/archive/](./docs/archive/) | Historical session/audit notes |
 
 ## Stack
 

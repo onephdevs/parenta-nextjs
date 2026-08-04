@@ -49,6 +49,8 @@ export interface DocumentFilters {
   accessLevel?: string;
   hasExpiry?: boolean;
   isExpired?: boolean;
+  isUnlinked?: boolean;
+  status?: 'signed' | 'on_file' | 'expiring_soon' | 'needs_review';
   dateFrom?: string;
   dateTo?: string;
 }
@@ -104,6 +106,8 @@ export interface DocumentStats {
   documentsByType: Record<string, number>;
   documentsByCategory: Record<string, number>;
   expiringDocuments: number;
+  unlinkedDocuments: number;
+  pendingSignature: number;
   storageUsed: number; // in bytes
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useAppDialog } from '@/hooks/useAppDialog';
 import { Document, DOCUMENT_TYPES } from '@/types/document';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -35,6 +36,7 @@ export default function BulkDocumentOperations({
   tenants,
 }: BulkDocumentOperationsProps) {
   const { showNotification } = useNotifications();
+  const { confirm, dialog } = useAppDialog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -98,9 +100,8 @@ export default function BulkDocumentOperations({
   const uploadSingleFile = async (file: File, fileKey: string): Promise<void> => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('category', 'lease');
-    formData.append('buildingId', '');
-    formData.append('tenantId', '');
+    formData.append('documentName', file.name.replace(/\.[^/.]+$/, '') || file.name);
+    formData.append('documentType', 'other');
 
     try {
       const xhr = new XMLHttpRequest();
@@ -242,9 +243,12 @@ export default function BulkDocumentOperations({
   const handleBulkDelete = async () => {
     if (selectedDocuments.length === 0) return;
 
-    const confirmed = confirm(
-      `Are you sure you want to delete ${selectedDocuments.length} documents? This action cannot be undone.`
-    );
+    const confirmed = await confirm({
+      title: 'Delete documents?',
+      message: `Are you sure you want to delete ${selectedDocuments.length} documents? This action cannot be undone.`,
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
 
     if (!confirmed) return;
 
@@ -281,6 +285,7 @@ export default function BulkDocumentOperations({
 
   return (
     <div className="space-y-4">
+      {dialog}
       <Card padding="md">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
