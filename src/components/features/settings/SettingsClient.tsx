@@ -16,7 +16,7 @@ import NotificationPreferencesPanel from '@/components/features/notifications/No
 import {
   DEFAULT_TENANT_PAYMENT_INSTRUCTIONS,
   type TenantPaymentInstructions,
-} from '@/lib/tenant-payment-instructions';
+} from '@/lib/tenant-payment-instructions-shared';
 
 interface SettingsClientProps {
   session: Session;

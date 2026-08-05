@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
-import type { TenantPaymentInstructions } from '@/lib/tenant-payment-instructions';
+import type { TenantPaymentInstructions } from '@/lib/tenant-payment-instructions-shared';
 
 interface Invoice {
   id: string;
