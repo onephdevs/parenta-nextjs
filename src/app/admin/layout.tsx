@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import AdminLayoutClient from '@/components/layout/AdminLayoutClient';
+import AppLoader from '@/components/ui/AppLoader';
 
 export default async function AdminLayout({
   children,
@@ -16,9 +17,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <Suspense
-      fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading…</div>}
-    >
+    <Suspense fallback={<AppLoader variant="inline" className="min-h-screen" />}>
       <AdminLayoutClient session={session}>{children}</AdminLayoutClient>
     </Suspense>
   );
