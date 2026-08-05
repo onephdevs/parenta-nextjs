@@ -672,6 +672,69 @@ export async function generateExpenseReportExcel(data: any): Promise<Buffer> {
 }
 
 /**
+ * Combined bills + expenses report (summary or detail)
+ */
+export async function generateBillsExpensesReportExcel(data: any): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Parenta';
+  workbook.created = new Date();
+
+  const isSummary = data.view !== 'detail';
+  const sheet = workbook.addWorksheet(isSummary ? 'Summary' : 'Detail');
+
+  sheet.mergeCells('A1:D1');
+  sheet.getCell('A1').value = 'Expense & Utility Report';
+  sheet.getCell('A1').font = { size: 16, bold: true };
+
+  sheet.mergeCells('A2:D2');
+  sheet.getCell('A2').value = `${data.periodLabel || ''} — ${
+    isSummary ? 'Summary by category' : 'Detail list'
+  }${data.buildingName ? ` · ${data.buildingName}` : ' · All buildings'}`;
+
+  sheet.addRow([]);
+
+  if (isSummary) {
+    sheet.addRow(['Category', 'Amount', '% of total', 'Count']);
+    sheet.getRow(4).font = { bold: true };
+    (data.summary || []).forEach((item: any) => {
+      sheet.addRow([item.label, item.amount, item.percentage / 100, item.count]);
+    });
+    sheet.addRow(['Total', data.totalAmount || 0, '', '']);
+    sheet.lastRow!.font = { bold: true };
+    sheet.getColumn(2).numFmt = '₱#,##0.00';
+    sheet.getColumn(3).numFmt = '0%';
+    sheet.getColumn(1).width = 28;
+    sheet.getColumn(2).width = 16;
+    sheet.getColumn(3).width = 12;
+    sheet.getColumn(4).width = 10;
+  } else {
+    sheet.addRow(['Date', 'Category', 'Description', 'Location', 'Vendor', 'Amount']);
+    sheet.getRow(4).font = { bold: true };
+    (data.details || []).forEach((item: any) => {
+      sheet.addRow([
+        item.date,
+        item.categoryLabel,
+        item.description,
+        item.locationLabel,
+        item.vendor || '',
+        item.amount,
+      ]);
+    });
+    sheet.addRow(['', '', '', '', 'Total', data.totalAmount || 0]);
+    sheet.lastRow!.font = { bold: true };
+    sheet.getColumn(6).numFmt = '₱#,##0.00';
+    sheet.getColumn(1).width = 12;
+    sheet.getColumn(2).width = 18;
+    sheet.getColumn(3).width = 36;
+    sheet.getColumn(4).width = 28;
+    sheet.getColumn(5).width = 20;
+    sheet.getColumn(6).width = 14;
+  }
+
+  return (await workbook.xlsx.writeBuffer()) as Buffer;
+}
+
+/**
  * Generate Collected Amount Report Excel
  */
 export async function generateCollectedAmountReportExcel(data: any): Promise<Buffer> {

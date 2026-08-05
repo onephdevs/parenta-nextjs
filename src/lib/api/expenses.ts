@@ -4,8 +4,8 @@ import { Expense } from '@/types/database';
 interface ExpenseFilters {
   search?: string;
   category?: string;
-  buildingId?: number;
-  roomId?: number;
+  buildingId?: string | number;
+  roomId?: string | number;
   vendor?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -54,6 +54,13 @@ export async function getExpenses(
       values.push(filters.buildingId);
     }
 
+    // Room / unit filter
+    if (filters.roomId) {
+      paramCount++;
+      conditions.push(`e.room_id = $${paramCount}`);
+      values.push(filters.roomId);
+    }
+
     // Vendor filter
     if (filters.vendor) {
       paramCount++;
@@ -95,9 +102,11 @@ export async function getExpenses(
       SELECT 
         e.*,
         b.name as building_name,
-        b.address_line1 as building_address
+        b.address_line1 as building_address,
+        r.room_number
       FROM expenses e
       LEFT JOIN buildings b ON e.building_id = b.id
+      LEFT JOIN rooms r ON e.room_id = r.id
       ${whereClause}
       ORDER BY e.expense_date DESC, e.created_at DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
@@ -153,7 +162,13 @@ export async function getExpenseById(id: string): Promise<Expense | null> {
 export async function createExpense(expenseData: Partial<Expense>): Promise<Expense> {
   try {
     // Always try to include room_id if provided, fallback to building-only if column doesn't exist
-    const hasRoomId = expenseData.roomId !== undefined && expenseData.roomId !== null;
+    const roomId =
+      expenseData.roomId !== undefined &&
+      expenseData.roomId !== null &&
+      String(expenseData.roomId).trim() !== ''
+        ? expenseData.roomId
+        : null;
+    const hasRoomId = roomId !== null;
     
     let query: string;
     let values: unknown[];
@@ -170,7 +185,7 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
       
       values = [
         expenseData.buildingId || null,
-        expenseData.roomId || null,
+        roomId,
         expenseData.expenseCategory || expenseData.category || 'other',
         expenseData.amount,
         expenseData.description,
@@ -469,6 +484,7 @@ function mapRowToExpense(row: Record<string, unknown>): Expense {
     // Additional fields from joins
     buildingName: row.building_name ? String(row.building_name) : undefined,
     buildingAddress: row.building_address ? String(row.building_address) : undefined,
+    roomNumber: row.room_number ? String(row.room_number) : undefined,
   };
 }
 

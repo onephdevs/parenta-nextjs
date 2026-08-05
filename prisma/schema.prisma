@@ -269,6 +269,7 @@ model documents {
 model expenses {
   id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   building_id         String?    @db.Uuid
+  room_id             String?    @db.Uuid
   category            String     @db.VarChar(100)
   description         String     @db.VarChar(255)
   amount              Decimal    @db.Decimal(10, 2)
@@ -284,9 +285,11 @@ model expenses {
   created_at          DateTime?  @default(now()) @db.Timestamp(6)
   updated_at          DateTime?  @default(now()) @db.Timestamp(6)
   buildings           buildings?       @relation(fields: [building_id], references: [id], onUpdate: NoAction)
+  rooms               rooms?           @relation(fields: [room_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
   pipeline_cards      pipeline_cards[]
 
   @@index([building_id], map: "idx_expenses_building")
+  @@index([room_id], map: "idx_expenses_room_id")
   @@index([category], map: "idx_expenses_category")
   @@index([expense_date], map: "idx_expenses_date")
   @@index([expense_status], map: "idx_expenses_status")
@@ -454,6 +457,8 @@ model rooms {
   tenant_room_assignments tenant_room_assignments[]
   tenant_utility_bills    tenant_utility_bills[]
   utility_meter_readings  utility_meter_readings[]
+  utility_bills           utility_bills[]
+  expenses                expenses[]
 
   @@unique([building_id, room_number])
   @@index([is_active], map: "idx_rooms_active")
@@ -634,7 +639,8 @@ model utility_allocation_rules {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model utility_bills {
   id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  building_id             String                    @db.Uuid
+  building_id             String?                   @db.Uuid
+  room_id                 String?                   @db.Uuid
   utility_type            String                    @db.VarChar(50)
   provider_name           String                    @db.VarChar(255)
   provider_account_number String?                   @db.VarChar(100)
@@ -644,6 +650,10 @@ model utility_bills {
   amount                  Decimal                   @db.Decimal(10, 2)
   usage_amount            Decimal?                  @db.Decimal(10, 2)
   usage_unit              String?                   @db.VarChar(20)
+  meter_reading_previous  Decimal?                  @db.Decimal(12, 2)
+  meter_reading_current   Decimal?                  @db.Decimal(12, 2)
+  allocation_method       String?                   @default("per_unit_metered") @db.VarChar(30)
+  parent_bill_id          String?                   @db.Uuid
   bill_status             String?                   @default("pending") @db.VarChar(20)
   bill_url                String?                   @db.VarChar(500)
   notes                   String?
@@ -651,12 +661,18 @@ model utility_bills {
   updated_at              DateTime?                 @default(now()) @db.Timestamp(6)
   cost_allocation_history cost_allocation_history[]
   tenant_utility_bills    tenant_utility_bills[]
-  buildings               buildings                 @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  buildings               buildings?                @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms                   rooms?                    @relation(fields: [room_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  parent_bill             utility_bills?            @relation("UtilityBillAllocations", fields: [parent_bill_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  child_bills             utility_bills[]           @relation("UtilityBillAllocations")
 
   @@index([building_id], map: "idx_utility_bills_building")
+  @@index([room_id], map: "idx_utility_bills_room_id")
   @@index([due_date], map: "idx_utility_bills_due_date")
   @@index([bill_status], map: "idx_utility_bills_status")
   @@index([utility_type], map: "idx_utility_bills_type")
+  @@index([allocation_method], map: "idx_utility_bills_allocation_method")
+  @@index([parent_bill_id], map: "idx_utility_bills_parent_bill")
 }
 
 model utility_meter_readings {

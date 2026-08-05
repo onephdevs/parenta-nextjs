@@ -2,131 +2,134 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  FileText, 
-  Download, 
-  FileSpreadsheet, 
+import {
+  ArrowLeft,
+  FileSpreadsheet,
   FileType,
-  Calendar,
   Loader2,
-  Filter,
   Printer,
-  DollarSign,
-  TrendingUp
+  Zap,
+  Droplets,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import SkeletonCard from '@/components/ui/SkeletonCard';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/Button';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { FormField } from '@/components/forms/FormField';
+import type {
+  ReportPeriodPreset,
+  ReportView,
+} from '@/lib/constants/bills-expenses';
+
+interface Building {
+  id: string;
+  name: string;
+}
+
+interface SummaryRow {
+  category: string;
+  label: string;
+  amount: number;
+  percentage: number;
+}
+
+interface DetailRow {
+  id: string;
+  category: string;
+  categoryLabel: string;
+  description: string;
+  date: string;
+  amount: number;
+  locationLabel: string;
+  vendor?: string;
+  source: 'utility' | 'expense';
+}
+
+interface ReportData {
+  view: ReportView;
+  periodLabel: string;
+  startDate: string;
+  endDate: string;
+  buildingName?: string;
+  totalAmount: number;
+  summary: SummaryRow[];
+  details: DetailRow[];
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export default function ExpenseReportsPage() {
   const { showNotification } = useNotifications();
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [periodType, setPeriodType] = useState<'monthly' | 'quarterly' | 'semi-annual' | 'annual'>('monthly');
-  const [category, setCategory] = useState<string>('');
-  const [buildingId, setBuildingId] = useState<string>('');
-  const [buildings, setBuildings] = useState<any[]>([]);
+  const [view, setView] = useState<ReportView>('summary');
+  const [period, setPeriod] = useState<ReportPeriodPreset>('this_month');
+  const [buildingId, setBuildingId] = useState('');
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [reportData, setReportData] = useState<any>(null);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
 
   useEffect(() => {
-    // Set default date range (last month)
-    const today = new Date();
-    const lastMonth = new Date();
-    lastMonth.setMonth(today.getMonth() - 1);
-    
-    setStartDate(lastMonth.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
-    
+    const fetchBuildings = async () => {
+      try {
+        const response = await fetch('/api/buildings');
+        if (!response.ok) return;
+        const data = await response.json();
+        let list: Building[] = [];
+        if (data.success && data.data?.buildings) list = data.data.buildings;
+        else if (data.success && Array.isArray(data.data)) list = data.data;
+        else if (Array.isArray(data.buildings)) list = data.buildings;
+        setBuildings(
+          list.map((b: Building & { building_name?: string }) => ({
+            id: String(b.id),
+            name: b.name || b.building_name || 'Building',
+          }))
+        );
+      } catch {
+        setBuildings([]);
+      }
+    };
     fetchBuildings();
   }, []);
 
-  const fetchBuildings = async () => {
-    try {
-      const response = await fetch('/api/buildings');
-      if (response.ok) {
-        const data = await response.json();
-        let buildingsList: any[] = [];
-        
-        if (data.success && data.data) {
-          // Handle { success: true, data: { buildings: [...] } } format
-          if (data.data.buildings && Array.isArray(data.data.buildings)) {
-            buildingsList = data.data.buildings;
-          } else if (Array.isArray(data.data)) {
-            buildingsList = data.data;
-          }
-        } else if (Array.isArray(data)) {
-          buildingsList = data;
-        } else if (data.buildings) {
-          buildingsList = data.buildings;
-        }
-        
-        setBuildings(buildingsList);
-      } else {
-        setBuildings([]);
-      }
-    } catch (error) {
-      console.error('Error fetching buildings:', error);
-      setBuildings([]);
-    }
-  };
-
-  const handleGenerateReport = async () => {
-    if (!startDate || !endDate) {
-      showNotification({
-        type: 'warning',
-        title: 'Date Required',
-        message: 'Please select both start and end dates',
-      });
-      return;
-    }
-    
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    
     try {
       const params = new URLSearchParams({
-        startDate,
-        endDate,
-        periodType,
+        view,
+        period,
       });
-      if (category) params.append('category', category);
-      if (buildingId) params.append('buildingId', buildingId);
-      
-      const response = await fetch(`/api/reports/expenses?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      if (buildingId) params.set('buildingId', buildingId);
 
-      if (data.success) {
-        setReportData(data.data);
-        showNotification({
-          type: 'success',
-          title: 'Report Generated',
-          message: 'Expense report generated successfully',
-        });
-      } else {
-        showNotification({
-          type: 'error',
-          title: 'Error',
-          message: data.error || 'Failed to generate report',
-        });
-      }
+      const response = await fetch(
+        `/api/reports/bills-expenses?${params.toString()}`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed');
+
+      setReportData(data.data);
+      showNotification({
+        type: 'success',
+        title: 'Report Generated',
+        message: 'Expense & utility report ready',
+      });
     } catch (error) {
-      console.error('Error generating report:', error);
+      console.error(error);
       showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to generate report. Please try again.',
+        message: 'Failed to generate report',
       });
     } finally {
       setIsGenerating(false);
@@ -138,35 +141,30 @@ export default function ExpenseReportsPage() {
       showNotification({
         type: 'warning',
         title: 'No Data',
-        message: 'Please generate the report first',
+        message: 'Generate the report first',
       });
       return;
     }
 
     setIsExporting(true);
-    
     try {
       const response = await fetch(`/api/reports/export/${format}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reportType: 'expenses',
+          reportType: 'bills-expenses',
           data: reportData,
-          filename: `expense-report-${new Date().toISOString().split('T')[0]}`,
+          filename: `bills-expenses-${reportData.startDate}`,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `expense-report-${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+      a.download = `bills-expenses-${reportData.startDate}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -178,7 +176,7 @@ export default function ExpenseReportsPage() {
         message: `Report exported as ${format.toUpperCase()}`,
       });
     } catch (error) {
-      console.error('Error exporting report:', error);
+      console.error(error);
       showNotification({
         type: 'error',
         title: 'Export Failed',
@@ -193,465 +191,257 @@ export default function ExpenseReportsPage() {
     window.print();
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
+  const CategoryIcon = ({ category }: { category: string }) => {
+    if (category === 'electricity') {
+      return <Zap className="h-3.5 w-3.5 text-amber-500" />;
+    }
+    if (category === 'water') {
+      return <Droplets className="h-3.5 w-3.5 text-sky-500" />;
+    }
+    return null;
   };
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const expenseCategories = [
-    'cleaning',
-    'maintenance',
-    'repair',
-    'upgrade',
-    'garbage_collection',
-    'utilities',
-    'supplies',
-    'services',
-    'insurance',
-    'taxes',
-    'other',
-  ];
 
   return (
-    <div className="space-y-6 p-6">
-      <Link
-        href="/admin/bills-expenses"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4 mr-1" />
-        Back to Bills & Expenses
-      </Link>
-      <PageHeader
-        title="Expense Reports"
-        description="Generate detailed expense reports by period"
-        actions={
-          reportData ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => handleExport('excel')}
-                isLoading={isExporting}
-                leftIcon={<FileSpreadsheet className="h-4 w-4" />}
-              >
-                Export Excel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleExport('pdf')}
-                isLoading={isExporting}
-                leftIcon={<FileType className="h-4 w-4" />}
-              >
-                Export PDF
-              </Button>
-              <Button variant="outline" onClick={handlePrint} leftIcon={<Printer className="h-4 w-4" />}>
-                Print
-              </Button>
-            </>
-          ) : undefined
-        }
-      />
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 print:max-w-none print:px-0">
+        <Link
+          href="/admin/bills-expenses"
+          className="mb-6 inline-flex items-center text-sm text-gray-500 hover:text-gray-900 print:hidden"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to Bills &amp; Expenses
+        </Link>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center">
-            <Filter className="h-5 w-5 text-gray-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
-          </div>
-        </CardHeader>
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              const lastMonth = new Date();
-              lastMonth.setMonth(today.getMonth() - 1);
-              lastMonth.setDate(1);
-              const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-              setStartDate(lastMonth.toISOString().split('T')[0]);
-              setEndDate(lastDayOfMonth.toISOString().split('T')[0]);
-            }}
-          >
-            Last Month
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              const last3Months = new Date();
-              last3Months.setMonth(today.getMonth() - 3);
-              setStartDate(last3Months.toISOString().split('T')[0]);
-              setEndDate(today.toISOString().split('T')[0]);
-            }}
-          >
-            Last 3 Months
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              const last6Months = new Date();
-              last6Months.setMonth(today.getMonth() - 6);
-              setStartDate(last6Months.toISOString().split('T')[0]);
-              setEndDate(today.toISOString().split('T')[0]);
-            }}
-          >
-            Last 6 Months
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              const thisYear = new Date(today.getFullYear(), 0, 1);
-              setStartDate(thisYear.toISOString().split('T')[0]);
-              setEndDate(today.toISOString().split('T')[0]);
-            }}
-          >
-            This Year
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const today = new Date();
-              const lastYear = new Date(today.getFullYear() - 1, 0, 1);
-              const lastYearEnd = new Date(today.getFullYear() - 1, 11, 31);
-              setStartDate(lastYear.toISOString().split('T')[0]);
-              setEndDate(lastYearEnd.toISOString().split('T')[0]);
-            }}
-          >
-            Last Year
-          </Button>
+        <div className="mb-8 print:hidden">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+            Reports
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Expense &amp; utility bill reporting
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          <FormField label="Start Date" htmlFor="startDate">
-            <Input
-              type="date"
-              id="startDate"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              min="2000-01-01"
-              max="2099-12-31"
-            />
-          </FormField>
-          <FormField label="End Date" htmlFor="endDate">
-            <Input
-              type="date"
-              id="endDate"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              min={startDate || '2000-01-01'}
-              max="2099-12-31"
-            />
-          </FormField>
-          <FormField label="Period Type" htmlFor="periodType">
-            <Select
-              id="periodType"
-              value={periodType}
-              onChange={(e) => setPeriodType(e.target.value as typeof periodType)}
+        {/* Controls */}
+        <div className="mb-8 flex flex-col gap-3 rounded-lg bg-gray-50 p-4 sm:flex-row sm:items-end print:hidden">
+          <div className="flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-500">
+              Report type
+            </label>
+            <select
+              value={view}
+              onChange={(e) => setView(e.target.value as ReportView)}
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
             >
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="semi-annual">Semi-Annual</option>
-              <option value="annual">Annual</option>
-            </Select>
-          </FormField>
-          <FormField label="Category" htmlFor="category">
-            <Select
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              <option value="summary">Summary by category</option>
+              <option value="detail">Detail list</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-500">
+              Period
+            </label>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as ReportPeriodPreset)}
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
             >
-              <option value="">All Categories</option>
-              {expenseCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Building" htmlFor="buildingId">
-            <Select
-              id="buildingId"
+              <option value="this_month">This month</option>
+              <option value="last_month">Last month</option>
+              <option value="this_quarter">This quarter</option>
+              <option value="last_quarter">Last quarter</option>
+              <option value="last_6_months">Last 6 months</option>
+              <option value="this_year">This year</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-500">
+              Building
+            </label>
+            <select
               value={buildingId}
               onChange={(e) => setBuildingId(e.target.value)}
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
             >
-              <option value="">All Buildings</option>
-              {buildings && Array.isArray(buildings) && buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name || building.building_name || building.buildingName || 'Unknown'}
+              <option value="">All buildings</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
-            </Select>
-          </FormField>
-          <div className="flex items-end">
-            <Button
-              onClick={handleGenerateReport}
-              isLoading={isGenerating}
-              className="w-full"
-              leftIcon={!isGenerating ? <FileText className="h-4 w-4" /> : undefined}
-            >
-              {isGenerating ? 'Generating...' : 'Generate Report'}
-            </Button>
+            </select>
           </div>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+          >
+            {isGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
+            Generate
+          </button>
         </div>
-      </Card>
 
-        {/* Report Summary */}
-        {reportData && reportData.summary && (
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Summary</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.totalExpenses)}</p>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Count</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalCount}</p>
-              </div>
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Average Expense</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.averageExpense)}</p>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Period</p>
-                <p className="text-sm font-medium text-gray-900">{reportData.summary.period}</p>
-                <p className="text-xs text-gray-600 mt-1">{reportData.summary.periodType}</p>
+        {/* Report output */}
+        {reportData && (
+          <div className="rounded-lg border border-gray-200 print:border-0">
+            <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-base font-semibold text-gray-900">
+                {reportData.periodLabel} —{' '}
+                {reportData.view === 'summary'
+                  ? 'Summary by category'
+                  : 'Detail list'}
+                {reportData.buildingName
+                  ? ` · ${reportData.buildingName}`
+                  : ''}
+              </h2>
+              <div className="flex gap-2 print:hidden">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  title="Print (uses PDF layout)"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('pdf')}
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <FileType className="h-3.5 w-3.5" />
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('excel')}
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Excel
+                </button>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* By Period Table */}
-        {reportData && reportData.byPeriod && reportData.byPeriod.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Expenses by Period</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Period
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Count
-                    </th>
+            {reportData.view === 'summary' ? (
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3 text-right">% of total</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reportData.byPeriod.map((item: any, index: number) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.period}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.count}
+                <tbody className="divide-y divide-gray-100">
+                  {reportData.summary.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-4 py-8 text-center text-sm text-gray-500"
+                      >
+                        No expenses or utility bills in this period
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    reportData.summary.map((row) => (
+                      <tr key={row.category} className="text-sm text-gray-900">
+                        <td className="px-4 py-3.5">
+                          <span className="inline-flex items-center gap-1.5 font-medium">
+                            <CategoryIcon category={row.category} />
+                            {row.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right tabular-nums">
+                          {formatCurrency(row.amount)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums">
+                          {row.percentage}%
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
+                {reportData.summary.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-gray-200 text-sm font-semibold text-gray-900">
+                      <td className="px-4 py-3.5">Total</td>
+                      <td className="px-4 py-3.5 text-right tabular-nums">
+                        {formatCurrency(reportData.totalAmount)}
+                      </td>
+                      <td className="px-4 py-3.5" />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* By Category */}
-        {reportData && reportData.byCategory && reportData.byCategory.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Expenses by Category</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Count
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Percentage
-                    </th>
+            ) : (
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3">Unit / Building</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reportData.byCategory.map((item: any, index: number) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.category.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.count}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.percentage.toFixed(1)}%
+                <tbody className="divide-y divide-gray-100">
+                  {reportData.details.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-sm text-gray-500"
+                      >
+                        No line items in this period
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    reportData.details.map((row) => (
+                      <tr key={row.id} className="text-sm text-gray-900">
+                        <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                          {formatDate(row.date)}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="inline-flex items-center gap-1.5">
+                            <CategoryIcon category={row.category} />
+                            {row.categoryLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">{row.description}</td>
+                        <td className="px-4 py-3.5 text-gray-600">
+                          {row.locationLabel}
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-medium tabular-nums">
+                          {formatCurrency(row.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* By Building */}
-        {reportData && reportData.byBuilding && reportData.byBuilding.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Expenses by Building</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Building
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Count
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reportData.byBuilding.map((item: any, index: number) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.buildingName}
+                {reportData.details.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-gray-200 text-sm font-semibold text-gray-900">
+                      <td className="px-4 py-3.5" colSpan={4}>
+                        Total
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.count}
+                      <td className="px-4 py-3.5 text-right tabular-nums">
+                        {formatCurrency(reportData.totalAmount)}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
+                  </tfoot>
+                )}
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* Expense Details */}
-        {reportData && reportData.details && reportData.details.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Expense Details</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Building
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vendor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reportData.details.map((item: any) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(item.expenseDate)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {item.description}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.category.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.buildingName || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.vendorName || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          item.expenseStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                          item.expenseStatus === 'approved' ? 'bg-blue-100 text-blue-800' :
-                          item.expenseStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.expenseStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
           </div>
         )}
 
         {!reportData && !isGenerating && (
-          <Card className="p-12 text-center">
-            <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Report Generated</h3>
-            <p className="text-sm text-gray-900 mb-4">Select date range and period type, then click &quot;Generate Report&quot;</p>
-          </Card>
+          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-16 text-center text-sm text-gray-500 print:hidden">
+            Choose report type, period, and building, then click Generate.
+          </div>
         )}
-
-        {isGenerating && (
-          <Card className="p-12">
-            <SkeletonCard />
-          </Card>
-        )}
+      </div>
     </div>
   );
 }

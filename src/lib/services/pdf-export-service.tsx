@@ -460,6 +460,103 @@ export async function generateExpenseReportPDF(data: any): Promise<Buffer> {
   return Buffer.from(await blob.arrayBuffer());
 }
 
+const BillsExpensesReportPDF = ({ data }: { data: any }) => {
+  const isSummary = data.view !== 'detail';
+  const title = `${data.periodLabel || 'Report'} — ${
+    isSummary ? 'Summary by category' : 'Detail list'
+  }`;
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Expense & Utility Report</Text>
+          <Text style={styles.subtitle}>{title}</Text>
+          {data.buildingName ? (
+            <Text style={styles.subtitle}>Building: {data.buildingName}</Text>
+          ) : (
+            <Text style={styles.subtitle}>All buildings</Text>
+          )}
+          <Text style={styles.subtitle}>
+            Generated: {new Date().toLocaleString()}
+          </Text>
+        </View>
+
+        {isSummary ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Summary by Category</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={styles.tableCell}>Category</Text>
+                <Text style={styles.tableCellRight}>Amount</Text>
+                <Text style={styles.tableCellRight}>%</Text>
+              </View>
+              {(data.summary || []).map((item: any, index: number) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={styles.tableCell}>{item.label}</Text>
+                  <Text style={styles.tableCellRight}>
+                    ₱{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                  <Text style={styles.tableCellRight}>{item.percentage}%</Text>
+                </View>
+              ))}
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>Total</Text>
+                <Text style={[styles.tableCellRight, { fontWeight: 'bold' }]}>
+                  ₱{Number(data.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.tableCellRight} />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Detail List</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={styles.tableCell}>Date</Text>
+                <Text style={styles.tableCell}>Category</Text>
+                <Text style={styles.tableCell}>Description</Text>
+                <Text style={styles.tableCellRight}>Amount</Text>
+              </View>
+              {(data.details || []).map((item: any, index: number) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={styles.tableCell}>{item.date}</Text>
+                  <Text style={styles.tableCell}>{item.categoryLabel}</Text>
+                  <Text style={styles.tableCell}>
+                    {item.description}
+                    {item.locationLabel ? ` (${item.locationLabel})` : ''}
+                  </Text>
+                  <Text style={styles.tableCellRight}>
+                    ₱{Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              ))}
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>Total</Text>
+                <Text style={styles.tableCell} />
+                <Text style={styles.tableCell} />
+                <Text style={[styles.tableCellRight, { fontWeight: 'bold' }]}>
+                  ₱{Number(data.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <Text style={styles.footer}>Parenta Property Management</Text>
+      </Page>
+    </Document>
+  );
+};
+
+export async function generateBillsExpensesReportPDF(data: any): Promise<Buffer> {
+  const doc = <BillsExpensesReportPDF data={data} />;
+  const asPdf = pdf(doc);
+  const blob = await asPdf.toBlob();
+  return Buffer.from(await blob.arrayBuffer());
+}
+
 /**
  * Tenant List Report PDF Component
  */

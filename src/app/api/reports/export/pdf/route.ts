@@ -6,6 +6,7 @@ import {
   generatePaymentHistoryReportPDF,
   generateOccupancyReportPDF,
   generateExpenseReportPDF,
+  generateBillsExpensesReportPDF,
   generateTenantListReportPDF,
   generateCollectedAmountReportPDF,
   generateDepositReportPDF,
@@ -47,6 +48,9 @@ export async function POST(request: NextRequest) {
         break;
       case 'expenses':
         pdfBuffer = await generateExpenseReportPDF(data);
+        break;
+      case 'bills-expenses':
+        pdfBuffer = await generateBillsExpensesReportPDF(data);
         break;
       case 'tenant-list':
         pdfBuffer = await generateTenantListReportPDF(data);

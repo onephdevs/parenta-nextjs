@@ -372,9 +372,12 @@ export interface Expense {
   buildingId?: string;
   roomId?: string;
   category: string;
+  /** @deprecated alias of category */
+  expenseCategory?: string;
   description: string;
   amount: number;
   expenseDate: Date;
+  vendor?: string;
   vendorName?: string;
   vendorContact?: string;
   paymentMethod: string;
@@ -385,6 +388,9 @@ export interface Expense {
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
+  buildingName?: string;
+  buildingAddress?: string;
+  roomNumber?: string;
 }
 
 export interface DatabaseExpense {
@@ -424,6 +430,10 @@ export interface UtilityBill {
   amount: number;
   usageAmount?: number;
   usageUnit?: string;
+  meterReadingPrevious?: number;
+  meterReadingCurrent?: number;
+  allocationMethod?: 'per_unit_metered' | 'split_evenly' | 'flat';
+  parentBillId?: string;
   billStatus: 'pending' | 'paid' | 'overdue' | 'disputed';
   billUrl?: string;
   notes?: string;

@@ -6,6 +6,7 @@ import {
   generatePaymentHistoryReportExcel,
   generateOccupancyReportExcel,
   generateExpenseReportExcel,
+  generateBillsExpensesReportExcel,
   generateTenantListReportExcel,
   generateCollectedAmountReportExcel,
   generateDepositReportExcel,
@@ -47,6 +48,9 @@ export async function POST(request: NextRequest) {
         break;
       case 'expenses':
         excelBuffer = await generateExpenseReportExcel(data);
+        break;
+      case 'bills-expenses':
+        excelBuffer = await generateBillsExpensesReportExcel(data);
         break;
       case 'tenant-list':
         excelBuffer = await generateTenantListReportExcel(data);

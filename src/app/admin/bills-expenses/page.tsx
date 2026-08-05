@@ -1,495 +1,444 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useNotifications } from '@/hooks/useNotifications';
-import { 
-  Plus, 
-  FileText, 
-  Zap, 
+import {
+  Plus,
+  Zap,
   Droplets,
-  DollarSign,
-  TrendingUp,
-  Calendar,
-  ArrowRight,
-  Receipt
+  FileText,
 } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
+import {
+  EXPENSE_CATEGORY_LABELS,
+  ExpenseCategory,
+  UTILITY_TYPE_LABELS,
+  normalizeExpenseCategory,
+} from '@/lib/constants/bills-expenses';
 
-interface Summary {
-  totalBills: number;
-  totalBillsAmount: number;
-  pendingBills: number;
-  totalExpenses: number;
-  totalExpensesAmount: number;
-  monthlyExpenses: number;
+interface Building {
+  id: string;
+  name: string;
 }
 
-interface RecentBill {
+interface UtilityBillRow {
   id: string;
-  roomNumber: string;
-  buildingName: string;
-  utilityType: 'electricity' | 'water';
+  buildingName?: string;
+  roomNumber?: string;
+  roomId?: string;
+  utilityType: 'electricity' | 'water' | string;
   amount: number;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
   dueDate: string;
   billStatus: string;
+  allocationMethod?: string;
 }
 
-interface RecentExpense {
+interface ExpenseRow {
   id: string;
   description: string;
-  amount: number;
   category: string;
+  amount: number;
   expenseDate: string;
   buildingName?: string;
+  roomNumber?: string;
+  buildingId?: string;
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatPeriod(start: string, end: string) {
+  const s = new Date(start);
+  const e = new Date(end);
+  const sameMonth =
+    s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+  if (sameMonth) {
+    return `${s.toLocaleDateString('en-US', { month: 'short' })} ${s.getDate()}–${e.getDate()}, ${e.getFullYear()}`;
+  }
+  return `${formatDate(start)} – ${formatDate(end)}`;
+}
+
+function roomUnitLabel(bill: UtilityBillRow) {
+  const building = bill.buildingName || 'Building';
+  if (bill.roomNumber) return `${building} · ${bill.roomNumber}`;
+  return `${building} · Common Area`;
+}
+
+function expenseLocationLabel(exp: ExpenseRow) {
+  if (!exp.buildingName && !exp.buildingId) return 'All buildings';
+  if (exp.buildingName && exp.roomNumber) {
+    return `${exp.buildingName} · ${exp.roomNumber}`;
+  }
+  if (exp.buildingName) return `${exp.buildingName} (building-wide)`;
+  return 'All buildings';
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  if (s === 'paid') {
+    return (
+      <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+        Paid
+      </span>
+    );
+  }
+  if (s === 'overdue') {
+    return (
+      <span className="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+        Overdue
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+      Pending
+    </span>
+  );
 }
 
 export default function BillsExpensesPage() {
   const { showNotification } = useNotifications();
-  
-  // Safe notification wrapper
-  const safeShowNotification = (notification: Parameters<typeof showNotification>[0]) => {
-    try {
-      showNotification(notification);
-    } catch (error) {
-      console.error('Notification error:', error);
-    }
-  };
-  const [summary, setSummary] = useState<Summary>({
-    totalBills: 0,
-    totalBillsAmount: 0,
-    pendingBills: 0,
-    totalExpenses: 0,
-    totalExpensesAmount: 0,
-    monthlyExpenses: 0,
-  });
-  const [recentBills, setRecentBills] = useState<RecentBill[]>([]);
-  const [recentExpenses, setRecentExpenses] = useState<RecentExpense[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [bills, setBills] = useState<UtilityBillRow[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const [buildingFilter, setBuildingFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const fetchBuildings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/buildings');
+      if (!response.ok) return;
+      const data = await response.json();
+      let list: Building[] = [];
+      if (data.success && data.data?.buildings) list = data.data.buildings;
+      else if (data.success && Array.isArray(data.data)) list = data.data;
+      else if (Array.isArray(data.buildings)) list = data.buildings;
+      else if (Array.isArray(data)) list = data;
+      setBuildings(
+        list.map((b: Building & { building_name?: string }) => ({
+          id: String(b.id),
+          name: b.name || b.building_name || 'Building',
+        }))
+      );
+    } catch {
+      setBuildings([]);
+    }
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch room utility bills
-      let billsData = { bills: [], total: 0 };
-      try {
-        const billsResponse = await fetch('/api/utility-bills/room?limit=5');
-        if (billsResponse.ok) {
-          const billsResult = await billsResponse.json();
-          if (billsResult.success && billsResult.data) {
-            billsData = billsResult.data;
-          } else if (billsResult.bills) {
-            // Handle direct response format
-            billsData = billsResult;
-          }
-        } else {
-          // Handle error response (e.g., 401, 500)
-          console.warn('Bills API returned non-OK status:', billsResponse.status);
-        }
-      } catch (billsError) {
-        console.error('Error fetching bills:', billsError);
-        // Continue with empty bills data
+      const billParams = new URLSearchParams({ limit: '100' });
+      if (buildingFilter) billParams.set('buildingId', buildingFilter);
+      if (typeFilter) billParams.set('utilityType', typeFilter);
+      if (statusFilter) billParams.set('billStatus', statusFilter);
+
+      const expParams = new URLSearchParams({ limit: '100' });
+      if (buildingFilter) expParams.set('buildingId', buildingFilter);
+
+      const [billsRes, expRes] = await Promise.all([
+        fetch(`/api/utility-bills/room?${billParams}`),
+        fetch(`/api/expenses?${expParams}`),
+      ]);
+
+      if (billsRes.ok) {
+        const data = await billsRes.json();
+        const rows = data.success ? data.data?.bills || [] : data.bills || [];
+        setBills(
+          rows.map((b: Record<string, unknown>) => ({
+            id: String(b.id),
+            buildingName: (b.buildingName || b.building_name) as string | undefined,
+            roomNumber: (b.roomNumber || b.room_number) as string | undefined,
+            roomId: (b.roomId || b.room_id) as string | undefined,
+            utilityType: String(b.utilityType || b.utility_type || 'electricity'),
+            amount: Number(b.amount) || 0,
+            billingPeriodStart: String(
+              b.billingPeriodStart || b.billing_period_start || ''
+            ),
+            billingPeriodEnd: String(
+              b.billingPeriodEnd || b.billing_period_end || ''
+            ),
+            dueDate: String(b.dueDate || b.due_date || ''),
+            billStatus: String(b.billStatus || b.bill_status || 'pending'),
+            allocationMethod: b.allocationMethod as string | undefined,
+          }))
+        );
+      } else {
+        setBills([]);
       }
 
-      // Fetch expenses
-      let expensesData = { expenses: [], total: 0 };
-      try {
-        const expensesResponse = await fetch('/api/expenses?limit=5');
-        if (expensesResponse.ok) {
-          const expensesResult = await expensesResponse.json();
-          if (expensesResult.success && expensesResult.data) {
-            expensesData = expensesResult.data;
-          } else if (expensesResult.expenses !== undefined) {
-            // Handle direct response format
-            expensesData = expensesResult;
-          }
-        } else {
-          // Handle error response (e.g., 401, 500)
-          console.warn('Expenses API returned non-OK status:', expensesResponse.status);
-        }
-      } catch (expensesError) {
-        console.error('Error fetching expenses:', expensesError);
-        // Continue with empty expenses data
+      if (expRes.ok) {
+        const data = await expRes.json();
+        const rows = data.success
+          ? data.data?.expenses || []
+          : data.expenses || [];
+        setExpenses(
+          rows.map((e: Record<string, unknown>) => ({
+            id: String(e.id),
+            description: String(e.description || ''),
+            category: String(e.category || e.expenseCategory || 'other'),
+            amount: Number(e.amount) || 0,
+            expenseDate: String(e.expenseDate || e.expense_date || ''),
+            buildingName: (e.buildingName || e.building_name) as string | undefined,
+            roomNumber: (e.roomNumber || e.room_number) as string | undefined,
+            buildingId: (e.buildingId || e.building_id) as string | undefined,
+          }))
+        );
+      } else {
+        setExpenses([]);
       }
-
-      // Calculate summary
-      const totalBills = billsData.total || 0;
-      const totalBillsAmount = (billsData.bills || []).reduce((sum: number, bill: any) => sum + (bill.amount || 0), 0);
-      const pendingBills = (billsData.bills || []).filter((b: any) => b.billStatus === 'pending').length;
-
-      const totalExpenses = expensesData.total || 0;
-      const totalExpensesAmount = (expensesData.expenses || []).reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
-      
-      // Calculate monthly expenses
-      const currentMonth = new Date();
-      currentMonth.setDate(1);
-      const monthlyExpenses = (expensesData.expenses || []).filter((exp: any) => {
-        const expDate = new Date(exp.expenseDate || exp.expense_date);
-        return expDate >= currentMonth;
-      }).reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
-
-      setSummary({
-        totalBills,
-        totalBillsAmount,
-        pendingBills,
-        totalExpenses,
-        totalExpensesAmount,
-        monthlyExpenses,
-      });
-
-      setRecentBills((billsData.bills || []).slice(0, 5).map((bill: any) => ({
-        id: bill.id || '',
-        roomNumber: bill.roomNumber || bill.room_number || '',
-        buildingName: bill.buildingName || bill.building_name || '',
-        utilityType: bill.utilityType || bill.utility_type || 'electricity',
-        amount: bill.amount || 0,
-        dueDate: bill.dueDate ? (typeof bill.dueDate === 'string' ? bill.dueDate : bill.dueDate.toISOString().split('T')[0]) : (bill.due_date ? new Date(bill.due_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
-        billStatus: bill.billStatus || bill.bill_status || 'pending',
-      })));
-
-      setRecentExpenses((expensesData.expenses || []).slice(0, 5).map((exp: any) => ({
-        id: exp.id,
-        description: exp.description,
-        amount: exp.amount,
-        category: exp.expenseCategory || exp.category || 'other',
-        expenseDate: exp.expenseDate ? (typeof exp.expenseDate === 'string' ? exp.expenseDate : exp.expenseDate.toISOString().split('T')[0]) : (exp.expense_date ? new Date(exp.expense_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
-        buildingName: exp.buildingName || exp.building_name,
-      })));
-
     } catch (error) {
-      console.error('Error fetching data:', error);
-      // Only show notification if context is available
-      safeShowNotification({
+      console.error(error);
+      showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to load bills and expenses data',
+        message: 'Failed to load bills and expenses',
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [buildingFilter, typeFilter, statusFilter, showNotification]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
-  };
+  useEffect(() => {
+    fetchBuildings();
+  }, [fetchBuildings]);
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const getCategoryBadge = (category: string) => {
-    const normalizedCategory = category.toLowerCase().replace(/\s+/g, '_');
-    const colors: Record<string, string> = {
-      cleaning: 'bg-blue-100 text-blue-800',
-      maintenance: 'bg-red-100 text-red-800',
-      repair: 'bg-orange-100 text-orange-800',
-      upgrade: 'bg-purple-100 text-purple-800',
-      garbage_collection: 'bg-green-100 text-green-800',
-      worker_wages: 'bg-teal-100 text-teal-800',
-      utilities: 'bg-yellow-100 text-yellow-800',
-      supplies: 'bg-indigo-100 text-indigo-800',
-      services: 'bg-pink-100 text-pink-800',
-      insurance: 'bg-gray-100 text-gray-800',
-      taxes: 'bg-gray-100 text-gray-800',
-      other: 'bg-gray-100 text-gray-800',
-    };
-    return colors[normalizedCategory] || 'bg-gray-100 text-gray-800';
+  const categoryLabel = (raw: string) => {
+    const cat = normalizeExpenseCategory(raw);
+    return EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory] || raw;
   };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Paid</span>;
-      case 'pending':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>;
-      case 'overdue':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Overdue</span>;
-      default:
-        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">{status}</span>;
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-900">Loading...</div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Utility Bills */}
+        <section className="mb-14">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Bills & Expenses</h1>
-              <p className="text-sm text-gray-900 mt-1">Manage utility bills and expenses</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+                Utility Bills
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Per-unit electric &amp; water billing.
+              </p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {/* Total Bills */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Receipt className="w-8 h-8 text-blue-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Total Bills</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.totalBillsAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.totalBills} bills</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Pending Bills */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Calendar className="w-8 h-8 text-yellow-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Pending Bills</dt>
-                    <dd className="text-lg font-medium text-gray-900">{summary.pendingBills}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">awaiting payment</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Total Expenses */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <DollarSign className="w-8 h-8 text-green-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Total Expenses</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.totalExpensesAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.totalExpenses} expenses</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Monthly Expenses */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <TrendingUp className="w-8 h-8 text-purple-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">This Month</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.monthlyExpenses)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">expenses this month</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
               href="/admin/bills-expenses/utility-bills/new"
-              className="bg-white rounded-lg shadow p-6 hover:shadow-md transition group"
+              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-gray-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-gray-800"
             >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Zap className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="ml-4 flex-1">
-                  <h4 className="font-semibold text-gray-900">Add Utility Bill</h4>
-                  <p className="text-sm text-gray-900">Record electric or water bill</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition" />
-              </div>
+              <Plus className="h-4 w-4" />
+              Add utility bill
             </Link>
+          </div>
 
-            <Link
-              href="/admin/financial/expenses/new"
-              className="bg-white rounded-lg shadow p-6 hover:shadow-md transition group"
+          <div className="mb-4 flex flex-wrap gap-2">
+            <select
+              value={buildingFilter}
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
             >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-                <div className="ml-4 flex-1">
-                  <h4 className="font-semibold text-gray-900">Record Expense</h4>
-                  <p className="text-sm text-gray-900">Add misc expense</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-green-600 transition" />
-              </div>
-            </Link>
-
+              <option value="">All buildings</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+            >
+              <option value="">All types</option>
+              <option value="electricity">Electric</option>
+              <option value="water">Water</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+            >
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
             <Link
               href="/admin/bills-expenses/reports"
-              className="bg-white rounded-lg shadow p-6 hover:shadow-md transition group"
+              className="ml-auto inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900"
             >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-                <div className="ml-4 flex-1">
-                  <h4 className="font-semibold text-gray-900">View Reports</h4>
-                  <p className="text-sm text-gray-900">Expense reports & analytics</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-purple-600 transition" />
-              </div>
+              <FileText className="h-4 w-4" />
+              Reports
             </Link>
           </div>
-        </div>
 
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Utility Bills */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Utility Bills</h3>
-                <Link
-                  href="/admin/bills-expenses/utility-bills"
-                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                >
-                  View All
-                </Link>
-              </div>
-            </div>
-            <div className="p-6">
-              {recentBills.length === 0 ? (
-                <div className="text-center py-8 text-gray-900">
-                  <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>No utility bills found</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentBills.map((bill) => (
-                    <div key={bill.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-purple-300 transition">
-                      <div className="flex items-center space-x-4">
-                        {bill.utilityType === 'electricity' ? (
-                          <Zap className="h-5 w-5 text-yellow-500" />
-                        ) : (
-                          <Droplets className="h-5 w-5 text-blue-500" />
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {bill.buildingName} - Room {bill.roomNumber}
-                          </div>
-                          <div className="text-xs text-gray-900">
-                            {bill.utilityType} • Due {formatDate(bill.dueDate)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-gray-900">{formatCurrency(bill.amount)}</div>
-                        {getStatusBadge(bill.billStatus)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Recent Expenses */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Expenses</h3>
-                <Link
-                  href="/admin/financial/expenses"
-                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                >
-                  View All
-                </Link>
-              </div>
-            </div>
-            <div className="p-6">
-              {recentExpenses.length === 0 ? (
-                <div className="text-center py-8 text-gray-900">
-                  <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>No expenses found</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentExpenses.map((expense) => (
-                    <div key={expense.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-purple-300 transition">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">{expense.description}</div>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getCategoryBadge(expense.category)}`}>
-                            {expense.category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                          </span>
-                          {expense.buildingName && (
-                            <span className="text-xs text-gray-900">{expense.buildingName}</span>
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Room / Unit</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Period</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3">Due date</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : bills.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
+                      No utility bills yet.{' '}
+                      <Link
+                        href="/admin/bills-expenses/utility-bills/new"
+                        className="font-medium text-gray-900 underline"
+                      >
+                        Add one
+                      </Link>
+                    </td>
+                  </tr>
+                ) : (
+                  bills.map((bill) => (
+                    <tr key={bill.id} className="text-sm text-gray-900">
+                      <td className="px-4 py-3.5 font-medium">
+                        {roomUnitLabel(bill)}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center gap-1.5">
+                          {bill.utilityType === 'water' ? (
+                            <Droplets className="h-3.5 w-3.5 text-sky-500" />
+                          ) : (
+                            <Zap className="h-3.5 w-3.5 text-amber-500" />
                           )}
-                          <span className="text-xs text-gray-900">{formatDate(expense.expenseDate)}</span>
-                        </div>
-                      </div>
-                      <div className="text-sm font-medium text-gray-900 ml-4">
-                        {formatCurrency(expense.amount)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                          {UTILITY_TYPE_LABELS[
+                            bill.utilityType as 'electricity' | 'water'
+                          ] || bill.utilityType}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">
+                        {formatPeriod(
+                          bill.billingPeriodStart,
+                          bill.billingPeriodEnd
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-medium tabular-nums">
+                        {formatCurrency(bill.amount)}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">
+                        {bill.dueDate ? formatDate(bill.dueDate) : '—'}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <StatusBadge status={bill.billStatus} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
+
+        {/* Expenses */}
+        <section>
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+                Expenses
+              </h2>
+            </div>
+            <Link
+              href="/admin/financial/expenses/new"
+              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-gray-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              <Plus className="h-4 w-4" />
+              Record expense
+            </Link>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Building / Unit</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : expenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">
+                      No expenses yet.{' '}
+                      <Link
+                        href="/admin/financial/expenses/new"
+                        className="font-medium text-gray-900 underline"
+                      >
+                        Record one
+                      </Link>
+                    </td>
+                  </tr>
+                ) : (
+                  expenses.map((exp) => (
+                    <tr key={exp.id} className="text-sm text-gray-900">
+                      <td className="px-4 py-3.5 font-medium">
+                        {exp.description}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">
+                        {categoryLabel(exp.category)}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">
+                        {expenseLocationLabel(exp)}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">
+                        {exp.expenseDate ? formatDate(exp.expenseDate) : '—'}
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-medium tabular-nums">
+                        {formatCurrency(exp.amount)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   );

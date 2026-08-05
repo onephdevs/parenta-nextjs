@@ -293,12 +293,6 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                 <option value="repair">Repair</option>
                 <option value="upgrade">Upgrade</option>
                 <option value="garbage_collection">Garbage Collection</option>
-                <option value="worker_wages">Worker Wages</option>
-                <option value="utilities">Utilities</option>
-                <option value="supplies">Supplies</option>
-                <option value="services">Services</option>
-                <option value="insurance">Insurance</option>
-                <option value="taxes">Taxes</option>
                 <option value="other">Other</option>
               </Select>
             </FormField>
@@ -350,6 +344,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
             <FormField
               label="Building (Optional)"
               htmlFor="buildingId"
+              hint="Leave empty for company-wide expenses"
             >
               <Select
                 id="buildingId"
@@ -367,9 +362,13 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
             </FormField>
 
             <FormField
-              label="Room (Optional)"
+              label="Unit / Room (Optional)"
               htmlFor="roomId"
-              hint={!formData.buildingId ? 'Select a building first to choose a room' : undefined}
+              hint={
+                !formData.buildingId
+                  ? 'Select a building first — leave empty for building-wide costs'
+                  : 'Leave empty for building-wide costs'
+              }
             >
               <Select
                 id="roomId"
@@ -378,10 +377,11 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
                 onChange={(e) => handleInputChange('roomId', e.target.value)}
                 isDisabled={!formData.buildingId}
               >
-                <option value="">Select a room</option>
+                <option value="">Building-wide / no unit</option>
                 {filteredRooms.map((room) => (
                   <option key={room.id} value={String(room.id)}>
-                    {room.buildingName ? `${room.buildingName} - ` : ''}Room {room.roomNumber}
+                    {room.buildingName ? `${room.buildingName} - ` : ''}Room{' '}
+                    {room.roomNumber}
                   </option>
                 ))}
               </Select>
