@@ -13,7 +13,6 @@ import {
   MapPin,
   BarChart3,
 } from 'lucide-react';
-import { LogoutButton } from '@/components/features/LogoutButton';
 import { Button } from '@/components/ui/Button';
 import { PaymentStatusBadge } from '@/components/domain/StatusBadges';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
@@ -225,7 +224,7 @@ function mapMaintenancePreview(data: { requests: unknown[] }): MaintenanceItem[]
 
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
-  const { canAccess, isPreview, isLoading: gateLoading, exitPreview } = useTenantPortalGate();
+  const { canAccess, isPreview, isLoading: gateLoading } = useTenantPortalGate();
   const { load, getCached, isLoading: cacheLoading } = useTenantData();
   const theme = useTenantTheme();
   const router = useRouter();
@@ -386,30 +385,15 @@ export default function TenantDashboard() {
     <div className={theme.page}>
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className={cn('text-3xl font-semibold tracking-tight', theme.shellHeader)}>
-              Welcome, {firstName}
-            </h1>
-            <p className={cn('mt-1', theme.muted)}>
-              {hasAssignment
-                ? `Room ${assignment?.roomNumber} · ${assignment?.buildingName}`
-                : 'No room assigned yet'}
-            </p>
-          </div>
-
-          {isPreview ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void exitPreview()}
-              className={theme.outlineButton}
-            >
-              Exit preview
-            </Button>
-          ) : (
-            <LogoutButton />
-          )}
+        <div>
+          <h1 className={cn('text-3xl font-semibold tracking-tight', theme.shellHeader)}>
+            Welcome, {firstName}
+          </h1>
+          <p className={cn('mt-1', theme.muted)}>
+            {hasAssignment
+              ? `Room ${assignment?.roomNumber} · ${assignment?.buildingName}`
+              : 'No room assigned yet'}
+          </p>
         </div>
 
         {/* Amount due hero */}

@@ -196,8 +196,8 @@ const light: TenantThemeTokens = {
 
 export const tenantThemePalettes = { dark, light } as const;
 
-/** @deprecated Prefer useTenantTheme() — kept for non-React callers / default dark */
-export const tenantTheme = dark;
+/** @deprecated Prefer useTenantTheme() — kept for non-React callers / default light */
+export const tenantTheme = light;
 
 export function getTenantTheme(mode: TenantThemeMode): TenantThemeTokens {
   return tenantThemePalettes[mode];

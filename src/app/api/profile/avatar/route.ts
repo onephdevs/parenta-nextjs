@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
 import { saveUploadedFile } from '@/lib/api/documents';
+import { toPublicAssetUrl } from '@/lib/format/image-url';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
@@ -38,7 +39,7 @@ async function saveProfileExtras(userId: string, extras: Record<string, string>)
 
 /**
  * POST /api/profile/avatar
- * Upload and persist an admin/staff profile photo
+ * Upload and persist a profile photo for the signed-in user
  */
 export async function POST(request: NextRequest) {
   try {
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     const { filePath } = await saveUploadedFile(file, 'uploads/avatars');
     const extras = await getProfileExtras(session.user.id);
-    extras.avatarUrl = filePath.startsWith('/') ? filePath : `/${filePath}`;
+    extras.avatarUrl = toPublicAssetUrl(filePath);
     await saveProfileExtras(session.user.id, extras);
 
     return NextResponse.json({

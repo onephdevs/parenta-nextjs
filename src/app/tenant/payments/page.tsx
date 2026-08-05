@@ -869,7 +869,8 @@ export default function PaymentsPage() {
                         <div>
                           <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
                           <p className="text-sm text-gray-900">
-                            Pay your rent securely online with multiple payment options
+                            Send via GCash or bank transfer using the office number, then upload
+                            your receipt screenshot
                           </p>
                         </div>
                         <div className="text-right">

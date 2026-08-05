@@ -29,18 +29,18 @@ interface TenantThemeContextValue extends TenantThemeTokens {
 const TenantThemeContext = createContext<TenantThemeContextValue | null>(null);
 
 function readStoredMode(): TenantThemeMode {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === 'light' || stored === 'dark') return stored;
   } catch {
     // ignore
   }
-  return 'dark';
+  return 'light';
 }
 
 export function TenantThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<TenantThemeMode>('dark');
+  const [mode, setModeState] = useState<TenantThemeMode>('light');
   const [ready, setReady] = useState(false);
 
   useEffect(() => {

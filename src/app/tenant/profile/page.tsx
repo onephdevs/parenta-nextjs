@@ -3,24 +3,26 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { User, Users, Phone } from 'lucide-react';
+import { User, Users, Phone, Shield } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import ProfileForm from '@/components/features/tenant/ProfileForm';
 import OccupantList from '@/components/features/tenant/OccupantList';
 import DocumentUpload from '@/components/features/DocumentUpload';
 import LeaseSignPanel from '@/components/features/lease-designer/LeaseSignPanel';
+import { TenantAccountPanel } from '@/components/features/tenant/TenantAccountPanel';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantProfile } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 
-type ProfileSection = 'personal' | 'occupants' | 'emergency';
+type ProfileSection = 'personal' | 'occupants' | 'emergency' | 'account';
 
 const SECTIONS: { id: ProfileSection; label: string; icon: typeof User }[] = [
   { id: 'personal', label: 'Personal info', icon: User },
   { id: 'occupants', label: 'Occupants', icon: Users },
   { id: 'emergency', label: 'Emergency contact', icon: Phone },
+  { id: 'account', label: 'Account', icon: Shield },
 ];
 
 interface ProfileData {
@@ -73,7 +75,10 @@ function ProfilePageInner() {
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get('section');
   const activeSection: ProfileSection =
-    sectionParam === 'occupants' || sectionParam === 'emergency' || sectionParam === 'personal'
+    sectionParam === 'occupants' ||
+    sectionParam === 'emergency' ||
+    sectionParam === 'personal' ||
+    sectionParam === 'account'
       ? sectionParam
       : 'personal';
 
@@ -124,7 +129,7 @@ function ProfilePageInner() {
       <div>
         <h1 className={theme.title}>Profile</h1>
         <p className={cn('mt-1', theme.muted)}>
-          Personal details, co-residents, and emergency contact
+          Personal details, co-residents, emergency contact, and account security
         </p>
       </div>
 
@@ -199,6 +204,14 @@ function ProfilePageInner() {
                 />
               </div>
             </div>
+          )}
+
+          {activeSection === 'account' && (
+            <TenantAccountPanel
+              email={profileData.profile.email}
+              firstName={profileData.profile.firstName}
+              lastName={profileData.profile.lastName}
+            />
           )}
         </div>
       )}

@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
     const paymentDateRaw = String(formData.get('paymentDate') || '').trim();
     const amountRaw = String(formData.get('amount') || '').trim();
     const notesRaw = String(formData.get('notes') || '').trim();
+    const referenceNumberRaw = String(formData.get('referenceNumber') || '').trim();
+    const paymentMethodRaw = String(formData.get('paymentMethod') || 'gcash')
+      .trim()
+      .toLowerCase();
+
+    const allowedMethods = new Set(['gcash', 'maya', 'bank_transfer', 'online', 'other']);
+    const paymentMethod = allowedMethods.has(paymentMethodRaw) ? paymentMethodRaw : 'gcash';
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
@@ -122,16 +129,18 @@ export async function POST(request: NextRequest) {
       const createPayment = await pool.query(
         `INSERT INTO payments (
            tenant_id, room_id, assignment_id, amount, payment_type, payment_method,
-           payment_date, due_date, payment_status, notes
-         ) VALUES ($1, $2, $3, $4, 'rent', 'bank_transfer', $5, $6, 'pending', $7)
+           payment_date, due_date, payment_status, reference_number, notes
+         ) VALUES ($1, $2, $3, $4, 'rent', $5, $6, $7, 'pending', $8, $9)
          RETURNING id`,
         [
           tenant.id,
           assignment?.room_id || null,
           assignment?.assignment_id || null,
           paymentAmount,
+          paymentMethod,
           paymentDateRaw || invoice.due_date,
           invoice.due_date,
+          referenceNumberRaw || null,
           notesRaw ||
             `Receipt uploaded for invoice ${invoice.invoice_number || invoice.id}`,
         ]
@@ -164,15 +173,17 @@ export async function POST(request: NextRequest) {
       const createPayment = await pool.query(
         `INSERT INTO payments (
            tenant_id, room_id, assignment_id, amount, payment_type, payment_method,
-           payment_date, due_date, payment_status, notes
-         ) VALUES ($1, $2, $3, $4, 'rent', 'bank_transfer', $5, $5, 'pending', $6)
+           payment_date, due_date, payment_status, reference_number, notes
+         ) VALUES ($1, $2, $3, $4, 'rent', $5, $6, $6, 'pending', $7, $8)
          RETURNING id`,
         [
           tenant.id,
           assignment?.room_id || null,
           assignment?.assignment_id || null,
           paymentAmount,
+          paymentMethod,
           paymentDateRaw,
+          referenceNumberRaw || null,
           notesRaw || `Receipt uploaded for payment dated ${paymentDateRaw}`,
         ]
       );
@@ -202,10 +213,19 @@ export async function POST(request: NextRequest) {
            receipt_file_name = $2,
            receipt_file_size = $3,
            receipt_uploaded_at = CURRENT_TIMESTAMP,
+           payment_method = COALESCE(NULLIF($5, ''), payment_method),
+           reference_number = COALESCE(NULLIF($6, ''), reference_number),
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
        RETURNING id, receipt_file_name, receipt_file_path, receipt_uploaded_at, payment_date, amount`,
-      [filePath, fileName, fileSize, paymentId]
+      [
+        filePath,
+        fileName,
+        fileSize,
+        paymentId,
+        paymentIdRaw ? paymentMethod : null,
+        paymentIdRaw ? referenceNumberRaw || null : null,
+      ]
     );
 
     return NextResponse.json({

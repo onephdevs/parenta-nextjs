@@ -12,6 +12,7 @@ import { Card, CardBody, CardFooter } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { IconButton } from '@/components/ui/IconButton';
 import { FormField } from '@/components/forms/FormField';
+import { getImageUrl } from '@/lib/format/image-url';
 
 interface ProfileClientProps {
   session: Session;
@@ -65,7 +66,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
             state: data.data.state || '',
             zipCode: data.data.zipCode || '',
             bio: data.data.bio || '',
-            avatarUrl: data.data.avatarUrl || '',
+            avatarUrl: data.data.avatarUrl ? getImageUrl(data.data.avatarUrl) : '',
           }));
         }
       } catch {
@@ -161,7 +162,7 @@ export default function ProfileClient({ session }: ProfileClientProps) {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to upload photo');
       }
-      setProfileData((prev) => ({ ...prev, avatarUrl: data.data.avatarUrl }));
+      setProfileData((prev) => ({ ...prev, avatarUrl: getImageUrl(data.data.avatarUrl) }));
       showSuccess('Profile photo updated');
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Failed to upload photo');
@@ -199,6 +200,9 @@ export default function ProfileClient({ session }: ProfileClientProps) {
                         src={profileData.avatarUrl}
                         alt="Profile"
                         className="h-32 w-32 rounded-full object-cover shadow-lg"
+                        onError={() =>
+                          setProfileData((prev) => ({ ...prev, avatarUrl: '' }))
+                        }
                       />
                     ) : (
                       <div className="h-32 w-32 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">

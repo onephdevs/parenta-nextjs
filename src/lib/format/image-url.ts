@@ -4,9 +4,26 @@
  */
 export function getImageUrl(filePath: string): string {
   if (!filePath) return '';
-  if (filePath.startsWith('https://') || filePath.startsWith('http://') || filePath.startsWith('/')) {
-    return filePath;
+
+  // Guard against previously stored "/https://..." mistakes
+  const cleaned = filePath.replace(/^\/+(https?:\/\/)/i, '$1').trim();
+
+  if (cleaned.startsWith('https://') || cleaned.startsWith('http://')) {
+    return cleaned;
   }
-  const pathParts = filePath.replace('uploads/images/', '').split('/');
+  if (cleaned.startsWith('/')) {
+    return cleaned;
+  }
+  const pathParts = cleaned.replace('uploads/images/', '').split('/');
   return `/api/images/serve/${pathParts.join('/')}`;
+}
+
+/** Normalize a newly uploaded asset path for storage / <img src>. */
+export function toPublicAssetUrl(filePath: string): string {
+  if (!filePath) return '';
+  const cleaned = filePath.replace(/^\/+(https?:\/\/)/i, '$1').trim();
+  if (cleaned.startsWith('https://') || cleaned.startsWith('http://') || cleaned.startsWith('/')) {
+    return cleaned;
+  }
+  return `/${cleaned.replace(/^\/+/, '')}`;
 }
