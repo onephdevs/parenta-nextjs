@@ -206,7 +206,7 @@ function mapRecentPayments(paymentsData: Record<string, unknown>): RecentPayment
     id: String(p.id),
     date: String(p.paymentDate || p.payment_date || ''),
     amount: Number(p.amount) || 0,
-    status: String(p.paymentStatus || p.payment_status || 'pending'),
+    status: String(p.status || p.paymentStatus || p.payment_status || 'pending'),
     type: String(p.paymentType || p.payment_type || 'Rent'),
   }));
 }

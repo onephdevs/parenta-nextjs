@@ -68,6 +68,7 @@ export async function generateInvoicesForTenant(
   request: InvoiceGenerationRequest
 ): Promise<InvoiceGenerationResult> {
   const client = await pool.connect();
+  let committed = false;
   
   try {
     await client.query('BEGIN');
@@ -264,16 +265,6 @@ export async function generateInvoicesForTenant(
           'rent'
         ]
       );
-
-      // Only apply advance to invoices that are already issued (sent)
-      if (invoiceStatus === 'sent') {
-        try {
-          const { applyCreditToRentInvoice } = await import('./payment-allocator');
-          await applyCreditToRentInvoice(tenantId, invoiceId);
-        } catch (advanceError) {
-          console.warn(`Could not auto-apply advance to invoice ${invoiceNumber}:`, advanceError);
-        }
-      }
     }
 
     // Handle deposit if provided
@@ -307,17 +298,20 @@ export async function generateInvoicesForTenant(
       }
     }
 
-    // After all invoices are created, auto-apply any remaining advance to unpaid rent invoices
-    // This ensures advance cascades forward to all newly created rent invoices
+    // Must commit before applying advance — payment-allocator uses separate pool
+    // connections and cannot see uncommitted invoices/credits.
+    await client.query('COMMIT');
+    committed = true;
+
+    let advanceApplied = 0;
     try {
       const { autoApplyAdvanceToUnpaidRentInvoices } = await import('./payment-allocator');
-      await autoApplyAdvanceToUnpaidRentInvoices(tenantId);
+      const applyResult = await autoApplyAdvanceToUnpaidRentInvoices(tenantId);
+      advanceApplied = applyResult.totalApplied || 0;
     } catch (advanceError) {
       // Log but don't fail invoice generation if advance application fails
       console.warn('Could not auto-apply advance to newly created invoices:', advanceError);
     }
-
-    await client.query('COMMIT');
 
     const totalAmount = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
 
@@ -331,11 +325,17 @@ export async function generateInvoicesForTenant(
       lastInvoiceNumber: invoices[invoices.length - 1]?.invoiceNumber,
       depositRecorded,
       depositAmount: depositRecorded ? depositAmount : undefined,
-      message: `Successfully generated ${invoiceIds.length} rent invoice(s) for ${tenant.first_name} ${tenant.last_name}${skippedExisting ? ` (${skippedExisting} existing month(s) skipped)` : ''}${depositRecorded ? ` and recorded deposit of ₱${depositAmount}` : ''}`
+      message: `Successfully generated ${invoiceIds.length} rent invoice(s) for ${tenant.first_name} ${tenant.last_name}${skippedExisting ? ` (${skippedExisting} existing month(s) skipped)` : ''}${depositRecorded ? ` and recorded deposit of ₱${depositAmount}` : ''}${advanceApplied > 0 ? ` and applied ₱${advanceApplied} advance` : ''}`
     };
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!committed) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Transaction may already be closed
+      }
+    }
     console.error('Error generating invoices:', error);
     throw error;
   } finally {

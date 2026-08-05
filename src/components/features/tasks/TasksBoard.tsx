@@ -584,8 +584,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             void loadBoard(activeSlug);
           }}
           onSaved={() => {
-            setShowOpportunity(false);
-            setSelectedCard(null);
+            // Soft refresh only — modal already calls onClose when it should dismiss
+            // (save, generate lease, delete). Payment confirm must keep the dialog open.
             void loadBoard(activeSlug);
           }}
           onMoved={(slug) => {

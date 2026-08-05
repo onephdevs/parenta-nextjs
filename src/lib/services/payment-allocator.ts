@@ -275,6 +275,7 @@ export async function applyCreditToRentInvoice(
     const creditBalance = await getTenantCreditBalance(tenantId);
 
     if (creditBalance <= 0) {
+      await client.query('ROLLBACK');
       return {
         success: false,
         amountApplied: 0,
@@ -304,6 +305,7 @@ export async function applyCreditToRentInvoice(
 
     // Verify this is a rent invoice - advance only applies to rent invoices
     if (invoice.rent_items_count === 0 || invoice.total_items_count === 0) {
+      await client.query('ROLLBACK');
       return {
         success: false,
         amountApplied: 0,
@@ -314,6 +316,7 @@ export async function applyCreditToRentInvoice(
     }
 
     if (invoice.balance_due <= 0) {
+      await client.query('ROLLBACK');
       return {
         success: false,
         amountApplied: 0,
@@ -613,32 +616,26 @@ export async function autoApplyAdvanceToUnpaidRentInvoices(
   totalApplied: number;
   remainingAdvance: number;
 }> {
-  const client = await pool.connect();
-  
   try {
-    await client.query('BEGIN');
-
-    // Get available advance balance
     const advanceBalance = await getTenantCreditBalance(tenantId);
-    
+
     if (advanceBalance <= 0) {
       return {
         success: true,
         invoicesUpdated: 0,
         totalApplied: 0,
-        remainingAdvance: 0
+        remainingAdvance: 0,
       };
     }
 
-    // Get unpaid rent invoices only (oldest first)
     const unpaidRentInvoices = await getUnpaidRentInvoicesForTenant(tenantId);
-    
+
     if (unpaidRentInvoices.length === 0) {
       return {
         success: true,
         invoicesUpdated: 0,
         totalApplied: 0,
-        remainingAdvance: advanceBalance
+        remainingAdvance: advanceBalance,
       };
     }
 
@@ -646,12 +643,13 @@ export async function autoApplyAdvanceToUnpaidRentInvoices(
     let invoicesUpdated = 0;
     let totalApplied = 0;
 
-    // Apply advance to each unpaid rent invoice (oldest first) until exhausted
+    // Each applyCreditToRentInvoice manages its own transaction
     for (const invoice of unpaidRentInvoices) {
       if (remainingAdvance <= 0) break;
 
-      const amountToApply = Math.min(remainingAdvance, parseFloat(invoice.balance_due));
-      
+      const balanceDue = Number(invoice.balanceDue);
+      const amountToApply = Math.min(remainingAdvance, balanceDue);
+
       if (amountToApply > 0) {
         const result = await applyCreditToRentInvoice(tenantId, invoice.id, amountToApply);
         if (result.success) {
@@ -662,21 +660,15 @@ export async function autoApplyAdvanceToUnpaidRentInvoices(
       }
     }
 
-    await client.query('COMMIT');
-
     return {
       success: true,
       invoicesUpdated,
       totalApplied,
-      remainingAdvance
+      remainingAdvance,
     };
-
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('Error auto-applying advance to unpaid rent invoices:', error);
     throw error;
-  } finally {
-    client.release();
   }
 }
 
