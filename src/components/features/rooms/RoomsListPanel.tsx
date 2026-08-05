@@ -59,21 +59,32 @@ export default function RoomsListPanel({
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return rooms.filter((room) => {
-      const matchesSearch =
-        !term ||
-        room.roomNumber.toLowerCase().includes(term) ||
-        room.buildingName.toLowerCase().includes(term) ||
-        (room.tenantName || '').toLowerCase().includes(term);
+    return rooms
+      .filter((room) => {
+        const matchesSearch =
+          !term ||
+          room.roomNumber.toLowerCase().includes(term) ||
+          room.buildingName.toLowerCase().includes(term) ||
+          (room.tenantName || '').toLowerCase().includes(term);
 
-      if (!matchesSearch) return false;
+        if (!matchesSearch) return false;
 
-      if (buildingFilter !== 'all' && room.buildingId !== buildingFilter) return false;
+        if (buildingFilter !== 'all' && room.buildingId !== buildingFilter) return false;
 
-      if (statusFilter === 'all') return true;
-      const display = toDisplayRoomStatus(room.roomStatus);
-      return display === statusFilter;
-    });
+        if (statusFilter === 'all') return true;
+        const display = toDisplayRoomStatus(room.roomStatus);
+        return display === statusFilter;
+      })
+      .sort((a, b) => {
+        const byBuilding = a.buildingName.localeCompare(b.buildingName, undefined, {
+          sensitivity: 'base',
+        });
+        if (byBuilding !== 0) return byBuilding;
+        return a.roomNumber.localeCompare(b.roomNumber, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      });
   }, [rooms, search, statusFilter, buildingFilter]);
 
   return (

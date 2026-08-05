@@ -45,12 +45,14 @@ if (process.env.NODE_ENV !== 'production') {
 function mapDatabaseUserToUser(dbUser: DatabaseUser): User {
   return {
     id: dbUser.id,
-    email: dbUser.email,
+    email: dbUser.email ?? null,
+    username: dbUser.username ?? null,
     role: dbUser.role,
     firstName: dbUser.first_name,
     lastName: dbUser.last_name,
     isActive: dbUser.is_active,
     emailVerified: dbUser.email_verified,
+    profileCompleted: dbUser.profile_completed !== false,
     createdAt: dbUser.created_at,
     updatedAt: dbUser.updated_at,
   };
@@ -58,27 +60,50 @@ function mapDatabaseUserToUser(dbUser: DatabaseUser): User {
 
 // Create a new user
 export async function createUser(userData: CreateUserData): Promise<User> {
-  const { email, password, role, firstName, lastName, isActive = true } = userData;
-  
-  // Hash password
+  const {
+    email,
+    username,
+    password,
+    role,
+    firstName,
+    lastName,
+    isActive = true,
+    profileCompleted = true,
+  } = userData;
+
   const saltRounds = 12;
   const passwordHash = await bcrypt.hash(password, saltRounds);
-  
+  const normalizedEmail = email ? email.toLowerCase().trim() : null;
+  const normalizedUsername = username ? username.trim() : null;
+
+  if (!normalizedEmail && !normalizedUsername) {
+    throw new Error('Email or username is required');
+  }
+
   const query = `
-    INSERT INTO users (email, password_hash, role, first_name, last_name, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO users (email, username, password_hash, role, first_name, last_name, is_active, profile_completed)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
   `;
-  
-  const values = [email, passwordHash, role, firstName, lastName, isActive];
-  
+
+  const values = [
+    normalizedEmail,
+    normalizedUsername,
+    passwordHash,
+    role,
+    firstName,
+    lastName,
+    isActive,
+    profileCompleted,
+  ];
+
   try {
     const result = await pool.query(query, values);
     const dbUser = result.rows[0] as DatabaseUser;
     return mapDatabaseUserToUser(dbUser);
   } catch (error) {
     if (error instanceof Error && error.message.includes('duplicate key')) {
-      throw new Error('User with this email already exists');
+      throw new Error('User with this email or username already exists');
     }
     throw error;
   }
@@ -88,7 +113,7 @@ export async function createUser(userData: CreateUserData): Promise<User> {
 export async function findUserByEmailAndRole(email: string, role: UserRole): Promise<User | null> {
   const query = `
     SELECT * FROM users 
-    WHERE email = $1 AND role = $2 AND is_active = true
+    WHERE lower(email) = lower($1) AND role = $2 AND is_active = true
   `;
   
   const result = await pool.query(query, [email, role]);
@@ -118,26 +143,41 @@ export async function findUserById(id: string): Promise<User | null> {
   return mapDatabaseUserToUser(dbUser);
 }
 
-// Verify user password
-export async function verifyPassword(email: string, role: UserRole, password: string): Promise<User | null> {
+/**
+ * Verify password using email OR username as the login identifier.
+ */
+export async function verifyPassword(
+  loginId: string,
+  role: UserRole,
+  password: string
+): Promise<User | null> {
+  const identifier = String(loginId || '').trim();
+  if (!identifier) return null;
+
   const query = `
     SELECT * FROM users 
-    WHERE email = $1 AND role = $2 AND is_active = true
+    WHERE role = $2
+      AND is_active = true
+      AND (
+        (email IS NOT NULL AND lower(email) = lower($1))
+        OR (username IS NOT NULL AND lower(username) = lower($1))
+      )
+    LIMIT 1
   `;
-  
-  const result = await pool.query(query, [email, role]);
-  
+
+  const result = await pool.query(query, [identifier, role]);
+
   if (result.rows.length === 0) {
     return null;
   }
-  
+
   const dbUser = result.rows[0] as DatabaseUser;
   const isValidPassword = await bcrypt.compare(password, dbUser.password_hash);
-  
+
   if (!isValidPassword) {
     return null;
   }
-  
+
   return mapDatabaseUserToUser(dbUser);
 }
 

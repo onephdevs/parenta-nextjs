@@ -39,28 +39,41 @@ export async function POST(request: Request) {
 
     const tenantData = await request.json();
     
-    // Basic validation
-    if (!tenantData.firstName || !tenantData.lastName || !tenantData.email) {
+    // Basic validation — email optional when username is provided for portal login
+    if (!tenantData.firstName || !tenantData.lastName) {
       return NextResponse.json(
         { 
           success: false, 
           error: 'Missing required fields',
-          details: 'First name, last name, and email are required'
+          details: 'First name and last name are required'
+        },
+        { status: 400 }
+      );
+    }
+
+    const createUserAccount = tenantData.createUserAccount !== false; // Default to true
+    if (createUserAccount && !tenantData.email && !tenantData.username) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing required fields',
+          details: 'Email or username is required when creating a portal login',
         },
         { status: 400 }
       );
     }
     
-    // Check if this should create a user account too
-    const createUserAccount = tenantData.createUserAccount !== false; // Default to true
     const entityLabel = `${tenantData.firstName} ${tenantData.lastName}`.trim();
     
     if (createUserAccount) {
       // Create both user account and tenant profile (linked)
       const result = await createTenantWithUser({
-        email: tenantData.email,
+        email: tenantData.email || null,
+        username: tenantData.username || null,
         password: tenantData.password, // Optional: if not provided, generates random
         sendInvitation: tenantData.sendInvitation || false,
+        profileCompleted: tenantData.profileCompleted,
+        tenantStatus: tenantData.tenantStatus,
         firstName: tenantData.firstName,
         lastName: tenantData.lastName,
         phone: tenantData.phone,

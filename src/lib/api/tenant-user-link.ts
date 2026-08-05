@@ -11,9 +11,12 @@ export const DEFAULT_TENANT_PASSWORD = 'tenant123';
 
 export interface CreateTenantWithUserData {
   // User account fields
-  email: string;
+  email?: string | null;
+  username?: string | null;
   password?: string; // Optional: if not provided, generates a random password
   sendInvitation?: boolean; // If true, sends invitation email to set password
+  profileCompleted?: boolean;
+  tenantStatus?: string;
   
   // Tenant profile fields
   firstName: string;
@@ -50,21 +53,35 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     const password = data.password || generateRandomPassword();
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    const email = data.email.toLowerCase().trim();
+    const email = data.email ? data.email.toLowerCase().trim() : null;
+    const username = data.username ? data.username.trim() : null;
+
+    if (!email && !username) {
+      throw new Error('Email or username is required');
+    }
 
     // User INSERT on the same client so ROLLBACK undoes both user + tenant
     let userId: string;
     try {
       const userResult = await client.query(
-        `INSERT INTO users (email, password_hash, role, first_name, last_name)
-         VALUES ($1, $2, 'tenant', $3, $4)
+        `INSERT INTO users (
+           email, username, password_hash, role, first_name, last_name, profile_completed
+         )
+         VALUES ($1, $2, $3, 'tenant', $4, $5, $6)
          RETURNING id`,
-        [email, passwordHash, data.firstName.trim(), data.lastName.trim()]
+        [
+          email,
+          username,
+          passwordHash,
+          data.firstName.trim(),
+          data.lastName.trim(),
+          data.profileCompleted !== false,
+        ]
       );
       userId = String(userResult.rows[0].id);
     } catch (error) {
       if (error instanceof Error && error.message.includes('duplicate key')) {
-        throw new Error('User with this email already exists');
+        throw new Error('User with this email or username already exists');
       }
       throw error;
     }
@@ -113,7 +130,7 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
       data.securityDeposit || null,
       data.leaseStartDate || null,
       data.leaseEndDate || null,
-      'pending',
+      data.tenantStatus || 'pending',
       data.notes || null,
       true,
     ];
@@ -123,8 +140,8 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     
     await client.query('COMMIT');
     
-    if (data.sendInvitation) {
-      console.log(`Invitation email would be sent to ${data.email} with password: ${password}`);
+    if (data.sendInvitation && email) {
+      console.log(`Invitation email would be sent to ${email} with password: ${password}`);
     }
     
     return {
@@ -159,6 +176,9 @@ export interface EnsureTenantForLeaseResult {
 export async function ensureTenantForLease(
   data: CreateTenantWithUserData
 ): Promise<EnsureTenantForLeaseResult> {
+  if (!data.email) {
+    throw new Error('Email is required to create or link a lease tenant');
+  }
   const email = data.email.toLowerCase().trim();
   const firstName = data.firstName.trim();
   const lastName = data.lastName.trim();

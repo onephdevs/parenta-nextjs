@@ -9,7 +9,9 @@
     "lint": "next lint",
     "clean": "rm -rf .next && echo '✅ Cleared .next cache'",
     "clear-cache": "rm -rf .next node_modules/.cache && echo '✅ Cleared all caches'",
-    "seed:addresses": "node scripts/seed-address-locations.mjs"
+    "seed:addresses": "node scripts/seed-address-locations.mjs",
+    "seed:apartment1-tenants": "node scripts/seed-apartment1-tenants.mjs",
+    "seed:apartment2-tenants": "node scripts/seed-apartment2-tenants.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

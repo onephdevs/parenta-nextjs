@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, Info, DollarSign, FileText } from 'lucide-react';
 import { Building, CreateRoomData } from '@/types/database';
@@ -11,6 +11,11 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
+import {
+  expandRoomRange,
+  MAX_BULK_ROOMS,
+  parseRoomList,
+} from '@/lib/rooms/parse-room-numbers';
 
 interface AddRoomModalProps {
   isOpen: boolean;
@@ -22,6 +27,7 @@ interface AddRoomModalProps {
 }
 
 type AddRoomSection = 'basic' | 'details' | 'financial' | 'additional';
+type RoomEntryMode = 'single' | 'list' | 'range';
 
 const SECTIONS: { id: AddRoomSection; label: string; icon: React.ReactNode; title: string; subtitle: string }[] = [
   { 
@@ -54,6 +60,13 @@ const SECTIONS: { id: AddRoomSection; label: string; icon: React.ReactNode; titl
   },
 ];
 
+function previewRoomNumbers(numbers: string[], limit = 12): string {
+  if (numbers.length === 0) return '';
+  const shown = numbers.slice(0, limit).join(', ');
+  const more = numbers.length > limit ? ` (+${numbers.length - limit} more)` : '';
+  return `${shown}${more}`;
+}
+
 export default function AddRoomModal({
   isOpen,
   onClose,
@@ -68,6 +81,11 @@ export default function AddRoomModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<AddRoomSection>('basic');
+  const [entryMode, setEntryMode] = useState<RoomEntryMode>('single');
+  const [roomListText, setRoomListText] = useState('');
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+  const [rangePrefix, setRangePrefix] = useState('');
 
   const [formData, setFormData] = useState<CreateRoomData>({
     buildingId: buildingId || building?.id || '',
@@ -81,6 +99,20 @@ export default function AddRoomModal({
   });
 
   const [amenitiesInput, setAmenitiesInput] = useState('');
+
+  const derivedRoomNumbers = useMemo(() => {
+    if (entryMode === 'single') {
+      const n = formData.roomNumber.trim();
+      return n ? [n] : [];
+    }
+    if (entryMode === 'list') {
+      return parseRoomList(roomListText);
+    }
+    return expandRoomRange(rangeFrom, rangeTo, rangePrefix);
+  }, [entryMode, formData.roomNumber, roomListText, rangeFrom, rangeTo, rangePrefix]);
+
+  const roomCount = derivedRoomNumbers.length;
+  const isBulk = entryMode !== 'single';
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -102,60 +134,133 @@ export default function AddRoomModal({
     setFormData((prev) => ({ ...prev, amenities: e.target.value }));
   };
 
+  const resetForm = () => {
+    setFormData({
+      buildingId: buildingId || building?.id || '',
+      roomNumber: '',
+      roomType: 'bedroom',
+      floorNumber: undefined,
+      squareFootage: undefined,
+      monthlyRate: 0,
+      amenities: '',
+      description: '',
+    });
+    setAmenitiesInput('');
+    setRoomListText('');
+    setRangeFrom('');
+    setRangeTo('');
+    setRangePrefix('');
+    setEntryMode('single');
+    setSection('basic');
+  };
+
+  const validateRoomNumbers = (): string | null => {
+    if (roomCount === 0) {
+      if (entryMode === 'range') {
+        return 'Enter a valid From / To range (From must be less than or equal to To).';
+      }
+      return 'Enter at least one room number.';
+    }
+    if (roomCount > MAX_BULK_ROOMS) {
+      return `You can create at most ${MAX_BULK_ROOMS} rooms at once.`;
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
+    const validationError = validateRoomNumbers();
+    if (validationError) {
+      setError(validationError);
+      setIsSubmitting(false);
+      return;
+    }
+
     const loadingId = showNotification({
       type: 'loading',
-      title: 'Creating room...',
-      message: 'Please wait while we create your room.',
+      title: roomCount === 1 ? 'Creating room...' : `Creating ${roomCount} rooms...`,
+      message: 'Please wait while we create your room(s).',
     });
 
     try {
-      const response = await fetch('/api/rooms', {
+      const targetBuildingId = formData.buildingId || buildingId || building?.id || '';
+
+      if (!isBulk) {
+        const response = await fetch('/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to create room');
+        }
+
+        updateNotification(loadingId, {
+          type: 'success',
+          title: 'Room created successfully!',
+          message: `Room ${formData.roomNumber} has been added. Opening the property page…`,
+        });
+
+        resetForm();
+        onClose();
+        onRoomAdded?.(result.data.id);
+
+        setTimeout(() => {
+          const params = new URLSearchParams();
+          if (targetBuildingId) params.set('buildingId', targetBuildingId);
+          if (result.data?.id) params.set('roomId', result.data.id);
+          router.push(`/admin/properties?${params.toString()}`);
+          router.refresh();
+        }, 400);
+        return;
+      }
+
+      const response = await fetch('/api/rooms/bulk', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buildingId: formData.buildingId,
+          roomNumbers: derivedRoomNumbers,
+          roomType: formData.roomType,
+          floorNumber: formData.floorNumber,
+          squareFootage: formData.squareFootage,
+          monthlyRate: formData.monthlyRate,
+          amenities: formData.amenities,
+          description: formData.description,
+        }),
       });
 
       const result = await response.json();
-
       if (!result.success) {
-        throw new Error(result.error || 'Failed to create room');
+        throw new Error(result.error || 'Failed to create rooms');
       }
 
-      const targetBuildingId = formData.buildingId || buildingId || building?.id || '';
+      const created = Array.isArray(result.data) ? result.data : [];
+      const count = created.length || roomCount;
+      const firstId = created[0]?.id as string | undefined;
 
       updateNotification(loadingId, {
         type: 'success',
-        title: 'Room created successfully!',
-        message: `Room ${formData.roomNumber} has been added. Opening the property page…`,
+        title: count === 1 ? 'Room created successfully!' : `${count} rooms created successfully!`,
+        message:
+          count === 1
+            ? `Room ${created[0]?.roomNumber || derivedRoomNumbers[0]} has been added. Opening the property page…`
+            : `${count} rooms have been added. Opening the property page…`,
       });
 
-      setFormData({
-        buildingId: buildingId || building?.id || '',
-        roomNumber: '',
-        roomType: 'bedroom',
-        floorNumber: undefined,
-        squareFootage: undefined,
-        monthlyRate: 0,
-        amenities: '',
-        description: '',
-      });
-      setAmenitiesInput('');
-      setSection('basic');
-
+      resetForm();
       onClose();
-      onRoomAdded?.(result.data.id);
+      onRoomAdded?.(firstId);
 
       setTimeout(() => {
         const params = new URLSearchParams();
         if (targetBuildingId) params.set('buildingId', targetBuildingId);
-        if (result.data?.id) params.set('roomId', result.data.id);
+        if (count === 1 && firstId) params.set('roomId', firstId);
         router.push(`/admin/properties?${params.toString()}`);
         router.refresh();
       }, 400);
@@ -164,7 +269,7 @@ export default function AddRoomModal({
 
       updateNotification(loadingId, {
         type: 'error',
-        title: 'Failed to create room',
+        title: isBulk ? 'Failed to create rooms' : 'Failed to create room',
         message: errorMessage,
       });
 
@@ -173,6 +278,11 @@ export default function AddRoomModal({
       setIsSubmitting(false);
     }
   };
+
+  const primaryLabel =
+    !isBulk || roomCount <= 1
+      ? 'Create room'
+      : `Create ${roomCount} rooms`;
 
   return (
     <SectionedFormShell
@@ -183,7 +293,7 @@ export default function AddRoomModal({
       activeSection={section}
       onSectionChange={setSection}
       formId="add-room-form"
-      primaryLabel="Create room"
+      primaryLabel={primaryLabel}
       primaryLoading={isSubmitting}
       primaryType="submit"
       errorBanner={error ? <FormErrorBanner message={error} className="mb-6" /> : null}
@@ -209,22 +319,138 @@ export default function AddRoomModal({
               </Select>
             </FormField>
 
-            <FormField label="Room number" htmlFor="roomNumber" required>
-              <Input
-                type="text"
-                id="roomNumber"
-                name="roomNumber"
-                required
-                value={formData.roomNumber}
-                onChange={handleInputChange}
-                placeholder="e.g., 101, A-201, Studio 5"
-              />
-            </FormField>
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium text-gray-700">
+                Room numbers
+              </legend>
+              <div className="mb-3 flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1">
+                {(
+                  [
+                    { id: 'single', label: 'Single' },
+                    { id: 'list', label: 'List' },
+                    { id: 'range', label: 'Range' },
+                  ] as const
+                ).map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => {
+                      setEntryMode(mode.id);
+                      setError(null);
+                    }}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      entryMode === mode.id
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+
+              {entryMode === 'single' && (
+                <FormField label="Room number" htmlFor="roomNumber" required>
+                  <Input
+                    type="text"
+                    id="roomNumber"
+                    name="roomNumber"
+                    required
+                    value={formData.roomNumber}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 101, A-201, Studio 5"
+                  />
+                </FormField>
+              )}
+
+              {entryMode === 'list' && (
+                <FormField
+                  label="Room numbers"
+                  htmlFor="roomList"
+                  required
+                  hint="Separate with commas or new lines."
+                >
+                  <Textarea
+                    id="roomList"
+                    name="roomList"
+                    required
+                    rows={4}
+                    value={roomListText}
+                    onChange={(e) => setRoomListText(e.target.value)}
+                    placeholder={'101, 102, 103\nA-201\nStudio 5'}
+                  />
+                </FormField>
+              )}
+
+              {entryMode === 'range' && (
+                <div className="space-y-4">
+                  <FormField
+                    label="Prefix (optional)"
+                    htmlFor="rangePrefix"
+                    hint="Added before each number, e.g. A-"
+                  >
+                    <Input
+                      type="text"
+                      id="rangePrefix"
+                      name="rangePrefix"
+                      value={rangePrefix}
+                      onChange={(e) => setRangePrefix(e.target.value)}
+                      placeholder="e.g., A- or Floor2-"
+                    />
+                  </FormField>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField label="From" htmlFor="rangeFrom" required>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        id="rangeFrom"
+                        name="rangeFrom"
+                        required
+                        value={rangeFrom}
+                        onChange={(e) => setRangeFrom(e.target.value)}
+                        placeholder="e.g., 101"
+                      />
+                    </FormField>
+                    <FormField label="To" htmlFor="rangeTo" required>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        id="rangeTo"
+                        name="rangeTo"
+                        required
+                        value={rangeTo}
+                        onChange={(e) => setRangeTo(e.target.value)}
+                        placeholder="e.g., 120"
+                      />
+                    </FormField>
+                  </div>
+                </div>
+              )}
+
+              {roomCount > 0 && entryMode !== 'single' && (
+                <p className="mt-3 text-sm text-gray-600">
+                  <span className="font-medium text-gray-900">
+                    {roomCount} {roomCount === 1 ? 'room' : 'rooms'}:
+                  </span>{' '}
+                  {previewRoomNumbers(derivedRoomNumbers)}
+                </p>
+              )}
+              {roomCount > MAX_BULK_ROOMS && (
+                <p className="mt-2 text-sm text-red-600">
+                  Maximum is {MAX_BULK_ROOMS} rooms per batch.
+                </p>
+              )}
+            </fieldset>
           </div>
         )}
 
         {section === 'details' && (
           <div className="space-y-5">
+            {isBulk && roomCount > 1 && (
+              <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                These details apply to all {roomCount} rooms.
+              </p>
+            )}
             <FormField label="Room type" htmlFor="roomType" required>
               <Select
                 id="roomType"
@@ -276,6 +502,11 @@ export default function AddRoomModal({
 
         {section === 'financial' && (
           <div className="space-y-5">
+            {isBulk && roomCount > 1 && (
+              <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                This rate applies to all {roomCount} rooms.
+              </p>
+            )}
             <FormField
               label="Monthly rate (₱)"
               htmlFor="monthlyRate"
@@ -299,6 +530,11 @@ export default function AddRoomModal({
 
         {section === 'additional' && (
           <div className="space-y-5">
+            {isBulk && roomCount > 1 && (
+              <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                Description and amenities apply to all {roomCount} rooms.
+              </p>
+            )}
             <FormField label="Description" htmlFor="description">
               <Textarea
                 id="description"

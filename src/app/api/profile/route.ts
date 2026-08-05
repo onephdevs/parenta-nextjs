@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
+import { getImageUrl } from '@/lib/format/image-url';
 
 async function getProfileExtras(userId: string) {
   const result = await pool.query(
@@ -40,7 +41,7 @@ export async function GET() {
     }
 
     const userResult = await pool.query(
-      `SELECT id, email, first_name, last_name, role FROM users WHERE id = $1 AND is_active = true`,
+      `SELECT id, email, username, first_name, last_name, role, profile_completed FROM users WHERE id = $1 AND is_active = true`,
       [session.user.id]
     );
 
@@ -50,6 +51,9 @@ export async function GET() {
 
     const user = userResult.rows[0];
     const extras = await getProfileExtras(session.user.id);
+    if (extras.avatarUrl) {
+      extras.avatarUrl = getImageUrl(String(extras.avatarUrl));
+    }
 
     return NextResponse.json({
       success: true,
@@ -57,7 +61,9 @@ export async function GET() {
         firstName: user.first_name,
         lastName: user.last_name,
         email: user.email,
+        username: user.username,
         role: user.role,
+        profileCompleted: user.profile_completed !== false,
         ...extras,
       },
     });

@@ -693,6 +693,10 @@ export interface CreateRoomData {
   amenities?: string;
 }
 
+export interface CreateRoomsBulkData extends Omit<CreateRoomData, 'roomNumber'> {
+  roomNumbers: string[];
+}
+
 export interface CreateTenantData {
   firstName: string;
   lastName: string;

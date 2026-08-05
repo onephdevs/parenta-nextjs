@@ -72,13 +72,13 @@ export default function TenantSignIn() {
           <AuthField
             id="username"
             name="username"
-            type="email"
+            type="text"
             autoComplete="username"
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username"
-            aria-label="Username"
+            placeholder="Username or email"
+            aria-label="Username or email"
           />
 
           <AuthPasswordField

@@ -9,9 +9,9 @@ export const authOptions: NextAuthOptions = {
       name: 'credentials',
       credentials: {
         email: { 
-          label: 'Email', 
-          type: 'email',
-          placeholder: 'Enter your email' 
+          label: 'Email or username', 
+          type: 'text',
+          placeholder: 'Enter your email or username' 
         },
         password: { 
           label: 'Password', 
@@ -36,7 +36,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Verify user credentials
+          // Verify user credentials (email OR username)
           const user = await verifyPassword(email, role as UserRole, password);
           
           if (!user) {
@@ -47,9 +47,11 @@ export const authOptions: NextAuthOptions = {
           return {
             id: user.id,
             email: user.email,
+            username: user.username,
             role: user.role,
             firstName: user.firstName,
             lastName: user.lastName,
+            profileCompleted: user.profileCompleted,
           };
         } catch (error) {
           console.error('Authentication error:', error);
@@ -83,6 +85,8 @@ export const authOptions: NextAuthOptions = {
         token.firstName = user.firstName;
         token.lastName = user.lastName;
         token.email = user.email;
+        token.username = user.username;
+        token.profileCompleted = user.profileCompleted;
       }
 
       // Support session.update() after profile edits
@@ -90,6 +94,10 @@ export const authOptions: NextAuthOptions = {
         if (session.firstName !== undefined) token.firstName = session.firstName;
         if (session.lastName !== undefined) token.lastName = session.lastName;
         if (session.email !== undefined) token.email = session.email;
+        if (session.username !== undefined) token.username = session.username;
+        if (session.profileCompleted !== undefined) {
+          token.profileCompleted = session.profileCompleted;
+        }
       }
 
       return token;
@@ -102,6 +110,9 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as UserRole;
         session.user.firstName = token.firstName as string;
         session.user.lastName = token.lastName as string;
+        session.user.email = (token.email as string | null | undefined) ?? null;
+        session.user.username = (token.username as string | null | undefined) ?? null;
+        session.user.profileCompleted = token.profileCompleted !== false;
       }
       return session;
     },

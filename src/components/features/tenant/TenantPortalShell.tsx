@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import {
   Home,
   CreditCard,
@@ -13,6 +14,8 @@ import {
   ChevronDown,
   Moon,
   Sun,
+  LogOut,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/ui/BrandLogo';
@@ -25,6 +28,7 @@ import {
   fetchTenantPayments,
   fetchTenantDocuments,
 } from '@/hooks/useTenantPortalData';
+import TenantCompleteProfileGate from '@/components/features/tenant/TenantCompleteProfileGate';
 
 interface NavChild {
   label: string;
@@ -79,6 +83,7 @@ const NAV: NavItem[] = [
       { label: 'Personal info', href: '/tenant/profile?section=personal' },
       { label: 'Occupants', href: '/tenant/profile?section=occupants' },
       { label: 'Emergency contact', href: '/tenant/profile?section=emergency' },
+      { label: 'Account & password', href: '/tenant/profile?section=account' },
     ],
   },
 ];
@@ -106,7 +111,7 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const search = searchParams?.toString() ?? '';
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { canAccess } = useTenantPortalGate();
+  const { canAccess, isPreview, exitPreview } = useTenantPortalGate();
   const { load } = useTenantData();
   const theme = useTenantTheme();
 
@@ -137,33 +142,88 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleSignOut = () => {
+    void signOut({
+      callbackUrl: '/auth/tenant/signin',
+      redirect: true,
+    });
+  };
+
+  const BrandBlock = (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <BrandLogo variant="mark" height={36} priority className="shrink-0" />
+      <div className="min-w-0">
+        <p className={cn('truncate text-sm font-semibold', theme.shellHeader)}>Alfonso</p>
+        <p className={cn('text-[11px]', theme.shellMuted)}>Tenant portal</p>
+      </div>
+    </div>
+  );
+
   const ThemeToggle = (
     <button
       type="button"
       onClick={theme.toggleMode}
       aria-label={theme.mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-      className={cn(
-        'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition',
-        theme.outlineButton
-      )}
+      title={theme.mode === 'dark' ? 'Light theme' : 'Dark theme'}
+      className={theme.shellIconButton}
     >
-      {theme.mode === 'dark' ? (
-        <>
-          <Sun className="h-4 w-4" />
-          <span>Light</span>
-        </>
-      ) : (
-        <>
-          <Moon className="h-4 w-4" />
-          <span>Dark</span>
-        </>
-      )}
+      {theme.mode === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
     </button>
+  );
+
+  const MenuFooter = (
+    <div className={cn('mt-auto space-y-1 border-t px-3 py-3', theme.shellBorder)}>
+      <div className="flex items-center justify-between gap-2 px-1 py-1">
+        <span className={cn('text-xs font-medium', theme.shellMuted)}>
+          {theme.mode === 'dark' ? 'Dark theme' : 'Light theme'}
+        </span>
+        {ThemeToggle}
+      </div>
+      <Link
+        href="/tenant/profile?section=account"
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
+          theme.navInactive
+        )}
+      >
+        <Settings className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+        Manage account
+      </Link>
+      {isPreview ? (
+        <button
+          type="button"
+          onClick={() => {
+            setMobileOpen(false);
+            void exitPreview();
+          }}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
+            theme.navInactive
+          )}
+        >
+          <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          Exit preview
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
+            theme.navInactive
+          )}
+        >
+          <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          Sign out
+        </button>
+      )}
+    </div>
   );
 
   const NavBody = (
     <>
-      <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
         {NAV.map((item) => {
           const Icon = item.icon;
           const isActive = activeParentId === item.id;
@@ -226,12 +286,13 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      <div className={cn('border-t px-3 py-3', theme.shellBorder)}>{ThemeToggle}</div>
+      {MenuFooter}
     </>
   );
 
   return (
     <div className={cn('flex min-h-screen', theme.page)}>
+      <TenantCompleteProfileGate />
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -240,12 +301,8 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
           theme.shellBorder
         )}
       >
-        <div className={cn('flex items-center gap-3 border-b px-4 py-4', theme.shellBorder)}>
-          <BrandLogo variant="mark" height={36} priority className="shrink-0" />
-          <div className="min-w-0">
-            <p className={cn('truncate text-sm font-semibold', theme.shellHeader)}>Alfonso</p>
-            <p className={cn('text-[11px]', theme.shellMuted)}>Tenant portal</p>
-          </div>
+        <div className={cn('flex items-center gap-2 border-b px-4 py-4', theme.shellBorder)}>
+          {BrandBlock}
         </div>
         {NavBody}
       </aside>
@@ -263,24 +320,14 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
           <BrandLogo variant="mark" height={28} className="shrink-0" />
           <span className={cn('text-sm font-semibold', theme.shellHeader)}>Alfonso</span>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label={theme.mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            onClick={theme.toggleMode}
-            className={theme.shellIconButton}
-          >
-            {theme.mode === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
-          <button
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setMobileOpen(true)}
-            className={theme.shellIconButton}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-label="Open menu"
+          onClick={() => setMobileOpen(true)}
+          className={theme.shellIconButton}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Mobile drawer */}

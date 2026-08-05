@@ -238,7 +238,10 @@ export async function getPropertyBuildingDetail(
       AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
     LEFT JOIN tenants t ON t.id = tra.tenant_id
     WHERE r.building_id = $1 AND r.is_active = true
-    ORDER BY r.room_number ASC
+    ORDER BY
+      regexp_replace(lower(r.room_number), '[0-9]+', '', 'g'),
+      COALESCE(NULLIF(regexp_replace(r.room_number, '[^0-9]', '', 'g'), '')::bigint, 0),
+      r.room_number
     `,
     [buildingId]
   );
@@ -491,7 +494,10 @@ export async function getRoomsForRoomsPage(): Promise<RoomsPageListItem[]> {
       AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
     LEFT JOIN tenants t ON t.id = tra.tenant_id
     WHERE r.is_active = true
-    ORDER BY b.name ASC, r.room_number ASC
+    ORDER BY b.name ASC,
+      regexp_replace(lower(r.room_number), '[0-9]+', '', 'g'),
+      COALESCE(NULLIF(regexp_replace(r.room_number, '[^0-9]', '', 'g'), '')::bigint, 0),
+      r.room_number
     `
   );
 

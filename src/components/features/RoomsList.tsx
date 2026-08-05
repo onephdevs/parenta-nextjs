@@ -71,14 +71,19 @@ export default function RoomsList({ rooms, buildings }: RoomsListProps) {
         bValue = buildings.find((building) => building.id === b.buildingId)?.name || '';
       }
 
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = (bValue as string).toLowerCase();
+      let comparison = 0;
+      if (typeof aValue === 'string' || typeof bValue === 'string') {
+        comparison = String(aValue ?? '').localeCompare(String(bValue ?? ''), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      } else {
+        const aNum = Number(aValue ?? 0);
+        const bNum = Number(bValue ?? 0);
+        comparison = aNum < bNum ? -1 : aNum > bNum ? 1 : 0;
       }
 
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
 
     return filtered;

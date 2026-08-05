@@ -1,5 +1,10 @@
 import pool from '../db';
-import { Room, DatabaseRoom, CreateRoomData } from '../../types/database';
+import { Room, DatabaseRoom, CreateRoomData, CreateRoomsBulkData } from '../../types/database';
+import {
+  dedupeRoomNumbers,
+  MAX_BULK_ROOMS,
+  roomNumberNaturalOrderSql,
+} from '@/lib/rooms/parse-room-numbers';
 
 // Helper function to map database room to Room interface
 function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
@@ -102,7 +107,7 @@ export async function getAllRooms(filters?: {
       FROM rooms r
       LEFT JOIN buildings b ON r.building_id = b.id
       ${whereClause}
-      ORDER BY b.name ASC, r.room_number ASC
+      ORDER BY b.name ASC, ${roomNumberNaturalOrderSql('r')}
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
     
@@ -135,7 +140,7 @@ export async function getRoomsByBuildingId(buildingId: string): Promise<Room[]> 
     const query = `
       SELECT * FROM rooms
       WHERE building_id = $1 AND is_active = true
-      ORDER BY room_number ASC
+      ORDER BY ${roomNumberNaturalOrderSql()}
     `;
     
     const result = await pool.query(query, [buildingId]);
@@ -215,6 +220,120 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
   } catch (error) {
     console.error('Error creating room:', error);
     throw error;
+  }
+}
+
+export class RoomConflictError extends Error {
+  conflicts: string[];
+
+  constructor(conflicts: string[]) {
+    const listed = conflicts.slice(0, 8).join(', ');
+    const more = conflicts.length > 8 ? ` (+${conflicts.length - 8} more)` : '';
+    super(`These room numbers already exist in this building: ${listed}${more}`);
+    this.name = 'RoomConflictError';
+    this.conflicts = conflicts;
+  }
+}
+
+export class BulkRoomValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BulkRoomValidationError';
+  }
+}
+
+/** Create many rooms in one transaction. Shared fields apply to every room. */
+export async function createRoomsBulk(roomData: CreateRoomsBulkData): Promise<Room[]> {
+  const roomNumbers = dedupeRoomNumbers(roomData.roomNumbers || []);
+
+  if (roomNumbers.length === 0) {
+    throw new BulkRoomValidationError('At least one room number is required');
+  }
+  if (roomNumbers.length > MAX_BULK_ROOMS) {
+    throw new BulkRoomValidationError(`You can create at most ${MAX_BULK_ROOMS} rooms at once`);
+  }
+  if (!roomData.buildingId) {
+    throw new BulkRoomValidationError('Building ID is required');
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT room_number
+       FROM rooms
+       WHERE building_id = $1
+         AND LOWER(room_number) = ANY($2::text[])`,
+      [roomData.buildingId, roomNumbers.map((n) => n.toLowerCase())]
+    );
+
+    if (existing.rows.length > 0) {
+      const conflicts = existing.rows.map((r: { room_number: string }) => r.room_number);
+      throw new RoomConflictError(conflicts);
+    }
+
+    const amenitiesArray = normalizeAmenities(roomData.amenities);
+    const roomType = roomData.roomType || 'bedroom';
+
+    // Build multi-row insert: shared columns repeated per room number
+    const valueRows: string[] = [];
+    const values: unknown[] = [];
+    let param = 0;
+
+    for (const roomNumber of roomNumbers) {
+      valueRows.push(
+        `($${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param}, $${++param})`
+      );
+      values.push(
+        roomData.buildingId,
+        roomNumber,
+        roomData.floorNumber ?? null,
+        roomType,
+        roomData.squareFootage ?? null,
+        roomData.monthlyRate ?? 0,
+        roomData.depositFixedAmount ?? null,
+        roomData.depositRequired || false,
+        roomData.depositType || 'one_month',
+        roomData.depositPercentage ?? null,
+        'vacant',
+        amenitiesArray,
+        roomData.description ?? null
+      );
+    }
+
+    const insertResult = await client.query(
+      `INSERT INTO rooms (
+        building_id, room_number, floor_number, room_type, square_footage,
+        monthly_rate, deposit_amount, deposit_required, deposit_type,
+        deposit_percentage, room_status, amenities, description
+      )
+      VALUES ${valueRows.join(', ')}
+      RETURNING *`,
+      values
+    );
+
+    await client.query('COMMIT');
+    return insertResult.rows.map((row: DatabaseRoom) => mapDatabaseRoomToRoom(row));
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof RoomConflictError || error instanceof BulkRoomValidationError) {
+      throw error;
+    }
+    // Unique constraint race
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: string }).code === '23505'
+    ) {
+      throw new RoomConflictError(roomNumbers);
+    }
+    console.error('Error creating rooms in bulk:', error);
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -303,6 +422,35 @@ export async function deleteRoom(id: string): Promise<void> {
     await pool.query(query, [id]);
   } catch (error) {
     console.error('Error deleting room:', error);
+    throw error;
+  }
+}
+
+/** Soft-delete many rooms in one update. Returns how many rows were deactivated. */
+export async function deleteRoomsBulk(roomIds: string[]): Promise<{ deletedCount: number; deletedIds: string[] }> {
+  const ids = [...new Set((roomIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+
+  if (ids.length === 0) {
+    throw new BulkRoomValidationError('At least one room ID is required');
+  }
+  if (ids.length > MAX_BULK_ROOMS) {
+    throw new BulkRoomValidationError(`You can delete at most ${MAX_BULK_ROOMS} rooms at once`);
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE rooms
+       SET is_active = false, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ANY($1::uuid[])
+         AND is_active = true
+       RETURNING id`,
+      [ids]
+    );
+
+    const deletedIds = result.rows.map((row: { id: string }) => row.id);
+    return { deletedCount: deletedIds.length, deletedIds };
+  } catch (error) {
+    console.error('Error deleting rooms in bulk:', error);
     throw error;
   }
 }

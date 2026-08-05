@@ -8,15 +8,20 @@ declare module 'next-auth' {
     role: UserRole;
     firstName: string;
     lastName: string;
+    username?: string | null;
+    profileCompleted?: boolean;
+    email?: string | null;
   }
 
   interface Session {
     user: {
       id: string;
-      email: string;
+      email?: string | null;
+      username?: string | null;
       role: UserRole;
       firstName: string;
       lastName: string;
+      profileCompleted?: boolean;
     };
   }
 }
@@ -27,5 +32,8 @@ declare module 'next-auth/jwt' {
     role: UserRole;
     firstName: string;
     lastName: string;
+    username?: string | null;
+    profileCompleted?: boolean;
+    email?: string | null;
   }
 }
