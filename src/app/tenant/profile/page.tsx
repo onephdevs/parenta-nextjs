@@ -8,6 +8,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import ProfileForm from '@/components/features/tenant/ProfileForm';
 import OccupantList from '@/components/features/tenant/OccupantList';
 import DocumentUpload from '@/components/features/DocumentUpload';
+import LeaseSignPanel from '@/components/features/lease-designer/LeaseSignPanel';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantProfile } from '@/hooks/useTenantPortalData';
@@ -160,13 +161,21 @@ function ProfilePageInner() {
               </div>
               <div className={cn(theme.formPanel, 'p-6')}>
                 <h3 className="mb-4 text-lg font-medium text-gray-900">Tenant agreement</h3>
-                <DocumentUpload
-                  tenantId={profileData.profile.id}
-                  currentDocumentUrl={profileData.agreementDocument?.url}
-                  currentDocumentName={profileData.agreementDocument?.name}
-                  onUploadComplete={refreshProfile}
-                  onDeleteComplete={refreshProfile}
-                />
+                <div className="space-y-4">
+                  <DocumentUpload
+                    tenantId={profileData.profile.id}
+                    currentDocumentId={profileData.agreementDocument?.id}
+                    currentDocumentUrl={profileData.agreementDocument?.url}
+                    currentDocumentName={profileData.agreementDocument?.name}
+                    allowGenerate={false}
+                    onUploadComplete={refreshProfile}
+                    onDeleteComplete={refreshProfile}
+                  />
+                  <div>
+                    <h4 className="mb-2 text-sm font-medium text-gray-900">Sign your lease</h4>
+                    <LeaseSignPanel asTenant onSigned={refreshProfile} />
+                  </div>
+                </div>
               </div>
             </>
           )}

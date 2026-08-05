@@ -285,6 +285,9 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
             <TenantDetailClient
               tenantId={tenant.id}
               profilePictureUrl={(tenant as { profilePictureUrl?: string | null }).profilePictureUrl}
+              agreementDocumentId={
+                (tenant as { agreementDocumentId?: string | null }).agreementDocumentId
+              }
               agreementDocumentUrl={
                 (tenant as { agreementDocumentUrl?: string | null }).agreementDocumentUrl
               }

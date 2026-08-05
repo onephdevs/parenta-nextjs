@@ -3,10 +3,12 @@
 import ProfilePictureUpload from './ProfilePictureUpload';
 import DocumentUpload from './DocumentUpload';
 import { TenantDocumentsPanel } from './TenantDocumentsPanel';
+import LeaseSignPanel from './lease-designer/LeaseSignPanel';
 
 interface TenantDetailClientProps {
   tenantId: string;
   profilePictureUrl?: string | null;
+  agreementDocumentId?: string | null;
   agreementDocumentUrl?: string | null;
   agreementDocumentName?: string | null;
 }
@@ -14,6 +16,7 @@ interface TenantDetailClientProps {
 export default function TenantDetailClient({
   tenantId,
   profilePictureUrl,
+  agreementDocumentId,
   agreementDocumentUrl,
   agreementDocumentName,
 }: TenantDetailClientProps) {
@@ -54,17 +57,25 @@ export default function TenantDetailClient({
         <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
           <h3 className="text-sm font-semibold text-gray-900">Signed lease agreement</h3>
           <p className="mt-0.5 text-xs text-gray-500">
-            Primary agreement on file for this tenant (optional dedicated upload).
+            Generate a draft, upload a signed PDF, or record landlord/witness clickwrap signatures.
           </p>
         </div>
-        <div className="px-4 py-4 sm:px-5">
+        <div className="space-y-4 px-4 py-4 sm:px-5">
           <DocumentUpload
             tenantId={tenantId}
+            currentDocumentId={agreementDocumentId}
             currentDocumentUrl={agreementDocumentUrl}
             currentDocumentName={agreementDocumentName}
+            allowGenerate
             onUploadComplete={handleRefresh}
             onDeleteComplete={handleRefresh}
           />
+          <div>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Electronic signatures
+            </h4>
+            <LeaseSignPanel tenantId={tenantId} onSigned={handleRefresh} />
+          </div>
         </div>
       </div>
     </div>

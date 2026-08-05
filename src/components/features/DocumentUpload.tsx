@@ -7,26 +7,31 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { FileText, Download, X, Upload } from 'lucide-react';
+import { FileText, Download, X, Upload, FilePlus2 } from 'lucide-react';
 
 interface DocumentUploadProps {
   tenantId: string;
+  currentDocumentId?: string | null;
   currentDocumentUrl?: string | null;
   currentDocumentName?: string | null;
   onUploadComplete?: (documentId: string) => void;
   onDeleteComplete?: () => void;
   documentType?: string;
   accept?: string;
+  /** Show Generate lease (admin tenant page). Default true in admin context. */
+  allowGenerate?: boolean;
 }
 
 export default function DocumentUpload({
   tenantId,
+  currentDocumentId,
   currentDocumentUrl,
   currentDocumentName,
   onUploadComplete,
   onDeleteComplete,
   documentType = 'tenant_agreement',
   accept = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  allowGenerate,
 }: DocumentUploadProps) {
   const { showNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
@@ -34,15 +39,23 @@ export default function DocumentUpload({
   const { data: session } = useSession();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdminContext = session?.user?.role === 'admin' || pathname?.startsWith('/admin');
   const isTenantContext = session?.user?.role === 'tenant' || pathname?.startsWith('/tenant');
+  const canGenerate = allowGenerate ?? isAdminContext;
 
   const apiBaseUrl =
     isTenantContext && !isAdminContext
       ? '/api/tenant/agreement'
       : `/api/tenants/${tenantId}/agreement`;
+
+  const viewUrl = currentDocumentId
+    ? `/api/documents/${currentDocumentId}/download`
+    : currentDocumentUrl || null;
+
+  const hasDocument = Boolean(viewUrl && currentDocumentName);
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -106,7 +119,7 @@ export default function DocumentUpload({
     showNotification({
       type: 'loading',
       title: 'Uploading',
-      message: 'Uploading document...',
+      message: 'Uploading signed lease...',
     });
 
     try {
@@ -159,7 +172,7 @@ export default function DocumentUpload({
       showNotification({
         type: 'success',
         title: 'Success',
-        message: 'Document uploaded successfully',
+        message: 'Signed lease uploaded successfully',
       });
 
       if (onUploadComplete) {
@@ -176,6 +189,81 @@ export default function DocumentUpload({
       });
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const requestGenerate = async (forceReplace: boolean) => {
+    const response = await fetch(`/api/tenants/${tenantId}/agreement/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ forceReplace }),
+    });
+    const data = await response.json().catch(() => ({}));
+    return { response, data };
+  };
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    showNotification({
+      type: 'loading',
+      title: 'Generating',
+      message: 'Generating lease agreement...',
+    });
+
+    try {
+      let { response, data } = await requestGenerate(false);
+
+      if (response.status === 409 && data.code === 'AGREEMENT_LOCKED') {
+        const replace = await confirm({
+          title: 'Replace signed lease?',
+          message:
+            'A signed lease is already on file. Generate a new draft and replace it? The previous file will be removed.',
+          confirmText: 'Replace & generate',
+          variant: 'danger',
+        });
+        if (!replace) {
+          showNotification({
+            type: 'info',
+            title: 'Cancelled',
+            message: 'Existing signed lease kept',
+          });
+          return;
+        }
+        ({ response, data } = await requestGenerate(true));
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate lease agreement');
+      }
+
+      showNotification({
+        type: 'success',
+        title: 'Success',
+        message: data.message || 'Lease agreement generated',
+      });
+
+      if (onUploadComplete && data.data?.documentId) {
+        onUploadComplete(data.data.documentId);
+      }
+
+      if (data.data?.downloadUrl) {
+        window.open(data.data.downloadUrl, '_blank');
+      }
+
+      window.location.reload();
+    } catch (error) {
+      console.error('Error generating lease:', error);
+      showNotification({
+        type: 'error',
+        title: 'Generate Failed',
+        message: error instanceof Error ? error.message : 'Failed to generate lease',
+      });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -260,32 +348,31 @@ export default function DocumentUpload({
   };
 
   const handleDownload = () => {
-    if (currentDocumentUrl) {
-      window.open(currentDocumentUrl, '_blank');
+    if (viewUrl) {
+      window.open(viewUrl, '_blank');
     }
   };
 
   return (
     <div className="space-y-4">
       {dialog}
-      {currentDocumentUrl && currentDocumentName ? (
+      {hasDocument ? (
         <Card padding="md" className="bg-gray-50 border-gray-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <FileText className="h-8 w-8 text-gray-400" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">{currentDocumentName}</p>
-                <p className="text-xs text-gray-900">Tenant Agreement Document</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center space-x-3 min-w-0">
+              <FileText className="h-8 w-8 shrink-0 text-gray-400" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-gray-900">{currentDocumentName}</p>
+                <p className="text-xs text-gray-500">Lease agreement on file</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
                 leftIcon={<Download className="h-4 w-4" />}
-                className="border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
               >
                 View
               </Button>
@@ -303,20 +390,39 @@ export default function DocumentUpload({
           </div>
         </Card>
       ) : (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-          <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-sm text-gray-900 mb-4">No agreement document uploaded</p>
+        <div className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
+          <FileText className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+          <p className="text-sm font-medium text-gray-900">No lease agreement on file</p>
+          <p className="mt-1 text-xs text-gray-500">
+            Generate a draft from lease data, or upload a signed PDF.
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {canGenerate && (
           <Button
             type="button"
             variant="primary"
-            onClick={() => fileInputRef.current?.click()}
-            isLoading={isUploading}
-            leftIcon={<Upload className="h-4 w-4" />}
+            size="sm"
+            onClick={() => void handleGenerate()}
+            isLoading={isGenerating}
+            leftIcon={<FilePlus2 className="h-4 w-4" />}
           >
-            {isUploading ? 'Uploading...' : 'Upload Document'}
+            {hasDocument ? 'Regenerate lease' : 'Generate lease'}
           </Button>
-        </div>
-      )}
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          isLoading={isUploading}
+          leftIcon={<Upload className="h-4 w-4" />}
+        >
+          {isUploading ? 'Uploading...' : hasDocument ? 'Upload signed PDF' : 'Upload'}
+        </Button>
+      </div>
 
       <input
         ref={fileInputRef}
@@ -326,7 +432,10 @@ export default function DocumentUpload({
         className="hidden"
       />
 
-      <p className="text-xs text-gray-900">PDF, DOC, or DOCX. Max 10MB.</p>
+      <p className="text-xs text-gray-500">
+        Generate creates a branded draft from the tenant&apos;s assignment and building policies.
+        Upload accepts PDF, DOC, or DOCX (max 10MB) as the signed copy.
+      </p>
     </div>
   );
 }
