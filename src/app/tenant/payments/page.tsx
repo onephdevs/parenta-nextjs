@@ -80,6 +80,20 @@ interface PaymentScheduleItem {
   address?: string;
 }
 
+interface UtilityBillItem {
+  id: string;
+  utilityType: string;
+  amount: number;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  dueDate: string;
+  status: string;
+  providerName?: string;
+  notes?: string;
+  roomNumber?: string;
+  buildingName?: string;
+}
+
 interface PaymentSummary {
   totalPaid: number;
   nextDueDate: string;
@@ -90,6 +104,7 @@ interface PaymentSummary {
   upcomingInvoices: number;
   recentPayments: Payment[];
   schedule: PaymentScheduleItem[];
+  utilityBills: UtilityBillItem[];
 }
 
 interface BalanceData {
@@ -115,6 +130,7 @@ function mapPaymentSummary(paymentsData: Record<string, unknown>): PaymentSummar
   const summary = (paymentsData.summary || {}) as Record<string, unknown>;
   const schedule = (paymentsData.schedule || []) as PaymentScheduleItem[];
   const history = (paymentsData.history || []) as Record<string, unknown>[];
+  const utilityBillsRaw = (paymentsData.utilityBills || []) as Record<string, unknown>[];
 
   const recentPayments: Payment[] = history.map((p) => ({
     id: String(p.id),
@@ -130,6 +146,20 @@ function mapPaymentSummary(paymentsData: Record<string, unknown>): PaymentSummar
     invoiceNumbers: (p.invoiceNumbers || p.invoice_numbers) as string | undefined,
   }));
 
+  const utilityBills: UtilityBillItem[] = utilityBillsRaw.map((b) => ({
+    id: String(b.id),
+    utilityType: String(b.utilityType || b.utility_type || ''),
+    amount: Number(b.amount) || 0,
+    billingPeriodStart: String(b.billingPeriodStart || b.billing_period_start || ''),
+    billingPeriodEnd: String(b.billingPeriodEnd || b.billing_period_end || ''),
+    dueDate: String(b.dueDate || b.due_date || ''),
+    status: String(b.status || b.bill_status || 'pending'),
+    providerName: (b.providerName || b.provider_name) as string | undefined,
+    notes: b.notes as string | undefined,
+    roomNumber: (b.roomNumber || b.room_number) as string | undefined,
+    buildingName: (b.buildingName || b.building_name) as string | undefined,
+  }));
+
   return {
     totalPaid: Number(summary.totalPaid) || 0,
     nextDueDate: schedule.length > 0 ? schedule[0].dueDate : '',
@@ -140,6 +170,7 @@ function mapPaymentSummary(paymentsData: Record<string, unknown>): PaymentSummar
     upcomingInvoices: Number(summary.upcomingInvoices) || 0,
     recentPayments,
     schedule,
+    utilityBills,
   };
 }
 
@@ -1030,10 +1061,81 @@ export default function PaymentsPage() {
             </div>
           )}
 
-          {/* History: schedule + history */}
+          {/* History: schedule + utilities + payments */}
           {activeTab === 'history' && (
             <>
               {paymentScheduleSection}
+              {paymentData && paymentData.utilityBills.length > 0 && (
+                <div className={cn(panelClass, 'mt-6')}>
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-medium leading-6 text-gray-900">
+                        Utility bills
+                      </h3>
+                      <span className="text-sm text-gray-500">
+                        {paymentData.utilityBills.length} bill
+                        {paymentData.utilityBills.length === 1 ? '' : 's'} for your unit
+                      </span>
+                    </div>
+                    <div className="overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                              Type
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                              Period
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                              Due
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                              Amount
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {paymentData.utilityBills.map((bill) => (
+                            <tr key={bill.id}>
+                              <td className="whitespace-nowrap px-6 py-4 text-sm font-medium capitalize text-gray-900">
+                                {bill.utilityType}
+                              </td>
+                              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                                {formatDate(bill.billingPeriodStart)} –{' '}
+                                {formatDate(bill.billingPeriodEnd)}
+                              </td>
+                              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                                {formatDate(bill.dueDate)}
+                              </td>
+                              <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                                {formatCurrency(bill.amount)}
+                              </td>
+                              <td className="whitespace-nowrap px-6 py-4 text-sm">
+                                <span
+                                  className={cn(
+                                    'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize',
+                                    bill.status === 'paid'
+                                      ? 'bg-green-100 text-green-800'
+                                      : bill.status === 'pending'
+                                        ? 'bg-amber-100 text-amber-800'
+                                        : 'bg-red-100 text-red-800'
+                                  )}
+                                >
+                                  {bill.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
               {paymentHistorySection}
             </>
           )}

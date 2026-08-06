@@ -110,6 +110,47 @@ export async function GET() {
     
     const summaryResult = await pool.query(summaryQuery, [tenant.id]);
     const summary = summaryResult.rows[0];
+
+    // Room utility bills for the tenant's active unit (electric / water)
+    const utilityBillsQuery = `
+      SELECT
+        ub.id,
+        ub.utility_type,
+        ub.amount,
+        ub.billing_period_start,
+        ub.billing_period_end,
+        ub.due_date,
+        ub.bill_status,
+        ub.provider_name,
+        ub.notes,
+        r.room_number,
+        b.name AS building_name
+      FROM utility_bills ub
+      JOIN rooms r ON r.id = ub.room_id
+      JOIN buildings b ON b.id = COALESCE(ub.building_id, r.building_id)
+      JOIN tenant_room_assignments tra
+        ON tra.room_id = r.id
+       AND tra.assignment_status = 'active'
+       AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+      WHERE tra.tenant_id = $1
+        AND ub.parent_bill_id IS NULL
+      ORDER BY ub.due_date DESC, ub.created_at DESC
+      LIMIT 50
+    `;
+    const utilityBillsResult = await pool.query(utilityBillsQuery, [tenant.id]);
+    const utilityBills = utilityBillsResult.rows.map((row) => ({
+      id: row.id,
+      utilityType: row.utility_type,
+      amount: parseFloat(row.amount || 0),
+      billingPeriodStart: row.billing_period_start,
+      billingPeriodEnd: row.billing_period_end,
+      dueDate: row.due_date,
+      status: row.bill_status,
+      providerName: row.provider_name,
+      notes: row.notes,
+      roomNumber: row.room_number,
+      buildingName: row.building_name,
+    }));
     
     // Format schedule items
     const schedule = scheduleResult.rows.map(row => ({
@@ -150,6 +191,7 @@ export async function GET() {
       data: {
         schedule,
         history,
+        utilityBills,
         summary: {
           totalPayments: parseInt(summary.total_payments || 0),
           totalPaid: parseFloat(summary.total_paid || 0),
