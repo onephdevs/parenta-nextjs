@@ -19,7 +19,6 @@ const SUGGESTED_TAGS: Record<BuiltInPipelineBoardSlug, string[]> = {
     'Call back',
     'Viewing scheduled',
   ],
-  nurture: ['Call back', 'Timing', 'Budget', 'Unit unavailable', 'Went quiet'],
   payments: ['Payment plan', 'Chronically late', 'Partial payment', 'Reminder due', 'Escalated'],
   expenses: ['Recurring', 'Needs receipt', 'Urgent', 'Pending vendor', 'Reconcile'],
   maintenance: ['Urgent', 'Parts ordered', 'Vendor scheduled', 'Waiting on tenant', 'Recurring issue'],

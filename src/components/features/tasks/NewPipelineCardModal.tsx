@@ -752,16 +752,16 @@ export function AddOpportunityModal({
     setError(null);
 
     try {
-      if (isOnboarding || board.slug === 'nurture' || board.slug === 'payments') {
+      if (isOnboarding || board.slug === 'payments') {
         if (!firstName.trim() || !lastName.trim()) {
           setActiveSection('contact');
           throw new Error('First and last name are required');
         }
       }
 
-      if ((buildingId && !roomId) || (!buildingId && roomId)) {
+      if (roomId && !buildingId) {
         setActiveSection('property');
-        throw new Error('Select both building and room, or leave both empty');
+        throw new Error('Select a building for the room');
       }
 
       if (markAsLost && !lostReason.trim()) {
@@ -854,7 +854,7 @@ export function AddOpportunityModal({
               : undefined,
           lostReason: markAsLost ? lostReason.trim() : undefined,
         });
-      } else if (board.slug === 'expenses' || board.slug === 'payments' || board.slug === 'nurture') {
+      } else if (board.slug === 'expenses' || board.slug === 'payments') {
         const fullName = `${firstName.trim()} ${lastName.trim()}`;
         Object.assign(body, {
           title: title.trim() || fullName,
@@ -1012,27 +1012,20 @@ export function AddOpportunityModal({
                     />
                   </FormField>
                 </div>
-                <FormField label="Message" htmlFor="opp-message">
-                  <Textarea
-                    id="opp-message"
-                    rows={4}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Which building or unit are you interested in?"
-                  />
-                </FormField>
-              </>
-            )}
-
-            {activeSection === 'property' && (
-              <>
-                <FormField label="Building" htmlFor="opp-building">
+                <FormField
+                  label="Which unit are you interested in?"
+                  htmlFor="opp-interested-building"
+                  hint="Captured from the website inquiry form. Pick a specific room later under Property."
+                >
                   <Select
-                    id="opp-building"
+                    id="opp-interested-building"
                     value={buildingId}
-                    onChange={(e) => setBuildingId(e.target.value)}
+                    onChange={(e) => {
+                      setBuildingId(e.target.value);
+                      setRoomId('');
+                    }}
                   >
-                    <option value="">Select later (e.g. website inquiry)</option>
+                    <option value="">Not sure yet / general inquiry</option>
                     {buildings.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name}
@@ -1040,7 +1033,46 @@ export function AddOpportunityModal({
                     ))}
                   </Select>
                 </FormField>
-                <FormField label="Room" htmlFor="opp-room">
+                <FormField label="Message" htmlFor="opp-message">
+                  <Textarea
+                    id="opp-message"
+                    rows={4}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Move-in timeline, preferred unit size, questions…"
+                  />
+                </FormField>
+              </>
+            )}
+
+            {activeSection === 'property' && (
+              <>
+                <FormField
+                  label="Building"
+                  htmlFor="opp-building"
+                  hint="Interest from the website form lands here. Room can wait until you're ready to assign one."
+                >
+                  <Select
+                    id="opp-building"
+                    value={buildingId}
+                    onChange={(e) => {
+                      setBuildingId(e.target.value);
+                      setRoomId('');
+                    }}
+                  >
+                    <option value="">Not sure yet / general inquiry</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField
+                  label="Room"
+                  htmlFor="opp-room"
+                  hint="Optional until lease generation — required before generating a lease."
+                >
                   <Select
                     id="opp-room"
                     value={roomId}

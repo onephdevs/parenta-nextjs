@@ -103,6 +103,15 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
     }
   };
 
+  const notes = payment.notes?.trim() || '';
+  const ledgerMatch = notes.match(/\[ledger:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})\]/i);
+  const descriptionLabel = notes
+    .replace(/\s*\[ledger:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}\]\s*/i, '')
+    .trim();
+  const billingPeriodLabel = ledgerMatch
+    ? `${formatDateOnly(new Date(ledgerMatch[1] + 'T00:00:00'))} – ${formatDateOnly(new Date(ledgerMatch[2] + 'T00:00:00'))}`
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -135,30 +144,75 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
 
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-          {/* Payment Summary Card */}
+          {/* Description first — what this payment is for */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">{formatCurrency(payment.amount)}</h2>
-                      <p className="text-sm text-gray-900">Payment made on {formatDateOnly(payment.paymentDate)}</p>
-                    </div>
-                  </div>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Description</p>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {descriptionLabel || 'No description'}
+                  </h2>
+                  {billingPeriodLabel && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Billing period: {billingPeriodLabel}
+                    </p>
+                  )}
+                  <p className="mt-3 text-2xl font-bold text-gray-900">
+                    {formatCurrency(payment.amount)}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Paid on {formatDateOnly(payment.paymentDate)}
+                  </p>
                 </div>
-                <div className="flex space-x-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(payment.paymentStatus)}`}>
+                <div className="flex flex-wrap gap-2">
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(payment.paymentStatus)}`}
+                  >
                     {payment.paymentStatus.charAt(0).toUpperCase() + payment.paymentStatus.slice(1)}
                   </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPaymentTypeClass(payment.paymentType)}`}>
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPaymentTypeClass(payment.paymentType)}`}
+                  >
                     {payment.paymentType.charAt(0).toUpperCase() + payment.paymentType.slice(1)}
                   </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Details */}
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Payment Details</h3>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-900">Payment Method</span>
+                    <span className="text-sm text-gray-900">{getPaymentMethodDisplay(payment.paymentMethod)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-900">Payment Date</span>
+                    <span className="text-sm text-gray-900">{formatDateOnly(payment.paymentDate)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-900">Due Date</span>
+                    <span className="text-sm text-gray-900">{payment.dueDate ? formatDateOnly(payment.dueDate) : 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-900">Transaction ID</span>
+                    <span className="text-sm text-gray-900">{payment.referenceNumber || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-900">Created</span>
+                    <span className="text-sm text-gray-900">{formatDate(payment.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-900">Last Updated</span>
+                    <span className="text-sm text-gray-900">{formatDate(payment.updatedAt)}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -230,50 +284,6 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Payment Details */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Payment Details</h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Payment Method</span>
-                    <span className="text-sm text-gray-900">{getPaymentMethodDisplay(payment.paymentMethod)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Payment Date</span>
-                    <span className="text-sm text-gray-900">{formatDateOnly(payment.paymentDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Due Date</span>
-                    <span className="text-sm text-gray-900">{payment.dueDate ? formatDateOnly(payment.dueDate) : 'N/A'}</span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Transaction ID</span>
-                    <span className="text-sm text-gray-900">{payment.referenceNumber || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Created</span>
-                    <span className="text-sm text-gray-900">{formatDate(payment.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Last Updated</span>
-                    <span className="text-sm text-gray-900">{formatDate(payment.updatedAt)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              {payment.notes && (
-                <div className="mt-6 pt-4 border-t">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
-                  <p className="text-sm text-gray-900">{payment.notes}</p>
-                </div>
-              )}
             </div>
           </div>
 

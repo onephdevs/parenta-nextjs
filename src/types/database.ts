@@ -920,7 +920,6 @@ export interface CreateAssetBillingData {
 export type PipelineBoardSlug = string;
 export type BuiltInPipelineBoardSlug =
   | 'onboarding'
-  | 'nurture'
   | 'payments'
   | 'expenses'
   | 'maintenance';

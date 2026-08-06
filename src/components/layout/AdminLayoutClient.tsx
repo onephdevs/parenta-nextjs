@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Session } from 'next-auth';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import AdminSidebar from './AdminSidebar';
 import GlobalSearchModal from '@/components/features/search/GlobalSearchModal';
 import { NotificationBell } from '@/components/features/notifications/NotificationBell';
@@ -48,8 +48,13 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
     {}
   );
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const returnTo = sanitizeReturnTo(searchParams.get('returnTo'));
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    setReturnTo(sanitizeReturnTo(params.get('returnTo')));
+  }, [pathname]);
 
   // Resolve friendly names for any UUID segments in the path
   useEffect(() => {
@@ -318,7 +323,9 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-gray-50">{children}</main>
+        <main data-app-main className="relative flex-1 overflow-y-auto bg-gray-50">
+          {children}
+        </main>
       </div>
 
       <GlobalSearchModal isOpen={searchModalOpen} onClose={() => setSearchModalOpen(false)} />

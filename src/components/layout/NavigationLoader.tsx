@@ -1,10 +1,12 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname, useSearchParams } from 'next/navigation';
 import AppLoader from '@/components/ui/AppLoader';
 
 const SAFETY_TIMEOUT_MS = 8000;
+const MAIN_SCOPE_SELECTOR = '[data-app-main]';
 
 function isModifiedClick(event: MouseEvent): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
@@ -41,6 +43,7 @@ function NavigationLoaderInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
+  const [mainEl, setMainEl] = useState<HTMLElement | null>(null);
   const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routeKeyRef = useRef(`${pathname}?${searchParams.toString()}`);
 
@@ -74,6 +77,14 @@ function NavigationLoaderInner() {
   }, [pathname, searchParams, stopPending]);
 
   useEffect(() => {
+    if (!pending) {
+      setMainEl(null);
+      return;
+    }
+    setMainEl(document.querySelector(MAIN_SCOPE_SELECTOR) as HTMLElement | null);
+  }, [pending, pathname]);
+
+  useEffect(() => {
     const onClick = (event: MouseEvent) => {
       if (isModifiedClick(event) || event.defaultPrevented) return;
 
@@ -104,6 +115,16 @@ function NavigationLoaderInner() {
   }, [startPending, clearSafetyTimer]);
 
   if (!pending) return null;
+
+  // Prefer main-content scope (admin shell) so the sidebar stays visible
+  if (mainEl) {
+    return createPortal(
+      <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+        <AppLoader variant="inline" className="min-h-0 bg-transparent" />
+      </div>,
+      mainEl
+    );
+  }
 
   return <AppLoader variant="overlay" />;
 }

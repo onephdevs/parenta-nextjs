@@ -77,6 +77,7 @@ MIGRATIONS=(
   add-pipeline-payment-stage.sql
   add-pipeline-maintenance-and-invoice-sync.sql
   add-pipeline-card-assignee.sql
+  remove-pipeline-nurture-board.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

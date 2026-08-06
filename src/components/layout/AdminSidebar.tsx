@@ -134,24 +134,6 @@ export default function AdminSidebar() {
       ),
       children: [
         {
-          name: 'All Payments',
-          href: '/admin/financial/payments',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          ),
-        },
-        {
-          name: 'Record Payment',
-          href: '/admin/financial/payments/new',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          ),
-        },
-        {
           name: 'Invoices',
           href: '/admin/financial/invoices',
           icon: (
@@ -374,11 +356,17 @@ export default function AdminSidebar() {
   const renderMenuItem = (item: MenuItem) => {
     const hasChildren = Boolean(item.children && item.children.length > 0);
     const isExpanded = expandedSections.includes(item.name);
+    // A child that duplicates the parent href should not steal the parent highlight
+    // (same pattern as Properties → /admin/properties vs All Rooms).
     const childIsActive = Boolean(
-      item.children?.some((child) => child.href && isActive(child.href))
+      item.children?.some((child) => {
+        if (!child.href || !isActive(child.href)) return false;
+        if (item.href && child.href === item.href) return false;
+        return true;
+      })
     );
     const active = item.href ? isActive(item.href) : false;
-    // Parent highlight only when this page is active and no child owns the route
+    // Parent highlight only when this page is active and no distinct child owns the route
     const parentHighlight = hasChildren ? active && !childIsActive : active;
 
     if (hasChildren) {

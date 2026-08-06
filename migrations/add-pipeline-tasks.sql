@@ -1,4 +1,4 @@
--- Multi-board Tasks / CRM pipeline (onboarding, nurture, payments, expenses)
+-- Multi-board Tasks / CRM pipeline (onboarding, payments, expenses, maintenance)
 -- Prospects are lightweight cards until Won creates a real tenant + assignment.
 
 CREATE TABLE IF NOT EXISTS pipeline_boards (
@@ -100,9 +100,8 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_card_events_card
 INSERT INTO pipeline_boards (slug, name, description, sort_order)
 VALUES
   ('onboarding', 'Onboarding', 'Inquiry to signed lease', 1),
-  ('nurture', 'Nurture', 'Stalled inquiries awaiting follow-up', 2),
-  ('payments', 'Payments', 'Manual payment follow-up for existing tenants', 3),
-  ('expenses', 'Building expenses', 'Vendor / utility bill follow-up', 4)
+  ('payments', 'Payments', 'Manual payment follow-up for existing tenants', 2),
+  ('expenses', 'Building expenses', 'Vendor / utility bill follow-up', 3)
 ON CONFLICT (slug) DO NOTHING;
 
 -- Seed stages (idempotent via board slug + stage slug)
@@ -120,12 +119,6 @@ JOIN (
     ('onboarding', 'awaiting_signature', 'Awaiting signature', '#14b8a6', 6, false, false, false),
     ('onboarding', 'won', 'Lease signed', '#22c55e', 7, true, false, true),
     ('onboarding', 'lost', 'Lost', '#94a3b8', 8, false, true, true),
-    -- Nurture
-    ('nurture', 'not_ready', 'Not ready', '#a78bfa', 1, false, false, false),
-    ('nurture', 'follow_up', 'Follow-up scheduled', '#818cf8', 2, false, false, false),
-    ('nurture', 're_engaged', 'Re-engaged', '#60a5fa', 3, false, false, false),
-    ('nurture', 'returned', 'Returned to onboarding', '#34d399', 4, false, false, true),
-    ('nurture', 'archived', 'Archived', '#94a3b8', 5, false, true, true),
     -- Payments
     ('payments', 'upcoming', 'Upcoming', '#6366f1', 1, false, false, false),
     ('payments', 'due', 'Due', '#3b82f6', 2, false, false, false),

@@ -1,22 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ChevronDown,
-  Columns3,
   Filter,
+  GripVertical,
   LayoutGrid,
   List,
-  ListPlus,
   MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
   Search,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import AppLoader from '@/components/ui/AppLoader';
 import type {
   PipelineBoard,
   PipelineBoardSlug,
@@ -41,6 +42,13 @@ type PageTab = 'board' | 'stages' | 'bulk';
 type ViewMode = 'kanban' | 'list';
 type SortKey = 'title' | 'amount' | 'dueAt' | 'updatedAt';
 
+const BUILT_IN_BOARD_SLUGS = new Set([
+  'onboarding',
+  'payments',
+  'expenses',
+  'maintenance',
+]);
+
 function formatPeso(amount: number | undefined): string {
   if (amount == null || Number.isNaN(amount)) return '₱0';
   return `₱${Math.round(amount).toLocaleString('en-PH')}`;
@@ -56,8 +64,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const [activeSlug, setActiveSlug] = useState<PipelineBoardSlug>(initialSlug);
   const [cards, setCards] = useState<PipelineCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assigneesReady, setAssigneesReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [showOpportunity, setShowOpportunity] = useState(false);
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null);
   const [showManageStages, setShowManageStages] = useState(false);
@@ -85,8 +93,12 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const [bulkStageId, setBulkStageId] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [confirmDeleteBoard, setConfirmDeleteBoard] = useState(false);
+  const [deletingBoard, setDeletingBoard] = useState(false);
+  const [draggingBoardId, setDraggingBoardId] = useState<string | null>(null);
+  const [dropBoardId, setDropBoardId] = useState<string | null>(null);
   const boardTitleInputRef = useRef<HTMLInputElement>(null);
-  const switcherRef = useRef<HTMLDivElement>(null);
+  const createBoardRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
   /** Ignores stale in-flight board fetches when the user switches quickly. */
   const loadSeqRef = useRef(0);
@@ -99,9 +111,10 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   );
 
   const loadBoard = useCallback(
-    async (slug: PipelineBoardSlug) => {
+    async (slug: PipelineBoardSlug, options?: { quiet?: boolean }) => {
       const seq = ++loadSeqRef.current;
       lastRequestedSlugRef.current = slug;
+      const quiet = Boolean(options?.quiet);
 
       // Optimistic UI: clear search/filters and update label/URL immediately so
       // a leftover search term can't hide the new board or look like a failed switch.
@@ -110,16 +123,18 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       setTagFilter(null);
       setSelectedIds(new Set());
       setFieldPair(loadCardFields(slug));
-      setSwitcherOpen(false);
       setCreatingBoard(false);
-      setLoading(true);
+      if (!quiet) setLoading(true);
       setError(null);
       router.replace(`/admin/tasks?board=${encodeURIComponent(slug)}`, {
         scroll: false,
       });
 
       try {
-        const res = await fetch(`/api/pipeline/boards?slug=${encodeURIComponent(slug)}`);
+        // sync=0: board UI must not wait on lease/maintenance sync (can take 30–60s+)
+        const res = await fetch(
+          `/api/pipeline/boards?slug=${encodeURIComponent(slug)}&sync=0`
+        );
         const json = await res.json();
         if (seq !== loadSeqRef.current) return;
         if (!json.success) {
@@ -127,6 +142,25 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         }
         setBoards(json.data.boards);
         setCards(json.data.cards || []);
+
+        // Background refresh for live pipelines — does not block the loader
+        if (slug === 'payments' || slug === 'maintenance') {
+          void (async () => {
+            try {
+              await fetch('/api/pipeline/sync', { method: 'POST' });
+              if (seq !== loadSeqRef.current) return;
+              const refresh = await fetch(
+                `/api/pipeline/boards?slug=${encodeURIComponent(slug)}&sync=0`
+              );
+              const refreshJson = await refresh.json();
+              if (seq !== loadSeqRef.current || !refreshJson.success) return;
+              setBoards(refreshJson.data.boards);
+              setCards(refreshJson.data.cards || []);
+            } catch {
+              /* non-fatal — board already visible */
+            }
+          })();
+        }
       } catch (err) {
         if (seq !== loadSeqRef.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load board');
@@ -156,6 +190,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         }
       } catch {
         /* non-fatal */
+      } finally {
+        setAssigneesReady(true);
       }
     })();
   }, []);
@@ -171,19 +207,15 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   }, [activeBoard, editingBoardTitle]);
 
   useEffect(() => {
-    if (!switcherOpen) return;
+    if (!creatingBoard) return;
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node | null;
-      if (switcherRef.current && target && !switcherRef.current.contains(target)) {
-        setSwitcherOpen(false);
+      if (createBoardRef.current && target && !createBoardRef.current.contains(target)) {
         setCreatingBoard(false);
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSwitcherOpen(false);
-        setCreatingBoard(false);
-      }
+      if (event.key === 'Escape') setCreatingBoard(false);
     };
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('touchstart', onPointerDown);
@@ -193,7 +225,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       document.removeEventListener('touchstart', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [switcherOpen]);
+  }, [creatingBoard]);
 
   useEffect(() => {
     if (!overflowOpen) return;
@@ -253,7 +285,6 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       setCreatingBoard(false);
       setNewBoardName('');
       setNewBoardDescription('');
-      setSwitcherOpen(false);
       setTagFilter(null);
       await loadBoard(json.data.board.slug);
     } catch (err) {
@@ -261,6 +292,59 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     } finally {
       setCreatingBoardLoading(false);
     }
+  }
+
+  async function handleDeleteBoard() {
+    if (!activeBoard) return;
+    setDeletingBoard(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/pipeline/boards/${activeBoard.id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to delete board');
+      setConfirmDeleteBoard(false);
+      const remaining = boards.filter((b) => b.id !== activeBoard.id);
+      const nextSlug = (remaining[0]?.slug || 'onboarding') as PipelineBoardSlug;
+      setSyncMessage(`Deleted “${activeBoard.name}”`);
+      await loadBoard(nextSlug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete board');
+    } finally {
+      setDeletingBoard(false);
+    }
+  }
+
+  async function persistBoardOrder(next: PipelineBoard[]) {
+    const previous = boards;
+    setBoards(next);
+    try {
+      const res = await fetch('/api/pipeline/boards', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boardIds: next.map((b) => b.id) }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to reorder boards');
+      if (Array.isArray(json.data?.boards)) {
+        setBoards(json.data.boards);
+      }
+    } catch (err) {
+      setBoards(previous);
+      setError(err instanceof Error ? err.message : 'Failed to reorder boards');
+    }
+  }
+
+  function handleBoardDrop(targetId: string) {
+    if (!draggingBoardId || draggingBoardId === targetId) return;
+    const from = boards.findIndex((b) => b.id === draggingBoardId);
+    const to = boards.findIndex((b) => b.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...boards];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    void persistBoardOrder(next);
   }
 
   const filteredCards = useMemo(() => {
@@ -319,16 +403,6 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     }
     return map;
   }, [filteredCards]);
-
-  const availableTags = useMemo(() => {
-    const set = new Set<string>();
-    for (const card of cards) {
-      for (const tag of card.tags || []) {
-        if (tag.trim()) set.add(tag);
-      }
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [cards]);
 
   async function handleMove(cardId: string, stageId: string) {
     const card = cards.find((c) => c.id === cardId);
@@ -533,7 +607,6 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
 
   const showMoney =
     activeSlug === 'onboarding' ||
-    activeSlug === 'nurture' ||
     activeSlug === 'payments';
 
   const opportunityCount = filteredCards.length;
@@ -549,324 +622,386 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     setShowOpportunity(true);
   }
 
+  const isReady = !loading && assigneesReady;
+
+  if (!isReady) {
+    return (
+      <AppLoader
+        variant="inline"
+        label="Loading pipeline…"
+        className="min-h-[calc(100vh-8rem)]"
+      />
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {/* 1. Header + tabs */}
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-gray-200 pb-0">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            Opportunities
-          </h1>
-          <nav className="mt-2 flex gap-4" aria-label="Opportunity views">
-            {(
-              [
-                { id: 'board' as const, label: 'Board' },
-                { id: 'stages' as const, label: 'Configure stages' },
-                { id: 'bulk' as const, label: 'Bulk Actions' },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setPageTab(tab.id);
-                  if (tab.id === 'stages') setShowManageStages(true);
-                }}
-                className={`border-b-2 pb-2 text-sm font-medium transition ${
-                  pageTab === tab.id
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
+      {/* Pipeline board tabs + toolbar */}
+      <div className="relative z-30 space-y-3">
+        <div className="flex items-end gap-2 border-b border-gray-200">
+          <nav
+            className="-mb-px flex min-w-0 flex-1 items-end gap-1 overflow-x-auto"
+            role="tablist"
+            aria-label="Pipeline boards"
+          >
+            {boards.map((board) => {
+              const selected = board.slug === activeSlug;
+              const isDropTarget =
+                dropBoardId === board.id &&
+                draggingBoardId != null &&
+                draggingBoardId !== board.id;
 
-      {/* 2. Toolbar row — z-30 so the board dropdown sits above search/filter rows */}
-      <div className="relative z-30 flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex min-w-0 flex-wrap items-center gap-2" ref={switcherRef}>
-          {editingBoardTitle ? (
-            <input
-              ref={boardTitleInputRef}
-              value={boardTitleDraft}
-              onChange={(e) => setBoardTitleDraft(e.target.value)}
-              onBlur={() => void handleRenameBoard()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
-                if (e.key === 'Escape') {
-                  setBoardTitleDraft(activeBoard?.name || '');
-                  setEditingBoardTitle(false);
-                }
-              }}
-              className="rounded-md border border-blue-300 px-2 py-1 text-lg font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-blue-400"
-              aria-label="Board title"
-            />
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setSwitcherOpen((o) => !o)}
-                className="flex min-w-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                aria-expanded={switcherOpen}
-                aria-haspopup="listbox"
-              >
-                <span className="truncate">{activeBoard?.name || 'Pipeline'}</span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
-              </button>
-              {activeBoard && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBoardTitleDraft(activeBoard.name);
-                    setEditingBoardTitle(true);
+              const dropProps = {
+                onDragOver: (e: DragEvent) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (draggingBoardId && draggingBoardId !== board.id) {
+                    setDropBoardId(board.id);
+                  }
+                },
+                onDragLeave: () => {
+                  setDropBoardId((prev) => (prev === board.id ? null : prev));
+                },
+                onDrop: (e: DragEvent) => {
+                  e.preventDefault();
+                  handleBoardDrop(board.id);
+                  setDraggingBoardId(null);
+                  setDropBoardId(null);
+                },
+              };
+
+              const grip = (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  draggable
+                  title="Drag to reorder"
+                  aria-label={`Reorder ${board.name}`}
+                  onDragStart={(e: DragEvent) => {
+                    setDraggingBoardId(board.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', board.id);
                   }}
-                  className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                  title="Rename board"
-                  aria-label="Rename board"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-              )}
-            </>
-          )}
-
-          <span className="text-sm font-medium text-blue-600">
-            {opportunityCount}{' '}
-            {opportunityCount === 1 ? 'opportunity' : 'opportunities'}
-            {showMoney && activeBoard ? (
-              <span className="text-gray-400">
-                {' '}
-                · {formatPeso(activeBoard.openTotalAmount)}
-              </span>
-            ) : null}
-          </span>
-
-          {switcherOpen && (
-            <div
-              role="listbox"
-              aria-label="Pipeline boards"
-              className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
-            >
-              {boards.map((board) => (
-                <button
-                  key={board.id}
-                  type="button"
-                  role="option"
-                  aria-selected={board.slug === activeSlug}
-                  className={`flex w-full flex-col px-4 py-3 text-left hover:bg-gray-50 ${
-                    board.slug === activeSlug ? 'bg-blue-50' : ''
-                  }`}
-                  onClick={() => {
-                    void loadBoard(board.slug);
+                  onDragEnd={() => {
+                    setDraggingBoardId(null);
+                    setDropBoardId(null);
+                  }}
+                  className="inline-flex cursor-grab items-center rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
                   }}
                 >
-                  <span className="text-sm font-semibold text-gray-900">
-                    {board.name}
-                  </span>
-                  {board.description && (
-                    <span className="text-xs text-gray-500">{board.description}</span>
-                  )}
-                </button>
-              ))}
+                  <GripVertical className="h-3.5 w-3.5" />
+                </span>
+              );
 
-              <div className="border-t border-gray-100 p-2">
-                {creatingBoard ? (
-                  <div className="space-y-2 p-2">
+              if (selected && editingBoardTitle) {
+                return (
+                  <div
+                    key={board.id}
+                    className={`flex shrink-0 cursor-default items-center gap-1 border-b-2 border-blue-600 px-1 pb-1.5 ${
+                      isDropTarget ? 'bg-blue-50' : ''
+                    } ${draggingBoardId === board.id ? 'opacity-50' : ''}`}
+                    {...dropProps}
+                  >
+                    {grip}
                     <input
-                      autoFocus
-                      value={newBoardName}
-                      onChange={(e) => setNewBoardName(e.target.value)}
-                      placeholder="Board name"
-                      className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                      ref={boardTitleInputRef}
+                      value={boardTitleDraft}
+                      onChange={(e) => setBoardTitleDraft(e.target.value)}
+                      onBlur={() => void handleRenameBoard()}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') void handleCreateBoard();
-                        if (e.key === 'Escape') setCreatingBoard(false);
+                        if (e.key === 'Enter') e.currentTarget.blur();
+                        if (e.key === 'Escape') {
+                          setBoardTitleDraft(activeBoard?.name || '');
+                          setEditingBoardTitle(false);
+                        }
                       }}
+                      className="max-w-[12rem] rounded-md border border-blue-300 px-2 py-1 text-sm font-semibold text-blue-700 outline-none focus:ring-2 focus:ring-blue-400"
+                      aria-label="Board title"
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
                     />
-                    <input
-                      value={newBoardDescription}
-                      onChange={(e) => setNewBoardDescription(e.target.value)}
-                      placeholder="Description (optional)"
-                      className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        className="rounded-md px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
-                        onClick={() => setCreatingBoard(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                        disabled={creatingBoardLoading || !newBoardName.trim()}
-                        onClick={() => void handleCreateBoard()}
-                      >
-                        {creatingBoardLoading ? 'Creating…' : 'Create'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteBoard(true)}
+                      className="rounded-md p-1 text-blue-400 hover:bg-red-50 hover:text-red-600"
+                      title="Delete board"
+                      aria-label="Delete board"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                ) : (
+                );
+              }
+
+              if (selected) {
+                return (
+                  <div
+                    key={board.id}
+                    className={`flex shrink-0 cursor-default items-center gap-0.5 border-b-2 border-blue-600 ${
+                      isDropTarget ? 'border-blue-400 bg-blue-50' : ''
+                    } ${draggingBoardId === board.id ? 'opacity-50' : ''}`}
+                    role="tab"
+                    aria-selected
+                    {...dropProps}
+                  >
+                    <span className="pl-1.5">{grip}</span>
+                    <button
+                      type="button"
+                      className="cursor-pointer whitespace-nowrap px-2 py-2.5 text-sm font-medium text-blue-700"
+                      onClick={() => setPageTab('board')}
+                    >
+                      {board.name}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBoardTitleDraft(board.name);
+                        setEditingBoardTitle(true);
+                      }}
+                      className="cursor-pointer rounded-md p-1 text-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                      title="Rename board"
+                      aria-label="Rename board"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteBoard(true)}
+                      className="mr-1 cursor-pointer rounded-md p-1 text-blue-400 hover:bg-red-50 hover:text-red-600"
+                      title="Delete board"
+                      aria-label="Delete board"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={board.id}
+                  className={`flex shrink-0 cursor-default items-center gap-0.5 border-b-2 ${
+                    isDropTarget
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-transparent hover:border-gray-300'
+                  } ${draggingBoardId === board.id ? 'opacity-50' : ''}`}
+                  role="tab"
+                  aria-selected={false}
+                  {...dropProps}
+                >
+                  <span className="pl-1.5">{grip}</span>
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                    onClick={() => setCreatingBoard(true)}
+                    title={board.description || board.name}
+                    onClick={() => {
+                      void loadBoard(board.slug);
+                      setPageTab('board');
+                      setEditingBoardTitle(false);
+                    }}
+                    className={`cursor-pointer whitespace-nowrap px-2 py-2.5 text-sm font-medium transition ${
+                      isDropTarget
+                        ? 'text-blue-700'
+                        : 'text-gray-500 hover:text-gray-800'
+                    }`}
                   >
-                    <Plus className="h-4 w-4" />
-                    Create new board
+                    {board.name}
                   </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+                </div>
+              );
+            })}
+          </nav>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
+          <div className="relative shrink-0 pb-1.5" ref={createBoardRef}>
             <button
               type="button"
-              title="Kanban view"
-              aria-pressed={viewMode === 'kanban'}
-              onClick={() => {
-                setViewMode('kanban');
-                setPageTab('board');
-              }}
-              className={`rounded p-1.5 ${
-                viewMode === 'kanban'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
+              onClick={() => setCreatingBoard((o) => !o)}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
+              aria-expanded={creatingBoard}
+              title="Create new board"
             >
-              <LayoutGrid className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New board</span>
             </button>
-            <button
-              type="button"
-              title="List view"
-              aria-pressed={viewMode === 'list'}
-              onClick={() => {
-                setViewMode('list');
-                setPageTab('board');
-              }}
-              className={`rounded p-1.5 ${
-                viewMode === 'list'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setSyncMessage('CSV import is coming soon — use Add opportunity for now.')
-            }
-          >
-            <Upload className="mr-1.5 h-4 w-4" />
-            Import
-          </Button>
-
-          <Button type="button" size="sm" onClick={openAdd}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add opportunity
-          </Button>
-
-          <div className="relative" ref={overflowRef}>
-            <button
-              type="button"
-              className="rounded-md border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50"
-              aria-label="More board actions"
-              onClick={() => setOverflowOpen((o) => !o)}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
-            {overflowOpen && (
-              <div className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                  onClick={() => void handleSyncLeases()}
-                  disabled={syncing}
-                >
-                  <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                  Sync pipelines
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                  onClick={() => {
-                    setOverflowOpen(false);
-                    setShowManageStages(true);
-                    setPageTab('stages');
+            {creatingBoard && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-72 space-y-2 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Create board
+                </p>
+                <input
+                  autoFocus
+                  value={newBoardName}
+                  onChange={(e) => setNewBoardName(e.target.value)}
+                  placeholder="Board name"
+                  className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleCreateBoard();
+                    if (e.key === 'Escape') setCreatingBoard(false);
                   }}
-                >
-                  <Columns3 className="h-4 w-4" />
-                  Edit stages
-                </button>
+                />
+                <input
+                  value={newBoardDescription}
+                  onChange={(e) => setNewBoardDescription(e.target.value)}
+                  placeholder="Description (optional)"
+                  className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    onClick={() => setCreatingBoard(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    disabled={creatingBoardLoading || !newBoardName.trim()}
+                    onClick={() => void handleCreateBoard()}
+                  >
+                    {creatingBoardLoading ? 'Creating…' : 'Create'}
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-sm font-medium text-blue-600">
+              {opportunityCount}{' '}
+              {opportunityCount === 1 ? 'opportunity' : 'opportunities'}
+              {showMoney && activeBoard ? (
+                <span className="text-gray-400">
+                  {' '}
+                  · {formatPeso(activeBoard.openTotalAmount)}
+                </span>
+              ) : null}
+            </span>
+
+            <div className="flex items-center gap-1 border-l border-gray-200 pl-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManageStages(true);
+                  setPageTab('stages');
+                }}
+                className={`rounded-md px-2.5 py-1.5 text-sm font-medium transition ${
+                  pageTab === 'stages'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                Configure stages
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setPageTab((prev) => (prev === 'bulk' ? 'board' : 'bulk'))
+                }
+                className={`rounded-md px-2.5 py-1.5 text-sm font-medium transition ${
+                  pageTab === 'bulk'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                Bulk Actions
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
+              <button
+                type="button"
+                title="Kanban view"
+                aria-pressed={viewMode === 'kanban'}
+                onClick={() => {
+                  setViewMode('kanban');
+                  setPageTab('board');
+                }}
+                className={`rounded p-1.5 ${
+                  viewMode === 'kanban'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                title="List view"
+                aria-pressed={viewMode === 'list'}
+                onClick={() => {
+                  setViewMode('list');
+                  setPageTab('board');
+                }}
+                className={`rounded p-1.5 ${
+                  viewMode === 'list'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setSyncMessage('CSV import is coming soon — use Add opportunity for now.')
+              }
+            >
+              <Upload className="mr-1.5 h-4 w-4" />
+              Import
+            </Button>
+
+            <Button type="button" size="sm" onClick={openAdd}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add opportunity
+            </Button>
+
+            <div className="relative" ref={overflowRef}>
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50"
+                aria-label="More board actions"
+                onClick={() => setOverflowOpen((o) => !o)}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+              {overflowOpen && (
+                <div className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    onClick={() => void handleSyncLeases()}
+                    disabled={syncing}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                    Sync pipelines
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 3. Saved views row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <List className="h-4 w-4 text-gray-400" />
-        <button
-          type="button"
-          onClick={() => setTagFilter(null)}
-          className={`rounded-md px-2.5 py-1 text-sm font-medium ${
-            !tagFilter
-              ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          All
-        </button>
-        {availableTags.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => setTagFilter((prev) => (prev === tag ? null : tag))}
-            className={`rounded-md px-2.5 py-1 text-sm font-medium ${
-              tagFilter === tag
-                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {tag}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          title="Saved filtered lists coming soon"
-          onClick={() =>
-            setSyncMessage(
-              'Saved lists are coming soon — use tag chips and search for now.'
-            )
-          }
-        >
-          <ListPlus className="h-3.5 w-3.5" />
-          List
-        </button>
-      </div>
-
-      {/* 4. Filter / search row */}
+      {/* Filter / search row */}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
           onClick={() =>
             setSyncMessage(
-              'Advanced filters coming soon — use search and tag views above.'
+              'Advanced filters coming soon — use search for now.'
             )
           }
         >
@@ -1012,11 +1147,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
 
       {/* Board / list */}
       {pageTab !== 'bulk' &&
-        (loading && !activeBoard ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
-            Loading pipeline…
-          </div>
-        ) : viewMode === 'list' ? (
+        (viewMode === 'list' ? (
           <div className="min-h-[400px] overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
@@ -1127,6 +1258,25 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
           onSaved={() => void loadBoard(activeSlug)}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDeleteBoard}
+        onClose={() => {
+          if (!deletingBoard) setConfirmDeleteBoard(false);
+        }}
+        onConfirm={() => void handleDeleteBoard()}
+        title="Delete board?"
+        message={
+          activeBoard
+            ? BUILT_IN_BOARD_SLUGS.has(activeBoard.slug)
+              ? `“${activeBoard.name}” is a system board. Deleting it removes all of its stages and opportunities, and may break website inquiries and automated sync. This cannot be undone.`
+              : `Delete “${activeBoard.name}”? All stages and opportunities on this board will be permanently deleted. This cannot be undone.`
+            : 'Delete this board and all of its stages and opportunities?'
+        }
+        confirmText="Delete board"
+        variant="danger"
+        isLoading={deletingBoard}
+      />
     </div>
   );
 }

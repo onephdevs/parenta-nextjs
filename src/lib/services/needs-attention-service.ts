@@ -328,15 +328,15 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
 }
 
 export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
-  const [payments, utilities, inquiries, maintenance] = await Promise.all([
+  const [inquiries, payments, utilities, maintenance] = await Promise.all([
+    getNewInquiries(),
     getPaymentsDue(),
     getUtilitiesDue(),
-    getNewInquiries(),
     getMaintenanceOpen(),
   ]);
 
   return {
     updatedAt: new Date().toISOString(),
-    cards: [payments, utilities, inquiries, maintenance],
+    cards: [inquiries, payments, utilities, maintenance],
   };
 }

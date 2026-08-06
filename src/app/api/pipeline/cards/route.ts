@@ -71,9 +71,10 @@ export async function POST(request: Request) {
       }
       const hasBuilding = Boolean(body.buildingId);
       const hasRoom = Boolean(body.roomId);
-      if (hasBuilding !== hasRoom) {
+      // Building alone is OK (website / early inquiry). Room requires building.
+      if (hasRoom && !hasBuilding) {
         return NextResponse.json(
-          { success: false, error: 'Provide both building and room, or neither' },
+          { success: false, error: 'Select a building for the room' },
           { status: 400 }
         );
       }

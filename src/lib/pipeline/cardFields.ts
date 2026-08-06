@@ -37,8 +37,7 @@ export type CardFieldPair = [CardFieldKey, CardFieldKey];
 const STORAGE_PREFIX = 'parenta.pipeline.cardFields.';
 
 const BOARD_DEFAULTS: Record<string, CardFieldPair> = {
-  onboarding: ['source', 'amount'],
-  nurture: ['source', 'amount'],
+  onboarding: ['source', 'unit'],
   payments: ['balance', 'dueAt'],
   expenses: ['amount', 'dueAt'],
   maintenance: ['unit', 'nextActionAt'],

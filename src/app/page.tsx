@@ -1,67 +1,95 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { 
-  Building2, 
-  Home, 
-  Shield, 
-  TrendingUp, 
-  Users, 
-  CheckCircle,
+import { useRouter } from 'next/navigation';
+import {
+  Building2,
+  Shield,
+  TrendingUp,
+  Users,
   ArrowRight,
-  Phone,
-  Mail,
   MapPin,
-  Star
+  Star,
+  ChevronDown,
+  Plus,
+  MessageSquare,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { HomeContactForm } from '@/components/features/HomeContactForm';
 
-interface Building {
+interface PortfolioStats {
+  propertyCount: number;
+  totalUnits: number;
+  occupancyRate: number;
+  availableUnits: number;
+}
+
+interface FeaturedProperty {
   id: string;
   name: string;
+  city: string | null;
+  state: string | null;
   address: string;
   totalUnits: number;
   availableUnits: number;
-  image?: string;
+  startingRent: number | null;
+  imageUrl: string | null;
 }
 
-function formatBuildingAddress(b: { addressLine1?: string; city?: string; state?: string; postalCode?: string; address?: string }): string {
-  if (b.address) return b.address;
-  const parts = [b.addressLine1, b.city, b.state, b.postalCode].filter(Boolean);
-  return parts.length ? parts.join(', ') : '';
+function formatPhp(amount: number): string {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function locationLabel(p: FeaturedProperty): string {
+  const parts = [p.city, p.state].filter(Boolean);
+  if (parts.length) return parts.join(', ');
+  return p.address || 'Location TBA';
 }
 
 export default function LandingPage() {
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  const router = useRouter();
+  const [stats, setStats] = useState<PortfolioStats | null>(null);
+  const [properties, setProperties] = useState<FeaturedProperty[]>([]);
+  const [propertiesWithAvailability, setPropertiesWithAvailability] = useState(0);
+  const [totalProperties, setTotalProperties] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [heroEmail, setHeroEmail] = useState('');
+  const loginRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchBuildings();
+    fetchPortfolio();
   }, []);
 
-  const fetchBuildings = async () => {
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (loginRef.current && !loginRef.current.contains(e.target as Node)) {
+        setLoginOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchPortfolio = async () => {
     try {
-      const response = await fetch('/api/buildings');
+      const response = await fetch('/api/public/portfolio');
       if (response.ok) {
         const result = await response.json();
-        if (result.success) {
-          // Handle both response formats: { data: { buildings: [] } } or { data: [] }
-          const raw = result.data.buildings || result.data || [];
-          const buildingsArray: Building[] = raw.slice(0, 6).map((b: Record<string, unknown>) => ({
-            id: String(b.id),
-            name: String(b.name ?? ''),
-            address: formatBuildingAddress(b as Parameters<typeof formatBuildingAddress>[0]),
-            totalUnits: Number(b.totalUnits) || 0,
-            availableUnits: Number(b.vacantUnits) || 0,
-            image: b.image as string | undefined,
-          }));
-          setBuildings(buildingsArray);
+        if (result.success && result.data) {
+          setStats(result.data.stats);
+          setProperties(result.data.properties || []);
+          setPropertiesWithAvailability(result.data.propertiesWithAvailability || 0);
+          setTotalProperties(result.data.totalProperties || 0);
         }
       }
     } catch (error) {
-      console.error('Error fetching buildings:', error);
+      console.error('Error fetching portfolio:', error);
     } finally {
       setLoading(false);
     }
@@ -71,366 +99,547 @@ export default function LandingPage() {
     {
       icon: Building2,
       title: 'Premium Properties',
-      description: 'Carefully curated selection of high-quality residential and commercial properties'
+      description: 'Carefully curated selection of high-quality residential and commercial properties',
     },
     {
       icon: Shield,
       title: 'Secure & Reliable',
-      description: 'Advanced security systems and 24/7 property management support'
+      description: 'Advanced security systems and 24/7 property management support',
     },
     {
       icon: TrendingUp,
       title: 'Great Value',
-      description: 'Competitive pricing with flexible payment options and transparent fees'
+      description: 'Competitive pricing with flexible payment options and transparent fees',
     },
     {
       icon: Users,
       title: 'Community First',
-      description: 'Building thriving communities with excellent tenant services'
-    }
+      description: 'Building thriving communities with excellent tenant services',
+    },
   ];
 
-  const stats = [
-    { value: buildings.length || '10+', label: 'Properties' },
-    { value: '500+', label: 'Happy Tenants' },
-    { value: '98%', label: 'Occupancy Rate' },
-    { value: '24/7', label: 'Support' }
-  ];
+  const featuredWithAvailability = properties.filter((p) => p.availableUnits > 0);
+  const featuredCards = featuredWithAvailability.slice(0, 2);
+  const availableForForm = featuredWithAvailability.map((p) => ({
+    id: p.id,
+    name: p.name,
+    availableUnits: p.availableUnits,
+  }));
+  const heroImage =
+    properties.find((p) => p.imageUrl)?.imageUrl || '/brand/rectangle-15.png';
+
+  const startAccountFromHero = (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = heroEmail.trim();
+    const qs = email ? `?email=${encodeURIComponent(email)}` : '';
+    router.push(`/auth/signup${qs}`);
+  };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header/Navigation */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+    <div className="min-h-screen bg-black text-white">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center" aria-label="Alfonso Property Management System">
-              <BrandLogo variant="full" height={36} priority className="max-w-[10rem] sm:max-w-none" />
+              <BrandLogo
+                variant="full"
+                height={36}
+                priority
+                className="max-w-[10rem] brightness-0 invert sm:max-w-none"
+              />
             </Link>
-            <nav className="hidden md:flex items-center space-x-8">
-              <a href="#properties" className="text-gray-900 hover:text-blue-600 transition">Properties</a>
-              <a href="#features" className="text-gray-900 hover:text-blue-600 transition">Features</a>
-              <a href="#about" className="text-gray-900 hover:text-blue-600 transition">About</a>
-              <a href="#contact" className="text-gray-900 hover:text-blue-600 transition">Contact</a>
+            <nav className="hidden items-center gap-8 md:flex">
+              <a href="#properties" className="text-sm text-white/65 transition hover:text-white">
+                Properties
+              </a>
+              <a href="#features" className="text-sm text-white/65 transition hover:text-white">
+                Features
+              </a>
+              <a href="#about" className="text-sm text-white/65 transition hover:text-white">
+                About
+              </a>
+              <a href="#contact" className="text-sm text-white/65 transition hover:text-white">
+                Contact
+              </a>
             </nav>
-            <div className="flex items-center space-x-4">
-              <Link 
-                href="/auth/tenant/signin"
-                className="text-gray-900 hover:text-blue-600 transition font-medium"
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="relative" ref={loginRef}>
+                <button
+                  type="button"
+                  onClick={() => setLoginOpen((o) => !o)}
+                  aria-expanded={loginOpen}
+                  aria-haspopup="menu"
+                  className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium text-white/75 transition hover:bg-white/10 hover:text-white"
+                >
+                  Log in
+                  <ChevronDown
+                    className={`h-4 w-4 text-white/50 transition ${loginOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {loginOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-white/10 bg-[#111] py-1 shadow-xl"
+                  >
+                    <Link
+                      href="/auth/tenant/signin"
+                      role="menuitem"
+                      className="block px-4 py-2.5 text-sm text-white/80 hover:bg-white/5 hover:text-white"
+                      onClick={() => setLoginOpen(false)}
+                    >
+                      Tenant portal
+                    </Link>
+                    <Link
+                      href="/auth/admin/signin"
+                      role="menuitem"
+                      className="block px-4 py-2.5 text-sm text-white/45 hover:bg-white/5 hover:text-white/80"
+                      onClick={() => setLoginOpen(false)}
+                    >
+                      Staff login
+                    </Link>
+                  </div>
+                )}
+              </div>
+              <Link
+                href="/auth/signup"
+                className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-100"
               >
-                Tenant Login
-              </Link>
-              <Link 
-                href="/auth/admin/signin"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
-              >
-                Admin Login
+                Create account
               </Link>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-blue-50 via-white to-blue-50 py-20 lg:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                Find Your Perfect
-                <span className="text-blue-600"> Home</span> Today
-              </h1>
-              <p className="text-xl text-gray-900 mb-8 leading-relaxed">
-                Discover premium properties with modern amenities, professional management, 
-                and a community you'll love to call home.
+      <section className="relative isolate min-h-[min(88vh,52rem)] overflow-hidden bg-black">
+        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic portfolio / brand fallback */}
+        <img
+          src={heroImage}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[68%_center]"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/15"
+          aria-hidden
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" aria-hidden />
+
+        <div className="relative mx-auto flex min-h-[min(88vh,52rem)] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8">
+          <div className="w-full max-w-xl lg:max-w-2xl">
+            <p className="mb-4 text-sm font-semibold tracking-[0.2em] text-white/70 uppercase">
+              Alfonso
+            </p>
+            <h1 className="text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
+              Find your next home — start your account today
+            </h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-white/75 sm:text-xl">
+              Browse available units, create your tenant account, and get matched with a place
+              you&apos;ll love to call home.
+            </p>
+
+            <form
+              onSubmit={startAccountFromHero}
+              className="mt-8 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:items-stretch"
+            >
+              <label htmlFor="hero-email" className="sr-only">
+                Email
+              </label>
+              <input
+                id="hero-email"
+                type="email"
+                value={heroEmail}
+                onChange={(e) => setHeroEmail(e.target.value)}
+                placeholder="Enter your email"
+                autoComplete="email"
+                className="min-h-12 flex-1 rounded-full border-0 bg-white px-5 text-sm text-gray-900 shadow-lg outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-white/50"
+              />
+              <button
+                type="submit"
+                className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-gray-900 transition hover:bg-gray-100"
+              >
+                Create account
+              </button>
+            </form>
+
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <a
+                href="#properties"
+                className="inline-flex items-center gap-1.5 font-medium text-white/85 underline-offset-4 hover:underline"
+              >
+                See available units
+                <ArrowRight className="h-4 w-4" />
+              </a>
+              <span className="hidden text-white/30 sm:inline" aria-hidden>
+                ·
+              </span>
+              <Link
+                href="/auth/tenant/signin"
+                className="font-medium text-white/55 underline-offset-4 hover:text-white hover:underline"
+              >
+                Already a tenant? Log in
+              </Link>
+            </div>
+
+            {stats && (
+              <p className="mt-8 text-sm text-white/45">
+                {stats.availableUnits > 0
+                  ? `${stats.availableUnits} unit${stats.availableUnits === 1 ? '' : 's'} available across ${stats.propertyCount} ${stats.propertyCount === 1 ? 'property' : 'properties'}`
+                  : `${stats.propertyCount} ${stats.propertyCount === 1 ? 'property' : 'properties'} under management`}
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a 
-                  href="#properties"
-                  className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 transition font-semibold text-center flex items-center justify-center group"
-                >
-                  Browse Properties
-                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition" />
-                </a>
-                <Link 
-                  href="/auth/tenant/signin"
-                  className="bg-white text-blue-600 border-2 border-blue-600 px-8 py-4 rounded-lg hover:bg-blue-50 transition font-semibold text-center"
-                >
-                  Tenant Portal
-                </Link>
-              </div>
-            </div>
-            <div className="hidden lg:block">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-blue-600 rounded-2xl transform rotate-3"></div>
-                <div className="relative bg-white rounded-2xl shadow-2xl p-8 transform -rotate-1">
-                  <div className="grid grid-cols-2 gap-6">
-                    {stats.map((stat, index) => (
-                      <div key={index} className="text-center">
-                        <div className="text-3xl font-bold text-blue-600 mb-1">{stat.value}</div>
-                        <div className="text-sm text-gray-900">{stat.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why Choose Alfonso Property Management System?</h2>
-            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
-              Experience the difference with our comprehensive property management services
+      {/* After hero: black continues; one inset green card (not full-bleed sheets) */}
+      <section id="features" className="bg-black px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#143d32] via-[#0c2e26] to-[#071a16] p-8 sm:rounded-[2rem] sm:p-12 lg:p-16">
+          <div className="max-w-3xl">
+            <p className="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+              <span className="text-white">Live where it feels right.</span>{' '}
+              <span className="text-white/40">
+                Managed properties, clear pricing, and a portal that makes renting simpler.
+              </span>
+            </p>
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-white/60 sm:text-lg">
+              Professional management with a modern tenant experience — from finding a unit to paying
+              rent and requesting maintenance.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <div 
-                key={index}
-                className="p-6 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 hover:shadow-lg transition group"
+
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className="rounded-2xl border border-white/10 bg-black/25 p-5 transition hover:border-white/20 hover:bg-black/35"
               >
-                <div className="bg-blue-100 w-14 h-14 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-600 transition">
-                  <feature.icon className="h-7 w-7 text-blue-600 group-hover:text-white transition" />
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5">
+                  <feature.icon className="h-5 w-5 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-900">{feature.description}</p>
+                <h3 className="text-base font-semibold text-white">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/50">{feature.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Properties Section */}
-      <section id="properties" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Featured Properties</h2>
-            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
-              Explore our carefully selected properties in prime locations
-            </p>
+      {/* Seamless dark continuum — blends darker toward the footer */}
+      <section
+        id="properties"
+        className="bg-gradient-to-b from-black via-[#070b12] to-[#050a14] px-4 py-20 sm:px-6 lg:px-8"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-14 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-xl">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Featured properties
+              </h2>
+              <p className="mt-3 text-lg text-white/55">
+                Explore units with current availability.
+              </p>
+            </div>
+            <a
+              href="#contact"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white/70 underline-offset-4 hover:text-white hover:underline"
+            >
+              Ask about a unit
+              <ArrowRight className="h-4 w-4" />
+            </a>
           </div>
 
           {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
-                  <div className="h-48 bg-gray-200"></div>
-                  <div className="p-6">
-                    <div className="h-6 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-2/3 mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : buildings.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {buildings.map((building) => (
-                <div 
-                  key={building.id}
-                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition group"
+            <div className="grid gap-6 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse overflow-hidden rounded-3xl border border-white/10 bg-white/5"
                 >
-                  <div className="relative h-48 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                    <Building2 className="h-20 w-20 text-blue-600 opacity-50" />
-                    <div className="absolute top-4 right-4 bg-white px-3 py-1 rounded-full text-sm font-semibold text-blue-600">
-                      {building.availableUnits || 0} Available
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition">
-                      {building.name}
-                    </h3>
-                    <div className="flex items-center text-gray-900 mb-3">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      <span className="text-sm">{building.address}</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <div className="flex items-center text-gray-900">
-                        <Home className="h-4 w-4 mr-2" />
-                        <span className="text-sm">{building.totalUnits} Units</span>
-                      </div>
-                      <a 
-                        href="#contact"
-                        className="text-blue-600 font-semibold text-sm hover:underline flex items-center"
-                      >
-                        Inquire
-                        <ArrowRight className="h-4 w-4 ml-1" />
-                      </a>
-                    </div>
+                  <div className="h-52 bg-white/10" />
+                  <div className="space-y-3 p-6">
+                    <div className="h-5 w-2/3 rounded bg-white/10" />
+                    <div className="h-4 w-1/2 rounded bg-white/10" />
                   </div>
                 </div>
               ))}
             </div>
+          ) : featuredCards.length > 0 ? (
+            <>
+              <div className="grid gap-6 md:grid-cols-3">
+                {featuredCards.map((building) => {
+                  const lowAvailability = building.availableUnits <= 1;
+                  return (
+                    <div
+                      key={building.id}
+                      className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition hover:border-white/25"
+                    >
+                      <div className="relative h-52 bg-[#1a1a1a]">
+                        {building.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- dynamic API/blob paths
+                          <img
+                            src={building.imageUrl}
+                            alt={building.name}
+                            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <Building2 className="h-14 w-14 text-white/20" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                        <div
+                          className={`absolute top-4 left-4 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm ${
+                            lowAvailability ? 'bg-white/90 text-gray-900' : 'bg-white text-gray-900'
+                          }`}
+                        >
+                          {building.availableUnits} unit
+                          {building.availableUnits === 1 ? '' : 's'} available
+                        </div>
+                      </div>
+                      <div className="p-6">
+                        <h3 className="text-xl font-semibold text-white">{building.name}</h3>
+                        <div className="mt-2 flex items-center text-white/45">
+                          <MapPin className="mr-2 h-4 w-4 shrink-0" />
+                          <span className="text-sm">{locationLabel(building)}</span>
+                        </div>
+                        {building.startingRent != null && building.startingRent > 0 && (
+                          <p className="mt-4 text-lg font-semibold text-white">
+                            {formatPhp(building.startingRent)}
+                            <span className="text-sm font-normal text-white/45"> /mo starting</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <a
+                  href="#contact"
+                  className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/20 bg-transparent p-8 text-center transition hover:border-white/40 hover:bg-white/[0.03]"
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/15">
+                    <Plus className="h-5 w-5 text-white/70" />
+                  </div>
+                  <p className="text-sm text-white/55">
+                    More listings added regularly —{' '}
+                    <span className="font-semibold text-white">get notified →</span>
+                  </p>
+                </a>
+              </div>
+              <p className="mt-10 text-center text-sm text-white/35">
+                Showing {featuredCards.length} of {totalProperties}{' '}
+                {totalProperties === 1 ? 'property' : 'properties'}
+                {propertiesWithAvailability > 0 ? ' with current availability' : ''}
+              </p>
+            </>
           ) : (
-            <div className="text-center py-12">
-              <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-900 text-lg">Properties coming soon!</p>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
+              <Building2 className="mx-auto mb-4 h-14 w-14 text-white/25" />
+              <p className="text-lg text-white">Properties coming soon</p>
+              <p className="mx-auto mt-2 max-w-md text-sm text-white/45">
+                {totalProperties > 0
+                  ? `We manage ${totalProperties} ${totalProperties === 1 ? 'property' : 'properties'} — check back for availability, or leave an inquiry below.`
+                  : "Leave an inquiry below and we'll reach out when units open up."}
+              </p>
+              <a
+                href="#contact"
+                className="mt-6 inline-flex items-center text-sm font-semibold text-white underline-offset-4 hover:underline"
+              >
+                Get in touch
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </a>
             </div>
           )}
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">What Our Tenants Say</h2>
-            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
-              Don't just take our word for it
-            </p>
+      <section className="bg-gradient-to-b from-[#050a14] to-[#03060c] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-14 max-w-2xl">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">What our tenants say</h2>
+            <p className="mt-3 text-lg text-white/55">Real feedback from real residents.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                name: 'Maria Santos',
-                role: 'Tenant since 2023',
-                text: 'The best property management I\'ve experienced. Responsive, professional, and truly care about their tenants.'
-              },
-              {
-                name: 'John Dela Cruz',
-                role: 'Tenant since 2022',
-                text: 'Beautiful property, great amenities, and an amazing community. I couldn\'t ask for more!'
-              },
-              {
-                name: 'Ana Garcia',
-                role: 'Tenant since 2024',
-                text: 'From the application process to move-in, everything was seamless. Highly recommended!'
-              }
-            ].map((testimonial, index) => (
-              <div key={index} className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                <div className="flex mb-4">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} className="h-5 w-5 text-yellow-400 fill-current" />
-                  ))}
+          <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+              <div className="mb-4 flex gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star key={star} className="h-4 w-4 fill-current text-white" />
+                ))}
+              </div>
+              <p className="mb-6 text-white/80 italic">
+                &ldquo;Quick response on my maintenance request and the online payment made rent so
+                much easier.&rdquo;
+              </p>
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-semibold text-gray-900"
+                  aria-hidden
+                >
+                  TB
                 </div>
-                <p className="text-gray-900 mb-4 italic">&ldquo;{testimonial.text}&rdquo;</p>
                 <div>
-                  <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                  <div className="text-sm text-gray-900">{testimonial.role}</div>
+                  <div className="font-semibold text-white">Tiffa B.</div>
+                  <div className="text-sm text-white/40">Tenant since 2026</div>
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/15 p-8 text-center">
+              <MessageSquare className="mb-3 h-8 w-8 text-white/25" />
+              <p className="text-sm text-white/40">More reviews coming as our community grows.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section id="about" className="py-20 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-4">Ready to Find Your New Home?</h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join hundreds of satisfied tenants who have found their perfect property with us
+      <section
+        id="about"
+        className="bg-gradient-to-b from-[#03060c] to-black px-4 py-20 sm:px-6 lg:px-8"
+      >
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+            Ready to find your new home?
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-lg text-white/55">
+            Create an account to get started, or send an inquiry and we&apos;ll help you find the
+            right fit.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a 
-              href="#properties"
-              className="bg-white text-blue-600 px-8 py-4 rounded-lg hover:bg-gray-100 transition font-semibold inline-flex items-center justify-center"
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/auth/signup"
+              className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-8 text-sm font-semibold text-gray-900 transition hover:bg-gray-100"
             >
-              View Properties
-              <ArrowRight className="ml-2 h-5 w-5" />
-                </a>
-                <a
+              Create account
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+            <a
               href="#contact"
-              className="bg-blue-800 text-white px-8 py-4 rounded-lg hover:bg-blue-900 transition font-semibold"
+              className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-8 text-sm font-semibold text-white transition hover:border-white hover:bg-white/5"
             >
-              Contact Us
+              Contact us
             </a>
           </div>
         </div>
       </section>
 
-      {/* Contact Section */}
-      <section id="contact" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Get In Touch</h2>
-            <p className="text-xl text-gray-900 max-w-2xl mx-auto">
+      <section id="contact" className="bg-black px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mx-auto mb-12 max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Get in touch</h2>
+            <p className="mt-3 text-lg text-white/55">
               Interested in a unit? Leave your name and email — we&apos;ll follow up.
             </p>
           </div>
 
-          <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-2">
-            <div className="grid gap-8 sm:grid-cols-3 lg:grid-cols-1">
-              <div className="flex items-start gap-4 text-left sm:flex-col sm:items-center sm:text-center lg:flex-row lg:items-start lg:text-left">
-                <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center shrink-0">
-                  <Phone className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
-                  <p className="text-gray-700">+63 (2) 1234-5678</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 text-left sm:flex-col sm:items-center sm:text-center lg:flex-row lg:items-start lg:text-left">
-                <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center shrink-0">
-                  <Mail className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
-                  <p className="text-gray-700">info@parenta.com</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 text-left sm:flex-col sm:items-center sm:text-center lg:flex-row lg:items-start lg:text-left">
-                <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center shrink-0">
-                  <MapPin className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Location</h3>
-                  <p className="text-gray-700">Manila, Philippines</p>
-                </div>
-              </div>
-            </div>
-
-            <HomeContactForm />
+          <div className="mx-auto max-w-xl">
+            <HomeContactForm availableBuildings={availableForForm} variant="dark" />
           </div>
         </div>
       </section>
 
-        {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+      {/* Shopify-style footer */}
+      <footer className="border-t border-white/10 bg-black">
+        <div className="mx-auto max-w-7xl px-4 pt-16 pb-10 sm:px-6 lg:px-8">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
             <div>
-              <div className="mb-4">
-                <BrandLogo variant="full" height={40} />
+              <div className="mb-6">
+                <BrandLogo variant="full" height={36} className="brightness-0 invert" />
               </div>
-              <p className="text-sm">
-                Professional property management services for modern living.
+              <p className="max-w-xs text-sm leading-relaxed text-white/45">
+                Professional property management for modern living.
               </p>
             </div>
+
             <div>
-              <h4 className="text-white font-semibold mb-4">Quick Links</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#properties" className="hover:text-blue-500 transition">Properties</a></li>
-                <li><a href="#features" className="hover:text-blue-500 transition">Features</a></li>
-                <li><a href="#about" className="hover:text-blue-500 transition">About Us</a></li>
-                <li><a href="#contact" className="hover:text-blue-500 transition">Contact</a></li>
+              <h4 className="mb-4 text-sm font-semibold text-white">Alfonso</h4>
+              <ul className="space-y-3 text-sm text-white/55">
+                <li>
+                  <a href="#about" className="transition hover:text-white">
+                    About us
+                  </a>
+                </li>
+                <li>
+                  <a href="#features" className="transition hover:text-white">
+                    Why Alfonso
+                  </a>
+                </li>
+                <li>
+                  <a href="#properties" className="transition hover:text-white">
+                    Properties
+                  </a>
+                </li>
+                <li>
+                  <a href="#contact" className="transition hover:text-white">
+                    Contact
+                  </a>
+                </li>
               </ul>
             </div>
+
             <div>
-              <h4 className="text-white font-semibold mb-4">For Tenants</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/auth/tenant/signin" className="hover:text-blue-500 transition">Tenant Login</Link></li>
-                <li><a href="#properties" className="hover:text-blue-500 transition">Available Units</a></li>
-                <li><a href="#" className="hover:text-blue-500 transition">Payment Portal</a></li>
-                <li><a href="#" className="hover:text-blue-500 transition">Maintenance Request</a></li>
+              <h4 className="mb-4 text-sm font-semibold text-white">For tenants</h4>
+              <ul className="space-y-3 text-sm text-white/55">
+                <li>
+                  <Link href="/auth/signup" className="transition hover:text-white">
+                    Create account
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/auth/tenant/signin" className="transition hover:text-white">
+                    Tenant login
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/auth/tenant/signin" className="transition hover:text-white">
+                    Payments
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/auth/tenant/signin" className="transition hover:text-white">
+                    Maintenance
+                  </Link>
+                </li>
               </ul>
             </div>
+
             <div>
-              <h4 className="text-white font-semibold mb-4">Management</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/auth/admin/signin" className="hover:text-blue-500 transition">Admin Login</Link></li>
-                <li><Link href="/auth/admin/signin" className="hover:text-blue-500 transition">Staff Portal</Link></li>
-                <li><a href="#" className="hover:text-blue-500 transition">Reports</a></li>
-                <li><a href="#" className="hover:text-blue-500 transition">Analytics</a></li>
+              <h4 className="mb-4 text-sm font-semibold text-white">Support</h4>
+              <ul className="space-y-3 text-sm text-white/55">
+                <li>
+                  <a href="#contact" className="transition hover:text-white">
+                    Get in touch
+                  </a>
+                </li>
+                <li>
+                  <a href="#properties" className="transition hover:text-white">
+                    Available units
+                  </a>
+                </li>
+                <li>
+                  <Link href="/auth/admin/signin" className="transition hover:text-white">
+                    Staff login
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>&copy; {new Date().getFullYear()} Alfonso Property Management System. All rights reserved.</p>
+
+          <div className="mt-14 flex flex-col gap-4 border-t border-white/10 pt-8 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              &copy; {new Date().getFullYear()} Alfonso Property Management System. All rights
+              reserved.
+            </p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              <a href="#contact" className="transition hover:text-white">
+                Privacy
+              </a>
+              <a href="#contact" className="transition hover:text-white">
+                Terms
+              </a>
+              <Link href="/auth/admin/signin" className="transition hover:text-white">
+                Staff
+              </Link>
+            </div>
           </div>
         </div>
       </footer>

@@ -1,9 +1,7 @@
-import { Suspense } from 'react';
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import AdminLayoutClient from '@/components/layout/AdminLayoutClient';
-import AppLoader from '@/components/ui/AppLoader';
 
 export default async function AdminLayout({
   children,
@@ -16,9 +14,6 @@ export default async function AdminLayout({
     redirect('/auth/admin/signin');
   }
 
-  return (
-    <Suspense fallback={<AppLoader variant="inline" className="min-h-screen" />}>
-      <AdminLayoutClient session={session}>{children}</AdminLayoutClient>
-    </Suspense>
-  );
+  // Keep sidebar mounted during navigations — page `loading.tsx` only replaces main content.
+  return <AdminLayoutClient session={session}>{children}</AdminLayoutClient>;
 }

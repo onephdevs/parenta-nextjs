@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { AuthSplitShell, AuthHeroPanel } from '@/components/features/auth/AuthSplitShell';
@@ -22,7 +23,8 @@ interface SignUpFormState {
   confirmPassword: string;
 }
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<SignUpFormState>({
     firstName: '',
     lastName: '',
@@ -35,6 +37,13 @@ export default function SignUpPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    const emailFromHero = searchParams.get('email')?.trim();
+    if (emailFromHero) {
+      setForm((prev) => (prev.email ? prev : { ...prev, email: emailFromHero }));
+    }
+  }, [searchParams]);
 
   const updateField = (key: keyof SignUpFormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -208,5 +217,21 @@ export default function SignUpPage() {
         loginHref="/auth/tenant/signin"
       />
     </>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthSplitShell left={<AuthHeroPanel />}>
+          <div className="flex min-h-[12rem] items-center justify-center text-sm text-gray-500">
+            Loading…
+          </div>
+        </AuthSplitShell>
+      }
+    >
+      <SignUpForm />
+    </Suspense>
   );
 }

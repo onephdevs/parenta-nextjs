@@ -1758,101 +1758,6 @@ export async function transferCardToBoard(
   return updated;
 }
 
-export async function transferCardToNurture(
-  cardId: string,
-  reason: string,
-  userId?: string | null
-): Promise<PipelineCard> {
-  const nurture = await getBoardBySlug('nurture');
-  if (!nurture) throw new Error('Nurture board not found');
-
-  const notReady = nurture.stages.find((s) => s.slug === 'not_ready');
-  if (!notReady) throw new Error('Nurture stages not seeded');
-
-  const existing = await pool.query<DbCard>(
-    `SELECT * FROM pipeline_cards WHERE id = $1`,
-    [cardId]
-  );
-  const card = existing.rows[0];
-  if (!card) throw new Error('Card not found');
-
-  await pool.query(
-    `UPDATE pipeline_cards SET
-       prior_board_id = board_id,
-       prior_stage_id = stage_id,
-       board_id = $1,
-       stage_id = $2,
-       nurture_reason = $3,
-       card_status = 'open',
-       position = 0,
-       updated_at = CURRENT_TIMESTAMP
-     WHERE id = $4`,
-    [nurture.id, notReady.id, reason, cardId]
-  );
-
-  await pool.query(
-    `INSERT INTO pipeline_card_events (
-       card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, note, created_by
-     ) VALUES ($1, 'moved_to_nurture', $2, $3, $4, $5, $6, $7)`,
-    [cardId, card.stage_id, notReady.id, card.board_id, nurture.id, reason, userId || null]
-  );
-
-  const cards = await getCardsForBoard('nurture');
-  return cards.find((c) => c.id === cardId)!;
-}
-
-export async function resumeCardToOnboarding(
-  cardId: string,
-  userId?: string | null
-): Promise<PipelineCard> {
-  const onboarding = await getBoardBySlug('onboarding');
-  if (!onboarding) throw new Error('Onboarding board not found');
-
-  const existing = await pool.query<DbCard>(
-    `SELECT * FROM pipeline_cards WHERE id = $1`,
-    [cardId]
-  );
-  const card = existing.rows[0];
-  if (!card) throw new Error('Card not found');
-
-  // Prefer prior onboarding stage; fall back to viewing_scheduled or new_inquiry
-  let targetStage = onboarding.stages.find((s) => s.id === card.prior_stage_id);
-  if (!targetStage || targetStage.isTerminal) {
-    targetStage =
-      onboarding.stages.find((s) => s.slug === 'viewing_scheduled') ||
-      onboarding.stages.find((s) => s.slug === 'new_inquiry') ||
-      onboarding.stages[0];
-  }
-
-  const nurture = await getBoardBySlug('nurture');
-  const returned = nurture?.stages.find((s) => s.slug === 'returned');
-
-  await pool.query(
-    `UPDATE pipeline_cards SET
-       board_id = $1,
-       stage_id = $2,
-       card_status = 'open',
-       position = 0,
-       updated_at = CURRENT_TIMESTAMP
-     WHERE id = $3`,
-    [onboarding.id, targetStage.id, cardId]
-  );
-
-  if (returned) {
-    // mark a synthetic returned event; card already moved
-  }
-
-  await pool.query(
-    `INSERT INTO pipeline_card_events (
-       card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, created_by
-     ) VALUES ($1, 'resumed_to_onboarding', $2, $3, $4, $5, $6)`,
-    [cardId, card.stage_id, targetStage.id, card.board_id, onboarding.id, userId || null]
-  );
-
-  const cards = await getCardsForBoard('onboarding');
-  return cards.find((c) => c.id === cardId)!;
-}
-
 export async function getPipelineCardById(cardId: string): Promise<PipelineCard | null> {
   const result = await pool.query<DbCard & { board_slug: string }>(
     `SELECT
@@ -1947,8 +1852,10 @@ export async function updatePipelineCard(
     const buildingId =
       data.buildingId !== undefined ? data.buildingId : existing.buildingId || null;
     const roomId = data.roomId !== undefined ? data.roomId : existing.roomId || null;
-    if (Boolean(buildingId) !== Boolean(roomId)) {
-      throw new Error('Provide both building and room, or neither');
+    // Building alone is OK (website inquiries pick a property before a specific room).
+    // A room always requires its building.
+    if (roomId && !buildingId) {
+      throw new Error('Select a building for the room');
     }
   }
 
@@ -2313,6 +2220,36 @@ export async function updatePipelineBoard(
   return board;
 }
 
+/**
+ * Permanently deletes a pipeline board along with its stages and cards.
+ * Card events cascade from cards; stage FKs require cards to be removed first.
+ */
+export async function deletePipelineBoard(boardId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const existing = await client.query<DbBoard>(
+      `SELECT * FROM pipeline_boards WHERE id = $1 AND is_active = true FOR UPDATE`,
+      [boardId]
+    );
+    const board = existing.rows[0];
+    if (!board) throw new Error('Board not found');
+
+    // Cards first — stages have ON DELETE RESTRICT from cards.stage_id
+    await client.query(`DELETE FROM pipeline_cards WHERE board_id = $1`, [boardId]);
+    await client.query(`DELETE FROM pipeline_stages WHERE board_id = $1`, [boardId]);
+    await client.query(`DELETE FROM pipeline_boards WHERE id = $1`, [boardId]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function createPipelineBoard(data: {
   name: string;
   description?: string;
@@ -2515,4 +2452,42 @@ export async function reorderPipelineStages(
   const boards = await getPipelineBoards();
   const board = boards.find((b) => b.id === boardId);
   return board?.stages || [];
+}
+
+export async function reorderPipelineBoards(
+  boardIds: string[]
+): Promise<PipelineBoard[]> {
+  if (boardIds.length === 0) throw new Error('boardIds required');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const active = await client.query<{ id: string }>(
+      `SELECT id FROM pipeline_boards WHERE is_active = true`
+    );
+    const activeIds = new Set(active.rows.map((r) => r.id));
+    if (
+      boardIds.length !== activeIds.size ||
+      boardIds.some((id) => !activeIds.has(id))
+    ) {
+      throw new Error('boardIds must include every active board exactly once');
+    }
+
+    for (let i = 0; i < boardIds.length; i++) {
+      await client.query(
+        `UPDATE pipeline_boards SET sort_order = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND is_active = true`,
+        [i + 1, boardIds[i]]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return getPipelineBoards();
 }

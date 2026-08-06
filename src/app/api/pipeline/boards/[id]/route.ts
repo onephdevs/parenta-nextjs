@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import {
+  deletePipelineBoard,
   getCardsForBoard,
   getPipelineBoards,
   updatePipelineBoard,
@@ -45,6 +46,23 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
+    const { id } = await context.params;
+    await deletePipelineBoard(id);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('Pipeline board DELETE error:', err);
+    const message = err instanceof Error ? err.message : 'Failed to delete board';
+    const status = message.includes('not found') ? 404 : 500;
+    return NextResponse.json({ success: false, error: message }, { status });
   }
 }
 

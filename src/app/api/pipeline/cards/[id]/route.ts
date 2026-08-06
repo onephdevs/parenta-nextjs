@@ -4,9 +4,7 @@ import {
   deletePipelineCard,
   getPipelineCardById,
   movePipelineCard,
-  resumeCardToOnboarding,
   transferCardToBoard,
-  transferCardToNurture,
   updatePipelineCard,
 } from '@/lib/api/pipeline';
 import { logActivitySafe } from '@/lib/services/activity-logger';
@@ -73,43 +71,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         link: '/admin/tasks',
       });
 
-      return NextResponse.json({ success: true, data: { card } });
-    }
-
-    if (action === 'move_to_nurture') {
-      if (!body.reason?.trim()) {
-        return NextResponse.json(
-          { success: false, error: 'Reason is required to move to nurture' },
-          { status: 400 }
-        );
-      }
-      const card = await transferCardToNurture(id, body.reason.trim(), session?.user?.id);
-      logActivitySafe({
-        actorUserId: session?.user?.id || null,
-        actorRole: 'admin',
-        actionType: 'pipeline.moved_to_nurture',
-        category: 'leases',
-        entityType: 'pipeline_card',
-        entityId: card.id,
-        entityLabel: card.title,
-        metadata: { reason: body.reason },
-        link: '/admin/tasks',
-      });
-      return NextResponse.json({ success: true, data: { card } });
-    }
-
-    if (action === 'resume_to_onboarding') {
-      const card = await resumeCardToOnboarding(id, session?.user?.id);
-      logActivitySafe({
-        actorUserId: session?.user?.id || null,
-        actorRole: 'admin',
-        actionType: 'pipeline.resumed_onboarding',
-        category: 'leases',
-        entityType: 'pipeline_card',
-        entityId: card.id,
-        entityLabel: card.title,
-        link: '/admin/tasks',
-      });
       return NextResponse.json({ success: true, data: { card } });
     }
 
@@ -258,7 +219,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       {
         success: false,
         error:
-          'Unknown action. Use update, move, move_to_board, move_to_nurture, or resume_to_onboarding',
+          'Unknown action. Use update, move, or move_to_board',
       },
       { status: 400 }
     );

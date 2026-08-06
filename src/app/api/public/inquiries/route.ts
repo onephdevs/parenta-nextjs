@@ -38,6 +38,11 @@ export async function POST(request: Request) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const rawBuildingId =
+      typeof body.buildingId === 'string' ? body.buildingId.trim() : '';
+    // "unsure" / empty = general inquiry (no building tag)
+    const buildingId =
+      rawBuildingId && rawBuildingId !== 'unsure' ? rawBuildingId : undefined;
     // Prefer obscure honeypot name; still accept legacy "website"/"company" from old clients/bots
     const honeypot =
       typeof body.hp_confirm === 'string'
@@ -115,6 +120,25 @@ export async function POST(request: Request) {
 
     const fullName = `${firstName} ${lastName}`.trim();
 
+    // Validate building exists and is active before tagging the card
+    let resolvedBuildingId: string | undefined;
+    let buildingName: string | undefined;
+    if (buildingId) {
+      const buildingResult = await pool.query<{ id: string; name: string }>(
+        `SELECT id, name FROM buildings WHERE id = $1 AND is_active = true`,
+        [buildingId]
+      );
+      if (buildingResult.rows[0]) {
+        resolvedBuildingId = buildingResult.rows[0].id;
+        buildingName = buildingResult.rows[0].name;
+      }
+    }
+
+    const notesParts = [
+      buildingName ? `Interested in: ${buildingName}` : null,
+      message || null,
+    ].filter(Boolean);
+
     let card;
     try {
       card = await createPipelineCard({
@@ -125,9 +149,10 @@ export async function POST(request: Request) {
         contactLastName: lastName,
         contactEmail: email,
         contactPhone: phone || undefined,
+        buildingId: resolvedBuildingId,
         source: 'Website',
         tags: ['Website inquiry'],
-        notes: message || undefined,
+        notes: notesParts.length ? notesParts.join('\n\n') : undefined,
       });
     } catch (err) {
       releaseInquiryAttempt(ip, email);
@@ -146,6 +171,8 @@ export async function POST(request: Request) {
         email,
         phone: phone || null,
         hasMessage: Boolean(message),
+        buildingId: resolvedBuildingId || null,
+        buildingName: buildingName || null,
         source: 'website_contact',
         ip,
       },

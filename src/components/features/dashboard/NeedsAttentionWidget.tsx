@@ -24,6 +24,12 @@ const CARD_META: Record<
     empty: string;
   }
 > = {
+  inquiries: {
+    icon: UserPlus,
+    iconWrap: 'bg-blue-50 text-blue-600',
+    badge: 'bg-blue-100 text-blue-700',
+    empty: 'No new inquiries',
+  },
   payments: {
     icon: Wallet,
     iconWrap: 'bg-red-50 text-red-600',
@@ -35,12 +41,6 @@ const CARD_META: Record<
     iconWrap: 'bg-amber-50 text-amber-600',
     badge: 'bg-amber-100 text-amber-700',
     empty: 'No utilities due',
-  },
-  inquiries: {
-    icon: UserPlus,
-    iconWrap: 'bg-blue-50 text-blue-600',
-    badge: 'bg-blue-100 text-blue-700',
-    empty: 'No new inquiries',
   },
   maintenance: {
     icon: Wrench,
@@ -70,7 +70,10 @@ function AttentionCard({ card }: { card: NeedsAttentionCard }) {
   const Icon = meta.icon;
 
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <Link
+      href={card.viewAllHref}
+      className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+    >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.iconWrap}`}>
@@ -89,57 +92,40 @@ function AttentionCard({ card }: { card: NeedsAttentionCard }) {
         {card.items.length === 0 ? (
           <p className="py-4 text-center text-sm text-gray-500">{meta.empty}</p>
         ) : (
-          card.items.map((item) => {
-            const content = (
-              <>
-                <p className="truncate text-sm font-medium text-gray-900">{item.title}</p>
-                <p className="truncate text-xs text-gray-500">
-                  {item.subtitle.split(' • ').map((part, i, arr) => {
-                    const isLast = i === arr.length - 1;
-                    const highlight =
-                      isLast &&
-                      (item.urgency === 'late' || item.urgency === 'soon');
-                    return (
-                      <span key={`${item.id}-${i}`}>
-                        {i > 0 && ' • '}
-                        <span className={highlight ? urgencyClass(item.urgency) : undefined}>
-                          {part}
-                        </span>
+          card.items.map((item) => (
+            <div key={item.id}>
+              <p className="truncate text-sm font-medium text-gray-900">{item.title}</p>
+              <p className="truncate text-xs text-gray-500">
+                {item.subtitle.split(' • ').map((part, i, arr) => {
+                  const isLast = i === arr.length - 1;
+                  const highlight =
+                    isLast &&
+                    (item.urgency === 'late' || item.urgency === 'soon');
+                  return (
+                    <span key={`${item.id}-${i}`}>
+                      {i > 0 && ' • '}
+                      <span className={highlight ? urgencyClass(item.urgency) : undefined}>
+                        {part}
                       </span>
-                    );
-                  })}
+                    </span>
+                  );
+                })}
+              </p>
+              {item.meta && (
+                <p className={`text-xs font-medium ${urgencyClass(item.urgency || 'soon')}`}>
+                  {item.meta}
                 </p>
-                {item.meta && (
-                  <p className={`text-xs font-medium ${urgencyClass(item.urgency || 'soon')}`}>
-                    {item.meta}
-                  </p>
-                )}
-              </>
-            );
-
-            return item.href ? (
-              <Link
-                key={item.id}
-                href={item.href}
-                className="block rounded-lg -mx-1 px-1 py-0.5 hover:bg-gray-50 transition"
-              >
-                {content}
-              </Link>
-            ) : (
-              <div key={item.id}>{content}</div>
-            );
-          })
+              )}
+            </div>
+          ))
         )}
       </div>
 
-      <Link
-        href={card.viewAllHref}
-        className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700"
-      >
+      <span className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 group-hover:text-blue-700">
         {card.viewAllLabel}
         <ArrowRight className="ml-1 h-3.5 w-3.5" />
-      </Link>
-    </div>
+      </span>
+    </Link>
   );
 }
 
