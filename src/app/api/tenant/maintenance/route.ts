@@ -135,6 +135,23 @@ export async function POST(request: Request) {
     const result = await pool.query(insertQuery, values);
     const created = result.rows[0];
 
+    try {
+      const { ensureMaintenancePipelineCard } = await import('@/lib/api/pipeline');
+      await ensureMaintenancePipelineCard({
+        requestId: String(created.id),
+        title: String(created.title || title),
+        description: created.description != null ? String(created.description) : description,
+        status: created.status != null ? String(created.status) : 'open',
+        priority: created.priority != null ? String(created.priority) : priority || 'medium',
+        category: created.category != null ? String(created.category) : category,
+        tenantId: created.tenant_id != null ? String(created.tenant_id) : String(tenant_id),
+        roomId: created.room_id != null ? String(created.room_id) : null,
+        buildingId: created.building_id != null ? String(created.building_id) : null,
+      });
+    } catch (pipelineErr) {
+      console.error('Maintenance pipeline card sync failed:', pipelineErr);
+    }
+
     logActivitySafe({
       actorUserId: access.session.user.id || null,
       actorRole: 'tenant',
@@ -144,8 +161,8 @@ export async function POST(request: Request) {
       entityId: String(created.id),
       entityLabel: title,
       afterData: created as Record<string, unknown>,
-      link: '/admin/maintenance',
-      metadata: { link: '/admin/maintenance', tenantId: tenant_id },
+      link: '/admin/tasks?board=maintenance',
+      metadata: { link: '/admin/tasks?board=maintenance', tenantId: tenant_id },
     });
 
     return NextResponse.json({

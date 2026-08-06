@@ -50,6 +50,8 @@ interface DbCard {
   tenant_id: string | null;
   assignment_id: string | null;
   expense_id: string | null;
+  invoice_id?: string | null;
+  maintenance_request_id?: string | null;
   amount: string | number | null;
   source: string | null;
   tags: string[] | null;
@@ -138,6 +140,8 @@ function mapCard(row: DbCard): PipelineCard {
     tenantId: row.tenant_id || undefined,
     assignmentId: row.assignment_id || undefined,
     expenseId: row.expense_id || undefined,
+    invoiceId: row.invoice_id || undefined,
+    maintenanceRequestId: row.maintenance_request_id || undefined,
     amount: row.amount != null ? Number(row.amount) : undefined,
     source: row.source || undefined,
     tags: row.tags || [],
@@ -208,7 +212,7 @@ export async function getPipelineBoards(): Promise<PipelineBoard[]> {
       .filter((s) => !s.isLost)
       .reduce((sum, s) => sum + (s.cardCount || 0), 0);
     const openTotalAmount = stages
-      .filter((s) => !s.isWon && !s.isLost)
+      .filter((s) => !s.isWon && !s.isLost && s.slug !== 'paid')
       .reduce((sum, s) => sum + (s.totalAmount || 0), 0);
 
     return {
@@ -340,6 +344,7 @@ export async function createPipelineCard(
        board_id, stage_id, title,
        contact_first_name, contact_last_name, contact_email, contact_phone,
        building_id, room_id, tenant_id, assignment_id, expense_id,
+       invoice_id, maintenance_request_id,
        amount, source, tags, due_at, next_action_at, viewing_at, notes,
        lost_reason, card_status, lost_at,
        position, created_by
@@ -347,9 +352,10 @@ export async function createPipelineCard(
        $1, $2, $3,
        $4, $5, $6, $7,
        $8, $9, $10, $11, $12,
-       $13, $14, $15, $16, $17, $18, $19,
-       $20, $21, $22,
-       $23, $24
+       $13, $14,
+       $15, $16, $17, $18, $19, $20, $21,
+       $22, $23, $24,
+       $25, $26
      )
      RETURNING *`,
     [
@@ -365,6 +371,8 @@ export async function createPipelineCard(
       data.tenantId || null,
       data.assignmentId || null,
       data.expenseId || null,
+      data.invoiceId || null,
+      data.maintenanceRequestId || null,
       amount,
       data.source || null,
       finalTags,
@@ -466,6 +474,29 @@ export async function movePipelineCard(
      ) VALUES ($1, 'stage_changed', $2, $3, $4, $4, $5, $6)`,
     [cardId, card.stage_id, stageId, card.board_id, options?.note || null, options?.userId || null]
   );
+
+  // Maintenance board drag → keep maintenance_requests.status in sync
+  if (card.board_slug === 'maintenance' && card.maintenance_request_id) {
+    const requestStatus =
+      stage.slug === 'in_progress'
+        ? 'in_progress'
+        : stage.slug === 'resolved'
+          ? 'completed'
+          : stage.slug === 'closed'
+            ? 'cancelled'
+            : 'open';
+    await pool.query(
+      `UPDATE maintenance_requests SET
+         status = $1,
+         completed_date = CASE
+           WHEN $1 = 'completed' THEN COALESCE(completed_date, CURRENT_DATE)
+           ELSE completed_date
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [requestStatus, card.maintenance_request_id]
+    );
+  }
 
   const cards = await getCardsForBoard(card.board_slug as PipelineBoardSlug);
   const updated = cards.find((c) => c.id === cardId);
@@ -918,6 +949,14 @@ export interface SyncLeasesResult {
   updated: number;
   skipped: number;
   paymentCardIds: string[];
+  stagesMoved: number;
+}
+
+export interface SyncMaintenanceResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  cardIds: string[];
 }
 
 interface LeaseSyncRow {
@@ -934,9 +973,160 @@ interface LeaseSyncRow {
   end_date: string | null;
 }
 
+interface TenantInvoiceFocus {
+  id: string;
+  due_date: string;
+  balance_due: string | number | null;
+  invoice_status: string | null;
+  total_amount: string | number | null;
+}
+
+type PaymentStageSlug =
+  | 'upcoming'
+  | 'due'
+  | 'reminder_sent'
+  | 'overdue'
+  | 'paid'
+  | 'escalation';
+
+const PAYMENT_DUE_SOON_DAYS = 7;
+
+function calendarDaysUntil(dueDateIso: string, today = new Date()): number {
+  const due = new Date(`${dueDateIso.slice(0, 10)}T00:00:00`);
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((due.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 /**
- * Ensure an open Payments-board follow-up card exists for an active lease.
- * Dedupes on tenant_id within the payments board.
+ * Map lease + invoice state → Payments board stage.
+ * Preserves manual stages (reminder_sent, escalation) while still unpaid.
+ */
+export function resolvePaymentStageFromInvoice(input: {
+  invoice: TenantInvoiceFocus | null;
+  currentStageSlug?: string | null;
+  dueSoonDays?: number;
+}): PaymentStageSlug {
+  const current = input.currentStageSlug || null;
+  const dueSoonDays = input.dueSoonDays ?? PAYMENT_DUE_SOON_DAYS;
+  const invoice = input.invoice;
+  const balance = invoice ? Number(invoice.balance_due || 0) : 0;
+  const status = (invoice?.invoice_status || '').toLowerCase();
+
+  if (!invoice || balance <= 0 || status === 'paid' || status === 'cancelled') {
+    return 'paid';
+  }
+
+  if (current === 'escalation') return 'escalation';
+
+  const daysUntilDue = calendarDaysUntil(String(invoice.due_date));
+  const isOverdue = daysUntilDue < 0 || status === 'overdue';
+
+  if (isOverdue) return 'overdue';
+  if (current === 'reminder_sent') return 'reminder_sent';
+  if (daysUntilDue <= dueSoonDays) return 'due';
+  return 'upcoming';
+}
+
+async function getFocusInvoiceForTenant(
+  tenantId: string
+): Promise<TenantInvoiceFocus | null> {
+  const unpaid = await pool.query<TenantInvoiceFocus>(
+    `SELECT id, due_date::text AS due_date, balance_due, invoice_status, total_amount
+     FROM invoices
+     WHERE tenant_id = $1
+       AND invoice_status IN ('sent', 'partial', 'overdue')
+       AND COALESCE(balance_due, 0) > 0
+     ORDER BY due_date ASC NULLS LAST, created_at ASC
+     LIMIT 1`,
+    [tenantId]
+  );
+  if (unpaid.rows[0]) return unpaid.rows[0];
+
+  const latest = await pool.query<TenantInvoiceFocus>(
+    `SELECT id, due_date::text AS due_date, balance_due, invoice_status, total_amount
+     FROM invoices
+     WHERE tenant_id = $1
+       AND invoice_status IS DISTINCT FROM 'cancelled'
+     ORDER BY due_date DESC NULLS LAST, created_at DESC
+     LIMIT 1`,
+    [tenantId]
+  );
+  return latest.rows[0] || null;
+}
+
+async function applyPaymentCardStage(
+  cardId: string,
+  stageSlug: PaymentStageSlug,
+  options?: {
+    invoiceId?: string | null;
+    amount?: number | null;
+    dueAt?: string | null;
+    note?: string;
+  }
+): Promise<boolean> {
+  const existing = await pool.query<DbCard & { stage_slug: string; board_id: string }>(
+    `SELECT c.*, s.slug AS stage_slug
+     FROM pipeline_cards c
+     JOIN pipeline_stages s ON s.id = c.stage_id
+     WHERE c.id = $1`,
+    [cardId]
+  );
+  const card = existing.rows[0];
+  if (!card) return false;
+
+  const stageResult = await pool.query<{ id: string }>(
+    `SELECT id FROM pipeline_stages
+     WHERE board_id = $1 AND slug = $2
+     LIMIT 1`,
+    [card.board_id, stageSlug]
+  );
+  const stageId = stageResult.rows[0]?.id;
+  if (!stageId) return false;
+
+  const changedStage = card.stage_slug !== stageSlug;
+  const nextAmount =
+    options?.amount !== undefined ? options.amount : Number(card.amount || 0);
+  const nextDueAt =
+    options?.dueAt !== undefined ? options.dueAt : toIso(card.due_at) || null;
+  const nextInvoiceId =
+    options?.invoiceId !== undefined ? options.invoiceId : card.invoice_id || null;
+
+  await pool.query(
+    `UPDATE pipeline_cards SET
+       stage_id = $1,
+       invoice_id = $2,
+       amount = $3,
+       due_at = $4::timestamptz,
+       card_status = 'open',
+       won_at = NULL,
+       lost_at = NULL,
+       updated_at = CURRENT_TIMESTAMP
+     WHERE id = $5`,
+    [stageId, nextInvoiceId, nextAmount, nextDueAt, cardId]
+  );
+
+  if (changedStage) {
+    await pool.query(
+      `INSERT INTO pipeline_card_events (
+         card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, note
+       ) VALUES ($1, 'stage_changed', $2, $3, $4, $4, $5)`,
+      [
+        cardId,
+        card.stage_id,
+        stageId,
+        card.board_id,
+        options?.note || 'Auto-synced from lease/invoice',
+      ]
+    );
+  }
+
+  return changedStage;
+}
+
+/**
+ * Ensure an open Payments-board follow-up card exists for an active lease,
+ * with stage driven by the tenant's focus invoice (lease + invoice aware).
+ * Dedupes on tenant_id within the payments board (including won/paid cards).
  */
 export async function ensurePaymentFollowUpCard(input: {
   tenantId: string;
@@ -949,37 +1139,71 @@ export async function ensurePaymentFollowUpCard(input: {
   contactEmail?: string;
   contactPhone?: string;
   source?: string;
-}): Promise<{ card: PipelineCard; created: boolean }> {
-  const existing = await pool.query<{ id: string }>(
-    `SELECT c.id
+}): Promise<{ card: PipelineCard; created: boolean; stageMoved: boolean }> {
+  await ensureMaintenanceBoardExists();
+
+  const invoice = await getFocusInvoiceForTenant(input.tenantId);
+  const existing = await pool.query<{ id: string; stage_slug: string }>(
+    `SELECT c.id, s.slug AS stage_slug
      FROM pipeline_cards c
      INNER JOIN pipeline_boards b ON b.id = c.board_id
+     INNER JOIN pipeline_stages s ON s.id = c.stage_id
      WHERE b.slug = 'payments'
        AND c.tenant_id = $1
-       AND c.card_status = 'open'
-     ORDER BY c.updated_at DESC
+       AND c.card_status IN ('open', 'won')
+     ORDER BY
+       CASE WHEN c.card_status = 'open' THEN 0 ELSE 1 END,
+       c.updated_at DESC
      LIMIT 1`,
     [input.tenantId]
   );
+
+  const targetStage = resolvePaymentStageFromInvoice({
+    invoice,
+    currentStageSlug: existing.rows[0]?.stage_slug || null,
+  });
+
+  const displayAmount =
+    invoice && Number(invoice.balance_due || 0) > 0
+      ? Number(invoice.balance_due)
+      : invoice
+        ? Number(invoice.total_amount || input.amount)
+        : input.amount;
+  const dueAt =
+    invoice?.due_date != null
+      ? `${String(invoice.due_date).slice(0, 10)}T12:00:00.000Z`
+      : null;
 
   if (existing.rows[0]) {
     const updated = await updatePipelineCard(existing.rows[0].id, {
       assignmentId: input.assignmentId,
       buildingId: input.buildingId,
       roomId: input.roomId,
-      amount: input.amount,
+      amount: displayAmount,
       contactFirstName: input.contactFirstName,
       contactLastName: input.contactLastName,
       contactEmail: input.contactEmail || null,
       contactPhone: input.contactPhone || null,
       title: `${input.contactFirstName} ${input.contactLastName}`.trim(),
+      dueAt,
+      source: input.source || 'Lease',
     });
-    return { card: updated, created: false };
+
+    // Link invoice + stage (updatePipelineCard does not yet touch invoice_id)
+    const stageMoved = await applyPaymentCardStage(existing.rows[0].id, targetStage, {
+      invoiceId: invoice?.id || null,
+      amount: displayAmount,
+      dueAt,
+      note: 'Auto-synced from lease/invoice',
+    });
+
+    const card = (await getPipelineCardById(existing.rows[0].id)) || updated;
+    return { card, created: false, stageMoved };
   }
 
   const card = await createPipelineCard({
     boardSlug: 'payments',
-    stageSlug: 'upcoming',
+    stageSlug: targetStage,
     title: `${input.contactFirstName} ${input.contactLastName}`.trim(),
     contactFirstName: input.contactFirstName,
     contactLastName: input.contactLastName,
@@ -989,21 +1213,27 @@ export async function ensurePaymentFollowUpCard(input: {
     roomId: input.roomId,
     tenantId: input.tenantId,
     assignmentId: input.assignmentId,
-    amount: input.amount,
+    invoiceId: invoice?.id,
+    amount: displayAmount,
+    dueAt: dueAt || undefined,
     source: input.source || 'Lease',
     tags: ['Active lease'],
-    notes: 'Synced from active lease assignment',
+    notes: invoice
+      ? `Synced from active lease · invoice ${invoice.id.slice(0, 8)}`
+      : 'Synced from active lease assignment',
   });
 
-  return { card, created: true };
+  return { card, created: true, stageMoved: false };
 }
 
 /**
  * Sync all active tenant room assignments into pipeline cards:
- * - Payments board: open follow-up card per tenant (create/update)
+ * - Payments board: open follow-up card per tenant (create/update + invoice stage)
  * - Onboarding won cards: fill missing building/room/assignment links
  */
 export async function syncActiveLeasesToPipelineCards(): Promise<SyncLeasesResult> {
+  await ensureMaintenanceBoardExists();
+
   const leases = await pool.query<LeaseSyncRow>(
     `SELECT
        t.id AS tenant_id,
@@ -1029,6 +1259,7 @@ export async function syncActiveLeasesToPipelineCards(): Promise<SyncLeasesResul
   let created = 0;
   let updated = 0;
   let skipped = 0;
+  let stagesMoved = 0;
   const paymentCardIds: string[] = [];
 
   for (const lease of leases.rows) {
@@ -1052,6 +1283,7 @@ export async function syncActiveLeasesToPipelineCards(): Promise<SyncLeasesResul
       paymentCardIds.push(result.card.id);
       if (result.created) created += 1;
       else updated += 1;
+      if (result.stageMoved) stagesMoved += 1;
     } catch (err) {
       console.error('Failed to sync payment card for tenant', lease.tenant_id, err);
       skipped += 1;
@@ -1088,7 +1320,324 @@ export async function syncActiveLeasesToPipelineCards(): Promise<SyncLeasesResul
     );
   }
 
-  return { created, updated, skipped, paymentCardIds };
+  return { created, updated, skipped, paymentCardIds, stagesMoved };
+}
+
+/** Soft-ensure maintenance board + stages exist (idempotent). */
+export async function ensureMaintenanceBoardExists(): Promise<void> {
+  await pool.query(
+    `INSERT INTO pipeline_boards (slug, name, description, sort_order)
+     VALUES ('maintenance', 'Maintenance', 'Tenant work orders from portal submissions', 5)
+     ON CONFLICT (slug) DO NOTHING`
+  );
+
+  await pool.query(
+    `INSERT INTO pipeline_stages (board_id, slug, name, color, sort_order, is_won, is_lost, is_terminal)
+     SELECT b.id, s.slug, s.name, s.color, s.sort_order, s.is_won, s.is_lost, s.is_terminal
+     FROM pipeline_boards b
+     JOIN (
+       VALUES
+         ('maintenance', 'submitted', 'Submitted', '#7c3aed', 1, false, false, false),
+         ('maintenance', 'in_progress', 'In progress', '#3b82f6', 2, false, false, false),
+         ('maintenance', 'resolved', 'Resolved', '#22c55e', 3, true, false, false),
+         ('maintenance', 'closed', 'Closed', '#94a3b8', 4, true, false, true)
+     ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
+       ON b.slug = s.board_slug
+     WHERE NOT EXISTS (
+       SELECT 1 FROM pipeline_stages ps
+       WHERE ps.board_id = b.id AND ps.slug = s.slug
+     )`
+  );
+
+  // Payments Paid stage must stay open so cards can cycle with the billing period
+  await pool.query(
+    `UPDATE pipeline_stages ps
+     SET is_won = false,
+         is_terminal = false,
+         updated_at = CURRENT_TIMESTAMP
+     FROM pipeline_boards pb
+     WHERE ps.board_id = pb.id
+       AND pb.slug = 'payments'
+       AND ps.slug = 'paid'
+       AND (ps.is_won = true OR ps.is_terminal = true)`
+  );
+
+  // Columns may be missing if migration not yet applied — add defensively
+  await pool.query(
+    `ALTER TABLE pipeline_cards
+       ADD COLUMN IF NOT EXISTS invoice_id UUID,
+       ADD COLUMN IF NOT EXISTS maintenance_request_id UUID`
+  ).catch(() => undefined);
+}
+
+function maintenanceStatusToStageSlug(status: string | null | undefined): string {
+  switch ((status || 'open').toLowerCase()) {
+    case 'in_progress':
+      return 'in_progress';
+    case 'completed':
+      return 'resolved';
+    case 'cancelled':
+      return 'closed';
+    case 'open':
+    default:
+      return 'submitted';
+  }
+}
+
+/**
+ * Create/update a Maintenance pipeline card from a maintenance_requests row.
+ */
+export async function ensureMaintenancePipelineCard(input: {
+  requestId: string;
+  title: string;
+  description?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  category?: string | null;
+  tenantId?: string | null;
+  roomId?: string | null;
+  buildingId?: string | null;
+  contactFirstName?: string | null;
+  contactLastName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+}): Promise<{ card: PipelineCard; created: boolean }> {
+  await ensureMaintenanceBoardExists();
+
+  const stageSlug = maintenanceStatusToStageSlug(input.status);
+  const tags = [
+    input.priority ? `Priority: ${input.priority}` : null,
+    input.category || null,
+  ].filter(Boolean) as string[];
+
+  const existing = await pool.query<{ id: string }>(
+    `SELECT c.id
+     FROM pipeline_cards c
+     INNER JOIN pipeline_boards b ON b.id = c.board_id
+     WHERE b.slug = 'maintenance'
+       AND c.maintenance_request_id = $1
+     ORDER BY c.updated_at DESC
+     LIMIT 1`,
+    [input.requestId]
+  );
+
+  if (existing.rows[0]) {
+    await updatePipelineCard(existing.rows[0].id, {
+      title: input.title,
+      notes: input.description || null,
+      buildingId: input.buildingId || null,
+      roomId: input.roomId || null,
+      contactFirstName: input.contactFirstName || null,
+      contactLastName: input.contactLastName || null,
+      contactEmail: input.contactEmail || null,
+      contactPhone: input.contactPhone || null,
+      tags,
+      source: 'Maintenance request',
+    });
+
+    const board = await getBoardBySlug('maintenance');
+    const stage = board?.stages.find((s) => s.slug === stageSlug);
+    if (stage) {
+      const cardRow = await pool.query<{ stage_id: string; board_id: string }>(
+        `SELECT stage_id, board_id FROM pipeline_cards WHERE id = $1`,
+        [existing.rows[0].id]
+      );
+      if (cardRow.rows[0] && cardRow.rows[0].stage_id !== stage.id) {
+        const isClosed = stageSlug === 'closed';
+        const isResolved = stageSlug === 'resolved';
+        await pool.query(
+          `UPDATE pipeline_cards SET
+             stage_id = $1,
+             card_status = $2,
+             won_at = CASE WHEN $3 THEN COALESCE(won_at, CURRENT_TIMESTAMP) ELSE won_at END,
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [
+            stage.id,
+            isClosed ? 'archived' : isResolved ? 'won' : 'open',
+            isResolved || isClosed,
+            existing.rows[0].id,
+          ]
+        );
+        await pool.query(
+          `INSERT INTO pipeline_card_events (
+             card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, note
+           ) VALUES ($1, 'stage_changed', $2, $3, $4, $4, $5)`,
+          [
+            existing.rows[0].id,
+            cardRow.rows[0].stage_id,
+            stage.id,
+            cardRow.rows[0].board_id,
+            'Synced from maintenance request status',
+          ]
+        );
+      }
+    }
+
+    const card = await getPipelineCardById(existing.rows[0].id);
+    if (!card) throw new Error('Failed to reload maintenance card');
+    return { card, created: false };
+  }
+
+  let firstName = input.contactFirstName || undefined;
+  let lastName = input.contactLastName || undefined;
+  let email = input.contactEmail || undefined;
+  let phone = input.contactPhone || undefined;
+
+  if (input.tenantId && (!firstName || !lastName)) {
+    const tenant = await pool.query<{
+      first_name: string;
+      last_name: string;
+      email: string | null;
+      phone: string | null;
+    }>(`SELECT first_name, last_name, email, phone FROM tenants WHERE id = $1`, [
+      input.tenantId,
+    ]);
+    if (tenant.rows[0]) {
+      firstName = firstName || tenant.rows[0].first_name;
+      lastName = lastName || tenant.rows[0].last_name;
+      email = email || tenant.rows[0].email || undefined;
+      phone = phone || tenant.rows[0].phone || undefined;
+    }
+  }
+
+  const card = await createPipelineCard({
+    boardSlug: 'maintenance',
+    stageSlug,
+    title: input.title,
+    contactFirstName: firstName,
+    contactLastName: lastName,
+    contactEmail: email,
+    contactPhone: phone,
+    buildingId: input.buildingId || undefined,
+    roomId: input.roomId || undefined,
+    tenantId: input.tenantId || undefined,
+    maintenanceRequestId: input.requestId,
+    source: 'Tenant portal',
+    tags,
+    notes: input.description || undefined,
+  });
+
+  return { card, created: true };
+}
+
+/** Backfill Maintenance board from open/in-progress requests. */
+export async function syncOpenMaintenanceToPipelineCards(): Promise<SyncMaintenanceResult> {
+  await ensureMaintenanceBoardExists();
+
+  const result = await pool.query<{
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string | null;
+    category: string | null;
+    tenant_id: string | null;
+    room_id: string | null;
+    building_id: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+  }>(
+    `SELECT
+       mr.id,
+       mr.title,
+       mr.description,
+       mr.status,
+       mr.priority,
+       mr.category,
+       mr.tenant_id,
+       mr.room_id,
+       mr.building_id,
+       t.first_name,
+       t.last_name,
+       t.email,
+       t.phone
+     FROM maintenance_requests mr
+     LEFT JOIN tenants t ON t.id = mr.tenant_id
+     WHERE mr.status IN ('open', 'in_progress', 'completed')
+     ORDER BY mr.created_at DESC
+     LIMIT 500`
+  );
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const cardIds: string[] = [];
+
+  for (const row of result.rows) {
+    try {
+      const synced = await ensureMaintenancePipelineCard({
+        requestId: row.id,
+        title: row.title,
+        description: row.description,
+        status: row.status,
+        priority: row.priority,
+        category: row.category,
+        tenantId: row.tenant_id,
+        roomId: row.room_id,
+        buildingId: row.building_id,
+        contactFirstName: row.first_name,
+        contactLastName: row.last_name,
+        contactEmail: row.email,
+        contactPhone: row.phone,
+      });
+      cardIds.push(synced.card.id);
+      if (synced.created) created += 1;
+      else updated += 1;
+    } catch (err) {
+      console.error('Failed to sync maintenance card', row.id, err);
+      skipped += 1;
+    }
+  }
+
+  return { created, updated, skipped, cardIds };
+}
+
+/**
+ * Refresh a single tenant's Payments card from invoices (e.g. after payment applied).
+ */
+export async function syncPaymentCardForTenant(tenantId: string): Promise<void> {
+  const lease = await pool.query<LeaseSyncRow>(
+    `SELECT
+       t.id AS tenant_id,
+       tra.id AS assignment_id,
+       t.first_name,
+       t.last_name,
+       t.email,
+       t.phone,
+       r.building_id,
+       tra.room_id,
+       tra.monthly_rate::text AS monthly_rate,
+       tra.start_date::text AS start_date,
+       tra.end_date::text AS end_date
+     FROM tenant_room_assignments tra
+     INNER JOIN tenants t ON t.id = tra.tenant_id
+     INNER JOIN rooms r ON r.id = tra.room_id
+     WHERE tra.tenant_id = $1
+       AND tra.assignment_status = 'active'
+       AND t.is_active = true
+       AND (tra.end_date IS NULL OR tra.end_date::date >= CURRENT_DATE)
+     ORDER BY tra.start_date DESC
+     LIMIT 1`,
+    [tenantId]
+  );
+
+  if (!lease.rows[0]) return;
+  const row = lease.rows[0];
+  await ensurePaymentFollowUpCard({
+    tenantId: row.tenant_id,
+    assignmentId: row.assignment_id,
+    buildingId: row.building_id,
+    roomId: row.room_id,
+    amount: Number(row.monthly_rate) || 0,
+    contactFirstName: (row.first_name || '').trim() || 'Tenant',
+    contactLastName: (row.last_name || '').trim() || 'Lease',
+    contactEmail: row.email || undefined,
+    contactPhone: row.phone || undefined,
+    source: 'Invoice sync',
+  });
 }
 
 export async function transferCardToBoard(

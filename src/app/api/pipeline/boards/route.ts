@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import {
   createPipelineBoard,
+  ensureMaintenanceBoardExists,
   getCardsForBoard,
   getPipelineBoards,
+  syncActiveLeasesToPipelineCards,
+  syncOpenMaintenanceToPipelineCards,
 } from '@/lib/api/pipeline';
 import type { PipelineBoardSlug } from '@/types/database';
 
@@ -14,6 +17,25 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug') as PipelineBoardSlug | null;
+    const autoSync = searchParams.get('sync') !== '0';
+
+    await ensureMaintenanceBoardExists();
+
+    // Auto-sync when opening Payments / Maintenance so stages reflect live data
+    if (autoSync && slug === 'payments') {
+      try {
+        await syncActiveLeasesToPipelineCards();
+      } catch (syncErr) {
+        console.error('Auto-sync payments pipeline failed:', syncErr);
+      }
+    }
+    if (autoSync && slug === 'maintenance') {
+      try {
+        await syncOpenMaintenanceToPipelineCards();
+      } catch (syncErr) {
+        console.error('Auto-sync maintenance pipeline failed:', syncErr);
+      }
+    }
 
     const boards = await getPipelineBoards();
 

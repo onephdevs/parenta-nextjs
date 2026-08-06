@@ -226,6 +226,13 @@ export async function allocatePaymentToInvoices(
       await client.query('COMMIT');
     }
 
+    // Keep Payments pipeline stages aligned with invoice balances
+    void import('@/lib/api/pipeline')
+      .then(({ syncPaymentCardForTenant }) => syncPaymentCardForTenant(tenantId))
+      .catch((err) =>
+        console.error('Payment pipeline sync after allocation failed:', err)
+      );
+
     const totalAllocated = paymentAmount - remainingAmount;
 
     return {

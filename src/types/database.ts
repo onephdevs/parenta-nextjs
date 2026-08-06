@@ -918,7 +918,12 @@ export interface CreateAssetBillingData {
 // =====================================================
 
 export type PipelineBoardSlug = string;
-export type BuiltInPipelineBoardSlug = 'onboarding' | 'nurture' | 'payments' | 'expenses';
+export type BuiltInPipelineBoardSlug =
+  | 'onboarding'
+  | 'nurture'
+  | 'payments'
+  | 'expenses'
+  | 'maintenance';
 export type PipelineCardStatus = 'open' | 'won' | 'lost' | 'archived';
 export type PipelineBackgroundCheckStatus =
   | 'not_started'
@@ -973,6 +978,8 @@ export interface PipelineCard {
   tenantId?: string;
   assignmentId?: string;
   expenseId?: string;
+  invoiceId?: string;
+  maintenanceRequestId?: string;
   amount?: number;
   source?: string;
   tags: string[];
@@ -1025,6 +1032,8 @@ export interface CreatePipelineCardData {
   tenantId?: string;
   assignmentId?: string;
   expenseId?: string;
+  invoiceId?: string;
+  maintenanceRequestId?: string;
   amount?: number;
   source?: string;
   tags?: string[];

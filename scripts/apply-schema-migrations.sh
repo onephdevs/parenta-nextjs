@@ -73,6 +73,9 @@ MIGRATIONS=(
   add-pipeline-onboarding-flow.sql
   add-pipeline-onboarding-stages-fix.sql
   add-pipeline-lease-dates.sql
+  add-pipeline-move-in-payment.sql
+  add-pipeline-payment-stage.sql
+  add-pipeline-maintenance-and-invoice-sync.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

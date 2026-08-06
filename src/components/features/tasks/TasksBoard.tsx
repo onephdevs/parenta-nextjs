@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, Columns3, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type {
@@ -47,6 +48,7 @@ interface TasksBoardProps {
 }
 
 export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
+  const router = useRouter();
   const [boards, setBoards] = useState<PipelineBoard[]>([]);
   const [activeSlug, setActiveSlug] = useState<PipelineBoardSlug>(initialSlug);
   const [cards, setCards] = useState<PipelineCard[]>([]);
@@ -87,12 +89,13 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       setBoards(json.data.boards);
       setCards(json.data.cards || []);
       setActiveSlug(slug);
+      router.replace(`/admin/tasks?board=${encodeURIComponent(slug)}`, { scroll: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load board');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void loadBoard(initialSlug);
@@ -296,25 +299,21 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       const res = await fetch('/api/pipeline/sync', { method: 'POST' });
       const json = await res.json();
       if (!json.success) {
-        throw new Error(json.error || 'Failed to sync leases');
+        throw new Error(json.error || 'Failed to sync');
       }
-      setSyncMessage(json.message || 'Leases synced to cards');
-      await loadBoard(activeSlug === 'payments' ? 'payments' : activeSlug);
-      if (activeSlug !== 'payments') {
-        // Soft nudge: payments board is where lease cards land
-        setSyncMessage(
-          `${json.message || 'Synced.'} Open the Payments pipeline to see lease follow-up cards.`
-        );
-      }
+      setSyncMessage(json.message || 'Pipelines synced from leases, invoices, and maintenance');
+      await loadBoard(activeSlug);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sync leases');
+      setError(err instanceof Error ? err.message : 'Failed to sync pipelines');
     } finally {
       setSyncing(false);
     }
   }
 
   const showMoney =
-    activeSlug === 'onboarding' || activeSlug === 'nurture' || activeSlug === 'payments';
+    activeSlug === 'onboarding' ||
+    activeSlug === 'nurture' ||
+    activeSlug === 'payments';
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -473,10 +472,10 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             onClick={() => void handleSyncLeases()}
             isDisabled={syncing}
             isLoading={syncing}
-            title="Create/update Payments cards from active leases"
+            title="Sync Payments from leases/invoices and Maintenance from open requests"
           >
             <RefreshCw className={`mr-1.5 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            Sync leases
+            Sync pipelines
           </Button>
           <Button
             type="button"

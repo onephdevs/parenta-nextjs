@@ -124,7 +124,7 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
             : status.tier === 'due_soon'
               ? ('soon' as const)
               : ('normal' as const),
-        href: `/admin/tenants/${row.id}`,
+        href: `/admin/tasks?board=payments`,
         urgencyRank: status.urgencyRank,
       };
     })
@@ -135,8 +135,8 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
     title: 'Payments due',
     count: ranked.length,
     items: ranked.slice(0, PREVIEW_LIMIT).map(({ urgencyRank: _, ...item }) => item),
-    viewAllHref: '/admin/financial/payments',
-    viewAllLabel: 'View all payments',
+    viewAllHref: '/admin/tasks?board=payments',
+    viewAllLabel: 'View payments pipeline',
   };
 }
 
@@ -263,7 +263,7 @@ async function getNewInquiries(): Promise<NeedsAttentionCard> {
       title: name,
       subtitle,
       urgency: row.stage_slug === 'new_inquiry' ? 'soon' : 'normal',
-      href: '/admin/tasks',
+      href: '/admin/tasks?board=onboarding',
     };
   });
 
@@ -272,7 +272,7 @@ async function getNewInquiries(): Promise<NeedsAttentionCard> {
     title: 'New inquiries',
     count: items.length,
     items: items.slice(0, PREVIEW_LIMIT),
-    viewAllHref: '/admin/tasks',
+    viewAllHref: '/admin/tasks?board=onboarding',
     viewAllLabel: 'View pipeline',
   };
 }
@@ -313,7 +313,7 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
       meta: submitted ? `Submitted ${submitted}` : undefined,
       urgency:
         row.priority === 'urgent' || row.priority === 'high' ? 'late' : 'soon',
-      href: '/admin/maintenance',
+      href: '/admin/tasks?board=maintenance',
     };
   });
 
@@ -322,8 +322,8 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
     title: 'Maintenance',
     count: items.length,
     items: items.slice(0, PREVIEW_LIMIT),
-    viewAllHref: '/admin/maintenance',
-    viewAllLabel: 'View all requests',
+    viewAllHref: '/admin/tasks?board=maintenance',
+    viewAllLabel: 'View maintenance pipeline',
   };
 }
 

@@ -91,6 +91,24 @@ export async function POST(request: Request) {
       scheduledDate,
     });
 
+    try {
+      const { ensureMaintenancePipelineCard } = await import('@/lib/api/pipeline');
+      await ensureMaintenancePipelineCard({
+        requestId: String(created.id),
+        title: String(created.title || title),
+        description: created.description != null ? String(created.description) : description,
+        status: created.status != null ? String(created.status) : 'open',
+        priority: created.priority != null ? String(created.priority) : priority,
+        category: created.category != null ? String(created.category) : category,
+        tenantId: created.tenant_id != null ? String(created.tenant_id) : tenantId,
+        roomId: created.room_id != null ? String(created.room_id) : roomId,
+        buildingId:
+          created.building_id != null ? String(created.building_id) : buildingId,
+      });
+    } catch (pipelineErr) {
+      console.error('Maintenance pipeline card sync failed:', pipelineErr);
+    }
+
     logActivitySafe({
       actorUserId: session.user.id || null,
       actorRole: 'admin',
@@ -100,8 +118,8 @@ export async function POST(request: Request) {
       entityId: String(created.id),
       entityLabel: title,
       afterData: created as Record<string, unknown>,
-      link: '/admin/maintenance',
-      metadata: { link: '/admin/maintenance' },
+      link: '/admin/tasks?board=maintenance',
+      metadata: { link: '/admin/tasks?board=maintenance' },
     });
 
     return NextResponse.json({
@@ -187,6 +205,28 @@ export async function PUT(request: Request) {
           ? 'maintenance.status_changed'
           : 'maintenance.updated';
 
+    try {
+      const { ensureMaintenancePipelineCard } = await import('@/lib/api/pipeline');
+      await ensureMaintenancePipelineCard({
+        requestId: String(updated.id),
+        title: String(updated.title || before.title || 'Maintenance'),
+        description:
+          updated.description != null
+            ? String(updated.description)
+            : before.description != null
+              ? String(before.description)
+              : null,
+        status: updated.status != null ? String(updated.status) : status,
+        priority: updated.priority != null ? String(updated.priority) : priority,
+        category: updated.category != null ? String(updated.category) : undefined,
+        tenantId: updated.tenant_id != null ? String(updated.tenant_id) : null,
+        roomId: updated.room_id != null ? String(updated.room_id) : null,
+        buildingId: updated.building_id != null ? String(updated.building_id) : null,
+      });
+    } catch (pipelineErr) {
+      console.error('Maintenance pipeline card sync failed:', pipelineErr);
+    }
+
     logActivitySafe({
       actorUserId: session.user.id || null,
       actorRole: 'admin',
@@ -197,8 +237,8 @@ export async function PUT(request: Request) {
       entityLabel: updated.title || before.title || id,
       beforeData: before as Record<string, unknown>,
       afterData: updated as Record<string, unknown>,
-      link: '/admin/maintenance',
-      metadata: { link: '/admin/maintenance' },
+      link: '/admin/tasks?board=maintenance',
+      metadata: { link: '/admin/tasks?board=maintenance' },
     });
 
     return NextResponse.json({
