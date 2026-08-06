@@ -95,10 +95,10 @@ export default function ActiveTenantsList() {
   }, [tenants]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-lg font-bold text-gray-900 flex items-center">
-          <Users className="h-5 w-5 mr-2 text-purple-600" />
+    <div className="flex max-h-[min(40rem,calc(100vh-14rem))] min-h-[28rem] flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="flex items-center text-lg font-bold text-gray-900">
+          <Users className="mr-2 h-5 w-5 text-purple-600" />
           Active tenants
         </h3>
         <div className="relative w-full sm:max-w-xs">
@@ -113,80 +113,84 @@ export default function ActiveTenantsList() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
-          ))}
-        </div>
-      ) : uniqueTenants.length === 0 ? (
-        <div className="text-center py-10 text-gray-500">
-          <Users className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-          <p className="text-sm">
-            {debouncedSearch ? 'No tenants match your search' : 'No active tenants found'}
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto -mx-2">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                <th className="px-2 py-2 font-medium">Tenant</th>
-                <th className="px-2 py-2 font-medium">Room</th>
-                <th className="px-2 py-2 font-medium text-right">Balance</th>
-                <th className="px-2 py-2 font-medium text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {uniqueTenants.map((tenant) => {
-                const status = getPastDueStatus({
-                  balance: tenant.balance,
-                  daysPastDue: tenant.daysPastDue,
-                  daysUntilDue: tenant.daysUntilDue,
-                });
-                const roomLabel = tenant.roomNumber
-                  ? tenant.buildingName
-                    ? `${tenant.roomNumber}`
-                    : tenant.roomNumber
-                  : '—';
+      <div className="min-h-0 flex-1 overflow-auto">
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />
+            ))}
+          </div>
+        ) : uniqueTenants.length === 0 ? (
+          <div className="py-10 text-center text-gray-500">
+            <Users className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+            <p className="text-sm">
+              {debouncedSearch ? 'No tenants match your search' : 'No active tenants found'}
+            </p>
+          </div>
+        ) : (
+          <div className="-mx-2 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-2 py-2 font-medium">Tenant</th>
+                  <th className="px-2 py-2 font-medium">Room</th>
+                  <th className="px-2 py-2 text-right font-medium">Balance</th>
+                  <th className="px-2 py-2 text-right font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {uniqueTenants.map((tenant) => {
+                  const status = getPastDueStatus({
+                    balance: tenant.balance,
+                    daysPastDue: tenant.daysPastDue,
+                    daysUntilDue: tenant.daysUntilDue,
+                  });
+                  const roomLabel = tenant.roomNumber
+                    ? tenant.buildingName
+                      ? `${tenant.roomNumber}`
+                      : tenant.roomNumber
+                    : '—';
 
-                return (
-                  <tr key={tenant.id} className="hover:bg-gray-50/80">
-                    <td className="px-2 py-3">
-                      <Link
-                        href={`/admin/tenants/${tenant.id}`}
-                        className="font-medium text-gray-900 hover:text-blue-600"
+                  return (
+                    <tr key={tenant.id} className="hover:bg-gray-50/80">
+                      <td className="px-2 py-3">
+                        <Link
+                          href={`/admin/tenants/${tenant.id}`}
+                          className="font-medium text-gray-900 hover:text-blue-600"
+                        >
+                          {tenant.firstName} {tenant.lastName}
+                        </Link>
+                      </td>
+                      <td className="px-2 py-3 text-gray-600">
+                        <span title={tenant.buildingName || undefined}>{roomLabel}</span>
+                      </td>
+                      <td
+                        className={`px-2 py-3 text-right tabular-nums ${pastDueAmountClass(status)}`}
                       >
-                        {tenant.firstName} {tenant.lastName}
-                      </Link>
-                    </td>
-                    <td className="px-2 py-3 text-gray-600">
-                      <span title={tenant.buildingName || undefined}>{roomLabel}</span>
-                    </td>
-                    <td className={`px-2 py-3 text-right tabular-nums ${pastDueAmountClass(status)}`}>
-                      {formatCurrency(tenant.balance)}
-                    </td>
-                    <td className="px-2 py-3 text-right">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${pastDueBadgeClass(status)}`}
-                      >
-                        {status.label}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                        {formatCurrency(tenant.balance)}
+                      </td>
+                      <td className="px-2 py-3 text-right">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${pastDueBadgeClass(status)}`}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-      <div className="mt-4 flex justify-end border-t border-gray-100 pt-3">
+      <div className="mt-4 flex shrink-0 justify-end border-t border-gray-100 pt-3">
         <Link
           href="/admin/tenants"
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium inline-flex items-center"
+          className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700"
         >
-          View all tenants <ArrowRight className="h-4 w-4 ml-1" />
+          View all tenants <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
       </div>
     </div>

@@ -162,16 +162,16 @@ export default function NotificationsWidget() {
 
   if (isLoading && notifications.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold text-gray-900 flex items-center">
-            <Bell className="h-4 w-4 mr-2 text-blue-600" />
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center text-base font-bold text-gray-900">
+            <Bell className="mr-2 h-4 w-4 text-blue-600" />
             Notifications
           </h3>
         </div>
         <div className="space-y-2">
           {[1, 2].map((i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
+            <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />
           ))}
         </div>
       </div>
@@ -179,45 +179,45 @@ export default function NotificationsWidget() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 h-full">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center min-w-0">
-          <h3 className="text-base font-bold text-gray-900 flex items-center">
-            <Bell className="h-4 w-4 mr-2 text-blue-600" />
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex min-w-0 items-center">
+          <h3 className="flex items-center text-base font-bold text-gray-900">
+            <Bell className="mr-2 h-4 w-4 text-blue-600" />
             Notifications
           </h3>
           {unreadCount > 0 && (
-            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
               {unreadCount}
             </span>
           )}
         </div>
         <Link
           href="/admin/notifications"
-          className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center shrink-0"
+          className="flex shrink-0 items-center text-xs font-medium text-blue-600 hover:text-blue-700"
         >
-          View all <ArrowRight className="h-3.5 w-3.5 ml-0.5" />
+          View all <ArrowRight className="ml-0.5 h-3.5 w-3.5" />
         </Link>
       </div>
 
       {notifications.length === 0 ? (
-        <div className="text-center py-6 text-gray-500">
-          <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+        <div className="py-6 text-center text-gray-500">
+          <Bell className="mx-auto mb-2 h-8 w-8 text-gray-300" />
           <p className="text-sm">No alerts right now</p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
+        <div className="max-h-72 space-y-2 overflow-y-auto">
           {notifications.map((notification) => {
             const inner = (
-              <div className="flex items-start gap-2 flex-1 min-w-0">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 <div className="mt-0.5 shrink-0">
                   {getPriorityIcon(notification.priority)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-900 line-clamp-2">
+                  <p className="line-clamp-2 text-sm text-gray-900">
                     {notification.title || notification.message}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-gray-500">
                     {formatTime(notification.createdAt)}
                   </p>
                 </div>
@@ -234,7 +234,7 @@ export default function NotificationsWidget() {
                 }`}
               >
                 {notification.link ? (
-                  <Link href={notification.link} className="flex-1 min-w-0">
+                  <Link href={notification.link} className="min-w-0 flex-1">
                     {inner}
                   </Link>
                 ) : (

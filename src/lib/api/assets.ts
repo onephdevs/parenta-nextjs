@@ -322,7 +322,7 @@ export async function deleteAsset(assetId: string): Promise<boolean> {
     // Also update any active assignments
     const assignmentQuery = `
       UPDATE asset_assignments 
-      SET assignment_status = 'terminated', return_date = CURRENT_DATE, updated_at = NOW()
+      SET assignment_status = 'returned', return_date = CURRENT_DATE, updated_at = NOW()
       WHERE asset_id = $1 AND assignment_status = 'active'
     `;
     
@@ -409,7 +409,7 @@ export async function unassignAsset(assetId: string): Promise<boolean> {
     // End assignment
     await client.query(`
       UPDATE asset_assignments 
-      SET assignment_status = 'terminated', return_date = CURRENT_DATE, updated_at = NOW()
+      SET assignment_status = 'returned', return_date = CURRENT_DATE, updated_at = NOW()
       WHERE asset_id = $1 AND assignment_status = 'active'
     `, [assetId]);
     

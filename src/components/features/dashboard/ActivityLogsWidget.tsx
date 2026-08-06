@@ -81,40 +81,40 @@ export default function ActivityLogsWidget() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 h-full">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-bold text-gray-900 flex items-center">
-          <Activity className="h-4 w-4 mr-2 text-indigo-600" />
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center text-base font-bold text-gray-900">
+          <Activity className="mr-2 h-4 w-4 text-indigo-600" />
           Activity log
         </h3>
         <Link
           href="/admin/activity"
-          className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center"
+          className="flex items-center text-xs font-medium text-blue-600 hover:text-blue-700"
         >
-          Full log <ArrowRight className="h-3.5 w-3.5 ml-0.5" />
+          Full log <ArrowRight className="ml-0.5 h-3.5 w-3.5" />
         </Link>
       </div>
 
       {isLoading && activityLogs.length === 0 ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
+            <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />
           ))}
         </div>
       ) : activityLogs.length === 0 ? (
-        <div className="text-center py-6 text-gray-500">
-          <Activity className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+        <div className="py-6 text-center text-gray-500">
+          <Activity className="mx-auto mb-2 h-8 w-8 text-gray-300" />
           <p className="text-sm">No recent activity</p>
         </div>
       ) : (
-        <ul className="space-y-2.5 max-h-64 overflow-y-auto">
+        <ul className="max-h-72 space-y-2.5 overflow-y-auto">
           {activityLogs.map((log) => (
             <li key={log.id}>
               <Link
                 href={`/admin/activity?id=${log.id}`}
-                className="block rounded-lg -mx-1 px-1 py-1 hover:bg-gray-50 transition"
+                className="-mx-1 block rounded-lg px-1 py-1 transition hover:bg-gray-50"
               >
-                <p className="text-sm text-gray-900 line-clamp-2">
+                <p className="line-clamp-2 text-sm text-gray-900">
                   {log.description || log.action}
                 </p>
                 <p className="mt-0.5 text-xs text-gray-500">

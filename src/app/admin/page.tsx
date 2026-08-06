@@ -150,12 +150,12 @@ export default async function AdminDashboard() {
         {/* Actionable monitoring */}
         <NeedsAttentionWidget />
 
-        {/* Monitoring: table + side panels */}
-        <div className="mb-10 grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2">
+        {/* Monitoring: tenants + notifications / activity */}
+        <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+          <div className="lg:col-span-7 xl:col-span-8">
             <ActiveTenantsList />
           </div>
-          <div className="flex flex-col gap-6">
+          <div className="flex max-h-[min(40rem,calc(100vh-14rem))] flex-col gap-6 overflow-y-auto lg:col-span-5 lg:sticky lg:top-4 xl:col-span-4">
             <NotificationsWidget />
             <ActivityLogsWidget />
           </div>
