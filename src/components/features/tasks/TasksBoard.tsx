@@ -88,6 +88,10 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const boardTitleInputRef = useRef<HTMLInputElement>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
+  /** Ignores stale in-flight board fetches when the user switches quickly. */
+  const loadSeqRef = useRef(0);
+  /** Last slug we intentionally loaded (user click or URL sync). */
+  const lastRequestedSlugRef = useRef<PipelineBoardSlug | null>(null);
 
   const activeBoard = useMemo(
     () => boards.find((b) => b.slug === activeSlug) || null,
@@ -96,32 +100,49 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
 
   const loadBoard = useCallback(
     async (slug: PipelineBoardSlug) => {
+      const seq = ++loadSeqRef.current;
+      lastRequestedSlugRef.current = slug;
+
+      // Optimistic UI: clear search/filters and update label/URL immediately so
+      // a leftover search term can't hide the new board or look like a failed switch.
+      setActiveSlug(slug);
+      setSearchQuery('');
+      setTagFilter(null);
+      setSelectedIds(new Set());
+      setFieldPair(loadCardFields(slug));
+      setSwitcherOpen(false);
+      setCreatingBoard(false);
       setLoading(true);
       setError(null);
+      router.replace(`/admin/tasks?board=${encodeURIComponent(slug)}`, {
+        scroll: false,
+      });
+
       try {
-        const res = await fetch(`/api/pipeline/boards?slug=${slug}`);
+        const res = await fetch(`/api/pipeline/boards?slug=${encodeURIComponent(slug)}`);
         const json = await res.json();
+        if (seq !== loadSeqRef.current) return;
         if (!json.success) {
           throw new Error(json.error || 'Failed to load board');
         }
         setBoards(json.data.boards);
         setCards(json.data.cards || []);
-        setActiveSlug(slug);
-        setFieldPair(loadCardFields(slug));
-        setSelectedIds(new Set());
-        router.replace(`/admin/tasks?board=${encodeURIComponent(slug)}`, {
-          scroll: false,
-        });
       } catch (err) {
+        if (seq !== loadSeqRef.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load board');
       } finally {
-        setLoading(false);
+        if (seq === loadSeqRef.current) setLoading(false);
       }
     },
     [router]
   );
 
+  // Sync from URL only when it differs from what we already requested (avoids
+  // racing a user switch with a stale reload of the previous board).
   useEffect(() => {
+    if (lastRequestedSlugRef.current === initialSlug) {
+      return;
+    }
     void loadBoard(initialSlug);
   }, [initialSlug, loadBoard]);
 
@@ -564,8 +585,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         </div>
       </div>
 
-      {/* 2. Toolbar row */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* 2. Toolbar row — z-30 so the board dropdown sits above search/filter rows */}
+      <div className="relative z-30 flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex min-w-0 flex-wrap items-center gap-2" ref={switcherRef}>
           {editingBoardTitle ? (
             <input
@@ -627,7 +648,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             <div
               role="listbox"
               aria-label="Pipeline boards"
-              className="absolute left-0 top-full z-20 mt-1 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+              className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
             >
               {boards.map((board) => (
                 <button
@@ -639,9 +660,6 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
                     board.slug === activeSlug ? 'bg-blue-50' : ''
                   }`}
                   onClick={() => {
-                    setSwitcherOpen(false);
-                    setCreatingBoard(false);
-                    setTagFilter(null);
                     void loadBoard(board.slug);
                   }}
                 >
