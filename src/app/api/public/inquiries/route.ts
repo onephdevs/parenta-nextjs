@@ -9,15 +9,31 @@ import {
 } from '@/lib/public-inquiry-guard';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const HERO_SOURCES = new Set(['hero_banner', 'hero']);
+
+function digitCount(value: string): number {
+  return (value.match(/\d/g) || []).length;
+}
+
+function looksLikePhone(value: string): boolean {
+  const digits = digitCount(value);
+  if (digits < 7) return false;
+  // Prefer email when @ is present
+  if (value.includes('@')) return false;
+  return /^[\d\s+().\-]+$/.test(value.trim());
+}
 
 /**
  * Public homepage contact / inquiry → Onboarding pipeline (New inquiry).
- * Fields map 1:1 to Add Opportunity Contact: firstName, lastName, email, phone, message→notes.
+ * Full form: firstName, lastName, email, phone, message→notes.
+ * Hero banner: email OR phone only (source: hero_banner).
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const ip = getClientIp(request);
+    const sourceRaw = typeof body.source === 'string' ? body.source.trim() : '';
+    const isHero = HERO_SOURCES.has(sourceRaw);
 
     // Prefer explicit first/last; fall back to legacy single `name`
     let firstName =
@@ -35,15 +51,34 @@ export async function POST(request: Request) {
       }
     }
 
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+    let email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    let phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const contact =
+      typeof body.contact === 'string' ? body.contact.trim() : '';
+
+    // Hero: single contact field may be email or phone
+    if (isHero && contact && !email && !phone) {
+      if (EMAIL_RE.test(contact.toLowerCase())) {
+        email = contact.toLowerCase();
+      } else if (looksLikePhone(contact)) {
+        phone = contact;
+      } else if (contact.includes('@')) {
+        email = contact.toLowerCase();
+      } else if (digitCount(contact) >= 7) {
+        phone = contact;
+      }
+    }
+
+    if (isHero) {
+      if (!firstName) firstName = 'Website';
+      if (!lastName) lastName = 'Inquiry';
+    }
+
     const rawBuildingId =
       typeof body.buildingId === 'string' ? body.buildingId.trim() : '';
-    // "unsure" / empty = general inquiry (no building tag)
     const buildingId =
       rawBuildingId && rawBuildingId !== 'unsure' ? rawBuildingId : undefined;
-    // Prefer obscure honeypot name; still accept legacy "website"/"company" from old clients/bots
     const honeypot =
       typeof body.hp_confirm === 'string'
         ? body.hp_confirm
@@ -67,7 +102,32 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!email || !EMAIL_RE.test(email)) {
+    const emailOk = Boolean(email && EMAIL_RE.test(email));
+    const phoneOk = Boolean(phone && digitCount(phone) >= 7);
+
+    if (isHero) {
+      if (!emailOk && !phoneOk) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Please enter a valid email address or phone number',
+          },
+          { status: 400 }
+        );
+      }
+      if (email && !emailOk) {
+        return NextResponse.json(
+          { success: false, error: 'Please enter a valid email address' },
+          { status: 400 }
+        );
+      }
+      if (phone && !phoneOk && !emailOk) {
+        return NextResponse.json(
+          { success: false, error: 'Please enter a valid phone number' },
+          { status: 400 }
+        );
+      }
+    } else if (!emailOk) {
       return NextResponse.json(
         { success: false, error: 'Please enter a valid email address' },
         { status: 400 }
@@ -79,10 +139,11 @@ export async function POST(request: Request) {
       formStartedAt: body.formStartedAt,
       firstName,
       lastName,
-      email,
-      phone,
+      email: emailOk ? email : '',
+      phone: phoneOk ? phone : phone,
       message,
       ip,
+      source: sourceRaw || undefined,
     });
 
     if (!spam.ok) {
@@ -98,29 +159,56 @@ export async function POST(request: Request) {
       );
     }
 
-    // Extra DB cooldown: same email already opened an inquiry in the last hour
-    const recent = await pool.query<{ id: string }>(
-      `SELECT c.id
-       FROM pipeline_cards c
-       INNER JOIN pipeline_boards b ON b.id = c.board_id
-       WHERE b.slug = 'onboarding'
-         AND LOWER(COALESCE(c.contact_email, '')) = $1
-         AND c.created_at > NOW() - INTERVAL '1 hour'
-       LIMIT 1`,
-      [email]
-    );
-    if (recent.rows[0]) {
-      return NextResponse.json({
-        success: true,
-        message:
-          'Thanks! We already have your inquiry and will get back to you soon.',
-        data: { id: recent.rows[0].id, duplicate: true },
-      });
+    // Extra DB cooldown: same email or phone already opened an inquiry in the last hour
+    if (emailOk) {
+      const recent = await pool.query<{ id: string }>(
+        `SELECT c.id
+         FROM pipeline_cards c
+         INNER JOIN pipeline_boards b ON b.id = c.board_id
+         WHERE b.slug = 'onboarding'
+           AND LOWER(COALESCE(c.contact_email, '')) = $1
+           AND c.created_at > NOW() - INTERVAL '1 hour'
+         LIMIT 1`,
+        [email]
+      );
+      if (recent.rows[0]) {
+        return NextResponse.json({
+          success: true,
+          message:
+            'Thanks! We already have your inquiry and will get back to you soon.',
+          data: { id: recent.rows[0].id, duplicate: true },
+        });
+      }
+    } else if (phoneOk) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      const recent = await pool.query<{ id: string }>(
+        `SELECT c.id
+         FROM pipeline_cards c
+         INNER JOIN pipeline_boards b ON b.id = c.board_id
+         WHERE b.slug = 'onboarding'
+           AND regexp_replace(COALESCE(c.contact_phone, ''), '\\D', '', 'g') = $1
+           AND c.created_at > NOW() - INTERVAL '1 hour'
+         LIMIT 1`,
+        [phoneDigits]
+      );
+      if (recent.rows[0]) {
+        return NextResponse.json({
+          success: true,
+          message:
+            'Thanks! We already have your inquiry and will get back to you soon.',
+          data: { id: recent.rows[0].id, duplicate: true },
+        });
+      }
     }
 
     const fullName = `${firstName} ${lastName}`.trim();
+    const title =
+      isHero && emailOk
+        ? email.split('@')[0] || fullName
+        : isHero && phoneOk
+          ? phone
+          : fullName;
 
-    // Validate building exists and is active before tagging the card
     let resolvedBuildingId: string | undefined;
     let buildingName: string | undefined;
     if (buildingId) {
@@ -135,6 +223,7 @@ export async function POST(request: Request) {
     }
 
     const notesParts = [
+      isHero ? 'Submitted from homepage hero' : null,
       buildingName ? `Interested in: ${buildingName}` : null,
       message || null,
     ].filter(Boolean);
@@ -144,18 +233,18 @@ export async function POST(request: Request) {
       card = await createPipelineCard({
         boardSlug: 'onboarding',
         stageSlug: 'new_inquiry',
-        title: fullName,
+        title: isHero ? `Inquiry · ${title}` : fullName,
         contactFirstName: firstName,
         contactLastName: lastName,
-        contactEmail: email,
-        contactPhone: phone || undefined,
+        contactEmail: emailOk ? email : undefined,
+        contactPhone: phoneOk ? phone : phone || undefined,
         buildingId: resolvedBuildingId,
-        source: 'Website',
-        tags: ['Website inquiry'],
+        source: isHero ? 'Website hero' : 'Website',
+        tags: isHero ? ['Website inquiry', 'Hero'] : ['Website inquiry'],
         notes: notesParts.length ? notesParts.join('\n\n') : undefined,
       });
     } catch (err) {
-      releaseInquiryAttempt(ip, email);
+      releaseInquiryAttempt(ip, emailOk ? email : '', phoneOk ? phone : '');
       throw err;
     }
 
@@ -168,12 +257,12 @@ export async function POST(request: Request) {
       entityId: card.id,
       entityLabel: card.title,
       metadata: {
-        email,
-        phone: phone || null,
+        email: emailOk ? email : null,
+        phone: phoneOk ? phone : null,
         hasMessage: Boolean(message),
         buildingId: resolvedBuildingId || null,
         buildingName: buildingName || null,
-        source: 'website_contact',
+        source: isHero ? 'website_hero' : 'website_contact',
         ip,
       },
       link: '/admin/tasks',

@@ -12,8 +12,8 @@ export async function GET() {
       { success: true, data },
       {
         headers: {
-          // Short cache so the "live data" badge stays honest without hammering the DB
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          // Align with in-process PUBLIC_PORTFOLIO_TTL_MS (5 min)
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         },
       }
     );

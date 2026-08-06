@@ -6,11 +6,16 @@
 
 const ipBuckets = new Map<string, number[]>();
 const emailBuckets = new Map<string, number[]>();
+const phoneBuckets = new Map<string, number[]>();
 
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_PER_IP = 5;
 const MAX_PER_EMAIL = 2;
-const MIN_SUBMIT_MS = 2500; // humans need a couple seconds to fill the form
+const MAX_PER_PHONE = 2;
+/** Full contact form — humans need a couple seconds. */
+const MIN_SUBMIT_MS = 2500;
+/** Hero inquire is a single field — allow a short pause without blocking real users. */
+const MIN_SUBMIT_MS_HERO = 800;
 const MAX_FIELD_LEN = {
   firstName: 80,
   lastName: 80,
@@ -58,6 +63,8 @@ export interface InquirySpamCheckInput {
   phone: string;
   message: string;
   ip: string;
+  /** Hero banner single-field inquire — shorter minimum fill time. */
+  source?: string;
 }
 
 export type InquirySpamResult =
@@ -82,7 +89,9 @@ export function checkInquirySpam(input: InquirySpamCheckInput): InquirySpamResul
   if (!Number.isFinite(startedAt) || startedAt > now + 5_000) {
     return { ok: false, status: 400, error: 'Please reload the page and try again.' };
   }
-  if (now - startedAt < MIN_SUBMIT_MS) {
+  const minMs =
+    input.source === 'hero_banner' || input.source === 'hero' ? MIN_SUBMIT_MS_HERO : MIN_SUBMIT_MS;
+  if (now - startedAt < minMs) {
     return {
       ok: false,
       status: 429,
@@ -120,20 +129,36 @@ export function checkInquirySpam(input: InquirySpamCheckInput): InquirySpamResul
   }
 
   const emailKey = input.email.trim().toLowerCase();
-  const emailCount = touchBucket(emailBuckets, emailKey, now);
-  if (emailCount > MAX_PER_EMAIL) {
-    return {
-      ok: false,
-      status: 429,
-      error: 'An inquiry with this email was already submitted recently. Please wait and try again.',
-    };
+  if (emailKey) {
+    const emailCount = touchBucket(emailBuckets, emailKey, now);
+    if (emailCount > MAX_PER_EMAIL) {
+      return {
+        ok: false,
+        status: 429,
+        error:
+          'An inquiry with this email was already submitted recently. Please wait and try again.',
+      };
+    }
+  }
+
+  const phoneKey = input.phone.replace(/\D/g, '');
+  if (phoneKey.length >= 7) {
+    const phoneCount = touchBucket(phoneBuckets, phoneKey, now);
+    if (phoneCount > MAX_PER_PHONE) {
+      return {
+        ok: false,
+        status: 429,
+        error:
+          'An inquiry with this phone was already submitted recently. Please wait and try again.',
+      };
+    }
   }
 
   return { ok: true };
 }
 
 /** Undo a successful bucket touch when creation fails after the check. */
-export function releaseInquiryAttempt(ip: string, email: string): void {
+export function releaseInquiryAttempt(ip: string, email: string, phone = ''): void {
   const now = Date.now();
   const dropLast = (map: Map<string, number[]>, key: string) => {
     const times = prune(map.get(key) || [], now);
@@ -142,5 +167,7 @@ export function releaseInquiryAttempt(ip: string, email: string): void {
     else map.set(key, times);
   };
   dropLast(ipBuckets, ip || 'unknown');
-  dropLast(emailBuckets, email.trim().toLowerCase());
+  if (email.trim()) dropLast(emailBuckets, email.trim().toLowerCase());
+  const phoneKey = phone.replace(/\D/g, '');
+  if (phoneKey.length >= 7) dropLast(phoneBuckets, phoneKey);
 }

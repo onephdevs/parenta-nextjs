@@ -1,6 +1,12 @@
 import pool from '@/lib/db';
 import { getBuildingStats, getOccupancyStats } from '@/lib/api/buildings';
 import { getImageUrl } from '@/lib/format/image-url';
+import {
+  cacheGet,
+  cacheSet,
+  PUBLIC_PORTFOLIO_KEY,
+  PUBLIC_PORTFOLIO_TTL_MS,
+} from '@/lib/cache/memory-cache';
 
 export interface PublicPortfolioStats {
   propertyCount: number;
@@ -38,11 +44,7 @@ function formatAddress(row: {
   return parts.length ? parts.join(', ') : '';
 }
 
-/**
- * Safe public aggregates + featured buildings for the marketing homepage.
- * Exposes no financial/revenue data.
- */
-export async function getPublicPortfolio(): Promise<PublicPortfolioPayload> {
+async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
   const [buildingStats, occupancyStats, propertiesResult] = await Promise.all([
     getBuildingStats(),
     getOccupancyStats(),
@@ -120,4 +122,16 @@ export async function getPublicPortfolio(): Promise<PublicPortfolioPayload> {
     propertiesWithAvailability,
     totalProperties: propertyCount,
   };
+}
+
+/**
+ * Safe public aggregates + featured buildings for the marketing homepage.
+ * Cached in-process so reloads do not re-query Postgres every time.
+ */
+export async function getPublicPortfolio(): Promise<PublicPortfolioPayload> {
+  const cached = cacheGet<PublicPortfolioPayload>(PUBLIC_PORTFOLIO_KEY);
+  if (cached) return cached;
+  const data = await fetchPublicPortfolio();
+  cacheSet(PUBLIC_PORTFOLIO_KEY, data, PUBLIC_PORTFOLIO_TTL_MS);
+  return data;
 }

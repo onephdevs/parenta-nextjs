@@ -31,12 +31,15 @@ function resolveInternalHref(anchor: HTMLAnchorElement): URL | null {
   }
 }
 
-function sameDestination(url: URL): boolean {
+/** True when the App Router will actually change path/query (not hash-only scroll). */
+function willChangeAppRoute(url: URL): boolean {
   return (
-    url.pathname === window.location.pathname &&
-    url.search === window.location.search &&
-    url.hash === window.location.hash
+    url.pathname !== window.location.pathname || url.search !== window.location.search
   );
+}
+
+function routeKeyFromLocation(): string {
+  return `${window.location.pathname}?${window.location.search}`;
 }
 
 function NavigationLoaderInner() {
@@ -95,24 +98,35 @@ function NavigationLoaderInner() {
       if (!(anchor instanceof HTMLAnchorElement)) return;
 
       const url = resolveInternalHref(anchor);
-      if (!url || sameDestination(url)) return;
+      // Hash-only anchors (#properties) and same-path links (/#contact, logo → /)
+      // must not show the route loader — App Router never remounts, so pending would stick.
+      if (!url || !willChangeAppRoute(url)) return;
 
       startPending();
     };
 
     const onPopState = () => {
+      // Hash back/forward updates location.hash but not path/search — skip those.
+      if (routeKeyFromLocation() === routeKeyRef.current) return;
       startPending();
+    };
+
+    const onHashChange = () => {
+      // Defensive: never leave the overlay up for in-page section jumps.
+      stopPending();
     };
 
     document.addEventListener('click', onClick, true);
     window.addEventListener('popstate', onPopState);
+    window.addEventListener('hashchange', onHashChange);
 
     return () => {
       document.removeEventListener('click', onClick, true);
       window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('hashchange', onHashChange);
       clearSafetyTimer();
     };
-  }, [startPending, clearSafetyTimer]);
+  }, [startPending, stopPending, clearSafetyTimer]);
 
   if (!pending) return null;
 

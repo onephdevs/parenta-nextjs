@@ -424,7 +424,7 @@ export default function AdminSidebar() {
     <div className="flex h-full flex-col border-r border-gray-200 bg-[#f1f1f1]">
       {/* Logo */}
       <div className="flex h-16 items-center border-b border-gray-200/80 px-4">
-        <Link href="/admin" className="flex items-center" aria-label="Alfonso Property Management System">
+        <Link href="/admin" className="flex items-center" aria-label="Alfonso Properties">
           <BrandLogo variant="full" height={36} priority />
         </Link>
       </div>

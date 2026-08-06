@@ -38,8 +38,16 @@ export const DASHBOARD_METRICS_KEY = 'dashboard:metrics';
 export const DASHBOARD_STATS_KEY = 'dashboard:stats';
 export const DASHBOARD_TTL_MS = 60_000;
 
+export const PUBLIC_PORTFOLIO_KEY = 'public:portfolio';
+/** Homepage portfolio aggregates — safe to cache a few minutes. */
+export const PUBLIC_PORTFOLIO_TTL_MS = 5 * 60_000;
+
 export function invalidateDashboardCache(): void {
   cacheDelete(DASHBOARD_METRICS_KEY);
   cacheDelete(DASHBOARD_STATS_KEY);
   cacheDeletePrefix('dashboard:');
+}
+
+export function invalidatePublicPortfolioCache(): void {
+  cacheDelete(PUBLIC_PORTFOLIO_KEY);
 }

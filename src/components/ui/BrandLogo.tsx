@@ -7,9 +7,13 @@ interface BrandLogoProps {
   height?: number;
 }
 
+/** Intrinsic size of /public/brand/widelogo.png (Alfonso Properties lockup). */
+const FULL_LOGO_WIDTH = 1092;
+const FULL_LOGO_HEIGHT = 160;
+
 /**
  * Brand logo from /public/brand.
- * - full: horizontal lockup (widelogo.png)
+ * - full: horizontal lockup (widelogo.png) — Alfonso Properties
  * - mark: square logo (logo.png)
  */
 export function BrandLogo({
@@ -23,7 +27,7 @@ export function BrandLogo({
     return (
       <Image
         src="/brand/logo.png"
-        alt="Alfonso"
+        alt="Alfonso Properties"
         width={size}
         height={size}
         className={`object-contain rounded-lg ${className}`}
@@ -33,12 +37,12 @@ export function BrandLogo({
   }
 
   const h = height ?? 40;
-  const w = Math.round(h * (344 / 99));
+  const w = Math.round(h * (FULL_LOGO_WIDTH / FULL_LOGO_HEIGHT));
 
   return (
     <Image
       src="/brand/widelogo.png"
-      alt="Alfonso Property Management System"
+      alt="Alfonso Properties"
       width={w}
       height={h}
       className={`object-contain ${className}`}
