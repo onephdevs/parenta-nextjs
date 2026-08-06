@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { Users, Percent, Banknote, DoorOpen } from 'lucide-react';
 import ActiveTenantsList from '@/components/features/dashboard/ActiveTenantsList';
-import NotificationsWidget from '@/components/features/dashboard/NotificationsWidget';
 import ActivityLogsWidget from '@/components/features/dashboard/ActivityLogsWidget';
 import NeedsAttentionWidget from '@/components/features/dashboard/NeedsAttentionWidget';
 import DashboardReportsHub from '@/components/features/dashboard/DashboardReportsHub';
@@ -116,9 +115,25 @@ export default async function AdminDashboard() {
           </p>
         </div>
 
-        {/* Top stat strip */}
+        {/* Actionable monitoring */}
+        <NeedsAttentionWidget />
+
+        {/* Monitoring: tenants + activity */}
+        <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
+          <div className="min-w-0 lg:col-span-7 xl:col-span-8">
+            <ActiveTenantsList />
+          </div>
+          <div className="flex min-w-0 max-h-[min(40rem,calc(100vh-14rem))] flex-col gap-4 overflow-x-hidden overflow-y-auto lg:col-span-5 lg:sticky lg:top-4 xl:col-span-4">
+            <ActivityLogsWidget />
+          </div>
+        </div>
+
+        {/* On-demand reporting */}
+        <DashboardReportsHub />
+
+        {/* Summary metrics */}
         {statCards ? (
-          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {statCards.map((card) => (
               <div
                 key={card.label}
@@ -137,7 +152,7 @@ export default async function AdminDashboard() {
             ))}
           </div>
         ) : (
-          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
@@ -146,23 +161,6 @@ export default async function AdminDashboard() {
             ))}
           </div>
         )}
-
-        {/* Actionable monitoring */}
-        <NeedsAttentionWidget />
-
-        {/* Monitoring: tenants + notifications / activity */}
-        <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-          <div className="lg:col-span-7 xl:col-span-8">
-            <ActiveTenantsList />
-          </div>
-          <div className="flex max-h-[min(40rem,calc(100vh-14rem))] flex-col gap-6 overflow-y-auto lg:col-span-5 lg:sticky lg:top-4 xl:col-span-4">
-            <NotificationsWidget />
-            <ActivityLogsWidget />
-          </div>
-        </div>
-
-        {/* On-demand reporting — visually distinct */}
-        <DashboardReportsHub />
       </div>
     </div>
   );

@@ -388,7 +388,7 @@ export async function updatePayment(id: string, updateData: UpdatePaymentData): 
   }
   if (updateData.paymentStatus) {
     updateFields.push(`payment_status = $${paramIndex++}`);
-    queryParams.push(updateData.paymentStatus);
+    queryParams.push(mapPaymentStatusToDb(updateData.paymentStatus));
   }
   if (updateData.paymentDate) {
     updateFields.push(`payment_date = $${paramIndex++}`);

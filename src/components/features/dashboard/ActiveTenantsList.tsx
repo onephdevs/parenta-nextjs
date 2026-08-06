@@ -95,13 +95,13 @@ export default function ActiveTenantsList() {
   }, [tenants]);
 
   return (
-    <div className="flex max-h-[min(40rem,calc(100vh-14rem))] min-h-[28rem] flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="flex max-h-[min(40rem,calc(100vh-14rem))] min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="flex items-center text-lg font-bold text-gray-900">
-          <Users className="mr-2 h-5 w-5 text-purple-600" />
+          <Users className="mr-2 h-5 w-5 shrink-0 text-purple-600" />
           Active tenants
         </h3>
-        <div className="relative w-full sm:max-w-xs">
+        <div className="relative w-full min-w-0 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
@@ -113,7 +113,7 @@ export default function ActiveTenantsList() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
@@ -128,14 +128,14 @@ export default function ActiveTenantsList() {
             </p>
           </div>
         ) : (
-          <div className="-mx-2 overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full table-fixed text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                  <th className="px-2 py-2 font-medium">Tenant</th>
-                  <th className="px-2 py-2 font-medium">Room</th>
-                  <th className="px-2 py-2 text-right font-medium">Balance</th>
-                  <th className="px-2 py-2 text-right font-medium">Status</th>
+                  <th className="w-[36%] py-2 pr-2 font-medium">Tenant</th>
+                  <th className="w-[22%] py-2 pr-2 font-medium">Room</th>
+                  <th className="w-[22%] py-2 pr-2 text-right font-medium">Balance</th>
+                  <th className="w-[20%] py-2 text-right font-medium">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -153,25 +153,28 @@ export default function ActiveTenantsList() {
 
                   return (
                     <tr key={tenant.id} className="hover:bg-gray-50/80">
-                      <td className="px-2 py-3">
+                      <td className="max-w-0 py-3 pr-2">
                         <Link
                           href={`/admin/tenants/${tenant.id}`}
-                          className="font-medium text-gray-900 hover:text-blue-600"
+                          className="block truncate font-medium text-gray-900 hover:text-blue-600"
+                          title={`${tenant.firstName} ${tenant.lastName}`}
                         >
                           {tenant.firstName} {tenant.lastName}
                         </Link>
                       </td>
-                      <td className="px-2 py-3 text-gray-600">
-                        <span title={tenant.buildingName || undefined}>{roomLabel}</span>
+                      <td className="max-w-0 py-3 pr-2 text-gray-600">
+                        <span className="block truncate" title={tenant.buildingName || undefined}>
+                          {roomLabel}
+                        </span>
                       </td>
                       <td
-                        className={`px-2 py-3 text-right tabular-nums ${pastDueAmountClass(status)}`}
+                        className={`py-3 pr-2 text-right tabular-nums ${pastDueAmountClass(status)}`}
                       >
                         {formatCurrency(tenant.balance)}
                       </td>
-                      <td className="px-2 py-3 text-right">
+                      <td className="py-3 text-right">
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${pastDueBadgeClass(status)}`}
+                          className={`inline-flex max-w-full items-center truncate rounded-full px-2 py-0.5 text-xs font-medium ${pastDueBadgeClass(status)}`}
                         >
                           {status.label}
                         </span>

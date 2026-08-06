@@ -39,26 +39,43 @@ export async function GET(request: Request) {
       }
     }
 
-    const boards = await getPipelineBoards();
+    const includeArchived = searchParams.get('archived') === '1';
+    const boards = includeArchived
+      ? await getPipelineBoards({ includeInactive: true })
+      : await getPipelineBoards();
 
     if (slug) {
-      const board = boards.find((b) => b.slug === slug);
-      if (!board) {
+      const matched =
+        boards.find((b) => b.slug === slug && b.isActive !== false) ||
+        (includeArchived ? boards.find((b) => b.slug === slug) : undefined);
+      if (!matched) {
         return NextResponse.json(
           { success: false, error: 'Board not found' },
           { status: 404 }
         );
       }
-      const cards = await getCardsForBoard(slug);
+      const cards = await getCardsForBoard(matched.slug);
       return NextResponse.json({
         success: true,
-        data: { boards, board, cards },
+        data: {
+          boards: includeArchived ? boards : boards.filter((b) => b.isActive !== false),
+          board: matched,
+          cards,
+          archivedBoards: includeArchived
+            ? boards.filter((b) => !b.isActive)
+            : undefined,
+        },
       });
     }
 
+    const active = boards.filter((b) => b.isActive !== false);
+    const archived = boards.filter((b) => !b.isActive);
     return NextResponse.json({
       success: true,
-      data: { boards },
+      data: {
+        boards: includeArchived ? boards : active,
+        archivedBoards: archived,
+      },
     });
   } catch (err) {
     console.error('Pipeline boards API error:', err);

@@ -2,13 +2,26 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Edit, Trash2, Eye, MapPin, Calendar, X, Package, AlertCircle, DollarSign, Info, History } from 'lucide-react';
+import {
+  Pencil,
+  Trash2,
+  Eye,
+  MapPin,
+  Calendar,
+  X,
+  Package,
+  AlertCircle,
+  DollarSign,
+  Info,
+  History,
+} from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
-import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import Pagination from '@/components/ui/Pagination';
+import AppLoader from '@/components/ui/AppLoader';
 import { AssetStatusBadge, AssetConditionBadge } from '@/components/domain/StatusBadges';
 
 interface Asset {
@@ -71,7 +84,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
   const { addNotification, showLoading, dismissToast } = useNotifications();
   const { confirm, dialog } = useAppDialog();
 
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!selectedAsset?.id) {
@@ -99,12 +112,16 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
   }, [selectedAsset?.id]);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  useEffect(() => {
     const fetchAssets = async () => {
       setLoading(true);
       try {
         // Filter out undefined values
         const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
-          if (value !== undefined && value !== '') {
+          if (value !== undefined && value !== '' && value !== 'undefined') {
             acc[key] = value;
           }
           return acc;
@@ -198,227 +215,185 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        <AppLoader variant="inline" className="min-h-[16rem]" />
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="overflow-hidden rounded-lg bg-white shadow">
       {dialog}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Asset
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Type & Location
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Condition
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Assignment
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Financial
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {assets.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-16 text-center">
-                  <Package className="mx-auto h-10 w-10 text-gray-300" />
-                  <p className="mt-3 text-sm font-medium text-gray-900">No assets found</p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Try adjusting filters, or add your first asset to get started.
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              assets.map((asset) => (
-              <tr key={asset.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {asset.assetName}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {asset.brand && asset.model ? `${asset.brand} ${asset.model}` : 
-                       asset.brand || asset.model || 'No model info'}
-                    </div>
-                    {asset.serialNumber && (
-                      <div className="text-xs text-gray-400">
-                        SN: {asset.serialNumber}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm text-gray-900 capitalize">
-                      {asset.assetType}
-                    </div>
-                    {asset.buildingName ? (
-                      <div className="text-sm text-gray-500 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {asset.buildingName}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">No building</div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(asset.assetStatus)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getConditionBadge(asset.assetCondition)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    {asset.assetStatus === 'assigned' ? (
-                      <>
-                        {asset.assignedRoom && (
-                          <div className="text-sm text-gray-900">
-                            Room: {asset.assignedRoom}
-                          </div>
-                        )}
-                        {asset.assignedTenant && (
-                          <div className="text-sm text-gray-500">
-                            Tenant: {asset.assignedTenant}
-                          </div>
-                        )}
-                        {asset.assignmentDate && (
-                          <div className="text-xs text-gray-400">
-                            Since: {formatDate(asset.assignmentDate)}
-                          </div>
-                        )}
-                        {!asset.assignedRoom && !asset.assignedTenant && (
-                          <div className="text-sm text-purple-600">
-                            Assigned (details pending)
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-sm text-gray-400">
-                        Not assigned
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    {asset.currentValue != null && asset.currentValue > 0 && (
-                      <div className="text-sm text-gray-900">
-                        Value: {formatCurrency(asset.currentValue)}
-                      </div>
-                    )}
-                    {asset.rentalRate != null && asset.rentalRate > 0 && (
-                      <div className="text-sm text-gray-500">
-                        Rent: {formatCurrency(asset.rentalRate)}/mo
-                      </div>
-                    )}
-                    {asset.purchaseDate && (
-                      <div className="text-xs text-gray-400 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(asset.purchaseDate)}
-                      </div>
-                    )}
-                    {!(asset.currentValue || asset.rentalRate || asset.purchaseDate) && (
-                      <div className="text-sm text-gray-400">—</div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex items-center gap-1">
-                    <IconButton
-                      label="View Details"
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setSelectedAsset(asset)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </IconButton>
-                    <a
-                      href={`/track/asset/${asset.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                      title="Open tracking page"
-                      aria-label="Open tracking page"
-                    >
-                      <MapPin className="h-4 w-4" />
-                    </a>
-                    <IconButton
-                      label="Edit Asset"
-                      variant="primary"
-                      size="sm"
-                      onClick={() => onEdit(asset)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </IconButton>
-                    <IconButton
-                      label="Delete Asset"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDeleteAsset(asset.id, asset.assetName)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </IconButton>
-                  </div>
-                </td>
-              </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-900">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total} assets
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                isDisabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <span className="px-3 py-2 text-sm text-gray-900">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                isDisabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+      {assets.length === 0 ? (
+        <div className="p-8 text-center text-gray-900">
+          <p className="mb-2 text-lg font-medium">No assets found</p>
+          <p className="text-sm text-gray-600">
+            Try adjusting your search or filters, or add your first asset.
+          </p>
         </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Asset
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Type & Location
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Condition
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Assignment
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Financial
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {assets.map((asset) => (
+                  <tr key={asset.id} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{asset.assetName}</div>
+                        <div className="text-sm text-gray-500">
+                          {asset.brand && asset.model
+                            ? `${asset.brand} ${asset.model}`
+                            : asset.brand || asset.model || 'No model info'}
+                        </div>
+                        {asset.serialNumber && (
+                          <div className="text-xs text-gray-400">SN: {asset.serialNumber}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div>
+                        <div className="text-sm capitalize text-gray-900">{asset.assetType}</div>
+                        {asset.buildingName ? (
+                          <div className="flex items-center gap-1 text-sm text-gray-500">
+                            <MapPin className="h-3 w-3" />
+                            {asset.buildingName}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">No building</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      {getStatusBadge(asset.assetStatus)}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      {getConditionBadge(asset.assetCondition)}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div>
+                        {asset.assetStatus === 'assigned' ? (
+                          <>
+                            {asset.assignedRoom && (
+                              <div className="text-sm text-gray-900">Room: {asset.assignedRoom}</div>
+                            )}
+                            {asset.assignedTenant && (
+                              <div className="text-sm text-gray-500">
+                                Tenant: {asset.assignedTenant}
+                              </div>
+                            )}
+                            {asset.assignmentDate && (
+                              <div className="text-xs text-gray-400">
+                                Since: {formatDate(asset.assignmentDate)}
+                              </div>
+                            )}
+                            {!asset.assignedRoom && !asset.assignedTenant && (
+                              <div className="text-sm text-gray-600">Assigned (details pending)</div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-400">Not assigned</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div>
+                        {asset.currentValue != null && asset.currentValue > 0 && (
+                          <div className="text-sm text-gray-900">
+                            Value: {formatCurrency(asset.currentValue)}
+                          </div>
+                        )}
+                        {asset.rentalRate != null && asset.rentalRate > 0 && (
+                          <div className="text-sm text-gray-500">
+                            Rent: {formatCurrency(asset.rentalRate)}/mo
+                          </div>
+                        )}
+                        {asset.purchaseDate && (
+                          <div className="flex items-center gap-1 text-xs text-gray-400">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(asset.purchaseDate)}
+                          </div>
+                        )}
+                        {!(asset.currentValue || asset.rentalRate || asset.purchaseDate) && (
+                          <div className="text-sm text-gray-400">—</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAsset(asset)}
+                          className="text-gray-500 hover:text-gray-900"
+                          title="View details"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                        <a
+                          href={`/track/asset/${asset.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gray-500 hover:text-gray-900"
+                          title="Open tracking page"
+                        >
+                          <MapPin className="h-5 w-5" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => onEdit(asset)}
+                          className="text-gray-500 hover:text-gray-900"
+                          title="Edit"
+                        >
+                          <Pencil className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAsset(asset.id, asset.assetName)}
+                          className="text-gray-500 hover:text-gray-900"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.max(1, totalPages)}
+            totalItems={total}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
+        </>
       )}
 
       {/* Enhanced Asset Details Modal — inset past sidebar */}
@@ -429,24 +404,27 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
             onClick={() => setSelectedAsset(null)}
             aria-hidden="true"
           />
-          <div className="absolute inset-0 lg:left-64 flex items-center justify-center p-4 pointer-events-none">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl pointer-events-auto">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4">
-              <div className="flex justify-between items-center">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 lg:left-64">
+          <div className="pointer-events-auto max-h-[95vh] w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="border-b border-gray-200 bg-white px-6 py-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold text-white">{selectedAsset.assetName}</h3>
-                  <p className="text-purple-100 text-sm capitalize">
-                    {selectedAsset.assetType} • {selectedAsset.brand && selectedAsset.model ? `${selectedAsset.brand} ${selectedAsset.model}` : 'Asset Details'}
+                  <h3 className="text-xl font-semibold text-gray-900">{selectedAsset.assetName}</h3>
+                  <p className="text-sm capitalize text-gray-600">
+                    {selectedAsset.assetType} •{' '}
+                    {selectedAsset.brand && selectedAsset.model
+                      ? `${selectedAsset.brand} ${selectedAsset.model}`
+                      : 'Asset Details'}
                   </p>
                 </div>
-                <IconButton
-                  label="Close"
-                  className="text-white hover:bg-white/10 hover:text-purple-100"
+                <button
+                  type="button"
                   onClick={() => setSelectedAsset(null)}
+                  className="text-gray-500 hover:text-gray-900"
+                  title="Close"
                 >
                   <X className="h-5 w-5" />
-                </IconButton>
+                </button>
               </div>
             </div>
 
@@ -592,7 +570,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                                     {item.roomId ? (
                                       <Link
                                         href={`/admin/rooms/${item.roomId}`}
-                                        className="font-medium text-purple-700 hover:underline"
+                                        className="font-medium text-gray-900 hover:underline"
                                       >
                                         Room {item.roomNumber || '—'}
                                       </Link>
@@ -682,7 +660,7 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
                 {/* Additional Details */}
                 <div className="bg-gray-50 rounded-xl p-6">
                   <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Info className="h-5 w-5 text-purple-600" />
+                    <Info className="h-5 w-5 text-slate-600" />
                     Additional Details
                   </h4>
                   <div className="space-y-4">
@@ -733,23 +711,19 @@ export function AssetsList({ filters, refreshTrigger, onEdit, onDelete }: Assets
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-gray-200">
-                <button
-                  onClick={() => setSelectedAsset(null)}
-                  className="px-6 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
+              <div className="mt-8 flex justify-end gap-3 border-t border-gray-200 pt-6">
+                <Button variant="outline" onClick={() => setSelectedAsset(null)}>
                   Close
-                </button>
-                <button
+                </Button>
+                <Button
+                  leftIcon={<Pencil className="h-4 w-4" />}
                   onClick={() => {
                     setSelectedAsset(null);
                     onEdit(selectedAsset);
                   }}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
                 >
-                  <Edit className="h-4 w-4" />
                   Edit Asset
-                </button>
+                </Button>
               </div>
             </div>
           </div>

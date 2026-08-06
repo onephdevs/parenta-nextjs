@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
     const filters: Record<string, unknown> = {};
     if (search) filters.search = search;
     if (category) filters.category = category;
-    if (buildingIdParam) filters.buildingId = parseInt(buildingIdParam);
-    if (roomIdParam) filters.roomId = parseInt(roomIdParam);
+    if (buildingIdParam) filters.buildingId = buildingIdParam;
+    if (roomIdParam) filters.roomId = roomIdParam;
     if (vendor) filters.vendor = vendor;
     if (dateFrom) filters.dateFrom = dateFrom;
     if (dateTo) filters.dateTo = dateTo;

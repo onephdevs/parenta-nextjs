@@ -212,10 +212,10 @@ export default function LandingPageClient({
                 Properties
               </a>
               <a href="#features" className="text-sm text-white/65 transition hover:text-white">
-                Features
+                Why us
               </a>
-              <a href="#features" className="text-sm text-white/65 transition hover:text-white">
-                About
+              <a href="#reviews" className="text-sm text-white/65 transition hover:text-white">
+                Reviews
               </a>
               <a href="#contact" className="text-sm text-white/65 transition hover:text-white">
                 Contact
@@ -523,7 +523,10 @@ export default function LandingPageClient({
         </div>
       </section>
 
-      <section className="bg-gradient-to-b from-[#050a14] to-[#03060c] px-4 py-20 sm:px-6 lg:px-8">
+      <section
+        id="reviews"
+        className="bg-gradient-to-b from-[#050a14] to-[#03060c] px-4 py-20 sm:px-6 lg:px-8"
+      >
         <div className="mx-auto max-w-7xl">
           <div className="mb-14 max-w-2xl">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">What our tenants say</h2>
@@ -594,8 +597,8 @@ export default function LandingPageClient({
               <h4 className="mb-4 text-sm font-semibold text-white">Alfonso Properties</h4>
               <ul className="space-y-3 text-sm text-white/55">
                 <li>
-                  <a href="#features" className="transition hover:text-white">
-                    About us
+                  <a href="#properties" className="transition hover:text-white">
+                    Properties
                   </a>
                 </li>
                 <li>
@@ -604,8 +607,8 @@ export default function LandingPageClient({
                   </a>
                 </li>
                 <li>
-                  <a href="#properties" className="transition hover:text-white">
-                    Properties
+                  <a href="#reviews" className="transition hover:text-white">
+                    Reviews
                   </a>
                 </li>
                 <li>

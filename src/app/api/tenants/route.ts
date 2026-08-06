@@ -4,12 +4,23 @@ import { createTenantWithUser } from '@/lib/api/tenant-user-link';
 import { requireAdmin } from '@/lib/api-auth';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { error } = await requireAdmin();
     if (error) return error;
 
-    const tenantsData = await getAllTenants({ limit: 1000 }); // Get all tenants for API
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search')?.trim() || undefined;
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(1000, Math.max(1, parseInt(searchParams.get('limit') || '1000', 10) || 1000));
+    const status = searchParams.get('status') || undefined;
+
+    const tenantsData = await getAllTenants({
+      page,
+      limit,
+      search,
+      status: status as 'active' | 'pending' | 'inactive' | 'terminated' | undefined,
+    });
     
     return NextResponse.json({
       success: true,

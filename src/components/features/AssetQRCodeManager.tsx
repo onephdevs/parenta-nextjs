@@ -401,7 +401,7 @@ export default function AssetQRCodeManager({ assets, onQRCodeGenerated }: AssetQ
                         variant="ghost"
                         size="sm"
                         onClick={() => generateQRCode(asset.id, asset.assetName)}
-                        className="text-purple-600 hover:text-purple-900"
+                        className="text-gray-500 hover:text-gray-900"
                       >
                         Generate
                       </Button>

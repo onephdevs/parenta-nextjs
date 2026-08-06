@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
-import { User, Home, Calendar, Plus, Calculator, FileText } from 'lucide-react';
+import { User, Home, Calendar, Plus, FileText } from 'lucide-react';
 
 interface Tenant {
   id: string;
@@ -39,7 +39,7 @@ interface CreateInvoiceFormProps {
   tenantId?: string;
 }
 
-type FormSection = 'tenant' | 'dates' | 'items' | 'calculations' | 'notes';
+type FormSection = 'tenant' | 'dates' | 'items' | 'notes';
 
 const formSections: SectionedFormSection<FormSection>[] = [
   {
@@ -62,13 +62,6 @@ const formSections: SectionedFormSection<FormSection>[] = [
     icon: <Plus className="h-4 w-4" />,
     title: 'Invoice Items',
     subtitle: 'Add items to the invoice',
-  },
-  {
-    id: 'calculations',
-    label: 'Calculations',
-    icon: <Calculator className="h-4 w-4" />,
-    title: 'Tax & Discount',
-    subtitle: 'Configure tax rate and discounts',
   },
   {
     id: 'notes',
@@ -95,7 +88,7 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
     dueDate: '',
     billingPeriodStart: '',
     billingPeriodEnd: '',
-    taxRate: 0.08,
+    taxRate: 0,
     discountAmount: undefined as number | undefined,
     notes: '',
   });
@@ -544,70 +537,6 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        );
-
-      case 'calculations':
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Tax Rate (%)" htmlFor="taxRate">
-                <Input
-                  type="number"
-                  id="taxRate"
-                  name="taxRate"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={formData.taxRate}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-
-              <FormField label="Discount Amount" htmlFor="discountAmount">
-                <Input
-                  type="number"
-                  id="discountAmount"
-                  name="discountAmount"
-                  min="0"
-                  step="0.01"
-                  value={formData.discountAmount ?? ''}
-                  onChange={handleInputChange}
-                />
-              </FormField>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h5 className="font-medium text-gray-900 mb-3">Invoice Total</h5>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-900">Subtotal:</span>
-                  <span className="text-sm font-medium">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-900">
-                    Tax ({(formData.taxRate * 100).toFixed(1)}%):
-                  </span>
-                  <span className="text-sm font-medium">{formatCurrency(taxAmount)}</span>
-                </div>
-                {(formData.discountAmount ?? 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-900">Discount:</span>
-                    <span className="text-sm font-medium text-red-600">
-                      -{formatCurrency(formData.discountAmount ?? 0)}
-                    </span>
-                  </div>
-                )}
-                <div className="border-t border-gray-200 pt-2">
-                  <div className="flex justify-between">
-                    <span className="text-base font-medium text-gray-900">Total:</span>
-                    <span className="text-base font-bold text-gray-900">
-                      {formatCurrency(totalAmount)}
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         );

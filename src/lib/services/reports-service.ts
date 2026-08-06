@@ -745,8 +745,11 @@ export async function generateExpenseReportByPeriod(
     totalExpenses: number;
     totalCount: number;
     averageExpense: number;
+    largestExpense: number;
+    averageMonthlyExpense: number;
     period: string;
     periodType: string;
+    periodLabel: string;
   };
   byPeriod: Array<{
     period: string;
@@ -765,6 +768,8 @@ export async function generateExpenseReportByPeriod(
     amount: number;
     count: number;
   }>;
+  /** One row per month; category keys hold amounts for the multi-line chart */
+  monthlyTrend: Array<Record<string, string | number>>;
   details: Array<{
     id: string;
     description: string;
@@ -775,6 +780,7 @@ export async function generateExpenseReportByPeriod(
     expenseDate: string;
     vendorName?: string;
     expenseStatus: string;
+    notes?: string;
   }>;
 }> {
   const client = await pool.connect();
@@ -797,7 +803,11 @@ export async function generateExpenseReportByPeriod(
       values.push(filters.buildingId);
     }
 
-    // Note: expenses table doesn't have room_id, so roomId filter is ignored
+    if (filters?.roomId) {
+      paramCount++;
+      conditions.push(`e.room_id = $${paramCount}`);
+      values.push(filters.roomId);
+    }
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
@@ -806,19 +816,39 @@ export async function generateExpenseReportByPeriod(
       SELECT 
         COALESCE(SUM(e.amount), 0) as total_expenses,
         COUNT(*) as total_count,
-        COALESCE(AVG(e.amount), 0) as average_expense
+        COALESCE(AVG(e.amount), 0) as average_expense,
+        COALESCE(MAX(e.amount), 0) as largest_expense
       FROM expenses e
       ${whereClause}
     `;
     const summaryResult = await client.query(summaryQuery, values);
     
     const totalExpenses = parseFloat(summaryResult.rows[0].total_expenses);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const monthSpan = Math.max(
+      1,
+      (end.getFullYear() - start.getFullYear()) * 12 +
+        (end.getMonth() - start.getMonth()) +
+        1
+    );
+
+    const periodLabelMap: Record<string, string> = {
+      monthly: 'Monthly',
+      quarterly: 'Quarterly',
+      'semi-annual': 'Semi-Annual',
+      annual: 'Annual',
+    };
+
     const summary = {
       totalExpenses,
       totalCount: parseInt(summaryResult.rows[0].total_count),
       averageExpense: parseFloat(summaryResult.rows[0].average_expense),
+      largestExpense: parseFloat(summaryResult.rows[0].largest_expense),
+      averageMonthlyExpense: totalExpenses / monthSpan,
       period: `${startDate} to ${endDate}`,
       periodType,
+      periodLabel: periodLabelMap[periodType] || periodType,
     };
 
     // Get all expenses for period grouping
@@ -831,9 +861,12 @@ export async function generateExpenseReportByPeriod(
         e.expense_date,
         e.vendor_name,
         e.expense_status,
-        b.name as building_name
+        e.notes,
+        b.name as building_name,
+        r.room_number
       FROM expenses e
       LEFT JOIN buildings b ON e.building_id = b.id
+      LEFT JOIN rooms r ON e.room_id = r.id
       ${whereClause}
       ORDER BY e.expense_date ASC
     `;
@@ -927,16 +960,44 @@ export async function generateExpenseReportByPeriod(
       amount: parseFloat(row.amount),
       category: row.category,
       buildingName: row.building_name,
+      roomNumber: row.room_number || undefined,
       expenseDate: row.expense_date,
       vendorName: row.vendor_name,
       expenseStatus: row.expense_status,
+      notes: row.notes || undefined,
     }));
+
+    // Monthly trend per category (for multi-line chart)
+    const monthOrder: string[] = [];
+    const monthlyMap = new Map<string, { label: string; amounts: Record<string, number> }>();
+    expenses.forEach((expense: any) => {
+      const date = new Date(expense.expense_date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('en-US', { month: 'short' });
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, { label: monthLabel, amounts: {} });
+        monthOrder.push(monthKey);
+      }
+      const bucket = monthlyMap.get(monthKey)!;
+      const cat = String(expense.category || 'other');
+      bucket.amounts[cat] = (bucket.amounts[cat] || 0) + parseFloat(expense.amount || 0);
+    });
+
+    const monthlyTrend = monthOrder.map((key) => {
+      const bucket = monthlyMap.get(key)!;
+      return {
+        month: bucket.label,
+        monthKey: key,
+        ...bucket.amounts,
+      } as Record<string, string | number>;
+    });
 
     return {
       summary,
       byPeriod,
       byCategory,
       byBuilding,
+      monthlyTrend,
       details,
     };
   } catch (error) {

@@ -39,8 +39,7 @@ JOIN (
   VALUES
     ('maintenance', 'submitted', 'Submitted', '#7c3aed', 1, false, false, false),
     ('maintenance', 'in_progress', 'In progress', '#3b82f6', 2, false, false, false),
-    ('maintenance', 'resolved', 'Resolved', '#22c55e', 3, true, false, false),
-    ('maintenance', 'closed', 'Closed', '#94a3b8', 4, true, false, true)
+    ('maintenance', 'resolved', 'Resolved', '#22c55e', 3, true, false, true)
 ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
   ON b.slug = s.board_slug
 WHERE NOT EXISTS (

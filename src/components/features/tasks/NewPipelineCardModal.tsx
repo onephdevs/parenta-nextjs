@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileCheck2,
   FileText,
+  History,
   ShieldCheck,
   Tag,
   Trash2,
@@ -41,6 +42,7 @@ import {
 } from '@/lib/lease-dates';
 import { OpportunityTagsField } from './OpportunityTagsField';
 import { OpportunityDocumentsPanel } from './OpportunityDocumentsPanel';
+import { OpportunityHistoryPanel } from './OpportunityHistoryPanel';
 
 interface BuildingOption {
   id: string;
@@ -78,7 +80,8 @@ type FormSection =
   | 'lease'
   | 'status'
   | 'tags'
-  | 'notes';
+  | 'notes'
+  | 'history';
 
 function toDatetimeLocal(iso?: string): string {
   if (!iso) return '';
@@ -237,12 +240,20 @@ const boardMoveSection: SectionedFormSection<FormSection> = {
   subtitle: 'Send this card to a different pipeline.',
 };
 
+const historySection: SectionedFormSection<FormSection> = {
+  id: 'history',
+  label: 'History',
+  icon: <History className="h-4 w-4" />,
+  title: 'Opportunity history',
+  subtitle: 'What changed on this card — assignments, stage moves, and updates.',
+};
+
 function sectionsForBoard(
   board: PipelineBoard,
   isEditing: boolean
 ): SectionedFormSection<FormSection>[] {
   if (board.slug === 'onboarding') {
-    return isEditing
+    const base = isEditing
       ? onboardingSections
       : onboardingSections.filter(
           (s) =>
@@ -251,14 +262,19 @@ function sectionsForBoard(
             s.id !== 'payment' &&
             s.id !== 'lease'
         );
+    return isEditing ? [...base, historySection] : base;
   }
 
   const base = board.slug === 'payments' ? paymentsSections : genericSections;
   if (!isEditing) return base;
 
-  const tagsIdx = base.findIndex((s) => s.id === 'tags');
-  if (tagsIdx < 0) return [...base, boardMoveSection];
-  return [...base.slice(0, tagsIdx), boardMoveSection, ...base.slice(tagsIdx)];
+  const withBoardMove = (() => {
+    const tagsIdx = base.findIndex((s) => s.id === 'tags');
+    if (tagsIdx < 0) return [...base, boardMoveSection];
+    return [...base.slice(0, tagsIdx), boardMoveSection, ...base.slice(tagsIdx)];
+  })();
+
+  return [...withBoardMove, historySection];
 }
 
 export function AddOpportunityModal({
@@ -1769,6 +1785,10 @@ export function AddOpportunityModal({
                 onChange={setTags}
               />
             )}
+
+            {activeSection === 'history' && card?.id && (
+              <OpportunityHistoryPanel cardId={card.id} />
+            )}
           </>
         ) : (
           <>
@@ -1778,7 +1798,7 @@ export function AddOpportunityModal({
                 <ol className="mt-2 list-decimal space-y-1 pl-4 text-indigo-800">
                   <li>
                     Drag the card across stages: Upcoming → Due → Reminder sent → Overdue → Paid
-                    (or Escalation).
+                    → Refund (or Escalation).
                   </li>
                   <li>Set the due date, then log what you did in Follow-up notes.</li>
                   <li>Record the actual money in Payments / Financial — this board tracks chase work.</li>
@@ -2031,6 +2051,10 @@ export function AddOpportunityModal({
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </FormField>
+            )}
+
+            {activeSection === 'history' && card?.id && (
+              <OpportunityHistoryPanel cardId={card.id} />
             )}
           </>
         )}

@@ -36,6 +36,7 @@ import {
 } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
+import { formatPaymentNotesLabel } from '@/lib/format-payment-notes';
 
 type PaymentTab = 'overview' | 'pay' | 'upload' | 'history' | 'statements';
 
@@ -208,6 +209,11 @@ export default function PaymentsPage() {
   const [advanceBalance, setAdvanceBalance] = useState<number | null>(null);
   const [utilityDepositData, setUtilityDepositData] = useState<any>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [payDraft, setPayDraft] = useState<{
+    invoiceId?: string;
+    amount?: number;
+    preferPartial?: boolean;
+  } | null>(null);
   const { showNotification } = useNotifications();
 
   useEffect(() => {
@@ -259,12 +265,22 @@ export default function PaymentsPage() {
     void fetchPaymentData(true);
   };
 
-  const handleMakePayment = () => {
+  const handleMakePayment = (opts?: {
+    invoiceId?: string;
+    amount?: number;
+    preferPartial?: boolean;
+  }) => {
+    setPayDraft(opts || null);
+    setShowDepositForm(false);
+    setShowUtilityDepositForm(false);
+    setShowManualPaymentForm(false);
     setShowPaymentForm(true);
+    setTab('pay');
   };
 
   const handlePaymentComplete = () => {
     setShowPaymentForm(false);
+    setPayDraft(null);
     refreshFinancials();
   };
 
@@ -467,6 +483,9 @@ export default function PaymentsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                     Property
                   </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -506,6 +525,41 @@ export default function PaymentsPage() {
                           </div>
                         ) : (
                           <span className="text-gray-400">N/A</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right">
+                        {item.balanceDue > 0 ? (
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() =>
+                                handleMakePayment({
+                                  invoiceId: item.id,
+                                  amount: item.balanceDue,
+                                  preferPartial: false,
+                                })
+                              }
+                            >
+                              Pay
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleMakePayment({
+                                  invoiceId: item.id,
+                                  amount: 0,
+                                  preferPartial: true,
+                                })
+                              }
+                            >
+                              Pay partial
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
                     </tr>
@@ -617,7 +671,7 @@ export default function PaymentsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {payment.description || '-'}
+                      {formatPaymentNotesLabel(payment.description)}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                       <div className="flex items-center space-x-3">
@@ -920,7 +974,7 @@ export default function PaymentsPage() {
                             <Button
                               variant="success"
                               size="lg"
-                              onClick={handleMakePayment}
+                              onClick={() => handleMakePayment()}
                               leftIcon={<CreditCard className="h-5 w-5" />}
                             >
                               Pay Now
@@ -943,6 +997,7 @@ export default function PaymentsPage() {
                       </button>
                     </div>
                     <PaymentForm
+                      key={`${payDraft?.invoiceId || 'any'}-${payDraft?.preferPartial ? 'partial' : 'full'}`}
                       invoices={
                         paymentData?.schedule?.map((item) => ({
                           id: item.id,
@@ -953,8 +1008,14 @@ export default function PaymentsPage() {
                           status: item.status,
                         })) || []
                       }
+                      initialInvoiceId={payDraft?.invoiceId}
+                      initialAmount={payDraft?.amount}
+                      preferPartial={payDraft?.preferPartial}
                       onPaymentComplete={handlePaymentComplete}
-                      onCancel={() => setShowPaymentForm(false)}
+                      onCancel={() => {
+                        setShowPaymentForm(false);
+                        setPayDraft(null);
+                      }}
                     />
                   </div>
                 )}

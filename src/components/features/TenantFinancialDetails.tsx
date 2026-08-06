@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { formatPaymentNotesLabel } from '@/lib/format-payment-notes';
 
 interface Invoice {
   id: string | number;
@@ -437,7 +438,7 @@ export default function TenantFinancialDetails({ tenantId }: TenantFinancialDeta
                         </span>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
-                        {payment.description ?? payment.notes ?? '-'}
+                        {formatPaymentNotesLabel(payment.description ?? payment.notes)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link

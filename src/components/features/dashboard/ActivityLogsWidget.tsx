@@ -81,15 +81,15 @@ export default function ActivityLogsWidget() {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center text-base font-bold text-gray-900">
-          <Activity className="mr-2 h-4 w-4 text-indigo-600" />
-          Activity log
+    <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+        <h3 className="flex min-w-0 items-center text-base font-bold text-gray-900">
+          <Activity className="mr-2 h-4 w-4 shrink-0 text-indigo-600" />
+          <span className="truncate">Activity log</span>
         </h3>
         <Link
           href="/admin/activity"
-          className="flex items-center text-xs font-medium text-blue-600 hover:text-blue-700"
+          className="flex shrink-0 items-center text-xs font-medium text-blue-600 hover:text-blue-700"
         >
           Full log <ArrowRight className="ml-0.5 h-3.5 w-3.5" />
         </Link>
@@ -98,26 +98,26 @@ export default function ActivityLogsWidget() {
       {isLoading && activityLogs.length === 0 ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />
+            <div key={i} className="h-9 animate-pulse rounded bg-gray-100" />
           ))}
         </div>
       ) : activityLogs.length === 0 ? (
-        <div className="py-6 text-center text-gray-500">
-          <Activity className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+        <div className="py-5 text-center text-gray-500">
+          <Activity className="mx-auto mb-2 h-7 w-7 text-gray-300" />
           <p className="text-sm">No recent activity</p>
         </div>
       ) : (
-        <ul className="max-h-72 space-y-2.5 overflow-y-auto">
+        <ul className="max-h-64 space-y-1 overflow-x-hidden overflow-y-auto">
           {activityLogs.map((log) => (
-            <li key={log.id}>
+            <li key={log.id} className="min-w-0">
               <Link
                 href={`/admin/activity?id=${log.id}`}
-                className="-mx-1 block rounded-lg px-1 py-1 transition hover:bg-gray-50"
+                className="block min-w-0 rounded-lg px-1.5 py-1.5 transition hover:bg-gray-50"
               >
-                <p className="line-clamp-2 text-sm text-gray-900">
+                <p className="break-words text-sm leading-snug text-gray-900 [overflow-wrap:anywhere]">
                   {log.description || log.action}
                 </p>
-                <p className="mt-0.5 text-xs text-gray-500">
+                <p className="mt-0.5 truncate text-xs text-gray-500">
                   {log.user} · {formatTime(log.createdAt)}
                 </p>
               </Link>

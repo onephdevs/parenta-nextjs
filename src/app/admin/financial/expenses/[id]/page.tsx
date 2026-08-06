@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getExpenseById } from '@/lib/api/expenses';
 import DeleteExpenseButton from '@/components/features/DeleteExpenseButton';
+import { Button } from '@/components/ui/Button';
+import { formatReportCategoryLabel } from '@/lib/constants/bills-expenses';
+import { formatPaymentNotesDisplay, formatPaymentNotesLabel } from '@/lib/format-payment-notes';
 
 interface ExpenseDetailPageProps {
   params: Promise<{
@@ -49,7 +52,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
       case 'supplies':
         return 'bg-green-100 text-green-800';
       case 'services':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-slate-100 text-slate-800';
       case 'insurance':
         return 'bg-yellow-100 text-yellow-800';
       case 'taxes':
@@ -84,7 +87,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
         );
       case 'services':
         return (
-          <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
         );
@@ -136,17 +139,19 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
           <div className="px-4 py-5 sm:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-16 h-16 bg-purple-100 rounded-lg flex items-center justify-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                   {getCategoryIcon(expense.category)}
                 </div>
               </div>
               <div className="ml-5">
-                <h2 className="text-2xl font-bold text-gray-900">{expense.description}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {formatPaymentNotesLabel(expense.description, expense.description)}
+                </h2>
                 <div className="flex items-center mt-2 space-x-4">
                   <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium ${getCategoryBadgeClass(expense.category)}`}>
-                    {expense.category}
+                    {formatReportCategoryLabel(expense.category)}
                   </span>
-                  <span className="text-3xl font-bold text-purple-600">
+                  <span className="text-3xl font-bold text-gray-900">
                     {formatCurrency(expense.amount)}
                   </span>
                 </div>
@@ -172,8 +177,8 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
                 </div>
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-900">Category</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 capitalize">
-                    {expense.category}
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {formatReportCategoryLabel(expense.category)}
                   </dd>
                 </div>
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -193,14 +198,26 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-900">Description</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {expense.description}
+                    {formatPaymentNotesLabel(expense.description, expense.description)}
                   </dd>
                 </div>
                 {expense.notes && (
                   <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                     <dt className="text-sm font-medium text-gray-900">Notes</dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {expense.notes}
+                      {(() => {
+                        const display = formatPaymentNotesDisplay(expense.notes);
+                        return (
+                          <>
+                            <div>{display.label || '—'}</div>
+                            {display.billingPeriodLabel && (
+                              <div className="mt-1 text-sm text-gray-600">
+                                Billing period: {display.billingPeriodLabel}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </dd>
                   </div>
                 )}
@@ -276,21 +293,16 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-between items-center mt-8">
+        <div className="mt-8 flex items-center justify-between">
           <Link
             href="/admin/financial/expenses"
-            className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+            className="text-sm font-medium text-gray-700 hover:text-gray-900"
           >
             ← Back to Expenses
           </Link>
-          <div className="flex space-x-3">
-            <Link
-              href={`/admin/financial/expenses/${expense.id}/edit`}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-            >
-              Edit Expense
-            </Link>
-          </div>
+          <Link href={`/admin/financial/expenses/${expense.id}/edit`}>
+            <Button>Edit Expense</Button>
+          </Link>
         </div>
       </div>
     </div>

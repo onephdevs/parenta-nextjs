@@ -29,7 +29,7 @@ export default function UpcomingDueDates({ dueDates }: UpcomingDueDatesProps) {
           </h3>
           <Link
             href="/admin/financial/invoices"
-            className="text-sm text-indigo-600 hover:text-indigo-900"
+            className="text-sm font-medium text-gray-700 hover:text-gray-900"
           >
             View all
           </Link>

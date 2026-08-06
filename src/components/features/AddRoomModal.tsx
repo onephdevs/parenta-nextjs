@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, Info, DollarSign, FileText } from 'lucide-react';
 import { Building, CreateRoomData } from '@/types/database';
@@ -75,7 +75,13 @@ export default function AddRoomModal({
   buildingId,
   onRoomAdded,
 }: AddRoomModalProps) {
-  const buildingOptions = buildings || (building ? [building] : []);
+  const lockedBuildingId = buildingId || building?.id || '';
+  const buildingOptions = useMemo(() => {
+    const list = buildings || (building ? [building] : []);
+    return [...list].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
+  }, [buildings, building]);
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,7 +94,7 @@ export default function AddRoomModal({
   const [rangePrefix, setRangePrefix] = useState('');
 
   const [formData, setFormData] = useState<CreateRoomData>({
-    buildingId: buildingId || building?.id || '',
+    buildingId: lockedBuildingId,
     roomNumber: '',
     roomType: 'bedroom',
     floorNumber: undefined,
@@ -97,6 +103,15 @@ export default function AddRoomModal({
     amenities: '',
     description: '',
   });
+
+  // When opening (or changing filter/locked building), pre-select building
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData((prev) => ({
+      ...prev,
+      buildingId: lockedBuildingId || prev.buildingId || '',
+    }));
+  }, [isOpen, lockedBuildingId]);
 
   const [amenitiesInput, setAmenitiesInput] = useState('');
 

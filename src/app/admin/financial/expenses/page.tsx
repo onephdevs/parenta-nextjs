@@ -1,163 +1,246 @@
-import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { authOptions } from '@/lib/auth';
-import { getExpenses, getExpenseSummary } from '@/lib/api/expenses';
-import { getAllBuildings } from '@/lib/api/buildings';
+import { useNotifications } from '@/hooks/useNotifications';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
-import { BarChart3, Calendar, PhilippinePeso, Plus, Receipt } from 'lucide-react';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import Pagination from '@/components/ui/Pagination';
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+  formatReportCategoryLabel,
+  type ExpenseCategory,
+} from '@/lib/constants/bills-expenses';
+import {
+  formatPaymentNotesDisplay,
+  formatPaymentNotesLabel,
+} from '@/lib/format-payment-notes';
+import {
+  AlertCircle,
+  Calendar,
+  DollarSign,
+  Eye,
+  PhilippinePeso,
+  Plus,
+  Receipt,
+  Search,
+} from 'lucide-react';
 
-interface SearchParams {
-  page?: string;
-  search?: string;
-  category?: string;
-  building?: string;
+const PAGE_SIZE = 20;
+
+interface ExpenseRow {
+  id: string;
+  category: string;
+  amount: number;
+  description: string;
   vendor?: string;
+  vendorName?: string;
+  expenseDate: string;
+  notes?: string;
+  buildingName?: string;
+  roomNumber?: string;
 }
 
-interface ExpensesPageProps {
-  searchParams: Promise<SearchParams>;
+interface BuildingOption {
+  id: string;
+  name: string;
 }
 
-export default async function ExpensesPage({ searchParams }: ExpensesPageProps) {
-  const params = await searchParams;
-  const session = await getServerSession(authOptions);
-  
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+  }).format(amount);
+}
+
+function formatDate(date: string | Date) {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function categoryBadgeClass(category: string) {
+  switch (category) {
+    case 'cleaning':
+      return 'bg-teal-100 text-teal-800';
+    case 'maintenance':
+      return 'bg-red-100 text-red-800';
+    case 'repair':
+      return 'bg-orange-100 text-orange-800';
+    case 'upgrade':
+      return 'bg-indigo-100 text-indigo-800';
+    case 'garbage_collection':
+      return 'bg-amber-100 text-amber-800';
+    case 'other':
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
   }
+}
 
-  const page = parseInt(params.page || '1');
-  const search = params.search || '';
-  const category = params.category || '';
-  const buildingId = params.building || '';
-  const vendor = params.vendor || '';
+export default function ExpensesPage() {
+  const { showNotification } = useNotifications();
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [buildings, setBuildings] = useState<BuildingOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Build filters
-  const filters: Record<string, unknown> = {};
-  if (category) filters.category = category;
-  if (buildingId) filters.buildingId = parseInt(buildingId);
-  if (vendor) filters.vendor = vendor;
-  if (search) filters.search = search;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [buildingFilter, setBuildingFilter] = useState('');
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [dateFromFilter, setDateFromFilter] = useState('');
+  const [dateToFilter, setDateToFilter] = useState('');
 
-  // Fetch data with error handling
-  let expensesData, buildings, summary;
-  
-  try {
-    const [expensesResult, buildingsData, summaryResult] = await Promise.all([
-      getExpenses(filters, page, 20),
-      getAllBuildings({ limit: 1000 }), // Get all buildings for dropdown
-      getExpenseSummary()
-    ]);
-    
-    expensesData = expensesResult;
-    buildings = buildingsData.buildings; // Extract buildings array from paginated response
-    summary = summaryResult;
-  } catch (error) {
-    console.error('Error loading expenses:', error);
-    // Return empty data if there's an error
-    expensesData = {
-      expenses: [],
-      total: 0,
-      page: 1,
-      limit: 20,
-      totalPages: 0
-    };
-    buildings = [];
-    summary = {
-      totalExpenses: 0,
-      totalAmount: 0,
-      monthlyAmount: 0,
-      monthlyExpenses: 0,
-      categoryBreakdown: [],
-      monthlyTrend: []
-    };
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const getCategoryBadgeClass = (category: string) => {
-    switch (category) {
-      case 'maintenance':
-        return 'bg-red-100 text-red-800';
-      case 'utilities':
-        return 'bg-blue-100 text-blue-800';
-      case 'supplies':
-        return 'bg-green-100 text-green-800';
-      case 'services':
-        return 'bg-purple-100 text-purple-800';
-      case 'insurance':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'taxes':
-        return 'bg-orange-100 text-orange-800';
-      case 'other':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const fetchBuildings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/buildings');
+      if (!response.ok) {
+        setBuildings([]);
+        return;
+      }
+      const data = await response.json();
+      let list: BuildingOption[] = [];
+      if (data.success && data.data?.buildings) {
+        list = data.data.buildings;
+      } else if (Array.isArray(data.data)) {
+        list = data.data;
+      } else if (Array.isArray(data.buildings)) {
+        list = data.buildings;
+      } else if (Array.isArray(data)) {
+        list = data;
+      }
+      setBuildings(
+        list.map((b) => ({
+          id: String(b.id),
+          name: b.name || 'Unknown',
+        }))
+      );
+    } catch (error) {
+      console.error('Error fetching buildings:', error);
+      setBuildings([]);
     }
-  };
+  }, []);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'maintenance':
-        return (
-          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        );
-      case 'utilities':
-        return (
-          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        );
-      case 'supplies':
-        return (
-          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-        );
-      case 'services':
-        return (
-          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        );
+  const fetchExpenses = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', String(PAGE_SIZE));
+      params.set('page', String(currentPage));
+      if (searchTerm.trim()) params.set('search', searchTerm.trim());
+      if (categoryFilter) params.set('category', categoryFilter);
+      if (buildingFilter) params.set('buildingId', buildingFilter);
+      if (vendorFilter.trim()) params.set('vendor', vendorFilter.trim());
+      if (dateFromFilter) params.set('dateFrom', dateFromFilter);
+      if (dateToFilter) params.set('dateTo', dateToFilter);
+
+      const response = await fetch(`/api/expenses?${params.toString()}`);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch expenses');
+      }
+
+      const rows: ExpenseRow[] = (data.expenses || []).map(
+        (e: Record<string, unknown>) => ({
+          id: String(e.id),
+          category: String(e.category || 'other'),
+          amount: Number(e.amount) || 0,
+          description: String(e.description || ''),
+          vendor: (e.vendor || e.vendorName || undefined) as string | undefined,
+          vendorName: (e.vendorName || e.vendor || undefined) as string | undefined,
+          expenseDate: e.expenseDate
+            ? String(e.expenseDate)
+            : new Date().toISOString(),
+          notes: e.notes ? String(e.notes) : undefined,
+          buildingName: e.buildingName ? String(e.buildingName) : undefined,
+          roomNumber: e.roomNumber ? String(e.roomNumber) : undefined,
+        })
+      );
+
+      setExpenses(rows);
+      setTotalItems(Number(data.total) || rows.length);
+      setTotalPages(Math.max(1, Number(data.totalPages) || 1));
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+      setExpenses([]);
+      setTotalItems(0);
+      setTotalPages(1);
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to fetch expenses',
+      });
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [
+    searchTerm,
+    categoryFilter,
+    buildingFilter,
+    vendorFilter,
+    dateFromFilter,
+    dateToFilter,
+    currentPage,
+  ]);
 
-  const totalPages = Math.ceil(expensesData.total / 20);
+  useEffect(() => {
+    void fetchBuildings();
+  }, [fetchBuildings]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, buildingFilter, vendorFilter, dateFromFilter, dateToFilter]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchExpenses();
+    }, searchTerm ? 300 : 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchExpenses, searchTerm]);
+
+  const summary = useMemo(() => {
+    const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonth = expenses.filter((e) => new Date(e.expenseDate) >= monthStart);
+    const byCategory = new Map<string, number>();
+    for (const e of expenses) {
+      byCategory.set(e.category, (byCategory.get(e.category) || 0) + e.amount);
+    }
+    let topCategory = 'N/A';
+    let topAmount = 0;
+    for (const [cat, amount] of byCategory) {
+      if (amount > topAmount) {
+        topAmount = amount;
+        topCategory = formatReportCategoryLabel(cat);
+      }
+    }
+    return {
+      total: totalItems,
+      totalAmount,
+      monthCount: thisMonth.length,
+      monthAmount: thisMonth.reduce((sum, e) => sum + e.amount, 0),
+      topCategory,
+      average: expenses.length > 0 ? totalAmount / expenses.length : 0,
+    };
+  }, [expenses, totalItems]);
 
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Expense Management"
+        title="Expenses"
         description="Track operating costs across properties"
         actions={
           <Link href="/admin/financial/expenses/new">
@@ -166,268 +249,229 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Expenses"
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ListSummaryCard
+          title="Total Amount"
           value={formatCurrency(summary.totalAmount)}
-          subtitle={`${summary.totalExpenses} expenses`}
-          tone="red"
-          icon={<PhilippinePeso className="h-5 w-5" />}
+          footer={`${summary.total} expenses`}
+          icon={<DollarSign className="h-8 w-8 text-red-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="This Month"
-          value={formatCurrency(summary.monthlyAmount)}
-          subtitle={`${summary.monthlyExpenses} expenses`}
-          tone="blue"
-          icon={<Calendar className="h-5 w-5" />}
+          value={formatCurrency(summary.monthAmount)}
+          footer={`${summary.monthCount} on this page`}
+          icon={<Calendar className="h-8 w-8 text-blue-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Top Category"
-          value={
-            summary.categoryBreakdown && summary.categoryBreakdown.length > 0
-              ? summary.categoryBreakdown[0].category
-              : 'N/A'
-          }
-          subtitle={`${summary.categoryBreakdown ? summary.categoryBreakdown.length : 0} categories`}
-          tone="green"
-          icon={<BarChart3 className="h-5 w-5" />}
+          value={summary.topCategory}
+          footer="on this page"
+          icon={<AlertCircle className="h-8 w-8 text-amber-600" />}
         />
-        <StatCard
-          title="Average Expense"
-          value={
-            summary.totalExpenses > 0
-              ? formatCurrency(summary.totalAmount / summary.totalExpenses)
-              : formatCurrency(0)
-          }
-          subtitle="per expense"
-          tone="yellow"
-          icon={<Receipt className="h-5 w-5" />}
+        <ListSummaryCard
+          title="Average"
+          value={formatCurrency(summary.average)}
+          footer="per expense on this page"
+          icon={<PhilippinePeso className="h-8 w-8 text-green-600" />}
         />
       </div>
 
-        <Card className="mb-6">
-            <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <FormField label="Search" htmlFor="search">
-                <Input
-                  type="text"
-                  name="search"
-                  id="search"
-                  defaultValue={search}
-                  placeholder="Search expenses..."
-                />
-              </FormField>
-
-              <FormField label="Category" htmlFor="category">
-                <Select name="category" id="category" defaultValue={category}>
-                  <option value="">All Categories</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="utilities">Utilities</option>
-                  <option value="supplies">Supplies</option>
-                  <option value="services">Services</option>
-                  <option value="insurance">Insurance</option>
-                  <option value="taxes">Taxes</option>
-                  <option value="other">Other</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Building" htmlFor="building">
-                <Select name="building" id="building" defaultValue={buildingId}>
-                  <option value="">All Buildings</option>
-                  {buildings.map((building) => (
-                    <option key={building.id} value={building.id}>
-                      {building.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField label="Vendor" htmlFor="vendor">
-                <Input
-                  type="text"
-                  name="vendor"
-                  id="vendor"
-                  defaultValue={vendor}
-                  placeholder="Filter by vendor..."
-                />
-              </FormField>
-
-              <div className="flex items-end">
-                <Button type="submit" className="w-full">
-                  Filter
-                </Button>
-              </div>
-            </form>
-        </Card>
-
-        {/* Expenses Table */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Expenses ({expensesData.total})
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-900">
-              Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, expensesData.total)} of {expensesData.total} expenses
-            </p>
-          </div>
-
-          {expensesData.expenses.length === 0 ? (
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No expenses found</h3>
-              <p className="mt-1 text-sm text-gray-900">Get started by recording a new expense.</p>
-              <div className="mt-6">
-                <Link
-                  href="/admin/financial/expenses/new"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Record Expense
-                </Link>
-              </div>
+      <Card className="mb-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+          <FormField label="Search" htmlFor="search">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="text"
+                id="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Description or vendor..."
+                className="pl-10"
+              />
             </div>
-          ) : (
-            <ul className="divide-y divide-gray-200">
-              {expensesData.expenses.map((expense) => (
-                <li key={expense.id}>
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                            {getCategoryIcon(expense.category)}
-                          </div>
+          </FormField>
+
+          <FormField label="Category" htmlFor="category">
+            <Select
+              id="category"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="">All Categories</option>
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory]}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label="Building" htmlFor="building">
+            <Select
+              id="building"
+              value={buildingFilter}
+              onChange={(e) => setBuildingFilter(e.target.value)}
+            >
+              <option value="">All Buildings</option>
+              {buildings.map((building) => (
+                <option key={building.id} value={building.id}>
+                  {building.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label="Vendor" htmlFor="vendor">
+            <Input
+              type="text"
+              id="vendor"
+              value={vendorFilter}
+              onChange={(e) => setVendorFilter(e.target.value)}
+              placeholder="Filter by vendor..."
+            />
+          </FormField>
+
+          <FormField label="From Date" htmlFor="dateFrom">
+            <Input
+              type="date"
+              id="dateFrom"
+              value={dateFromFilter}
+              onChange={(e) => setDateFromFilter(e.target.value)}
+            />
+          </FormField>
+
+          <FormField label="To Date" htmlFor="dateTo">
+            <Input
+              type="date"
+              id="dateTo"
+              value={dateToFilter}
+              onChange={(e) => setDateToFilter(e.target.value)}
+            />
+          </FormField>
+        </div>
+      </Card>
+
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        {isLoading ? (
+          <div className="p-8 text-center text-gray-900">Loading...</div>
+        ) : expenses.length === 0 ? (
+          <div className="p-8 text-center text-gray-900">
+            <Receipt className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+            <p className="mb-2 text-lg font-medium">No expenses found</p>
+            <p className="mb-4 text-sm text-gray-600">Get started by recording a new expense</p>
+            <Link href="/admin/financial/expenses/new">
+              <Button leftIcon={<Plus className="h-4 w-4" />}>Record Expense</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Description
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Category
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Property
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Vendor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {expenses.map((expense) => {
+                  const notesDisplay = formatPaymentNotesDisplay(expense.notes);
+                  const descriptionLabel = formatPaymentNotesLabel(
+                    expense.description,
+                    expense.description || '—'
+                  );
+                  return (
+                    <tr key={expense.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {descriptionLabel}
                         </div>
-                        <div className="ml-4">
-                          <div className="flex items-center">
-                            <p className="text-sm font-medium text-gray-900">
-                              {expense.description}
-                            </p>
-                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadgeClass(expense.category)}`}>
-                              {expense.category}
-                            </span>
-                            <span className="ml-2 text-lg font-semibold text-gray-900">
-                              {formatCurrency(expense.amount)}
-                            </span>
+                        {notesDisplay.label && notesDisplay.label !== descriptionLabel && (
+                          <div className="mt-0.5 text-xs text-gray-500">{notesDisplay.label}</div>
+                        )}
+                        {notesDisplay.billingPeriodLabel && (
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            Period: {notesDisplay.billingPeriodLabel}
                           </div>
-                          <div className="mt-1 flex items-center text-sm text-gray-900">
-                            {expense.vendor && (
-                              <>
-                                <p>{expense.vendor}</p>
-                                <span className="mx-2">•</span>
-                              </>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryBadgeClass(expense.category)}`}
+                        >
+                          {formatReportCategoryLabel(expense.category)}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        {expense.buildingName ? (
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {expense.buildingName}
+                            </div>
+                            {expense.roomNumber && (
+                              <div className="text-sm text-gray-600">
+                                Room {expense.roomNumber}
+                              </div>
                             )}
-                            {expense.buildingName && (
-                              <>
-                                <p>{expense.buildingName}</p>
-                                {expense.roomNumber && <span> {expense.roomNumber}</span>}
-                                <span className="mx-2">•</span>
-                              </>
-                            )}
-                            <p>{formatDate(expense.expenseDate)}</p>
                           </div>
-                          {expense.notes && (
-                            <p className="mt-1 text-sm text-gray-900">{expense.notes}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        {expense.vendorName || expense.vendor || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        {formatDate(expense.expenseDate)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-gray-900">
+                        {formatCurrency(expense.amount)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                         <Link
                           href={`/admin/financial/expenses/${expense.id}`}
-                          className="text-purple-600 hover:text-purple-900 text-sm font-medium"
+                          className="inline-flex text-gray-500 hover:text-gray-900"
+                          title="View"
                         >
-                          View Details
+                          <Eye className="h-5 w-5" />
                         </Link>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow">
-            <div className="flex-1 flex justify-between sm:hidden">
-              {page > 1 && (
-                <Link
-                  href={`?page=${page - 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
-                >
-                  Previous
-                </Link>
-              )}
-              {page < totalPages && (
-                <Link
-                  href={`?page=${page + 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
-                >
-                  Next
-                </Link>
-              )}
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-900">
-                  Showing <span className="font-medium">{((page - 1) * 20) + 1}</span> to{' '}
-                  <span className="font-medium">{Math.min(page * 20, expensesData.total)}</span> of{' '}
-                  <span className="font-medium">{expensesData.total}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  {page > 1 && (
-                    <Link
-                      href={`?page=${page - 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
-                    >
-                      <span className="sr-only">Previous</span>
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  )}
-                  
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
-                    if (pageNum > totalPages) return null;
-                    
-                    return (
-                      <Link
-                        key={pageNum}
-                        href={`?page=${pageNum}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          pageNum === page
-                            ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
-                            : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </Link>
-                    );
-                  })}
-
-                  {page < totalPages && (
-                    <Link
-                      href={`?page=${page + 1}&search=${search}&category=${category}&building=${buildingId}&vendor=${vendor}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
-                    >
-                      <span className="sr-only">Next</span>
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  )}
-                </nav>
-              </div>
-            </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
+        {!isLoading && expenses.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={PAGE_SIZE}
+            onPageChange={setCurrentPage}
+          />
+        )}
+      </div>
     </div>
   );
-} 
+}

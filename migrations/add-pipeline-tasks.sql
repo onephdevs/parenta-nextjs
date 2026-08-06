@@ -125,15 +125,15 @@ JOIN (
     ('payments', 'reminder_sent', 'Reminder sent', '#f59e0b', 3, false, false, false),
     ('payments', 'overdue', 'Overdue', '#ef4444', 4, false, false, false),
     ('payments', 'paid', 'Paid', '#22c55e', 5, true, false, true),
-    ('payments', 'escalation', 'Escalation', '#dc2626', 6, false, false, false),
+    ('payments', 'refund', 'Refund', '#0d9488', 6, false, false, false),
+    ('payments', 'escalation', 'Escalation', '#dc2626', 7, false, false, false),
     -- Expenses
     ('expenses', 'bill_received', 'Bill received', '#7c3aed', 1, false, false, false),
     ('expenses', 'verification', 'Verification', '#8b5cf6', 2, false, false, false),
     ('expenses', 'approval_pending', 'Approval pending', '#f59e0b', 3, false, false, false),
     ('expenses', 'approved', 'Approved', '#3b82f6', 4, false, false, false),
     ('expenses', 'payment_scheduled', 'Payment scheduled', '#14b8a6', 5, false, false, false),
-    ('expenses', 'paid', 'Paid', '#22c55e', 6, true, false, false),
-    ('expenses', 'reconciled', 'Reconciled', '#16a34a', 7, true, false, true)
+    ('expenses', 'paid', 'Paid', '#22c55e', 6, true, false, true)
 ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
   ON b.slug = s.board_slug
 WHERE NOT EXISTS (

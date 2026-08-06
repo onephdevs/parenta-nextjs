@@ -4,6 +4,7 @@ import { saveUploadedFile } from '@/lib/api/documents';
 import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
+import { logActivitySafe } from '@/lib/services/activity-logger';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const SUPPORTED_FILE_TYPES = [
@@ -141,26 +142,17 @@ export async function POST(request: NextRequest) {
           paymentDateRaw || invoice.due_date,
           invoice.due_date,
           referenceNumberRaw || null,
-          notesRaw ||
-            `Receipt uploaded for invoice ${invoice.invoice_number || invoice.id}`,
+          [
+            `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})`,
+            'Status: awaiting office verification — invoice balance not updated yet.',
+            notesRaw ? `Tenant notes: ${notesRaw}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n'),
         ]
       );
       paymentId = createPayment.rows[0].id;
-
-      try {
-        await pool.query(
-          `INSERT INTO payment_allocations (payment_id, invoice_id, allocated_amount, notes)
-           VALUES ($1, $2, $3, $4)`,
-          [
-            paymentId,
-            linkedInvoiceId,
-            paymentAmount,
-            `Linked via receipt upload for ${invoice.invoice_number || linkedInvoiceId}`,
-          ]
-        );
-      } catch (allocError) {
-        console.warn('Could not create payment allocation:', allocError);
-      }
+      // Do not allocate until an admin confirms the transaction ID / receipt.
     } else {
       // Custom payment date (no existing payment / invoice)
       if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
@@ -228,17 +220,45 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    const paymentRow = updateResult.rows[0];
+    const amountValue = parseFloat(paymentRow.amount);
+
+    logActivitySafe({
+      actorUserId: access.userId,
+      actorRole: 'tenant',
+      actionType: 'payment.claim_submitted',
+      category: 'payments',
+      entityType: 'payment',
+      entityId: String(paymentRow.id),
+      entityLabel: `₱${amountValue.toLocaleString()} — verify transaction ID`,
+      afterData: {
+        paymentId: paymentRow.id,
+        amount: amountValue,
+        referenceNumber: referenceNumberRaw || null,
+        invoiceId: linkedInvoiceId,
+      },
+      link: `/admin/financial/payments/${paymentRow.id}`,
+      metadata: {
+        link: `/admin/financial/payments/${paymentRow.id}`,
+        invoiceId: linkedInvoiceId,
+        tenantId: tenant.id,
+        referenceNumber: referenceNumberRaw || null,
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Receipt uploaded and linked successfully',
+      message:
+        'Payment submitted for verification. Your invoice balance updates after the office confirms the transaction ID.',
       data: {
-        paymentId: updateResult.rows[0].id,
+        paymentId: paymentRow.id,
         invoiceId: linkedInvoiceId,
-        receiptFileName: updateResult.rows[0].receipt_file_name,
-        receiptFilePath: updateResult.rows[0].receipt_file_path,
-        receiptUploadedAt: updateResult.rows[0].receipt_uploaded_at,
-        paymentDate: updateResult.rows[0].payment_date,
-        amount: parseFloat(updateResult.rows[0].amount),
+        receiptFileName: paymentRow.receipt_file_name,
+        receiptFilePath: paymentRow.receipt_file_path,
+        receiptUploadedAt: paymentRow.receipt_uploaded_at,
+        paymentDate: paymentRow.payment_date,
+        amount: amountValue,
+        status: 'pending',
       },
     });
   } catch (error) {

@@ -125,11 +125,12 @@ export async function POST(request: NextRequest) {
       entityId: String(payment.id),
       entityLabel: `₱${parseFloat(amount).toLocaleString()} — ${invoice.invoice_number}`,
       afterData: payment as Record<string, unknown>,
-      link: `/admin/financial/payments`,
+      link: `/admin/financial/payments/${payment.id}`,
       metadata: {
-        link: '/admin/financial/payments',
+        link: `/admin/financial/payments/${payment.id}`,
         invoiceId,
         tenantId: tenant.id,
+        referenceNumber: payment.reference_number,
       },
     });
 

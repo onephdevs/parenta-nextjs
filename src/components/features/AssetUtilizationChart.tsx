@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Package, Clock } from 'lucide-react';
-import { useNotifications } from '@/hooks/useNotifications';
 
 interface UtilizationData {
   utilizationRate: number;
@@ -26,7 +25,6 @@ interface AssetUtilizationChartProps {
 export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartProps) {
   const [data, setData] = useState<UtilizationData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { addNotification } = useNotifications();
 
   useEffect(() => {
     const fetchUtilizationData = async () => {
@@ -38,18 +36,32 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
         if (result.success) {
           setData(result.data);
         } else {
-          throw new Error(result.error);
+          // Empty inventory is valid — show empty state, don't toast as hard failure
+          setData({
+            utilizationRate: 0,
+            averageAssignmentDuration: 0,
+            mostUtilizedAssets: [],
+            underutilizedAssets: [],
+          });
+          if (result.error && !String(result.details || result.error).includes('division')) {
+            console.warn('Utilization analytics:', result.error, result.details);
+          }
         }
       } catch (error) {
         console.error('Error fetching utilization data:', error);
-        addNotification('Failed to load utilization analytics', 'error');
+        setData({
+          utilizationRate: 0,
+          averageAssignmentDuration: 0,
+          mostUtilizedAssets: [],
+          underutilizedAssets: [],
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchUtilizationData();
-  }, [refreshTrigger, addNotification]);
+  }, [refreshTrigger]);
 
   if (loading) {
     return (
@@ -124,14 +136,14 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900">Most Utilized Assets</p>
-              <p className="text-2xl font-bold text-purple-600">
+              <p className="text-2xl font-bold text-slate-600">
                 {data.mostUtilizedAssets.length}
               </p>
               <p className="text-sm text-gray-900">
                 High-demand assets
               </p>
             </div>
-            <div className="bg-purple-500 p-3 rounded-lg">
+            <div className="bg-slate-600 p-3 rounded-lg">
               <Package className="h-6 w-6 text-white" />
             </div>
           </div>

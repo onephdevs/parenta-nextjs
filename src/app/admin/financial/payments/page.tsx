@@ -7,7 +7,7 @@ import { getPaymentsHubStats, getUpcomingAndDueInvoices } from '@/lib/api/paymen
 import { getAllBuildings } from '@/lib/api/buildings';
 import PaymentsHub from '@/components/features/PaymentsHub';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/ui/StatCard';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Banknote, Plus, Receipt, Wallet } from 'lucide-react';
 
@@ -58,36 +58,51 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
     payments: [],
     total: 0,
   };
+  let pendingClaims: Awaited<ReturnType<typeof getPayments>> = {
+    payments: [],
+    total: 0,
+  };
   let buildings: Array<{ id: string; name: string }> = [];
 
   try {
-    const [statsResult, upcomingResult, historyResult, buildingsResult] = await Promise.all([
-      getPaymentsHubStats(),
-      status === 'paid'
-        ? Promise.resolve([])
-        : getUpcomingAndDueInvoices({
-            search: search || undefined,
-            buildingId: buildingId || undefined,
-            status: upcomingStatus,
-            limit: 50,
-          }),
-      status === 'due' || status === 'overdue'
-        ? Promise.resolve({ payments: [], total: 0 })
-        : getPayments(
-            {
+    const [statsResult, upcomingResult, historyResult, pendingResult, buildingsResult] =
+      await Promise.all([
+        getPaymentsHubStats(),
+        status === 'paid'
+          ? Promise.resolve([])
+          : getUpcomingAndDueInvoices({
               search: search || undefined,
               buildingId: buildingId || undefined,
-              paymentStatus: 'completed',
-            },
-            page,
-            20
-          ),
-      getAllBuildings({ limit: 200 }),
-    ]);
+              status: upcomingStatus,
+              limit: 50,
+            }),
+        status === 'due' || status === 'overdue'
+          ? Promise.resolve({ payments: [], total: 0 })
+          : getPayments(
+              {
+                search: search || undefined,
+                buildingId: buildingId || undefined,
+                paymentStatus: 'completed',
+              },
+              page,
+              20
+            ),
+        getPayments(
+          {
+            search: search || undefined,
+            buildingId: buildingId || undefined,
+            paymentStatus: 'pending',
+          },
+          1,
+          50
+        ),
+        getAllBuildings({ limit: 200 }),
+      ]);
 
     stats = statsResult;
     upcoming = upcomingResult;
     history = historyResult;
+    pendingClaims = pendingResult;
     buildings = buildingsResult.buildings.map((b) => ({ id: b.id, name: b.name }));
   } catch (error) {
     console.error('Error loading payments hub:', error);
@@ -102,43 +117,42 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
         description="Track collections, dues, and payment history"
         actions={
           <Link href="/admin/financial/payments/new">
-            <Button variant="outline" leftIcon={<Plus className="h-4 w-4" />}>
-              Record manual payment
-            </Button>
+            <Button leftIcon={<Plus className="h-4 w-4" />}>Record Payment</Button>
           </Link>
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ListSummaryCard
           title="Collected this month"
           value={formatCurrency(stats.collectedThisMonth)}
-          tone="green"
-          icon={<Banknote className="h-5 w-5" />}
+          footer="confirmed collections"
+          icon={<Banknote className="h-8 w-8 text-green-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Outstanding"
           value={formatCurrency(stats.outstanding)}
-          tone="yellow"
-          icon={<Wallet className="h-5 w-5" />}
+          footer="unpaid balances"
+          icon={<Wallet className="h-8 w-8 text-yellow-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Overdue"
           value={stats.overdueCount}
-          tone="red"
-          icon={<AlertTriangle className="h-5 w-5" />}
+          footer="overdue invoices"
+          icon={<AlertTriangle className="h-8 w-8 text-red-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Penalties applied"
           value={formatCurrency(stats.penaltiesApplied)}
-          tone="default"
-          icon={<Receipt className="h-5 w-5" />}
+          footer="late fees"
+          icon={<Receipt className="h-8 w-8 text-blue-600" />}
         />
       </div>
 
       <PaymentsHub
         upcoming={upcoming}
         history={history.payments}
+        pendingClaims={pendingClaims.payments}
         buildings={buildings}
         searchParams={{
           search: resolvedSearchParams.search,

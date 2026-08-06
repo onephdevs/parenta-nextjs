@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
@@ -50,6 +50,11 @@ interface RoomUtilityBillFormProps {
   initialData?: Partial<RoomUtilityBillFormData>;
   onSubmit?: (data: RoomUtilityBillFormData) => Promise<void>;
   onCancel?: () => void;
+  /** Called after a successful default create (not used when onSubmit is provided) */
+  onSuccess?: () => void;
+  mode?: 'page' | 'modal' | 'dialog';
+  isOpen?: boolean;
+  headerExtra?: ReactNode;
 }
 
 type FormSection = 'room' | 'type' | 'period' | 'amount' | 'status' | 'notes';
@@ -103,6 +108,10 @@ export default function RoomUtilityBillForm({
   initialData,
   onSubmit,
   onCancel,
+  onSuccess,
+  mode = 'page',
+  isOpen = true,
+  headerExtra,
 }: RoomUtilityBillFormProps) {
   const router = useRouter();
   const { showNotification } = useNotifications();
@@ -280,7 +289,8 @@ export default function RoomUtilityBillForm({
           title: 'Success',
           message: 'Utility bill created successfully',
         });
-        router.push('/admin/bills-expenses');
+        if (onSuccess) onSuccess();
+        else router.push('/admin/bills-expenses/utility-bills');
       }
     } catch (error) {
       showNotification({
@@ -326,7 +336,7 @@ export default function RoomUtilityBillForm({
 
   const handleCancel = () => {
     if (onCancel) onCancel();
-    else router.push('/admin/bills-expenses');
+    else router.push('/admin/bills-expenses/utility-bills');
   };
 
   const renderSectionContent = () => {
@@ -646,7 +656,7 @@ export default function RoomUtilityBillForm({
     }
   };
 
-  return (
+  return mode === 'page' ? (
     <SectionedFormShell
       mode="page"
       onCancel={handleCancel}
@@ -658,6 +668,26 @@ export default function RoomUtilityBillForm({
       primaryLabel="Create Bill"
       primaryLoading={isLoading}
       formId="utility-bill-form"
+      headerExtra={headerExtra}
+    >
+      <form id="utility-bill-form" onSubmit={handleSubmit} className="space-y-6">
+        {renderSectionContent()}
+      </form>
+    </SectionedFormShell>
+  ) : (
+    <SectionedFormShell
+      mode={mode}
+      isOpen={isOpen}
+      onCancel={handleCancel}
+      eyebrow="Utility Bill"
+      entityLabel="New Utility Bill"
+      sections={formSections}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      primaryLabel="Create Bill"
+      primaryLoading={isLoading}
+      formId="utility-bill-form"
+      headerExtra={headerExtra}
     >
       <form id="utility-bill-form" onSubmit={handleSubmit} className="space-y-6">
         {renderSectionContent()}

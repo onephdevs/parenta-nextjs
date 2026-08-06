@@ -95,6 +95,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [confirmDeleteBoard, setConfirmDeleteBoard] = useState(false);
   const [deletingBoard, setDeletingBoard] = useState(false);
+  const [archivedBoards, setArchivedBoards] = useState<PipelineBoard[]>([]);
+  const [restoringBoardId, setRestoringBoardId] = useState<string | null>(null);
   const [draggingBoardId, setDraggingBoardId] = useState<string | null>(null);
   const [dropBoardId, setDropBoardId] = useState<string | null>(null);
   const boardTitleInputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +144,19 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         }
         setBoards(json.data.boards);
         setCards(json.data.cards || []);
+        if (Array.isArray(json.data.archivedBoards)) {
+          setArchivedBoards(json.data.archivedBoards);
+        } else {
+          // Fetch archived list in background
+          void fetch('/api/pipeline/boards?archived=1')
+            .then((r) => r.json())
+            .then((arch) => {
+              if (arch.success && Array.isArray(arch.data?.archivedBoards)) {
+                setArchivedBoards(arch.data.archivedBoards);
+              }
+            })
+            .catch(() => undefined);
+        }
 
         // Background refresh for live pipelines — does not block the loader
         if (slug === 'payments' || slug === 'maintenance') {
@@ -303,16 +318,42 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         method: 'DELETE',
       });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Failed to delete board');
+      if (!json.success) throw new Error(json.error || 'Failed to archive board');
       setConfirmDeleteBoard(false);
+      const archived = { ...activeBoard, isActive: false };
+      setArchivedBoards((prev) =>
+        prev.some((b) => b.id === archived.id) ? prev : [...prev, archived]
+      );
       const remaining = boards.filter((b) => b.id !== activeBoard.id);
       const nextSlug = (remaining[0]?.slug || 'onboarding') as PipelineBoardSlug;
-      setSyncMessage(`Deleted “${activeBoard.name}”`);
+      setSyncMessage(`Archived “${activeBoard.name}”. You can restore it below.`);
       await loadBoard(nextSlug);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete board');
+      setError(err instanceof Error ? err.message : 'Failed to archive board');
     } finally {
       setDeletingBoard(false);
+    }
+  }
+
+  async function handleUnarchiveBoard(boardId: string) {
+    setRestoringBoardId(boardId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/pipeline/boards/${boardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unarchive' }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to restore board');
+      const restored = json.data.board as PipelineBoard;
+      setArchivedBoards((prev) => prev.filter((b) => b.id !== boardId));
+      setSyncMessage(`Restored “${restored.name}”`);
+      await loadBoard(restored.slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore board');
+    } finally {
+      setRestoringBoardId(null);
     }
   }
 
@@ -727,8 +768,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
                       type="button"
                       onClick={() => setConfirmDeleteBoard(true)}
                       className="rounded-md p-1 text-blue-400 hover:bg-red-50 hover:text-red-600"
-                      title="Delete board"
-                      aria-label="Delete board"
+                      title="Archive board"
+                      aria-label="Archive board"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -771,8 +812,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
                       type="button"
                       onClick={() => setConfirmDeleteBoard(true)}
                       className="mr-1 cursor-pointer rounded-md p-1 text-blue-400 hover:bg-red-50 hover:text-red-600"
-                      title="Delete board"
-                      aria-label="Delete board"
+                      title="Archive board"
+                      aria-label="Archive board"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1062,6 +1103,32 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         </div>
       )}
 
+      {archivedBoards.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+            Archived boards
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {archivedBoards.map((board) => (
+              <li
+                key={board.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/80 px-2.5 py-1.5 text-sm"
+              >
+                <span className="font-medium text-gray-800">{board.name}</span>
+                <button
+                  type="button"
+                  className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-50 disabled:opacity-50"
+                  disabled={restoringBoardId === board.id}
+                  onClick={() => void handleUnarchiveBoard(board.id)}
+                >
+                  {restoringBoardId === board.id ? 'Restoring…' : 'Unarchive'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
@@ -1265,15 +1332,13 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
           if (!deletingBoard) setConfirmDeleteBoard(false);
         }}
         onConfirm={() => void handleDeleteBoard()}
-        title="Delete board?"
+        title="Archive board?"
         message={
           activeBoard
-            ? BUILT_IN_BOARD_SLUGS.has(activeBoard.slug)
-              ? `“${activeBoard.name}” is a system board. Deleting it removes all of its stages and opportunities, and may break website inquiries and automated sync. This cannot be undone.`
-              : `Delete “${activeBoard.name}”? All stages and opportunities on this board will be permanently deleted. This cannot be undone.`
-            : 'Delete this board and all of its stages and opportunities?'
+            ? `Move “${activeBoard.name}” to archive? Stages and opportunities are kept. You can restore the board anytime.`
+            : 'Archive this board? You can restore it later.'
         }
-        confirmText="Delete board"
+        confirmText="Archive board"
         variant="danger"
         isLoading={deletingBoard}
       />

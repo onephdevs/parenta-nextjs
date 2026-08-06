@@ -98,7 +98,7 @@ export async function getTotalRevenue(period: 'month' | 'year' = 'month'): Promi
       FROM payments
       WHERE payment_date >= DATE_TRUNC('month', CURRENT_DATE)
         AND payment_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-        AND payment_status IN ('paid', 'pending')
+        AND payment_status IN ('paid', 'partial', 'completed')
     `);
     
     // Previous month revenue
@@ -107,7 +107,7 @@ export async function getTotalRevenue(period: 'month' | 'year' = 'month'): Promi
       FROM payments
       WHERE payment_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
         AND payment_date < DATE_TRUNC('month', CURRENT_DATE)
-        AND payment_status IN ('paid', 'pending')
+        AND payment_status IN ('paid', 'partial', 'completed')
     `);
     
     // Current year revenue
@@ -116,7 +116,7 @@ export async function getTotalRevenue(period: 'month' | 'year' = 'month'): Promi
       FROM payments
       WHERE payment_date >= DATE_TRUNC('year', CURRENT_DATE)
         AND payment_date < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
-        AND payment_status IN ('paid', 'pending')
+        AND payment_status IN ('paid', 'partial', 'completed')
     `);
     
     // Previous year revenue
@@ -125,7 +125,7 @@ export async function getTotalRevenue(period: 'month' | 'year' = 'month'): Promi
       FROM payments
       WHERE payment_date >= DATE_TRUNC('year', CURRENT_DATE) - INTERVAL '1 year'
         AND payment_date < DATE_TRUNC('year', CURRENT_DATE)
-        AND payment_status IN ('paid', 'pending')
+        AND payment_status IN ('paid', 'partial', 'completed')
     `);
     
     const monthly = parseFloat(currentMonthResult.rows[0].revenue);
@@ -346,7 +346,7 @@ export async function getTopTenantsByPayments(limit: number = 5): Promise<TopTen
         MAX(p.payment_date) as last_payment_date
       FROM payments p
       JOIN tenants t ON t.id = p.tenant_id
-      WHERE p.payment_status IN ('paid', 'pending')
+      WHERE p.payment_status IN ('paid', 'partial', 'completed')
       GROUP BY p.tenant_id, tenant_name
     ),
     on_time_payments AS (
@@ -363,7 +363,7 @@ export async function getTopTenantsByPayments(limit: number = 5): Promise<TopTen
           )
         ) as total_count
       FROM payments p
-      WHERE p.payment_status IN ('paid', 'pending')
+      WHERE p.payment_status IN ('paid', 'partial', 'completed')
       GROUP BY p.tenant_id
     )
     SELECT 
@@ -474,7 +474,7 @@ export async function getMonthlyRevenueTrend(): Promise<Array<{ month: string; r
       COUNT(*) as payments
     FROM payments
     WHERE payment_date >= CURRENT_DATE - INTERVAL '12 months'
-      AND payment_status IN ('paid', 'pending')
+      AND payment_status IN ('paid', 'partial', 'completed')
     GROUP BY DATE_TRUNC('month', payment_date), TO_CHAR(payment_date, 'Mon YYYY')
     ORDER BY month_date ASC
   `);

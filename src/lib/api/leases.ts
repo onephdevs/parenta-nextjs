@@ -67,9 +67,9 @@ function mapListRow(row: Record<string, unknown>): LeaseListItem {
 
   return {
     id: String(row.id),
-    tenantId: String(row.tenant_id),
-    roomId: String(row.room_id),
-    buildingId: String(row.building_id),
+    tenantId: row.tenant_id ? String(row.tenant_id) : '',
+    roomId: row.room_id ? String(row.room_id) : '',
+    buildingId: row.building_id ? String(row.building_id) : '',
     buildingName: String(row.building_name || 'Unknown'),
     roomNumber: String(row.room_number || ''),
     tenantFirstName: String(row.first_name || row.tenant_name_snapshot?.toString().split(' ')[0] || ''),

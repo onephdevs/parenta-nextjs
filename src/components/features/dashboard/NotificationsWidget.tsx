@@ -162,8 +162,8 @@ export default function NotificationsWidget() {
 
   if (isLoading && notifications.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
+      <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between">
           <h3 className="flex items-center text-base font-bold text-gray-900">
             <Bell className="mr-2 h-4 w-4 text-blue-600" />
             Notifications
@@ -171,7 +171,7 @@ export default function NotificationsWidget() {
         </div>
         <div className="space-y-2">
           {[1, 2].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />
+            <div key={i} className="h-11 animate-pulse rounded bg-gray-100" />
           ))}
         </div>
       </div>
@@ -179,15 +179,15 @@ export default function NotificationsWidget() {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center">
           <h3 className="flex items-center text-base font-bold text-gray-900">
-            <Bell className="mr-2 h-4 w-4 text-blue-600" />
+            <Bell className="mr-2 h-4 w-4 shrink-0 text-blue-600" />
             Notifications
           </h3>
           {unreadCount > 0 && (
-            <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+            <span className="ml-2 inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
               {unreadCount}
             </span>
           )}
@@ -201,20 +201,20 @@ export default function NotificationsWidget() {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="py-6 text-center text-gray-500">
-          <Bell className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+        <div className="py-5 text-center text-gray-500">
+          <Bell className="mx-auto mb-2 h-7 w-7 text-gray-300" />
           <p className="text-sm">No alerts right now</p>
         </div>
       ) : (
-        <div className="max-h-72 space-y-2 overflow-y-auto">
+        <div className="max-h-64 space-y-2 overflow-x-hidden overflow-y-auto">
           {notifications.map((notification) => {
             const inner = (
               <div className="flex min-w-0 flex-1 items-start gap-2">
                 <div className="mt-0.5 shrink-0">
                   {getPriorityIcon(notification.priority)}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm text-gray-900">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <p className="break-words text-sm leading-snug text-gray-900 [overflow-wrap:anywhere]">
                     {notification.title || notification.message}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">
@@ -227,14 +227,14 @@ export default function NotificationsWidget() {
             return (
               <div
                 key={notification.id}
-                className={`group flex items-start gap-1 rounded-lg border p-2.5 ${
+                className={`group flex min-w-0 items-start gap-1 rounded-lg border p-2 ${
                   !notification.isRead
                     ? 'border-blue-100 bg-blue-50/40'
                     : 'border-gray-100 bg-gray-50/50'
                 }`}
               >
                 {notification.link ? (
-                  <Link href={notification.link} className="min-w-0 flex-1">
+                  <Link href={notification.link} className="min-w-0 flex-1 overflow-hidden">
                     {inner}
                   </Link>
                 ) : (

@@ -201,9 +201,13 @@ function mapCard(row: DbCard): PipelineCard {
   };
 }
 
-export async function getPipelineBoards(): Promise<PipelineBoard[]> {
+export async function getPipelineBoards(options?: {
+  includeInactive?: boolean;
+}): Promise<PipelineBoard[]> {
   const boardsResult = await pool.query<DbBoard>(
-    `SELECT * FROM pipeline_boards WHERE is_active = true ORDER BY sort_order ASC`
+    options?.includeInactive
+      ? `SELECT * FROM pipeline_boards ORDER BY sort_order ASC`
+      : `SELECT * FROM pipeline_boards WHERE is_active = true ORDER BY sort_order ASC`
   );
 
   if (boardsResult.rows.length === 0) {
@@ -232,7 +236,7 @@ export async function getPipelineBoards(): Promise<PipelineBoard[]> {
       .filter((s) => !s.isLost)
       .reduce((sum, s) => sum + (s.cardCount || 0), 0);
     const openTotalAmount = stages
-      .filter((s) => !s.isWon && !s.isLost && s.slug !== 'paid')
+      .filter((s) => !s.isWon && !s.isLost && s.slug !== 'paid' && s.slug !== 'refund')
       .reduce((sum, s) => sum + (s.totalAmount || 0), 0);
 
     return {
@@ -505,20 +509,13 @@ export async function movePipelineCard(
 
   // Maintenance board drag → keep maintenance_requests.status in sync
   if (card.board_slug === 'maintenance' && card.maintenance_request_id) {
-    const requestStatus =
-      stage.slug === 'in_progress'
-        ? 'in_progress'
-        : stage.slug === 'resolved'
-          ? 'completed'
-          : stage.slug === 'closed'
-            ? 'cancelled'
-            : 'open';
+    const requestStatus = maintenanceStageSlugToStatus(stage.slug);
     await pool.query(
       `UPDATE maintenance_requests SET
          status = $1,
          completed_date = CASE
            WHEN $1 = 'completed' THEN COALESCE(completed_date, CURRENT_DATE)
-           ELSE completed_date
+           ELSE NULL
          END,
          updated_at = CURRENT_TIMESTAMP
        WHERE id = $2`,
@@ -1015,6 +1012,7 @@ type PaymentStageSlug =
   | 'reminder_sent'
   | 'overdue'
   | 'paid'
+  | 'refund'
   | 'escalation';
 
 const PAYMENT_DUE_SOON_DAYS = 7;
@@ -1027,7 +1025,7 @@ function calendarDaysUntil(dueDateIso: string, today = new Date()): number {
 
 /**
  * Map lease + invoice state → Payments board stage.
- * Preserves manual stages (reminder_sent, escalation) while still unpaid.
+ * Preserves manual stages (reminder_sent, escalation, refund) while still unpaid / after paid.
  */
 export function resolvePaymentStageFromInvoice(input: {
   invoice: TenantInvoiceFocus | null;
@@ -1039,6 +1037,9 @@ export function resolvePaymentStageFromInvoice(input: {
   const invoice = input.invoice;
   const balance = invoice ? Number(invoice.balance_due || 0) : 0;
   const status = (invoice?.invoice_status || '').toLowerCase();
+
+  // Manual refund stays put (e.g. after a paid collection)
+  if (current === 'refund') return 'refund';
 
   if (!invoice || balance <= 0 || status === 'paid' || status === 'cancelled') {
     return 'paid';
@@ -1367,8 +1368,7 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
        VALUES
          ('maintenance', 'submitted', 'Submitted', '#7c3aed', 1, false, false, false),
          ('maintenance', 'in_progress', 'In progress', '#3b82f6', 2, false, false, false),
-         ('maintenance', 'resolved', 'Resolved', '#22c55e', 3, true, false, false),
-         ('maintenance', 'closed', 'Closed', '#94a3b8', 4, true, false, true)
+         ('maintenance', 'resolved', 'Resolved', '#22c55e', 3, true, false, true)
      ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
        ON b.slug = s.board_slug
      WHERE NOT EXISTS (
@@ -1398,17 +1398,33 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
   ).catch(() => undefined);
 }
 
-function maintenanceStatusToStageSlug(status: string | null | undefined): string {
+/** Map maintenance_requests.status → pipeline stage slug (shared with reverse sync). */
+export function maintenanceStatusToStageSlug(status: string | null | undefined): string {
   switch ((status || 'open').toLowerCase()) {
     case 'in_progress':
       return 'in_progress';
     case 'completed':
-      return 'resolved';
     case 'cancelled':
-      return 'closed';
+      return 'resolved';
     case 'open':
+    case 'submitted':
     default:
       return 'submitted';
+  }
+}
+
+/** Map pipeline stage slug → maintenance_requests.status. */
+export function maintenanceStageSlugToStatus(
+  stageSlug: string | null | undefined
+): 'open' | 'in_progress' | 'completed' {
+  switch ((stageSlug || 'submitted').toLowerCase()) {
+    case 'in_progress':
+      return 'in_progress';
+    case 'resolved':
+      return 'completed';
+    case 'submitted':
+    default:
+      return 'open';
   }
 }
 
@@ -1471,7 +1487,6 @@ export async function ensureMaintenancePipelineCard(input: {
         [existing.rows[0].id]
       );
       if (cardRow.rows[0] && cardRow.rows[0].stage_id !== stage.id) {
-        const isClosed = stageSlug === 'closed';
         const isResolved = stageSlug === 'resolved';
         await pool.query(
           `UPDATE pipeline_cards SET
@@ -1482,8 +1497,8 @@ export async function ensureMaintenancePipelineCard(input: {
            WHERE id = $4`,
           [
             stage.id,
-            isClosed ? 'archived' : isResolved ? 'won' : 'open',
-            isResolved || isClosed,
+            isResolved ? 'won' : 'open',
+            isResolved,
             existing.rows[0].id,
           ]
         );
@@ -1790,6 +1805,104 @@ export async function getPipelineCardById(cardId: string): Promise<PipelineCard 
   return mapCard(result.rows[0]);
 }
 
+export interface PipelineCardEvent {
+  id: string;
+  cardId: string;
+  eventType: string;
+  note?: string;
+  metadata?: Record<string, unknown>;
+  fromStageName?: string;
+  toStageName?: string;
+  actorName?: string;
+  createdAt: string;
+  summary: string;
+}
+
+function summarizePipelineEvent(row: {
+  event_type: string;
+  note: string | null;
+  metadata: Record<string, unknown> | null;
+  from_stage_name: string | null;
+  to_stage_name: string | null;
+}): string {
+  const note = row.note?.trim();
+  if (note) return note;
+
+  switch (row.event_type) {
+    case 'created':
+      return 'Opportunity created';
+    case 'assignee_changed':
+      return 'Assignee updated';
+    case 'stage_changed':
+      if (row.from_stage_name && row.to_stage_name) {
+        return `Moved from ${row.from_stage_name} to ${row.to_stage_name}`;
+      }
+      return 'Stage changed';
+    case 'moved_to_board':
+      return 'Moved to another board';
+    case 'lease_generated':
+      return 'Lease generated';
+    case 'updated':
+      return 'Opportunity updated';
+    default:
+      return row.event_type.replace(/_/g, ' ');
+  }
+}
+
+export async function getPipelineCardEvents(
+  cardId: string,
+  limit = 50
+): Promise<PipelineCardEvent[]> {
+  const result = await pool.query<{
+    id: string;
+    card_id: string;
+    event_type: string;
+    note: string | null;
+    metadata: Record<string, unknown> | null;
+    from_stage_name: string | null;
+    to_stage_name: string | null;
+    actor_first_name: string | null;
+    actor_last_name: string | null;
+    created_at: Date;
+  }>(
+    `SELECT
+       e.id,
+       e.card_id,
+       e.event_type,
+       e.note,
+       e.metadata,
+       fs.name AS from_stage_name,
+       ts.name AS to_stage_name,
+       u.first_name AS actor_first_name,
+       u.last_name AS actor_last_name,
+       e.created_at
+     FROM pipeline_card_events e
+     LEFT JOIN pipeline_stages fs ON fs.id = e.from_stage_id
+     LEFT JOIN pipeline_stages ts ON ts.id = e.to_stage_id
+     LEFT JOIN users u ON u.id = e.created_by
+     WHERE e.card_id = $1
+     ORDER BY e.created_at DESC
+     LIMIT $2`,
+    [cardId, limit]
+  );
+
+  return result.rows.map((row) => {
+    const actorName = [row.actor_first_name, row.actor_last_name].filter(Boolean).join(' ').trim();
+    return {
+      id: row.id,
+      cardId: row.card_id,
+      eventType: row.event_type,
+      note: row.note || undefined,
+      metadata: row.metadata || undefined,
+      fromStageName: row.from_stage_name || undefined,
+      toStageName: row.to_stage_name || undefined,
+      actorName: actorName || undefined,
+      createdAt: row.created_at.toISOString(),
+      summary: summarizePipelineEvent(row),
+    };
+  });
+}
+
 export interface UpdatePipelineCardData {
   title?: string;
   contactFirstName?: string | null;
@@ -1956,6 +2069,55 @@ export async function updatePipelineCard(
     // Fall through: save fields first, then convert at end
   }
 
+  const changeNotes: string[] = [];
+  const nextAssignedTo =
+    data.assignedTo !== undefined ? data.assignedTo : existing.assignedTo || null;
+  if (data.assignedTo !== undefined && nextAssignedTo !== (existing.assignedTo || null)) {
+    if (!nextAssignedTo) {
+      changeNotes.push(
+        existing.assignedToName
+          ? `Unassigned from ${existing.assignedToName}`
+          : 'Unassigned admin'
+      );
+    } else {
+      const assigneeRow = await pool.query<{ first_name: string; last_name: string }>(
+        `SELECT first_name, last_name FROM users WHERE id = $1`,
+        [nextAssignedTo]
+      );
+      const name = assigneeRow.rows[0]
+        ? `${assigneeRow.rows[0].first_name} ${assigneeRow.rows[0].last_name}`.trim()
+        : 'admin';
+      changeNotes.push(`Assigned to ${name}`);
+    }
+  }
+  if (data.contactFirstName !== undefined || data.contactLastName !== undefined) {
+    const prev = [existing.contactFirstName, existing.contactLastName].filter(Boolean).join(' ');
+    const next = [firstName, lastName].filter(Boolean).join(' ');
+    if (prev !== next) changeNotes.push(`Contact updated to ${next || '(cleared)'}`);
+  }
+  if (data.buildingId !== undefined && data.buildingId !== (existing.buildingId || null)) {
+    changeNotes.push('Building updated');
+  }
+  if (data.roomId !== undefined && data.roomId !== (existing.roomId || null)) {
+    changeNotes.push('Room updated');
+  }
+  if (data.amount !== undefined && data.amount !== (existing.amount ?? null)) {
+    changeNotes.push('Amount updated');
+  }
+  if (data.tags !== undefined) changeNotes.push('Tags updated');
+  if (data.notes !== undefined && (data.notes?.trim() || null) !== (existing.notes || null)) {
+    changeNotes.push('Notes updated');
+  }
+  if (markAsLost) changeNotes.push(lostReason ? `Marked lost: ${lostReason}` : 'Marked as lost');
+  if (data.backgroundCheckStatus !== undefined &&
+      data.backgroundCheckStatus !== (existing.backgroundCheckStatus || 'not_started')) {
+    changeNotes.push(`Screening set to ${data.backgroundCheckStatus.replace(/_/g, ' ')}`);
+  }
+  if (data.moveInPaymentStatus !== undefined &&
+      data.moveInPaymentStatus !== (existing.moveInPaymentStatus || 'unpaid')) {
+    changeNotes.push(`Move-in payment marked ${data.moveInPaymentStatus}`);
+  }
+
   await pool.query(
     `UPDATE pipeline_cards SET
        title = $1,
@@ -2027,13 +2189,23 @@ export async function updatePipelineCard(
     ]
   );
 
+  const eventType =
+    data.assignedTo !== undefined &&
+    nextAssignedTo !== (existing.assignedTo || null) &&
+    changeNotes.length === 1
+      ? 'assignee_changed'
+      : 'updated';
+
   await pool.query(
-    `INSERT INTO pipeline_card_events (card_id, event_type, from_board_id, to_board_id, note, created_by)
-     VALUES ($1, 'updated', $2, $2, $3, $4)`,
+    `INSERT INTO pipeline_card_events (
+       card_id, event_type, from_board_id, to_board_id, note, metadata, created_by
+     ) VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6)`,
     [
       cardId,
+      eventType,
       existing.boardId,
-      markAsLost ? lostReason : null,
+      changeNotes.length > 0 ? changeNotes.join('; ') : markAsLost ? lostReason : 'Opportunity updated',
+      JSON.stringify({ changes: changeNotes }),
       userId || null,
     ]
   );
@@ -2221,33 +2393,38 @@ export async function updatePipelineBoard(
 }
 
 /**
- * Permanently deletes a pipeline board along with its stages and cards.
- * Card events cascade from cards; stage FKs require cards to be removed first.
+ * Soft-archive a pipeline board (keeps stages and cards). Use unarchive to restore.
  */
 export async function deletePipelineBoard(boardId: string): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const result = await pool.query(
+    `UPDATE pipeline_boards
+     SET is_active = false, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND is_active = true
+     RETURNING id`,
+    [boardId]
+  );
+  if (!result.rows[0]) throw new Error('Board not found');
+}
 
-    const existing = await client.query<DbBoard>(
-      `SELECT * FROM pipeline_boards WHERE id = $1 AND is_active = true FOR UPDATE`,
-      [boardId]
-    );
-    const board = existing.rows[0];
-    if (!board) throw new Error('Board not found');
+export async function unarchivePipelineBoard(boardId: string): Promise<PipelineBoard> {
+  const result = await pool.query(
+    `UPDATE pipeline_boards
+     SET is_active = true, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND is_active = false
+     RETURNING id`,
+    [boardId]
+  );
+  if (!result.rows[0]) throw new Error('Archived board not found');
 
-    // Cards first — stages have ON DELETE RESTRICT from cards.stage_id
-    await client.query(`DELETE FROM pipeline_cards WHERE board_id = $1`, [boardId]);
-    await client.query(`DELETE FROM pipeline_stages WHERE board_id = $1`, [boardId]);
-    await client.query(`DELETE FROM pipeline_boards WHERE id = $1`, [boardId]);
+  const boards = await getPipelineBoards({ includeInactive: true });
+  const board = boards.find((b) => b.id === boardId);
+  if (!board) throw new Error('Board not found after unarchive');
+  return board;
+}
 
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+export async function getArchivedPipelineBoards(): Promise<PipelineBoard[]> {
+  const all = await getPipelineBoards({ includeInactive: true });
+  return all.filter((b) => !b.isActive);
 }
 
 export async function createPipelineBoard(data: {

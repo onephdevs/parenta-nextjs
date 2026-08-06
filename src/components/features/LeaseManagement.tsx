@@ -2,21 +2,23 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText, Plus, Search } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  FileText,
+  Plus,
+  Search,
+  XCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { StatCard } from '@/components/ui/StatCard';
+import { FormField } from '@/components/forms/FormField';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import Pagination from '@/components/ui/Pagination';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyState } from '@/components/ui/EmptyState';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/Table';
 import { LeaseStatusBadge } from '@/components/domain/StatusBadges';
 import {
   formatLeaseTermShort,
@@ -25,11 +27,20 @@ import {
   type LeaseUiStatus,
 } from '@/lib/leases-shared';
 
+const PAGE_SIZE = 20;
+
 type OpsTab = 'leases' | 'alerts' | 'renewals' | 'moveouts';
 
 interface BuildingOption {
   id: string;
   name: string;
+}
+
+interface LeasePagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 export default function LeaseManagement() {
@@ -39,19 +50,38 @@ export default function LeaseManagement() {
   const [stats, setStats] = useState<LeaseStats | null>(null);
   const [buildings, setBuildings] = useState<BuildingOption[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState<LeaseUiStatus | 'all'>('all');
   const [buildingId, setBuildingId] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<LeasePagination>({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  });
   const [alerts, setAlerts] = useState<any[]>([]);
   const [renewals, setRenewals] = useState<any[]>([]);
   const [moveouts, setMoveouts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, status, buildingId]);
 
   const fetchLeases = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (search.trim()) params.set('search', search.trim());
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
       if (status !== 'all') params.set('status', status);
       if (buildingId) params.set('buildingId', buildingId);
+      params.set('page', String(page));
+      params.set('limit', String(PAGE_SIZE));
       params.set('includeStats', 'true');
 
       const response = await fetch(`/api/leases?${params.toString()}`, {
@@ -61,13 +91,21 @@ export default function LeaseManagement() {
       if (data.success) {
         setLeases(data.data || []);
         if (data.stats) setStats(data.stats);
+        if (data.pagination) {
+          setPagination({
+            page: Number(data.pagination.page) || page,
+            limit: Number(data.pagination.limit) || PAGE_SIZE,
+            total: Number(data.pagination.total) || 0,
+            totalPages: Math.max(1, Number(data.pagination.totalPages) || 1),
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching leases:', error);
     } finally {
       setLoading(false);
     }
-  }, [search, status, buildingId]);
+  }, [debouncedSearch, status, buildingId, page]);
 
   const fetchBuildings = useCallback(async () => {
     try {
@@ -158,7 +196,7 @@ export default function LeaseManagement() {
   const tabClass = (tab: OpsTab) =>
     `px-4 py-2 font-medium border-b-2 transition-colors ${
       activeTab === tab
-        ? 'border-purple-500 text-purple-600'
+        ? 'border-gray-900 text-gray-900'
         : 'border-transparent text-gray-600 hover:text-gray-900'
     }`;
 
@@ -182,11 +220,31 @@ export default function LeaseManagement() {
       />
 
       {stats && activeTab === 'leases' && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard title="Active" value={stats.active} tone="green" />
-          <StatCard title="Expiring soon" value={stats.expiringSoon} tone="yellow" />
-          <StatCard title="Draft" value={stats.draft} tone="default" />
-          <StatCard title="Terminated" value={stats.terminated} tone="red" />
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <ListSummaryCard
+            title="Active"
+            value={stats.active}
+            footer="active leases"
+            icon={<CheckCircle2 className="h-8 w-8 text-green-600" />}
+          />
+          <ListSummaryCard
+            title="Expiring soon"
+            value={stats.expiringSoon}
+            footer="leases ending soon"
+            icon={<AlertCircle className="h-8 w-8 text-yellow-600" />}
+          />
+          <ListSummaryCard
+            title="Draft"
+            value={stats.draft}
+            footer="draft leases"
+            icon={<FileText className="h-8 w-8 text-gray-500" />}
+          />
+          <ListSummaryCard
+            title="Terminated"
+            value={stats.terminated}
+            footer="terminated leases"
+            icon={<XCircle className="h-8 w-8 text-red-600" />}
+          />
         </div>
       )}
 
@@ -217,104 +275,140 @@ export default function LeaseManagement() {
 
       {activeTab === 'leases' && (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') fetchLeases();
-                }}
-                placeholder="Search by tenant or unit"
-                className="pl-9"
-              />
+          <Card className="mb-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <FormField label="Search" htmlFor="lease-search">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    id="lease-search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Tenant, unit..."
+                    className="pl-10"
+                  />
+                </div>
+              </FormField>
+              <FormField label="Status" htmlFor="lease-status">
+                <Select
+                  id="lease-status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as LeaseUiStatus | 'all')}
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="expiring_soon">Expiring soon</option>
+                  <option value="draft">Draft</option>
+                  <option value="terminated">Terminated</option>
+                </Select>
+              </FormField>
+              <FormField label="Building" htmlFor="lease-building">
+                <Select
+                  id="lease-building"
+                  value={buildingId}
+                  onChange={(e) => setBuildingId(e.target.value)}
+                >
+                  <option value="">All Buildings</option>
+                  {buildings.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
             </div>
-            <Select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as LeaseUiStatus | 'all')}
-              className="sm:w-48"
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="expiring_soon">Expiring soon</option>
-              <option value="draft">Draft</option>
-              <option value="terminated">Terminated</option>
-            </Select>
-            <Select
-              value={buildingId}
-              onChange={(e) => setBuildingId(e.target.value)}
-              className="sm:w-56"
-            >
-              <option value="">All properties</option>
-              {buildings.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-            <Button variant="outline" onClick={fetchLeases} isDisabled={loading}>
-              Apply
-            </Button>
-          </div>
+          </Card>
 
           {loading ? (
-            <div className="py-12 text-center text-sm text-gray-500">Loading leases...</div>
+            <div className="overflow-hidden rounded-lg bg-white p-8 text-center shadow text-gray-900">
+              Loading...
+            </div>
           ) : leases.length === 0 ? (
-            <EmptyState
-              icon={<FileText className="h-8 w-8" />}
-              title="No leases found"
-              description="Create a tenant with a room assignment to start a lease."
-              action={
-                <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
-                  <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
-                </Link>
-              }
-            />
+            <div className="overflow-hidden rounded-lg bg-white p-8 text-center shadow text-gray-900">
+              <p className="mb-2 text-lg font-medium">No leases found</p>
+              <p className="mb-4 text-sm text-gray-600">
+                Create a tenant with a room assignment to start a lease.
+              </p>
+              <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
+                <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
+              </Link>
+            </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Tenant(s)</TableHead>
-                    <TableHead>Term</TableHead>
-                    <TableHead>Rent</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leases.map((lease) => {
-                    const tenantLabel = `${lease.tenantFirstName} ${lease.tenantLastName}`.trim();
-                    const withOccupants =
-                      lease.occupantCount > 0
-                        ? `${tenantLabel} +${lease.occupantCount}`
-                        : tenantLabel || '—';
-                    return (
-                      <TableRow key={lease.id} className="hover:bg-gray-50">
-                        <TableCell>
-                          <Link
-                            href={`/admin/lease-management/${lease.id}`}
-                            className="font-medium text-gray-900 hover:text-purple-700"
-                          >
-                            {lease.buildingName} · {lease.roomNumber}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-gray-700">{withOccupants}</TableCell>
-                        <TableCell className="text-gray-700">
-                          {formatLeaseTermShort(lease.startDate, lease.endDate)}
-                        </TableCell>
-                        <TableCell className="text-gray-900">
-                          ₱{Number(lease.monthlyRate || 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <LeaseStatusBadge status={lease.uiStatus} />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <div className="overflow-hidden rounded-lg bg-white shadow">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                        Unit
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                        Tenant
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                        Term
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                        Rent
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {leases.map((lease) => {
+                      const tenantLabel =
+                        `${lease.tenantFirstName} ${lease.tenantLastName}`.trim();
+                      const withOccupants =
+                        lease.occupantCount > 0
+                          ? `${tenantLabel} +${lease.occupantCount}`
+                          : tenantLabel || '—';
+                      return (
+                        <tr key={lease.id} className="hover:bg-gray-50">
+                          <td className="whitespace-nowrap px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {lease.buildingName}
+                            </div>
+                            <div className="text-sm text-gray-600">Room {lease.roomNumber}</div>
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                            {withOccupants}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                            {formatLeaseTermShort(lease.startDate, lease.endDate)}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                            ₱{Number(lease.monthlyRate || 0).toLocaleString()}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4">
+                            <LeaseStatusBadge status={lease.uiStatus} />
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                            <Link
+                              href={`/admin/lease-management/${lease.id}`}
+                              className="inline-flex text-gray-500 hover:text-gray-900"
+                              title="View"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                currentPage={Math.min(page, pagination.totalPages)}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.total}
+                itemsPerPage={PAGE_SIZE}
+                onPageChange={setPage}
+              />
             </div>
           )}
         </>
@@ -322,105 +416,200 @@ export default function LeaseManagement() {
 
       {activeTab !== 'leases' &&
         (loading ? (
-          <div className="py-12 text-center text-sm text-gray-500">Loading...</div>
+          <div className="overflow-hidden rounded-lg bg-white p-8 text-center shadow text-gray-900">
+            Loading...
+          </div>
         ) : (
           <>
             {activeTab === 'alerts' && (
-              <div className="space-y-4">
+              <div className="overflow-hidden rounded-lg bg-white shadow">
                 {alerts.length === 0 ? (
-                  <p className="text-gray-600">No pending alerts</p>
+                  <div className="p-8 text-center text-gray-900">
+                    <p className="mb-2 text-lg font-medium">No pending alerts</p>
+                    <p className="text-sm text-gray-600">
+                      Expiration alerts will appear here when leases are nearing end.
+                    </p>
+                  </div>
                 ) : (
-                  alerts.map((alert) => (
-                    <div key={alert.id} className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{alert.tenant_name}</h3>
-                          <p className="text-sm text-gray-600">
-                            {alert.building_name} - Room {alert.room_number}
-                          </p>
-                          <p className="mt-2 text-sm text-gray-800">
-                            <strong>Lease ends:</strong>{' '}
-                            {new Date(alert.lease_end_date).toLocaleDateString()}
-                          </p>
-                          <p className="text-sm text-gray-800">
-                            <strong>Days until expiry:</strong>{' '}
-                            <span className="font-bold text-red-600">{alert.days_until_expiry}</span>
-                          </p>
-                        </div>
-                        <span className="rounded bg-yellow-200 px-3 py-1 text-sm text-yellow-800">
-                          {alert.alert_type}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Unit
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Tenant
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Lease Ends
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Days Left
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Alert
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {alerts.map((alert) => (
+                          <tr key={alert.id} className="hover:bg-gray-50">
+                            <td className="whitespace-nowrap px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {alert.building_name}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Room {alert.room_number}
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                              {alert.tenant_name}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                              {new Date(alert.lease_end_date).toLocaleDateString()}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-red-600">
+                              {alert.days_until_expiry}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4">
+                              <span className="inline-flex rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                                {alert.alert_type}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
 
             {activeTab === 'renewals' && (
-              <div className="space-y-4">
+              <div className="overflow-hidden rounded-lg bg-white shadow">
                 {renewals.length === 0 ? (
-                  <p className="text-gray-600">No renewal requests</p>
+                  <div className="p-8 text-center text-gray-900">
+                    <p className="mb-2 text-lg font-medium">No renewal requests</p>
+                    <p className="text-sm text-gray-600">
+                      Renewal requests will show up here when submitted.
+                    </p>
+                  </div>
                 ) : (
-                  renewals.map((renewal) => (
-                    <div key={renewal.id} className="rounded-lg border border-gray-200 bg-white p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{renewal.tenant_name}</h3>
-                          <p className="text-sm text-gray-600">
-                            {renewal.building_name} - Room {renewal.room_number}
-                          </p>
-                          <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-800">
-                            <div>
-                              <strong>Current rent:</strong> ₱{renewal.current_monthly_rent}
-                            </div>
-                            <div>
-                              <strong>Proposed rent:</strong> ₱{renewal.proposed_monthly_rent}
-                            </div>
-                            <div>
-                              <strong>Current end:</strong>{' '}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Unit
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Tenant
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Current → Proposed
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Rent
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {renewals.map((renewal) => (
+                          <tr key={renewal.id} className="hover:bg-gray-50">
+                            <td className="whitespace-nowrap px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {renewal.building_name}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Room {renewal.room_number}
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                              {renewal.tenant_name}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                               {new Date(renewal.current_lease_end_date).toLocaleDateString()}
-                            </div>
-                            <div>
-                              <strong>Proposed end:</strong>{' '}
+                              {' → '}
                               {new Date(renewal.proposed_lease_end_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-                        <span className="rounded bg-gray-100 px-3 py-1 text-sm capitalize text-gray-800">
-                          {renewal.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                              ₱{Number(renewal.current_monthly_rent || 0).toLocaleString()}
+                              {' → '}
+                              ₱{Number(renewal.proposed_monthly_rent || 0).toLocaleString()}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4">
+                              <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium capitalize text-gray-800">
+                                {renewal.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
 
             {activeTab === 'moveouts' && (
-              <div className="space-y-4">
+              <div className="overflow-hidden rounded-lg bg-white shadow">
                 {moveouts.length === 0 ? (
-                  <p className="text-gray-600">No move-out processing records</p>
+                  <div className="p-8 text-center text-gray-900">
+                    <p className="mb-2 text-lg font-medium">No move-out records</p>
+                    <p className="text-sm text-gray-600">
+                      Move-out processing records will appear here.
+                    </p>
+                  </div>
                 ) : (
-                  moveouts.map((moveout) => (
-                    <div key={moveout.id} className="rounded-lg border border-gray-200 bg-white p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{moveout.tenant_name}</h3>
-                          <p className="text-sm text-gray-600">
-                            {moveout.building_name} - Room {moveout.room_number}
-                          </p>
-                          <p className="mt-2 text-sm text-gray-800">
-                            <strong>Move-out date:</strong>{' '}
-                            {new Date(moveout.moveout_date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span className="rounded bg-blue-100 px-3 py-1 text-sm capitalize text-blue-800">
-                          {moveout.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Unit
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Tenant
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Move-out Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {moveouts.map((moveout) => (
+                          <tr key={moveout.id} className="hover:bg-gray-50">
+                            <td className="whitespace-nowrap px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {moveout.building_name}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Room {moveout.room_number}
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                              {moveout.tenant_name}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                              {new Date(moveout.moveout_date).toLocaleDateString()}
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4">
+                              <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium capitalize text-blue-800">
+                                {moveout.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}

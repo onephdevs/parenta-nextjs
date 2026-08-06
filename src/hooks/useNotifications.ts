@@ -34,7 +34,8 @@ export function useNotifications() {
         type: n.type,
         title: n.title || n.message || 'Notification',
         message: n.title ? n.message : undefined,
-        duration: n.duration,
+        // Omit undefined so the provider default (5s) is preserved
+        ...(typeof n.duration === 'number' ? { duration: n.duration } : {}),
         isLoading: n.type === 'loading' || n.isLoading,
       });
     },

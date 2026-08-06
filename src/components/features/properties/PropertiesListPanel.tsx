@@ -7,6 +7,7 @@ import type { PropertyListBuilding, PropertyRoomDetail } from '@/lib/api/propert
 import PropertyListCard from './PropertyListCard';
 
 type FilterValue = 'all' | 'has_vacant' | 'fully_occupied';
+type SortValue = 'name-asc' | 'name-desc' | 'city-asc' | 'vacant-desc';
 
 interface PropertiesListPanelProps {
   buildings: PropertyListBuilding[];
@@ -37,17 +38,18 @@ export default function PropertiesListPanel({
 }: PropertiesListPanelProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterValue>('all');
+  const [sort, setSort] = useState<SortValue>('name-asc');
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return buildings.filter((b) => {
+    const list = buildings.filter((b) => {
       const matchesSearch =
         !term ||
-        b.name.toLowerCase().includes(term) ||
-        b.city.toLowerCase().includes(term) ||
-        b.addressLine1.toLowerCase().includes(term) ||
-        b.state.toLowerCase().includes(term);
+        (b.name || '').toLowerCase().includes(term) ||
+        (b.city || '').toLowerCase().includes(term) ||
+        (b.addressLine1 || '').toLowerCase().includes(term) ||
+        (b.state || '').toLowerCase().includes(term);
 
       if (!matchesSearch) return false;
 
@@ -57,7 +59,35 @@ export default function PropertiesListPanel({
       }
       return true;
     });
-  }, [buildings, search, filter]);
+
+    list.sort((a, b) => {
+      switch (sort) {
+        case 'name-desc':
+          return (b.name || '').localeCompare(a.name || '', undefined, { sensitivity: 'base' });
+        case 'city-asc': {
+          const cityCmp = (a.city || '').localeCompare(b.city || '', undefined, {
+            sensitivity: 'base',
+          });
+          return (
+            cityCmp ||
+            (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+          );
+        }
+        case 'vacant-desc': {
+          const vacantCmp = (b.vacantUnits || 0) - (a.vacantUnits || 0);
+          return (
+            vacantCmp ||
+            (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+          );
+        }
+        case 'name-asc':
+        default:
+          return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      }
+    });
+
+    return list;
+  }, [buildings, search, filter, sort]);
 
   return (
     <aside className="flex h-full w-full flex-col border-r border-gray-200 bg-white lg:w-[340px] lg:flex-shrink-0">
@@ -83,19 +113,32 @@ export default function PropertiesListPanel({
           </button>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-medium text-gray-500">
             {filtered.length} {filtered.length === 1 ? 'Property' : 'Properties'}
           </span>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as FilterValue)}
-            className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
-          >
-            <option value="all">All properties</option>
-            <option value="has_vacant">Has vacant rooms</option>
-            <option value="fully_occupied">Fully occupied</option>
-          </select>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortValue)}
+              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+              aria-label="Sort properties"
+            >
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+              <option value="city-asc">City A–Z</option>
+              <option value="vacant-desc">Most vacant</option>
+            </select>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as FilterValue)}
+              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+            >
+              <option value="all">All properties</option>
+              <option value="has_vacant">Has vacant rooms</option>
+              <option value="fully_occupied">Fully occupied</option>
+            </select>
+          </div>
         </div>
       </div>
 

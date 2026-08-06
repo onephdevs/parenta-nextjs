@@ -101,9 +101,16 @@ export async function getAllAssets(filters?: {
     let paramCount = 0;
     
     if (filters?.buildingId) {
-      paramCount++;
-      query += ` AND a.building_id = $${paramCount}`;
-      params.push(filters.buildingId);
+      // Ignore non-UUID values (e.g. "undefined" from bad query strings)
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          filters.buildingId
+        );
+      if (isUuid) {
+        paramCount++;
+        query += ` AND a.building_id = $${paramCount}`;
+        params.push(filters.buildingId);
+      }
     }
     
     if (filters?.assetType) {
@@ -150,11 +157,22 @@ export async function getAllAssets(filters?: {
     const countResult = await client.query(countQuery, params);
     const total = parseInt(countResult.rows[0].total);
     
-    // Add sorting and pagination
-    const sortBy = filters?.sortBy || 'asset_name';
-    const sortOrder = filters?.sortOrder || 'asc';
+    // Add sorting and pagination (allowlist columns to avoid SQL errors)
+    const allowedSort = new Set([
+      'asset_name',
+      'asset_type',
+      'asset_status',
+      'asset_condition',
+      'purchase_date',
+      'current_value',
+      'created_at',
+    ]);
+    const sortBy = allowedSort.has(filters?.sortBy || '')
+      ? (filters!.sortBy as string)
+      : 'asset_name';
+    const sortOrder = filters?.sortOrder === 'desc' ? 'DESC' : 'ASC';
     
-    query += ` ORDER BY a.${sortBy} ${sortOrder.toUpperCase()}`;
+    query += ` ORDER BY a.${sortBy} ${sortOrder}`;
     
     if (filters?.limit) {
       paramCount++;
@@ -585,10 +603,14 @@ export async function getAssetUtilizationMetrics(): Promise<{
   const client = await pool.connect();
   
   try {
-    // Utilization rate
+    // Utilization rate — guard empty set to avoid Postgres division by zero
     const utilizationQuery = `
       SELECT 
-        COUNT(CASE WHEN asset_status = 'assigned' THEN 1 END)::float / COUNT(*)::float * 100 as utilization_rate
+        CASE
+          WHEN COUNT(*) = 0 THEN 0
+          ELSE COUNT(CASE WHEN asset_status = 'assigned' THEN 1 END)::float
+               / COUNT(*)::float * 100
+        END as utilization_rate
       FROM assets 
       WHERE is_active = true AND asset_status IN ('available', 'assigned')
     `;

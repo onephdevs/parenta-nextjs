@@ -192,6 +192,12 @@ export default function RoomsListPanel({
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         buildings={buildings}
+        buildingId={buildingFilter !== 'all' ? buildingFilter : undefined}
+        building={
+          buildingFilter !== 'all'
+            ? buildings.find((b) => b.id === buildingFilter)
+            : undefined
+        }
         onRoomAdded={(roomId) => {
           setIsAddOpen(false);
           onRoomAdded(roomId);

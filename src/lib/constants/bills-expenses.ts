@@ -72,6 +72,19 @@ export function normalizeExpenseCategory(raw: string | null | undefined): Expens
   return 'other';
 }
 
+/** Human-readable label for expense or report category keys (e.g. garbage_collection). */
+export function formatReportCategoryLabel(raw: string | null | undefined): string {
+  const key = (raw || '').toLowerCase().trim().replace(/\s+/g, '_');
+  if (key in REPORT_CATEGORY_LABELS) {
+    return REPORT_CATEGORY_LABELS[key as ReportCategory];
+  }
+  if ((EXPENSE_CATEGORIES as readonly string[]).includes(key)) {
+    return EXPENSE_CATEGORY_LABELS[key as ExpenseCategory];
+  }
+  if (!key) return 'Other';
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function normalizeUtilityType(raw: string | null | undefined): UtilityType | null {
   const key = (raw || '').toLowerCase().trim();
   if (key === 'electric' || key === 'electricity') return 'electricity';
@@ -109,7 +122,12 @@ export function getPeriodRange(
   const y = today.getFullYear();
   const m = today.getMonth();
 
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const fmt = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
   const monthLabel = (d: Date) =>
     d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 

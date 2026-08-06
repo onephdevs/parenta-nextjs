@@ -96,13 +96,27 @@ function AssetConditionBadge({ condition }: { condition: string }) {
 function MaintenanceStatusBadge({ status }: { status: string }) {
   const map: Record<string, BadgeTone> = {
     open: 'warning',
+    submitted: 'warning',
     pending: 'neutral',
     scheduled: 'warning',
     in_progress: 'info',
     completed: 'success',
+    resolved: 'success',
     cancelled: 'neutral',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  // Align labels with Maintenance pipeline stages (Submitted / In Progress / Resolved)
+  const labelMap: Record<string, string> = {
+    open: 'Submitted',
+    submitted: 'Submitted',
+    in_progress: 'In Progress',
+    completed: 'Resolved',
+    resolved: 'Resolved',
+    cancelled: 'Cancelled',
+  };
+  const key = status.toLowerCase();
+  return (
+    <Badge tone={map[key] ?? 'neutral'}>{labelMap[key] ?? formatLabel(status)}</Badge>
+  );
 }
 
 function ReservationStatusBadge({ status }: { status: string }) {

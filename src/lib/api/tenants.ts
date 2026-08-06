@@ -94,12 +94,28 @@ export async function getAllTenants(options?: {
     if (options?.search) {
       paramCount++;
       whereClause += whereClause ? ' AND' : ' WHERE';
-      whereClause += ` (t.first_name ILIKE $${paramCount} OR t.last_name ILIKE $${paramCount} OR t.email ILIKE $${paramCount})`;
+      whereClause += ` (
+        COALESCE(t.first_name, '') ILIKE $${paramCount}
+        OR COALESCE(t.last_name, '') ILIKE $${paramCount}
+        OR COALESCE(t.email, '') ILIKE $${paramCount}
+        OR COALESCE(t.phone, '') ILIKE $${paramCount}
+        OR COALESCE(b.name, '') ILIKE $${paramCount}
+        OR COALESCE(r.room_number, '') ILIKE $${paramCount}
+      )`;
       values.push(`%${options.search}%`);
     }
 
-    // Get total count
-    const countQuery = `SELECT COUNT(*) FROM tenants t${whereClause}`;
+    // Get total count — join rooms/buildings when search may reference them
+    const needsPropertyJoin = Boolean(options?.search);
+    const countFrom = needsPropertyJoin
+      ? ` FROM tenants t
+      LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id
+        AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date::date >= CURRENT_DATE)
+      LEFT JOIN rooms r ON tra.room_id = r.id
+      LEFT JOIN buildings b ON r.building_id = b.id`
+      : ' FROM tenants t';
+    const countQuery = `SELECT COUNT(DISTINCT t.id)${countFrom}${whereClause}`;
     const countResult = await pool.query(countQuery, values);
     const total = parseInt(countResult.rows[0].count);
 
@@ -118,7 +134,7 @@ export async function getAllTenants(options?: {
       LEFT JOIN rooms r ON tra.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       ${whereClause}
-      ORDER BY t.created_at DESC
+      ORDER BY COALESCE(t.last_name, ''), COALESCE(t.first_name, ''), t.created_at DESC
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
     
@@ -318,10 +334,10 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
 } {
   return {
     id: row.id as string,
-    firstName: row.first_name as string,
-    lastName: row.last_name as string,
-    email: row.email as string,
-    phone: row.phone as string,
+    firstName: (row.first_name as string) || '',
+    lastName: (row.last_name as string) || '',
+    email: (row.email as string) || '',
+    phone: (row.phone as string) || undefined,
     dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth as string) : undefined,
     tenantStatus: row.tenant_status as 'active' | 'pending' | 'inactive' | 'terminated',
     moveInDate: row.move_in_date ? new Date(row.move_in_date as string) : undefined,

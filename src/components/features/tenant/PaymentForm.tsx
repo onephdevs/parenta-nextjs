@@ -25,6 +25,12 @@ interface PaymentFormProps {
   invoices?: Invoice[];
   onPaymentComplete?: () => void;
   onCancel?: () => void;
+  /** Prefill which invoice to pay */
+  initialInvoiceId?: string;
+  /** Prefill amount (use with full pay). Omit / 0 for partial entry. */
+  initialAmount?: number;
+  /** When true, do not auto-fill full balance — tenant enters a partial amount */
+  preferPartial?: boolean;
 }
 
 type PayMethod = TenantPaymentInstructions['acceptedMethods'][number];
@@ -47,6 +53,9 @@ export default function PaymentForm({
   invoices = [],
   onPaymentComplete,
   onCancel,
+  initialInvoiceId,
+  initialAmount,
+  preferPartial = false,
 }: PaymentFormProps) {
   const theme = useTenantTheme();
   const { showNotification } = useNotifications();
@@ -57,14 +66,17 @@ export default function PaymentForm({
   >(null);
   const [loadingInstructions, setLoadingInstructions] = useState(true);
 
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
-  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(initialInvoiceId || '');
+  const [paymentAmount, setPaymentAmount] = useState(
+    preferPartial ? initialAmount ?? 0 : initialAmount ?? 0
+  );
   const [paymentMethod, setPaymentMethod] = useState<PayMethod>('gcash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [userEditedAmount, setUserEditedAmount] = useState(preferPartial);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,17 +104,28 @@ export default function PaymentForm({
   }, []);
 
   useEffect(() => {
-    if (invoices.length > 0 && !selectedInvoiceId) {
-      setSelectedInvoiceId(invoices[0].id);
-      setPaymentAmount(invoices[0].balanceDue);
+    if (invoices.length === 0) return;
+    if (!selectedInvoiceId) {
+      const preferred =
+        (initialInvoiceId && invoices.find((i) => i.id === initialInvoiceId)) || invoices[0];
+      setSelectedInvoiceId(preferred.id);
+      if (!preferPartial && !userEditedAmount) {
+        setPaymentAmount(
+          typeof initialAmount === 'number' && initialAmount > 0
+            ? Math.min(initialAmount, preferred.balanceDue)
+            : preferred.balanceDue
+        );
+      } else if (preferPartial && typeof initialAmount === 'number' && initialAmount > 0) {
+        setPaymentAmount(Math.min(initialAmount, preferred.balanceDue));
+      }
     }
-  }, [invoices, selectedInvoiceId]);
+  }, [invoices, selectedInvoiceId, initialInvoiceId, initialAmount, preferPartial, userEditedAmount]);
 
   useEffect(() => {
-    if (!selectedInvoiceId) return;
+    if (!selectedInvoiceId || userEditedAmount || preferPartial) return;
     const invoice = invoices.find((inv) => inv.id === selectedInvoiceId);
     if (invoice) setPaymentAmount(invoice.balanceDue);
-  }, [selectedInvoiceId, invoices]);
+  }, [selectedInvoiceId, invoices, userEditedAmount, preferPartial]);
 
   const selectedInvoice = invoices.find((inv) => inv.id === selectedInvoiceId);
   const maxAmount = selectedInvoice ? selectedInvoice.balanceDue : 0;
@@ -362,6 +385,7 @@ export default function PaymentForm({
           value={paymentAmount === 0 || Number.isNaN(paymentAmount) ? '' : paymentAmount}
           onChange={(e) => {
             const v = e.target.value;
+            setUserEditedAmount(true);
             setPaymentAmount(v === '' ? 0 : parseFloat(v) || 0);
           }}
           placeholder="0"

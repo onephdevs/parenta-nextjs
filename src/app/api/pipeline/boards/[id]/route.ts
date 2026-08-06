@@ -4,6 +4,7 @@ import {
   deletePipelineBoard,
   getCardsForBoard,
   getPipelineBoards,
+  unarchivePipelineBoard,
   updatePipelineBoard,
 } from '@/lib/api/pipeline';
 
@@ -19,11 +20,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json();
 
-    if (body.name === undefined && body.description === undefined) {
+    if (
+      body.name === undefined &&
+      body.description === undefined &&
+      body.isActive === undefined &&
+      body.action !== 'unarchive'
+    ) {
       return NextResponse.json(
-        { success: false, error: 'Provide name and/or description' },
+        { success: false, error: 'Provide name, description, isActive, or action=unarchive' },
         { status: 400 }
       );
+    }
+
+    if (body.action === 'unarchive' || body.isActive === true) {
+      const board = await unarchivePipelineBoard(id);
+      return NextResponse.json({ success: true, data: { board } });
     }
 
     const board = await updatePipelineBoard(id, {

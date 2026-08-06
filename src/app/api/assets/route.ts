@@ -4,17 +4,27 @@ import { authOptions } from '@/lib/auth';
 import { getAllAssets, createAsset } from '@/lib/api/assets';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function cleanParam(value: string | null): string | undefined {
+  if (!value || value === 'undefined' || value === 'null') return undefined;
+  return value;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const buildingIdRaw = cleanParam(searchParams.get('buildingId'));
     
     const filters = {
-      buildingId: searchParams.get('buildingId') || undefined,
-      assetType: searchParams.get('assetType') || undefined,
-      assetStatus: searchParams.get('assetStatus') || undefined,
-      assetCondition: searchParams.get('assetCondition') || undefined,
-      searchTerm: searchParams.get('searchTerm') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
+      buildingId:
+        buildingIdRaw && UUID_RE.test(buildingIdRaw) ? buildingIdRaw : undefined,
+      assetType: cleanParam(searchParams.get('assetType')),
+      assetStatus: cleanParam(searchParams.get('assetStatus')),
+      assetCondition: cleanParam(searchParams.get('assetCondition')),
+      searchTerm: cleanParam(searchParams.get('searchTerm')),
+      sortBy: cleanParam(searchParams.get('sortBy')),
       sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined,
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : undefined,

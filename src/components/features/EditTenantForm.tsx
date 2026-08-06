@@ -150,6 +150,13 @@ function applyLeaseEndDate(data: TenantFormData): string {
   return computeLeaseEndDate(start, months);
 }
 
+function toIsoDateInput(value?: Date | string | null): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0];
+}
+
 export function EditTenantForm({ tenant, returnTo }: EditTenantFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
@@ -168,28 +175,25 @@ export function EditTenantForm({ tenant, returnTo }: EditTenantFormProps) {
   };
 
   // Initialize form data with tenant values
-  const initialStart = tenant.leaseStartDate
-    ? new Date(tenant.leaseStartDate).toISOString().split('T')[0]
-    : '';
-  const initialEnd = tenant.leaseEndDate
-    ? new Date(tenant.leaseEndDate).toISOString().split('T')[0]
-    : '';
+  const initialStart = toIsoDateInput(tenant.leaseStartDate);
+  const initialEnd = toIsoDateInput(tenant.leaseEndDate);
   const inferredDuration = inferLeaseDuration(initialStart, initialEnd);
 
   const [formData, setFormData] = useState<TenantFormData>({
-    firstName: tenant.firstName,
-    lastName: tenant.lastName,
-    email: tenant.email,
+    firstName: tenant.firstName || '',
+    lastName: tenant.lastName || '',
+    email: tenant.email || '',
     phone: tenant.phone || '',
-    dateOfBirth: tenant.dateOfBirth ? new Date(tenant.dateOfBirth).toISOString().split('T')[0] : '',
-    tenantStatus: tenant.tenantStatus,
-    moveInDate: tenant.moveInDate ? new Date(tenant.moveInDate).toISOString().split('T')[0] : '',
-    moveOutDate: tenant.moveOutDate ? new Date(tenant.moveOutDate).toISOString().split('T')[0] : '',
+    dateOfBirth: toIsoDateInput(tenant.dateOfBirth),
+    tenantStatus: tenant.tenantStatus || 'active',
+    moveInDate: toIsoDateInput(tenant.moveInDate),
+    moveOutDate: toIsoDateInput(tenant.moveOutDate),
     previousAddress: tenant.previousAddress || '',
     emergencyContactName: tenant.emergencyContactName || '',
     emergencyContactPhone: tenant.emergencyContactPhone || '',
     emergencyContactRelationship: tenant.emergencyContactRelationship || '',
-    employmentStatus: tenant.employmentStatus as 'employed' | 'unemployed' | 'student' | 'retired' | 'other' || 'employed',
+    employmentStatus:
+      (tenant.employmentStatus as TenantFormData['employmentStatus']) || 'employed',
     employerName: tenant.employerName || '',
     monthlyIncome: tenant.monthlyIncome ?? undefined,
     securityDeposit: tenant.securityDeposit || 0,

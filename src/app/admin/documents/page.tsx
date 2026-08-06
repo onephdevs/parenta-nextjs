@@ -8,7 +8,7 @@ import { getAllTenants } from '@/lib/api/tenants';
 import DocumentsList from '@/components/features/DocumentsList';
 import AdminDocumentUpload from '@/components/features/AdminDocumentUpload';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/ui/StatCard';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, FileSignature, FileText, Link2Off, Tags } from 'lucide-react';
 
@@ -147,30 +147,30 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ListSummaryCard
           title="Total documents"
           value={stats.totalDocuments}
-          tone="blue"
-          icon={<FileText className="h-5 w-5" />}
+          footer="all documents"
+          icon={<FileText className="h-8 w-8 text-blue-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Pending signature"
           value={stats.pendingSignature}
-          tone="default"
-          icon={<FileSignature className="h-5 w-5" />}
+          footer="awaiting signature"
+          icon={<FileSignature className="h-8 w-8 text-slate-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Expiring soon"
           value={stats.expiringDocuments}
-          tone="yellow"
-          icon={<AlertTriangle className="h-5 w-5" />}
+          footer="documents expiring"
+          icon={<AlertTriangle className="h-8 w-8 text-yellow-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Unlinked"
           value={stats.unlinkedDocuments}
-          tone="red"
-          icon={<Link2Off className="h-5 w-5" />}
+          footer="not linked to a record"
+          icon={<Link2Off className="h-8 w-8 text-red-600" />}
         />
       </div>
 

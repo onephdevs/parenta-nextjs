@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
@@ -38,6 +38,10 @@ interface ExpenseFormProps {
   initialData?: Partial<ExpenseFormData>;
   onSubmit?: (data: ExpenseFormData) => Promise<void>;
   onCancel?: () => void;
+  onSuccess?: () => void;
+  mode?: 'page' | 'modal' | 'dialog';
+  isOpen?: boolean;
+  headerExtra?: ReactNode;
 }
 
 type FormSection = 'amount' | 'category' | 'date' | 'location' | 'vendor' | 'notes';
@@ -87,7 +91,15 @@ const formSections: SectionedFormSection<FormSection>[] = [
   },
 ];
 
-export default function ExpenseForm({ initialData, onSubmit, onCancel }: ExpenseFormProps) {
+export default function ExpenseForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  onSuccess,
+  mode = 'page',
+  isOpen = true,
+  headerExtra,
+}: ExpenseFormProps) {
   const router = useRouter();
   const { addNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
@@ -202,8 +214,8 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            buildingId: formData.buildingId ? parseInt(formData.buildingId) : null,
-            roomId: formData.roomId ? parseInt(formData.roomId) : null,
+            buildingId: formData.buildingId || null,
+            roomId: formData.roomId || null,
             amount: parseFloat(formData.amount),
             category: formData.category,
             description: formData.description,
@@ -220,7 +232,8 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
 
         const result = await response.json();
         addNotification('Expense recorded successfully', 'success');
-        router.push(`/admin/financial/expenses/${result.expense.id}`);
+        if (onSuccess) onSuccess();
+        else router.push(`/admin/financial/expenses/${result.expense.id}`);
       }
     } catch (error) {
       console.error('Error recording expense:', error);
@@ -425,7 +438,7 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
     }
   };
 
-  return (
+  return mode === 'page' ? (
     <SectionedFormShell
       mode="page"
       onCancel={handleCancel}
@@ -437,6 +450,26 @@ export default function ExpenseForm({ initialData, onSubmit, onCancel }: Expense
       primaryLabel="Record Expense"
       primaryLoading={isLoading}
       formId="expense-form"
+      headerExtra={headerExtra}
+    >
+      <form id="expense-form" onSubmit={handleSubmit} className="space-y-6">
+        {renderSectionContent()}
+      </form>
+    </SectionedFormShell>
+  ) : (
+    <SectionedFormShell
+      mode={mode}
+      isOpen={isOpen}
+      onCancel={handleCancel}
+      eyebrow="Record Expense"
+      entityLabel="New Expense"
+      sections={formSections}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      primaryLabel="Record Expense"
+      primaryLoading={isLoading}
+      formId="expense-form"
+      headerExtra={headerExtra}
     >
       <form id="expense-form" onSubmit={handleSubmit} className="space-y-6">
         {renderSectionContent()}

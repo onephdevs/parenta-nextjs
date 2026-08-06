@@ -5,14 +5,15 @@ import { authOptions } from '@/lib/auth';
 import { getInvoices, getInvoiceSummary } from '@/lib/api/invoices';
 import { getAllTenants } from '@/lib/api/tenants';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { StatCard } from '@/components/ui/StatCard';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
-import { AlertTriangle, CheckCircle2, Clock, FileText, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Eye, FileText, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
+import Pagination from '@/components/ui/Pagination';
 
 interface SearchParams {
   page?: string;
@@ -38,10 +39,10 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const status = params.status || '';
   const tenantId = params.tenant || '';
 
-  // Build filters
+  // Build filters (tenant IDs are UUIDs — keep as string)
   const filters: Record<string, unknown> = {};
   if (status) filters.status = status;
-  if (tenantId) filters.tenantId = parseInt(tenantId);
+  if (tenantId) filters.tenantId = tenantId;
   if (search) filters.search = search;
 
   // Fetch data with error handling
@@ -110,52 +111,6 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     });
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-green-100 text-green-800';
-      case 'sent':
-        return 'bg-blue-100 text-blue-800';
-      case 'overdue':
-        return 'bg-red-100 text-red-800';
-      case 'draft':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return (
-          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      case 'sent':
-        return (
-          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      case 'overdue':
-        return (
-          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        );
-    }
-  };
-
   const totalPages = Math.ceil(invoicesData.total / 20);
 
   return (
@@ -170,245 +125,173 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ListSummaryCard
           title="Paid Invoices"
           value={formatCurrency(summary.paidAmount)}
-          subtitle={`${summary.paidInvoices} invoices`}
-          tone="green"
-          icon={<CheckCircle2 className="h-5 w-5" />}
+          footer={`${summary.paidInvoices} invoices`}
+          icon={<CheckCircle2 className="h-8 w-8 text-green-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Unpaid Invoices"
           value={formatCurrency(summary.unpaidAmount)}
-          subtitle={`${summary.unpaidInvoices} invoices`}
-          tone="yellow"
-          icon={<Clock className="h-5 w-5" />}
+          footer={`${summary.unpaidInvoices} invoices`}
+          icon={<Clock className="h-8 w-8 text-yellow-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Overdue"
           value={formatCurrency(summary.overdueAmount)}
-          subtitle={`${summary.overdueInvoices} invoices`}
-          tone="red"
-          icon={<AlertTriangle className="h-5 w-5" />}
+          footer={`${summary.overdueInvoices} invoices`}
+          icon={<AlertTriangle className="h-8 w-8 text-red-600" />}
         />
-        <StatCard
+        <ListSummaryCard
           title="Total Invoices"
           value={summary.totalInvoices}
-          subtitle={`${formatCurrency(summary.totalAmount)} total value`}
-          tone="blue"
-          icon={<FileText className="h-5 w-5" />}
+          footer={`${formatCurrency(summary.totalAmount)} total value`}
+          icon={<FileText className="h-8 w-8 text-blue-600" />}
         />
       </div>
 
-        <Card className="mb-6">
-            <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <FormField label="Search" htmlFor="search">
-                <Input
-                  type="text"
-                  name="search"
-                  id="search"
-                  defaultValue={search}
-                  placeholder="Search invoices..."
-                />
-              </FormField>
+      <Card className="mb-6">
+        <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <FormField label="Search" htmlFor="search">
+            <Input
+              type="text"
+              name="search"
+              id="search"
+              defaultValue={search}
+              placeholder="Invoice #, tenant..."
+            />
+          </FormField>
 
-              <FormField label="Status" htmlFor="status">
-                <Select name="status" id="status" defaultValue={status}>
-                  <option value="">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="sent">Sent</option>
-                  <option value="paid">Paid</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="cancelled">Cancelled</option>
-                </Select>
-              </FormField>
+          <FormField label="Status" htmlFor="status">
+            <Select name="status" id="status" defaultValue={status}>
+              <option value="">All Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+              <option value="cancelled">Cancelled</option>
+            </Select>
+          </FormField>
 
-              <FormField label="Tenant" htmlFor="tenant">
-                <Select name="tenant" id="tenant" defaultValue={tenantId}>
-                  <option value="">All Tenants</option>
-                  {uniqueTenants.length > 0 ? (
-                    uniqueTenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.firstName} {tenant.lastName}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>
-                      No tenants available
-                    </option>
-                  )}
-                </Select>
-              </FormField>
+          <FormField label="Tenant" htmlFor="tenant">
+            <Select name="tenant" id="tenant" defaultValue={tenantId}>
+              <option value="">All Tenants</option>
+              {uniqueTenants.length > 0 ? (
+                uniqueTenants.map((tenant) => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.firstName} {tenant.lastName}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  No tenants available
+                </option>
+              )}
+            </Select>
+          </FormField>
 
-              <div className="flex items-end">
-                <Button type="submit" className="w-full">
-                  Filter
-                </Button>
-              </div>
-            </form>
-        </Card>
-
-        {/* Invoices Table */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Invoices ({invoicesData.total})
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-900">
-              Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, invoicesData.total)} of {invoicesData.total} invoices
-            </p>
+          <div className="flex items-end">
+            <Button type="submit" className="w-full">
+              Apply filters
+            </Button>
           </div>
+        </form>
+      </Card>
 
-          {invoicesData.invoices.length === 0 ? (
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
-              <p className="mt-1 text-sm text-gray-900">Get started by creating a new invoice.</p>
-              <div className="mt-6">
-                <Link
-                  href="/admin/financial/invoices/new"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Create Invoice
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <ul className="divide-y divide-gray-200">
-              {invoicesData.invoices.map((invoice) => (
-                <li key={invoice.id}>
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                            {getStatusIcon(invoice.status)}
-                          </div>
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        {invoicesData.invoices.length === 0 ? (
+          <div className="p-8 text-center text-gray-900">
+            <p className="mb-2 text-lg font-medium">No invoices found</p>
+            <p className="mb-4 text-sm text-gray-600">Get started by creating a new invoice</p>
+            <Link href="/admin/financial/invoices/new">
+              <Button leftIcon={<Plus className="h-4 w-4" />}>Create Invoice</Button>
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                      Invoice
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                      Tenant
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                      Due Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {invoicesData.invoices.map((invoice) => (
+                    <tr key={invoice.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {invoice.invoiceNumber}
                         </div>
-                        <div className="ml-4">
-                          <div className="flex items-center">
-                            <p className="text-sm font-medium text-gray-900">
-                              {invoice.invoiceNumber}
-                            </p>
-                            <span className="ml-2">
-                              <InvoiceStatusBadge status={invoice.status} />
-                            </span>
-                            <span className="ml-2 text-lg font-semibold text-gray-900">
-                              {formatCurrency(invoice.totalAmount)}
-                            </span>
+                        {invoice.description && (
+                          <div className="mt-0.5 max-w-xs truncate text-xs text-gray-500">
+                            {invoice.description}
                           </div>
-                          <div className="mt-1 flex items-center text-sm text-gray-900">
-                            <p>
-                              {invoice.tenantName} • {invoice.buildingName} {invoice.roomNumber}
-                            </p>
-                            <span className="mx-2">•</span>
-                            <p>Due: {formatDate(invoice.dueDate)}</p>
-                          </div>
-                          {invoice.description && (
-                            <p className="mt-1 text-sm text-gray-900">{invoice.description}</p>
-                          )}
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {invoice.tenantName || '—'}
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
+                        {(invoice as { buildingName?: string }).buildingName && (
+                          <div className="text-sm text-gray-600">
+                            {(invoice as { buildingName?: string }).buildingName}{' '}
+                            {(invoice as { roomNumber?: string }).roomNumber || ''}
+                          </div>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        {formatDate(invoice.dueDate)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                        {formatCurrency(invoice.totalAmount)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <InvoiceStatusBadge status={invoice.status} />
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                         <Link
                           href={`/admin/financial/invoices/${invoice.id}`}
-                          className="text-purple-600 hover:text-purple-900 text-sm font-medium"
+                          className="inline-flex text-gray-500 hover:text-gray-900"
+                          title="View"
                         >
-                          View Details
+                          <Eye className="h-5 w-5" />
                         </Link>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow">
-            <div className="flex-1 flex justify-between sm:hidden">
-              {page > 1 && (
-                <Link
-                  href={`?page=${page - 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
-                >
-                  Previous
-                </Link>
-              )}
-              {page < totalPages && (
-                <Link
-                  href={`?page=${page + 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50"
-                >
-                  Next
-                </Link>
-              )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-900">
-                  Showing <span className="font-medium">{((page - 1) * 20) + 1}</span> to{' '}
-                  <span className="font-medium">{Math.min(page * 20, invoicesData.total)}</span> of{' '}
-                  <span className="font-medium">{invoicesData.total}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  {page > 1 && (
-                    <Link
-                      href={`?page=${page - 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
-                    >
-                      <span className="sr-only">Previous</span>
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  )}
-                  
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
-                    if (pageNum > totalPages) return null;
-                    
-                    return (
-                      <Link
-                        key={pageNum}
-                        href={`?page=${pageNum}&search=${search}&status=${status}&tenant=${tenantId}`}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          pageNum === page
-                            ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
-                            : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </Link>
-                    );
-                  })}
-
-                  {page < totalPages && (
-                    <Link
-                      href={`?page=${page + 1}&search=${search}&status=${status}&tenant=${tenantId}`}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50"
-                    >
-                      <span className="sr-only">Next</span>
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  )}
-                </nav>
-              </div>
-            </div>
-          </div>
+            <Pagination
+              currentPage={page}
+              totalPages={Math.max(1, totalPages)}
+              totalItems={invoicesData.total}
+              itemsPerPage={20}
+            />
+          </>
         )}
+      </div>
     </div>
   );
-} 
+}
+ 

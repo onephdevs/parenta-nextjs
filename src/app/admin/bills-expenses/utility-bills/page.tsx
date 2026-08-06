@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
@@ -10,6 +10,8 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import Pagination from '@/components/ui/Pagination';
 import { 
   Plus, 
   Search, 
@@ -19,8 +21,9 @@ import {
   Zap,
   Droplets,
   DollarSign,
-  ArrowLeft
 } from 'lucide-react';
+
+const PAGE_SIZE = 20;
 
 interface RoomUtilityBill {
   id: string;
@@ -47,6 +50,7 @@ export default function RoomUtilityBillsPage() {
   const [bills, setBills] = useState<RoomUtilityBill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [buildings, setBuildings] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Filters
   const [roomFilter, setRoomFilter] = useState('');
@@ -98,6 +102,8 @@ export default function RoomUtilityBillsPage() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
+      params.set('limit', '500');
+      params.set('page', '1');
       if (buildingFilter) params.append('buildingId', buildingFilter);
       if (utilityTypeFilter) params.append('utilityType', utilityTypeFilter);
       if (statusFilter) params.append('billStatus', statusFilter);
@@ -116,15 +122,6 @@ export default function RoomUtilityBillsPage() {
           billsToDisplay = data.bills;
         }
         
-        // Apply search filter
-        if (searchTerm) {
-          billsToDisplay = billsToDisplay.filter((bill: RoomUtilityBill) =>
-            (bill.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (bill.buildingName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (bill.providerName || '').toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-
         // Apply room filter
         if (roomFilter) {
           billsToDisplay = billsToDisplay.filter((bill: RoomUtilityBill) =>
@@ -133,6 +130,7 @@ export default function RoomUtilityBillsPage() {
         }
 
         setBills(billsToDisplay);
+        setCurrentPage(1);
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to fetch bills:', errorData);
@@ -165,6 +163,27 @@ export default function RoomUtilityBillsPage() {
   useEffect(() => {
     fetchBills();
   }, [buildingFilter, utilityTypeFilter, statusFilter, dateFromFilter, dateToFilter, roomFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredBills = useMemo(() => {
+    if (!searchTerm.trim()) return bills;
+    const term = searchTerm.toLowerCase();
+    return bills.filter(
+      (bill) =>
+        (bill.roomNumber || '').toLowerCase().includes(term) ||
+        (bill.buildingName || '').toLowerCase().includes(term) ||
+        (bill.providerName || '').toLowerCase().includes(term)
+    );
+  }, [bills, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBills.length / PAGE_SIZE));
+  const pageBills = filteredBills.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const handleDelete = async (id: string) => {
     if (
@@ -267,23 +286,16 @@ export default function RoomUtilityBillsPage() {
   };
 
   const summary = {
-    total: bills.length,
-    totalAmount: bills.reduce((sum, bill) => sum + bill.amount, 0),
-    pending: bills.filter(b => b.billStatus === 'pending').length,
-    paid: bills.filter(b => b.billStatus === 'paid').length,
-    overdue: bills.filter(b => b.billStatus === 'overdue').length,
+    total: filteredBills.length,
+    totalAmount: filteredBills.reduce((sum, bill) => sum + bill.amount, 0),
+    pending: filteredBills.filter((b) => b.billStatus === 'pending').length,
+    paid: filteredBills.filter((b) => b.billStatus === 'paid').length,
+    overdue: filteredBills.filter((b) => b.billStatus === 'overdue').length,
   };
 
   return (
     <div className="space-y-6 p-6">
       {dialog}
-      <Link
-        href="/admin/bills-expenses"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4 mr-1" />
-        Back to Bills & Expenses
-      </Link>
       <PageHeader
         title="Room Utility Bills"
         description="Track electricity and water bills by room"
@@ -294,91 +306,31 @@ export default function RoomUtilityBillsPage() {
         }
       />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <DollarSign className="w-8 h-8 text-blue-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Total Amount</dt>
-                    <dd className="text-lg font-medium text-gray-900">{formatCurrency(summary.totalAmount)}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">{summary.total} bills</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="w-8 h-8 text-yellow-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Pending</dt>
-                    <dd className="text-lg font-medium text-gray-900">{summary.pending}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">bills pending payment</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <CheckCircle2 className="w-8 h-8 text-green-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Paid</dt>
-                    <dd className="text-lg font-medium text-gray-900">{summary.paid}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">bills paid</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="w-8 h-8 text-red-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-900 truncate">Overdue</dt>
-                    <dd className="text-lg font-medium text-gray-900">{summary.overdue}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <span className="text-gray-900">bills overdue</span>
-              </div>
-            </div>
-          </div>
+        <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <ListSummaryCard
+            title="Total Amount"
+            value={formatCurrency(summary.totalAmount)}
+            footer={`${summary.total} bills`}
+            icon={<DollarSign className="h-8 w-8 text-blue-600" />}
+          />
+          <ListSummaryCard
+            title="Pending"
+            value={summary.pending}
+            footer="bills pending payment"
+            icon={<AlertCircle className="h-8 w-8 text-yellow-600" />}
+          />
+          <ListSummaryCard
+            title="Paid"
+            value={summary.paid}
+            footer="bills paid"
+            icon={<CheckCircle2 className="h-8 w-8 text-green-600" />}
+          />
+          <ListSummaryCard
+            title="Overdue"
+            value={summary.overdue}
+            footer="bills overdue"
+            icon={<AlertCircle className="h-8 w-8 text-red-600" />}
+          />
         </div>
 
         <Card className="mb-6">
@@ -462,7 +414,7 @@ export default function RoomUtilityBillsPage() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           {isLoading ? (
             <div className="p-8 text-center text-gray-900">Loading...</div>
-          ) : bills.length === 0 ? (
+          ) : filteredBills.length === 0 ? (
             <div className="p-8 text-center text-gray-900">
               <p className="text-lg font-medium mb-2">No room utility bills found</p>
               <p className="text-sm text-gray-900 mb-4">Get started by adding a new bill</p>
@@ -471,6 +423,7 @@ export default function RoomUtilityBillsPage() {
               </Link>
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -486,7 +439,7 @@ export default function RoomUtilityBillsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {bills.map((bill) => (
+                  {pageBills.map((bill) => (
                     <tr key={bill.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{bill.buildingName}</div>
@@ -551,6 +504,14 @@ export default function RoomUtilityBillsPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              currentPage={Math.min(currentPage, totalPages)}
+              totalPages={totalPages}
+              totalItems={filteredBills.length}
+              itemsPerPage={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+            />
+            </>
           )}
         </div>
     </div>

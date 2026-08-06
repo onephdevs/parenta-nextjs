@@ -38,46 +38,54 @@ interface NotificationProviderProps {
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const showNotification = useCallback((notification: Omit<Notification, 'id'>) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    const newNotification: Notification = {
-      id,
-      duration: notification.type === 'loading' ? undefined : 5000,
-      ...notification,
-    };
-
-    setNotifications(prev => [...prev, newNotification]);
-
-    // Auto-remove notification after duration (except loading notifications)
-    if (newNotification.duration && notification.type !== 'loading') {
-      setTimeout(() => {
-        removeNotification(id);
-      }, newNotification.duration);
-    }
-
-    return id;
-  }, []);
-
   const removeNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
+    setNotifications((prev) => prev.filter((notification) => notification.id !== id));
   }, []);
 
-  const updateNotification = useCallback((id: string, updates: Partial<Notification>) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, ...updates }
-          : notification
-      )
-    );
+  const showNotification = useCallback(
+    (notification: Omit<Notification, 'id'>) => {
+      const id = Math.random().toString(36).substring(2, 9);
+      const isLoading = notification.type === 'loading' || notification.isLoading;
+      // Only apply an explicit duration when provided; otherwise default to 5s.
+      // Callers often pass `duration: undefined`, which must not wipe the default.
+      const duration = isLoading
+        ? undefined
+        : typeof notification.duration === 'number'
+          ? notification.duration
+          : 5000;
 
-    // If updating to a non-loading type and no custom duration, auto-remove
-    if (updates.type && updates.type !== 'loading' && !updates.duration) {
-      setTimeout(() => {
-        removeNotification(id);
-      }, 5000);
-    }
-  }, [removeNotification]);
+      const newNotification: Notification = {
+        ...notification,
+        id,
+        duration,
+        isLoading,
+      };
+
+      setNotifications((prev) => [...prev, newNotification]);
+      return id;
+    },
+    []
+  );
+
+  const updateNotification = useCallback(
+    (id: string, updates: Partial<Notification>) => {
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === id ? { ...notification, ...updates } : notification
+        )
+      );
+
+      // If updating to a non-loading type, ensure a dismiss duration is applied
+      if (updates.type && updates.type !== 'loading') {
+        const duration =
+          typeof updates.duration === 'number' ? updates.duration : 5000;
+        setTimeout(() => {
+          removeNotification(id);
+        }, duration);
+      }
+    },
+    [removeNotification]
+  );
 
   const clearAll = useCallback(() => {
     setNotifications([]);

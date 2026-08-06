@@ -12,12 +12,12 @@ const Toast: React.FC<ToastProps> = ({ notification, onRemove }) => {
   const { id, type, title, message, duration } = notification;
 
   useEffect(() => {
-    if (duration && type !== 'loading') {
-      const timer = setTimeout(() => {
-        onRemove(id);
-      }, duration);
-      return () => clearTimeout(timer);
-    }
+    if (type === 'loading') return;
+    const ms = typeof duration === 'number' && duration > 0 ? duration : 5000;
+    const timer = setTimeout(() => {
+      onRemove(id);
+    }, ms);
+    return () => clearTimeout(timer);
   }, [id, duration, type, onRemove]);
 
   const getToastStyles = (type: NotificationType) => {

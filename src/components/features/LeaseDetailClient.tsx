@@ -125,12 +125,29 @@ export default function LeaseDetailClient({ leaseId }: LeaseDetailClientProps) {
         <div className="flex flex-wrap items-center gap-2">
           <LeaseStatusBadge status={lease.uiStatus} />
           <Link
-            href={withReturnTo(
-              `/admin/tenants/${lease.tenantId}/edit`,
-              `/admin/lease-management/${lease.id}`
-            )}
+            href={
+              lease.tenantId
+                ? withReturnTo(
+                    `/admin/tenants/${lease.tenantId}/edit`,
+                    `/admin/lease-management/${lease.id}`
+                  )
+                : '#'
+            }
+            onClick={(e) => {
+              if (!lease.tenantId) e.preventDefault();
+            }}
+            className={!lease.tenantId ? 'pointer-events-none' : undefined}
           >
-            <Button variant="outline" leftIcon={<Pencil className="h-4 w-4" />}>
+            <Button
+              variant="outline"
+              leftIcon={<Pencil className="h-4 w-4" />}
+              isDisabled={!lease.tenantId}
+              title={
+                lease.tenantId
+                  ? 'Edit tenant'
+                  : 'No tenant linked to this lease — cannot edit'
+              }
+            >
               Edit
             </Button>
           </Link>

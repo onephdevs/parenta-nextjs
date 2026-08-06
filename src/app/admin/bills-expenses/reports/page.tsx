@@ -205,7 +205,7 @@ export default function ExpenseReportsPage() {
     <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 print:max-w-none print:px-0">
         <Link
-          href="/admin/bills-expenses"
+          href="/admin/bills-expenses/utility-bills"
           className="mb-6 inline-flex items-center text-sm text-gray-500 hover:text-gray-900 print:hidden"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />

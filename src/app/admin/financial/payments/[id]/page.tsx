@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getPaymentById } from '@/lib/api/payments';
 import DownloadReceiptButton from '@/components/features/DownloadReceiptButton';
+import ConfirmPaymentActions from '@/components/features/ConfirmPaymentActions';
+import { formatPaymentNotesDisplay } from '@/lib/format-payment-notes';
 
 interface PaymentDetailPageProps {
   params: Promise<{
@@ -103,14 +105,9 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
     }
   };
 
-  const notes = payment.notes?.trim() || '';
-  const ledgerMatch = notes.match(/\[ledger:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})\]/i);
-  const descriptionLabel = notes
-    .replace(/\s*\[ledger:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}\]\s*/i, '')
-    .trim();
-  const billingPeriodLabel = ledgerMatch
-    ? `${formatDateOnly(new Date(ledgerMatch[1] + 'T00:00:00'))} – ${formatDateOnly(new Date(ledgerMatch[2] + 'T00:00:00'))}`
-    : null;
+  const { label: descriptionLabel, billingPeriodLabel } = formatPaymentNotesDisplay(
+    payment.notes
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,6 +130,13 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              {payment.paymentStatus === 'pending' && (
+                <ConfirmPaymentActions
+                  paymentId={payment.id}
+                  referenceNumber={payment.referenceNumber}
+                  amountLabel={formatCurrency(payment.amount)}
+                />
+              )}
               <DownloadReceiptButton
                 paymentId={payment.id}
                 hasReceipt={Boolean(payment.receiptFilePath)}
@@ -144,6 +148,31 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
 
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
+          {payment.paymentStatus === 'pending' && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 sm:px-6">
+              <h2 className="text-base font-semibold text-amber-950">
+                Awaiting verification
+              </h2>
+              <p className="mt-1 text-sm text-amber-900">
+                Cross-check the tenant&apos;s Transaction ID against their bank/GCash receipt,
+                then confirm or reject this claim. Invoice balances stay unchanged until you confirm.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="rounded-md bg-white/80 px-3 py-2 text-sm">
+                  <span className="font-medium text-gray-600">Transaction ID: </span>
+                  <span className="font-mono font-semibold text-gray-900">
+                    {payment.referenceNumber || 'Not provided'}
+                  </span>
+                </div>
+                <ConfirmPaymentActions
+                  paymentId={payment.id}
+                  referenceNumber={payment.referenceNumber}
+                  amountLabel={formatCurrency(payment.amount)}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Description first — what this payment is for */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
@@ -189,7 +218,7 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-900">Payment Method</span>
-                    <span className="text-sm text-gray-900">{getPaymentMethodDisplay(payment.paymentMethod)}</span>
+                    <span className="text-sm text-gray-900">{getPaymentMethodDisplay(payment.paymentMethod || '')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-900">Payment Date</span>
@@ -201,9 +230,11 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-4">
                     <span className="text-sm font-medium text-gray-900">Transaction ID</span>
-                    <span className="text-sm text-gray-900">{payment.referenceNumber || 'N/A'}</span>
+                    <span className="text-sm font-mono font-semibold text-gray-900 text-right break-all">
+                      {payment.referenceNumber || 'N/A'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-900">Created</span>
