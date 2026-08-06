@@ -613,7 +613,8 @@ model users {
   deposit_ledger        deposit_ledger[]
   documents             documents[]
   notifications         notifications[]
-  pipeline_cards        pipeline_cards[]
+  pipeline_cards_created pipeline_cards[] @relation("PipelineCardCreator")
+  pipeline_cards_assigned pipeline_cards[] @relation("PipelineCardAssignee")
   pipeline_card_events  pipeline_card_events[]
   tenants               tenants[]
 
@@ -768,6 +769,7 @@ model pipeline_cards {
   won_at             DateTime?                @db.Timestamptz(6)
   lost_at            DateTime?                @db.Timestamptz(6)
   created_by         String?                  @db.Uuid
+  assigned_to        String?                  @db.Uuid
   created_at         DateTime?                @default(now()) @db.Timestamp(6)
   updated_at         DateTime?                @default(now()) @db.Timestamp(6)
   board              pipeline_boards          @relation(fields: [board_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -779,7 +781,8 @@ model pipeline_cards {
   tenant             tenants?                 @relation(fields: [tenant_id], references: [id], onUpdate: NoAction)
   assignment         tenant_room_assignments? @relation(fields: [assignment_id], references: [id], onUpdate: NoAction)
   expense            expenses?                @relation(fields: [expense_id], references: [id], onUpdate: NoAction)
-  creator            users?                   @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  creator            users?                   @relation("PipelineCardCreator", fields: [created_by], references: [id], onUpdate: NoAction)
+  assignee           users?                   @relation("PipelineCardAssignee", fields: [assigned_to], references: [id], onUpdate: NoAction)
   events             pipeline_card_events[]
   documents          documents[]
 
@@ -787,6 +790,7 @@ model pipeline_cards {
   @@index([card_status], map: "idx_pipeline_cards_status")
   @@index([building_id], map: "idx_pipeline_cards_building")
   @@index([tenant_id], map: "idx_pipeline_cards_tenant")
+  @@index([assigned_to], map: "idx_pipeline_cards_assigned")
 }
 
 model pipeline_card_events {

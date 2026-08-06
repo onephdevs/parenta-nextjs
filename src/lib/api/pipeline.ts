@@ -80,6 +80,10 @@ interface DbCard {
   won_at: Date | string | null;
   lost_at: Date | string | null;
   created_by: string | null;
+  assigned_to?: string | null;
+  assigned_first_name?: string | null;
+  assigned_last_name?: string | null;
+  document_count?: string | number | null;
   created_at: Date | string;
   updated_at: Date | string;
   stage_color?: string | null;
@@ -171,6 +175,22 @@ function mapCard(row: DbCard): PipelineCard {
     wonAt: toIso(row.won_at),
     lostAt: toIso(row.lost_at),
     createdBy: row.created_by || undefined,
+    assignedTo: row.assigned_to || undefined,
+    assignedToName: (() => {
+      const name = [row.assigned_first_name, row.assigned_last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      return name || undefined;
+    })(),
+    assignedToInitials: (() => {
+      const first = row.assigned_first_name?.[0] || '';
+      const last = row.assigned_last_name?.[0] || '';
+      const initials = `${first}${last}`.toUpperCase();
+      return initials || undefined;
+    })(),
+    documentCount:
+      row.document_count != null ? Number(row.document_count) : undefined,
     createdAt: toIso(row.created_at) || new Date().toISOString(),
     updatedAt: toIso(row.updated_at) || new Date().toISOString(),
     stageColor: row.stage_color || undefined,
@@ -248,12 +268,20 @@ export async function getCardsForBoard(
        s.slug AS stage_slug,
        s.name AS stage_name,
        s.is_won AS stage_is_won,
-       pb.slug AS board_slug
+       pb.slug AS board_slug,
+       au.first_name AS assigned_first_name,
+       au.last_name AS assigned_last_name,
+       (
+         SELECT COUNT(*)::int
+         FROM documents d
+         WHERE d.pipeline_card_id = c.id
+       ) AS document_count
      FROM pipeline_cards c
      JOIN pipeline_boards pb ON pb.id = c.board_id
      JOIN pipeline_stages s ON s.id = c.stage_id
      LEFT JOIN buildings b ON b.id = c.building_id
      LEFT JOIN rooms r ON r.id = c.room_id
+     LEFT JOIN users au ON au.id = c.assigned_to
      WHERE pb.slug = $1
        AND ($2::boolean OR c.card_status = 'open')
      ORDER BY s.sort_order ASC, c.position ASC, c.created_at ASC`,
@@ -1835,12 +1863,20 @@ export async function getPipelineCardById(cardId: string): Promise<PipelineCard 
        s.slug AS stage_slug,
        s.name AS stage_name,
        s.is_won AS stage_is_won,
-       pb.slug AS board_slug
+       pb.slug AS board_slug,
+       au.first_name AS assigned_first_name,
+       au.last_name AS assigned_last_name,
+       (
+         SELECT COUNT(*)::int
+         FROM documents d
+         WHERE d.pipeline_card_id = c.id
+       ) AS document_count
      FROM pipeline_cards c
      JOIN pipeline_boards pb ON pb.id = c.board_id
      JOIN pipeline_stages s ON s.id = c.stage_id
      LEFT JOIN buildings b ON b.id = c.building_id
      LEFT JOIN rooms r ON r.id = c.room_id
+     LEFT JOIN users au ON au.id = c.assigned_to
      WHERE c.id = $1`,
     [cardId]
   );
@@ -1881,6 +1917,7 @@ export interface UpdatePipelineCardData {
   moveInPaymentNotes?: string | null;
   markLeaseSigned?: boolean;
   generateLease?: boolean;
+  assignedTo?: string | null;
 }
 
 export async function updatePipelineCard(
@@ -2042,8 +2079,9 @@ export async function updatePipelineCard(
        move_in_paid_at = $26,
        move_in_payment_method = $27,
        move_in_payment_notes = $28,
+       assigned_to = $29,
        updated_at = CURRENT_TIMESTAMP
-     WHERE id = $29`,
+     WHERE id = $30`,
     [
       title,
       firstName,
@@ -2077,6 +2115,7 @@ export async function updatePipelineCard(
       moveInPaidAt,
       moveInPaymentMethod,
       moveInPaymentNotes,
+      data.assignedTo !== undefined ? data.assignedTo : existing.assignedTo || null,
       cardId,
     ]
   );

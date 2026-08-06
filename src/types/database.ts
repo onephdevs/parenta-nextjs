@@ -1010,6 +1010,12 @@ export interface PipelineCard {
   wonAt?: string;
   lostAt?: string;
   createdBy?: string;
+  /** Admin/staff user who owns this opportunity */
+  assignedTo?: string;
+  assignedToName?: string;
+  assignedToInitials?: string;
+  /** Documents attached directly to this card (pipeline_card_id) */
+  documentCount?: number;
   createdAt: string;
   updatedAt: string;
   stageColor?: string;

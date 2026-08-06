@@ -228,6 +228,12 @@ export async function PATCH(request: Request, context: RouteContext) {
             body.moveInPaymentMethod !== undefined ? body.moveInPaymentMethod : undefined,
           moveInPaymentNotes:
             body.moveInPaymentNotes !== undefined ? body.moveInPaymentNotes : undefined,
+          assignedTo:
+            body.assignedTo !== undefined
+              ? body.assignedTo === null || body.assignedTo === ''
+                ? null
+                : String(body.assignedTo)
+              : undefined,
           markLeaseSigned: body.markLeaseSigned === true,
           generateLease: body.generateLease === true,
         },
