@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { FileText, Pencil, Plus } from 'lucide-react';
 import { listLeaseTemplates } from '@/lib/api/lease-templates';
 import { Button } from '@/components/ui/Button';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 
 export const metadata: Metadata = {
@@ -64,15 +65,15 @@ export default async function DocumentTemplatesPage() {
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {templates.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="mb-2 text-lg font-medium">No lease templates yet</p>
-            <p className="mb-4 text-sm text-gray-600">
-              Create your first template in Lease Designer.
-            </p>
-            <Link href="/admin/documents/lease-designer">
-              <Button leftIcon={<Plus className="h-4 w-4" />}>Open Lease Designer</Button>
-            </Link>
-          </div>
+          <EmptyState
+            title="No lease templates yet"
+            description="Create your first template in Lease Designer."
+            action={
+              <Link href="/admin/documents/lease-designer">
+                <Button leftIcon={<Plus className="h-4 w-4" />}>Open Lease Designer</Button>
+              </Link>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

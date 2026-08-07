@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface ProfilePictureUploadProps {
   tenantId: string;
@@ -181,7 +182,7 @@ export default function ProfilePictureUpload({
         </div>
         {(isUploading || isDeleting) && (
           <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <Spinner className="text-white" label="Uploading" />
           </div>
         )}
       </div>

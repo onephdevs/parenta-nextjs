@@ -13,16 +13,27 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Card } from '@/components/ui/Card';
-import { Dialog } from '@/components/ui/Dialog';
+import {
+  AppLoader,
+  Button,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Input,
+  ListSummaryCard,
+  PageHeader,
+  Pagination,
+  SearchInput,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import Pagination from '@/components/ui/Pagination';
-import AppLoader from '@/components/ui/AppLoader';
+import { BuildingStatusBadge } from '@/components/domain/StatusBadges';
 
 const PAGE_SIZE = 20;
 
@@ -376,131 +387,96 @@ export default function AdminUsersPage() {
         />
       </div>
 
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FormField label="Search" htmlFor="users-search">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                id="users-search"
-                type="text"
-                className="pl-10"
-                placeholder="Name, email, username..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </FormField>
-          <FormField label="Status" htmlFor="users-status">
-            <Select
-              id="users-status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </FormField>
-        </div>
-      </Card>
+      <FilterBar columns={4}>
+        <FormField label="Search" htmlFor="users-search">
+          <SearchInput
+            id="users-search"
+            placeholder="Name, email, username..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </FormField>
+        <FormField label="Status" htmlFor="users-status">
+          <Select
+            id="users-status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+        </FormField>
+      </FilterBar>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {filteredUsers.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="mb-2 text-lg font-medium">No admin users found</p>
-            <p className="text-sm text-gray-600">Try adjusting your search or filters.</p>
-          </div>
+          <EmptyState
+            title="No admin users found"
+            description="Try adjusting your search or filters."
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Username
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Created
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {pageUsers.map((user) => {
-                    const isSelf = user.id === session.user.id;
-                    return (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {user.firstName} {user.lastName}
-                            {isSelf && (
-                              <span className="ml-2 text-xs font-normal text-gray-500">(you)</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {user.email || '—'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {user.username || '—'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              user.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pageUsers.map((user) => {
+                  const isSelf = user.id === session.user.id;
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="text-sm font-medium text-gray-900">
+                          {user.firstName} {user.lastName}
+                          {isSelf && (
+                            <span className="ml-2 text-xs font-normal text-gray-500">(you)</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{user.email || '—'}</TableCell>
+                      <TableCell>{user.username || '—'}</TableCell>
+                      <TableCell>
+                        <BuildingStatusBadge isActive={user.isActive} />
+                      </TableCell>
+                      <TableCell>{formatDate(user.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(user)}
+                            className="text-gray-500 hover:text-gray-900"
+                            title="Edit"
                           >
-                            {user.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {formatDate(user.createdAt)}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(user)}
-                              className="text-gray-500 hover:text-gray-900"
-                              title="Edit"
-                            >
-                              <Pencil className="h-5 w-5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleActive(user)}
-                              disabled={isSelf && user.isActive}
-                              className="text-gray-500 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
-                              title={user.isActive ? 'Deactivate' : 'Activate'}
-                            >
-                              {user.isActive ? (
-                                <UserX className="h-5 w-5" />
-                              ) : (
-                                <UserCheck className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            <Pencil className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleActive(user)}
+                            disabled={isSelf && user.isActive}
+                            className="text-gray-500 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+                            title={user.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {user.isActive ? (
+                              <UserX className="h-5 w-5" />
+                            ) : (
+                              <UserCheck className="h-5 w-5" />
+                            )}
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}

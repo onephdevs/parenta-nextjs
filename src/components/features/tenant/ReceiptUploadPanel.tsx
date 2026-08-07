@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
+import { FileDropzone } from '@/components/ui/FileDropzone';
 import { FormField } from '@/components/forms/FormField';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
@@ -266,32 +267,8 @@ export function ReceiptUploadPanel({
         </FormField>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFileSelect(file);
-        }}
-      />
-
-      <div
-        className={cn(
-          'mt-5 rounded-lg border-2 border-dashed p-6 text-center transition',
-          selectedFile ? 'border-emerald-300 bg-emerald-50/40' : 'border-gray-300 bg-gray-50'
-        )}
-        onDragOver={(e) => {
-          e.preventDefault();
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          const file = e.dataTransfer.files?.[0];
-          if (file) handleFileSelect(file);
-        }}
-      >
-        {selectedFile ? (
+      {selectedFile ? (
+        <div className="mt-5 rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-6 text-center">
           <div className="space-y-3">
             {preview ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -315,18 +292,18 @@ export function ReceiptUploadPanel({
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="mx-auto flex flex-col items-center gap-2 text-sm text-gray-600"
-          >
-            <Upload className="h-8 w-8 text-gray-400" />
-            <span>Drop receipt here or click to browse</span>
-            <span className="text-xs text-gray-400">PDF, JPEG, PNG, WEBP · max 5MB</span>
-          </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <FileDropzone
+          className="mt-5"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          inputRef={fileInputRef}
+          onFiles={(files) => handleFileSelect(files[0])}
+          label="Drop receipt here or click to browse"
+          hint="PDF, JPEG, PNG, WEBP · max 5MB"
+          icon={<Upload className="mx-auto mb-3 h-8 w-8 text-gray-400" />}
+        />
+      )}
 
       <div className="mt-5 flex justify-end">
         <Button

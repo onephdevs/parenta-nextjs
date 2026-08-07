@@ -5,29 +5,41 @@ import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import {
   Wrench,
-  Search,
   AlertCircle,
   CheckCircle2,
   Clock,
-  User,
   Building,
-  AlertTriangle,
+  User,
   Save,
   Pencil,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/Textarea';
-import { Card } from '@/components/ui/Card';
-import { Dialog } from '@/components/ui/Dialog';
+import {
+  AppLoader,
+  Button,
+  Card,
+  Dialog,
+  EmptyState,
+  FilterBar,
+  Input,
+  ListSummaryCard,
+  PageHeader,
+  Pagination,
+  SearchInput,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import { MaintenanceStatusBadge } from '@/components/domain/StatusBadges';
-import Pagination from '@/components/ui/Pagination';
-import AppLoader from '@/components/ui/AppLoader';
+import {
+  MaintenancePriorityBadge,
+  MaintenanceStatusBadge,
+} from '@/components/domain/StatusBadges';
 
 const PAGE_SIZE = 20;
 
@@ -228,25 +240,6 @@ export default function AdminMaintenancePage() {
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const styles: Record<string, string> = {
-      urgent: 'bg-red-100 text-red-800',
-      high: 'bg-orange-100 text-orange-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      low: 'bg-green-100 text-green-800',
-    };
-    return (
-      <span
-        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-          styles[priority] || 'bg-gray-100 text-gray-800'
-        }`}
-      >
-        {priority === 'urgent' && <AlertTriangle className="h-3 w-3" />}
-        {priority}
-      </span>
-    );
-  };
-
   const formatDate = (dateString: string | undefined | null) => {
     if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -290,154 +283,127 @@ export default function AdminMaintenancePage() {
         />
       </div>
 
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FormField label="Search" htmlFor="maintenance-search">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                id="maintenance-search"
-                type="text"
-                className="pl-10"
-                placeholder="Title, tenant, building..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </FormField>
+      <FilterBar columns={4}>
+        <FormField label="Search" htmlFor="maintenance-search">
+          <SearchInput
+            id="maintenance-search"
+            placeholder="Title, tenant, building..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </FormField>
 
-          <FormField label="Status" htmlFor="maintenance-status">
-            <Select
-              id="maintenance-status"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="">All Status</option>
-              <option value="open">Submitted</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Resolved</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
-          </FormField>
+        <FormField label="Status" htmlFor="maintenance-status">
+          <Select
+            id="maintenance-status"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="open">Submitted</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Resolved</option>
+            <option value="cancelled">Cancelled</option>
+          </Select>
+        </FormField>
 
-          <FormField label="Priority" htmlFor="maintenance-priority">
-            <Select
-              id="maintenance-priority"
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-            >
-              <option value="">All Priority</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </Select>
-          </FormField>
+        <FormField label="Priority" htmlFor="maintenance-priority">
+          <Select
+            id="maintenance-priority"
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+          >
+            <option value="">All Priority</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </Select>
+        </FormField>
 
-          <FormField label="Category" htmlFor="maintenance-category">
-            <Select
-              id="maintenance-category"
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-            >
-              <option value="">All Categories</option>
-              <option value="plumbing">Plumbing</option>
-              <option value="electrical">Electrical</option>
-              <option value="hvac">HVAC</option>
-              <option value="appliance">Appliance</option>
-              <option value="structural">Structural</option>
-              <option value="other">Other</option>
-            </Select>
-          </FormField>
-        </div>
-      </Card>
+        <FormField label="Category" htmlFor="maintenance-category">
+          <Select
+            id="maintenance-category"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            <option value="plumbing">Plumbing</option>
+            <option value="electrical">Electrical</option>
+            <option value="hvac">HVAC</option>
+            <option value="appliance">Appliance</option>
+            <option value="structural">Structural</option>
+            <option value="other">Other</option>
+          </Select>
+        </FormField>
+      </FilterBar>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {filteredRequests.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="mb-2 text-lg font-medium">No maintenance requests found</p>
-            <p className="text-sm text-gray-600">Try adjusting your search or filters.</p>
-          </div>
+          <EmptyState
+            title="No maintenance requests found"
+            description="Try adjusting your search or filters."
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Request
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Property
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Tenant
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Priority
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {pageRequests.map((request) => (
-                    <tr key={request.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{request.title}</div>
-                        <div className="line-clamp-1 text-sm text-gray-600">
-                          {request.description}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {request.building_name || '—'}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {request.room_number ? `Room ${request.room_number}` : 'No room'}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <div className="text-sm text-gray-900">{request.tenant_name || '—'}</div>
-                        <div className="text-xs text-gray-500">{request.tenant_email || ''}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm capitalize text-gray-900">
-                        {request.category?.replace(/_/g, ' ') || '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        {getPriorityBadge(request.priority)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <MaintenanceStatusBadge status={request.status} />
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        {formatDate(request.request_date)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateRequest(request)}
-                          className="inline-flex text-gray-500 hover:text-gray-900"
-                          title="Update"
-                        >
-                          <Pencil className="h-5 w-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Request</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Tenant</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pageRequests.map((request) => (
+                  <TableRow key={request.id}>
+                    <TableCell>
+                      <div className="text-sm font-medium text-gray-900">{request.title}</div>
+                      <div className="line-clamp-1 text-sm text-gray-600">
+                        {request.description}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium text-gray-900">
+                        {request.building_name || '—'}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {request.room_number ? `Room ${request.room_number}` : 'No room'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-900">{request.tenant_name || '—'}</div>
+                      <div className="text-xs text-gray-500">{request.tenant_email || ''}</div>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {request.category?.replace(/_/g, ' ') || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <MaintenancePriorityBadge priority={request.priority} />
+                    </TableCell>
+                    <TableCell>
+                      <MaintenanceStatusBadge status={request.status} />
+                    </TableCell>
+                    <TableCell>{formatDate(request.request_date)}</TableCell>
+                    <TableCell className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateRequest(request)}
+                        className="inline-flex text-gray-500 hover:text-gray-900"
+                        title="Update"
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}

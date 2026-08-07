@@ -1,7 +1,7 @@
 import { getAllReservations } from '@/lib/api/reservations';
 import ReservationsClient from '@/components/features/reservations/ReservationsClient';
 import CreateReservationButton from '@/components/features/reservations/CreateReservationButton';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export const revalidate = 0;
 

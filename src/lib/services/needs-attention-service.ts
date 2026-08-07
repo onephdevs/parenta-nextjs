@@ -202,7 +202,7 @@ async function getUtilitiesDue(): Promise<NeedsAttentionCard> {
       title: `${utilityLabel} — ${building}`,
       subtitle: `${formatPhp(parseFloat(row.amount || 0))} • ${urgencyPhrase}`,
       urgency: isLate ? 'late' : daysUntilDue != null && daysUntilDue <= 3 ? 'soon' : 'normal',
-      href: '/admin/bills-expenses/utility-bills',
+      href: '/admin/tasks?board=expenses',
     };
   });
 
@@ -211,7 +211,7 @@ async function getUtilitiesDue(): Promise<NeedsAttentionCard> {
     title: 'Utilities due',
     count: items.length,
     items: items.slice(0, PREVIEW_LIMIT),
-    viewAllHref: '/admin/bills-expenses/utility-bills',
+    viewAllHref: '/admin/tasks?board=expenses',
     viewAllLabel: 'View all utilities',
   };
 }

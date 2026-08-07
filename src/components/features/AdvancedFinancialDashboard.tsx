@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdvancedFinancialMetrics } from '@/types/analytics';
+import { Spinner } from '@/components/ui/Spinner';
 
 export default function AdvancedFinancialDashboard() {
   const [metrics, setMetrics] = useState<AdvancedFinancialMetrics | null>(null);
@@ -62,7 +63,7 @@ export default function AdvancedFinancialDashboard() {
     return (
       <div className="bg-white shadow rounded-lg p-8">
         <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          <Spinner label="Loading metrics" />
         </div>
       </div>
     );

@@ -11,15 +11,28 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Search,
   X,
   Printer,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import {
+  Button,
+  EmptyState,
+  SearchInput,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
+import {
+  InvoiceStatusBadge,
+  PaymentStatusBadge,
+  PaymentTypeBadge,
+} from '@/components/domain/StatusBadges';
 import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
 import { ReceiptUploadPanel, type ReceiptLinkOption } from '@/components/features/tenant/ReceiptUploadPanel';
 import PaymentForm from '@/components/features/tenant/PaymentForm';
@@ -355,35 +368,6 @@ export default function PaymentsPage() {
     refreshFinancials();
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'overdue':
-        return 'bg-red-100 text-red-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return <CheckCircle2 className="h-4 w-4" />;
-      case 'pending':
-        return <Clock className="h-4 w-4" />;
-      case 'overdue':
-      case 'failed':
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
-  };
-
   const formatCurrency = (amount: number | undefined | null) => {
     const value = amount || 0;
     return new Intl.NumberFormat('en-PH', {
@@ -465,39 +449,28 @@ export default function PaymentsPage() {
           </div>
 
           <div className="overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Invoice #
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Amount Due
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Property
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice #</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Amount Due</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {paymentData.schedule.map((item) => {
                   const isOverdue =
                     new Date(item.dueDate) < new Date() && item.status === 'overdue';
                   return (
-                    <tr key={item.id} className={isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'}>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                        {item.invoiceNumber}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                    <TableRow
+                      key={item.id}
+                      className={isOverdue ? 'bg-red-50 hover:bg-red-50' : undefined}
+                    >
+                      <TableCell className="font-medium">{item.invoiceNumber}</TableCell>
+                      <TableCell>
                         <div className="flex items-center">
                           <Calendar className="mr-1 h-4 w-4 text-gray-400" />
                           {formatDate(item.dueDate)}
@@ -505,19 +478,14 @@ export default function PaymentsPage() {
                             <span className="ml-2 text-xs font-medium text-red-600">Overdue</span>
                           )}
                         </div>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-gray-900">
+                      </TableCell>
+                      <TableCell className="font-semibold">
                         {formatCurrency(item.balanceDue)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(item.status)}`}
-                        >
-                          {getStatusIcon(item.status)}
-                          <span className="ml-1 capitalize">{item.status}</span>
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                      </TableCell>
+                      <TableCell>
+                        <InvoiceStatusBadge status={item.status} />
+                      </TableCell>
+                      <TableCell>
                         {item.buildingName && item.roomNumber ? (
                           <div>
                             <div className="font-medium">{item.buildingName}</div>
@@ -526,8 +494,8 @@ export default function PaymentsPage() {
                         ) : (
                           <span className="text-gray-400">N/A</span>
                         )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">
                         {item.balanceDue > 0 ? (
                           <div className="flex flex-wrap items-center justify-end gap-2">
                             <Button
@@ -561,12 +529,12 @@ export default function PaymentsPage() {
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -579,17 +547,13 @@ export default function PaymentsPage() {
           <h3 className="text-lg font-medium leading-6 text-gray-900">Payment History</h3>
           <div className="flex flex-wrap items-center gap-3">
             <FormField htmlFor="payment-search" className="mb-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <Input
-                  id="payment-search"
-                  type="text"
-                  placeholder="Search payments..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64 pl-10"
-                />
-              </div>
+              <SearchInput
+                id="payment-search"
+                placeholder="Search payments..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
             </FormField>
             <FormField htmlFor="payment-status-filter" className="mb-0">
               <Select
@@ -606,120 +570,95 @@ export default function PaymentsPage() {
         </div>
 
         {filteredPayments.length > 0 ? (
-          <div className="overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Method
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Description
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {filteredPayments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {formatDate(payment.paymentDate)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                      {formatCurrency(payment.amount)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {payment.method ? (
-                        <span className="capitalize">
-                          {String(payment.method).replace(/_/g, ' ')}
-                        </span>
-                      ) : (
-                        <span className="italic text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {payment.type ? (
-                        <span className="capitalize">{String(payment.type).replace(/_/g, ' ')}</span>
-                      ) : (
-                        <span className="italic text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4">
-                      {payment.status ? (
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(payment.status)}`}
-                        >
-                          {getStatusIcon(payment.status)}
-                          <span className="ml-1 capitalize">{String(payment.status)}</span>
-                        </span>
-                      ) : (
-                        <span className="italic text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {formatPaymentNotesLabel(payment.description)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => handlePrintReceipt(payment.id)}
-                          className="flex items-center text-green-600 hover:text-green-900"
-                          title="Print Receipt"
-                        >
-                          <Printer className="mr-1 h-4 w-4" />
-                          Print
-                        </button>
-                        <button
-                          onClick={() => setSelectedPaymentForReceipt(payment.id)}
-                          className="flex items-center text-blue-600 hover:text-blue-900"
-                          title="Upload Receipt"
-                        >
-                          <Download className="mr-1 h-4 w-4" />
-                          Upload
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredPayments.map((payment) => (
+                <TableRow key={payment.id}>
+                  <TableCell>{formatDate(payment.paymentDate)}</TableCell>
+                  <TableCell className="font-medium">
+                    {formatCurrency(payment.amount)}
+                  </TableCell>
+                  <TableCell>
+                    {payment.method ? (
+                      <span className="capitalize">
+                        {String(payment.method).replace(/_/g, ' ')}
+                      </span>
+                    ) : (
+                      <span className="italic text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {payment.type ? (
+                      <PaymentTypeBadge type={payment.type} />
+                    ) : (
+                      <span className="italic text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {payment.status ? (
+                      <PaymentStatusBadge status={payment.status} />
+                    ) : (
+                      <span className="italic text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>{formatPaymentNotesLabel(payment.description)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => handlePrintReceipt(payment.id)}
+                        className="flex items-center text-green-600 hover:text-green-900"
+                        title="Print Receipt"
+                      >
+                        <Printer className="mr-1 h-4 w-4" />
+                        Print
+                      </button>
+                      <button
+                        onClick={() => setSelectedPaymentForReceipt(payment.id)}
+                        className="flex items-center text-blue-600 hover:text-blue-900"
+                        title="Upload Receipt"
+                      >
+                        <Download className="mr-1 h-4 w-4" />
+                        Upload
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
-          <div className="py-8 text-center">
-            <CreditCard className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-            <p className="text-gray-900">
-              {searchTerm || filterStatus !== 'all'
+          <EmptyState
+            title={
+              searchTerm || filterStatus !== 'all'
                 ? 'No payments found matching your criteria.'
-                : 'No payment history available.'}
-            </p>
-            {(searchTerm || filterStatus !== 'all') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('all');
-                }}
-                className="mt-2"
-              >
-                Clear filters
-              </Button>
-            )}
-          </div>
+                : 'No payment history available.'
+            }
+            action={
+              searchTerm || filterStatus !== 'all' ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterStatus('all');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              ) : undefined
+            }
+          />
         )}
       </div>
     </div>
@@ -1138,62 +1077,39 @@ export default function PaymentsPage() {
                         {paymentData.utilityBills.length === 1 ? '' : 's'} for your unit
                       </span>
                     </div>
-                    <div className="overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                              Type
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                              Period
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                              Due
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                              Amount
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
-                          {paymentData.utilityBills.map((bill) => (
-                            <tr key={bill.id}>
-                              <td className="whitespace-nowrap px-6 py-4 text-sm font-medium capitalize text-gray-900">
-                                {bill.utilityType}
-                              </td>
-                              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                                {formatDate(bill.billingPeriodStart)} –{' '}
-                                {formatDate(bill.billingPeriodEnd)}
-                              </td>
-                              <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                                {formatDate(bill.dueDate)}
-                              </td>
-                              <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                                {formatCurrency(bill.amount)}
-                              </td>
-                              <td className="whitespace-nowrap px-6 py-4 text-sm">
-                                <span
-                                  className={cn(
-                                    'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize',
-                                    bill.status === 'paid'
-                                      ? 'bg-green-100 text-green-800'
-                                      : bill.status === 'pending'
-                                        ? 'bg-amber-100 text-amber-800'
-                                        : 'bg-red-100 text-red-800'
-                                  )}
-                                >
-                                  {bill.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Due</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paymentData.utilityBills.map((bill) => (
+                          <TableRow key={bill.id}>
+                            <TableCell className="font-medium capitalize">
+                              {bill.utilityType}
+                            </TableCell>
+                            <TableCell className="text-gray-600">
+                              {formatDate(bill.billingPeriodStart)} –{' '}
+                              {formatDate(bill.billingPeriodEnd)}
+                            </TableCell>
+                            <TableCell className="text-gray-600">
+                              {formatDate(bill.dueDate)}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(bill.amount)}
+                            </TableCell>
+                            <TableCell>
+                              <InvoiceStatusBadge status={bill.status} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               )}

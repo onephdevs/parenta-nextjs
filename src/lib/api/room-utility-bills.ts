@@ -84,6 +84,40 @@ function mapRow(row: Record<string, unknown>): UtilityBillRecord {
   };
 }
 
+async function syncUtilityBillToExpensesBoard(bill: UtilityBillRecord): Promise<void> {
+  try {
+    const { ensureUtilityBillPipelineCard } = await import('@/lib/api/pipeline');
+    await ensureUtilityBillPipelineCard({
+      utilityBillId: bill.id,
+      utilityType: String(bill.utilityType),
+      amount: bill.amount,
+      billStatus: bill.billStatus,
+      dueDate: bill.dueDate,
+      providerName: bill.providerName,
+      buildingId: bill.buildingId,
+      roomId: bill.roomId,
+      buildingName: bill.buildingName,
+      roomNumber: bill.roomNumber,
+      notes: bill.notes,
+    });
+  } catch (err) {
+    console.error('Expenses pipeline sync after utility bill failed:', err);
+  }
+}
+
+async function fetchUtilityBillWithNames(id: string): Promise<UtilityBillRecord | null> {
+  const named = await pool.query(
+    `SELECT ub.*, b.name as building_name, r.room_number
+     FROM utility_bills ub
+     LEFT JOIN rooms r ON ub.room_id = r.id
+     LEFT JOIN buildings b ON COALESCE(ub.building_id, r.building_id) = b.id
+     WHERE ub.id = $1`,
+    [id]
+  );
+  if (!named.rows[0]) return null;
+  return mapRow(named.rows[0]);
+}
+
 /**
  * List utility bills (unit-specific and/or building-wide).
  * Electric/water per room, or common-area / split building bills.
@@ -358,15 +392,12 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
   }
 
   try {
-    const named = await pool.query(
-      `SELECT ub.*, b.name as building_name, r.room_number
-       FROM utility_bills ub
-       LEFT JOIN rooms r ON ub.room_id = r.id
-       LEFT JOIN buildings b ON COALESCE(ub.building_id, r.building_id) = b.id
-       WHERE ub.id = $1`,
-      [parentId]
-    );
-    return mapRow(named.rows[0]);
+    const named = await fetchUtilityBillWithNames(parentId);
+    if (!named) {
+      throw new Error('Failed to fetch created utility bill');
+    }
+    await syncUtilityBillToExpensesBoard(named);
+    return named;
   } catch (error) {
     console.error('Error fetching created utility bill:', error);
     throw error;
@@ -445,7 +476,10 @@ export async function updateRoomUtilityBill(
       throw new Error('Utility bill not found');
     }
 
-    return mapRow(result.rows[0]);
+    const updated = await fetchUtilityBillWithNames(id);
+    const bill = updated || mapRow(result.rows[0]);
+    await syncUtilityBillToExpensesBoard(bill);
+    return bill;
   } catch (error) {
     console.error('Error updating utility bill:', error);
     throw error;

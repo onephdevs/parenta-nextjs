@@ -18,12 +18,13 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonCard from '@/components/ui/SkeletonCard';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
+import { MetricTile } from '@/components/ui/MetricTile';
 
 export default function CollectedAmountReportPage() {
   const { data: session, status } = useSession();
@@ -368,26 +369,28 @@ export default function CollectedAmountReportPage() {
         {reportData && reportData.summary && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Summary</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Collected</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.totalCollected)}</p>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Payments</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalPayments}</p>
-              </div>
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Average Payment</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.averagePayment)}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <MetricTile
+                tone="blue"
+                label="Total Collected"
+                value={formatCurrency(reportData.summary.totalCollected)}
+              />
+              <MetricTile
+                tone="green"
+                label="Total Payments"
+                value={reportData.summary.totalPayments}
+              />
+              <MetricTile
+                tone="yellow"
+                label="Average Payment"
+                value={formatCurrency(reportData.summary.averagePayment)}
+              />
               {reportData.summary.growth !== undefined && (
-                <div className={`p-4 rounded-lg ${reportData.summary.growth >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                  <p className="text-sm text-gray-600">Growth vs Previous</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {reportData.summary.growth >= 0 ? '+' : ''}{reportData.summary.growth.toFixed(2)}%
-                  </p>
-                </div>
+                <MetricTile
+                  tone={reportData.summary.growth >= 0 ? 'green' : 'red'}
+                  label="Growth vs Previous"
+                  value={`${reportData.summary.growth >= 0 ? '+' : ''}${reportData.summary.growth.toFixed(2)}%`}
+                />
               )}
             </div>
           </div>

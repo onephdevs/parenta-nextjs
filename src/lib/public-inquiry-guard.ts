@@ -16,6 +16,9 @@ const MAX_PER_PHONE = 2;
 const MIN_SUBMIT_MS = 2500;
 /** Hero inquire is a single field — allow a short pause without blocking real users. */
 const MIN_SUBMIT_MS_HERO = 800;
+/** Allow device clocks to drift relative to the server without false rejects. */
+const CLOCK_SKEW_MS = 15 * 60 * 1000;
+const MAX_FORM_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_FIELD_LEN = {
   firstName: 80,
   lastName: 80,
@@ -56,7 +59,13 @@ export function getClientIp(request: Request): string {
 
 export interface InquirySpamCheckInput {
   honeypot?: string;
+  /** Absolute client timestamp when the form opened (legacy). */
   formStartedAt?: number | string | null;
+  /**
+   * Preferred: how long the form was open on the client (ms).
+   * Avoids false rejects when the device clock is skewed vs the server.
+   */
+  formElapsedMs?: number | string | null;
   firstName: string;
   lastName: string;
   email: string;
@@ -71,6 +80,31 @@ export type InquirySpamResult =
   | { ok: true }
   | { ok: false; status: number; error: string; silent?: boolean };
 
+function parseFiniteNumber(value: number | string | null | undefined): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+}
+
+/** Resolve how long the form was open, preferring client-reported elapsed ms. */
+export function resolveFormElapsedMs(input: {
+  formElapsedMs?: number | string | null;
+  formStartedAt?: number | string | null;
+  now?: number;
+}): number | null {
+  const now = input.now ?? Date.now();
+  const elapsedDirect = parseFiniteNumber(input.formElapsedMs);
+  if (Number.isFinite(elapsedDirect) && elapsedDirect >= 0) {
+    return elapsedDirect;
+  }
+
+  const startedAt = parseFiniteNumber(input.formStartedAt);
+  if (!Number.isFinite(startedAt)) return null;
+  // Reject clearly impossible future timestamps (beyond skew tolerance)
+  if (startedAt > now + CLOCK_SKEW_MS) return null;
+  return Math.max(0, now - startedAt);
+}
+
 export function checkInquirySpam(input: InquirySpamCheckInput): InquirySpamResult {
   const honeypot = typeof input.honeypot === 'string' ? input.honeypot.trim() : '';
   // Bots that fill hidden fields — pretend success so they don't retry harder.
@@ -78,20 +112,14 @@ export function checkInquirySpam(input: InquirySpamCheckInput): InquirySpamResul
     return { ok: false, status: 200, error: 'ok', silent: true };
   }
 
-  const startedRaw = input.formStartedAt;
-  const startedAt =
-    typeof startedRaw === 'number'
-      ? startedRaw
-      : typeof startedRaw === 'string'
-        ? Number(startedRaw)
-        : NaN;
-  const now = Date.now();
-  if (!Number.isFinite(startedAt) || startedAt > now + 5_000) {
+  const elapsed = resolveFormElapsedMs(input);
+  if (elapsed == null) {
     return { ok: false, status: 400, error: 'Please reload the page and try again.' };
   }
+
   const minMs =
     input.source === 'hero_banner' || input.source === 'hero' ? MIN_SUBMIT_MS_HERO : MIN_SUBMIT_MS;
-  if (now - startedAt < minMs) {
+  if (elapsed < minMs) {
     return {
       ok: false,
       status: 429,
@@ -99,7 +127,7 @@ export function checkInquirySpam(input: InquirySpamCheckInput): InquirySpamResul
     };
   }
   // Forms open longer than a day are likely stale / replayed
-  if (now - startedAt > 24 * 60 * 60 * 1000) {
+  if (elapsed > MAX_FORM_AGE_MS + CLOCK_SKEW_MS) {
     return { ok: false, status: 400, error: 'Please reload the page and try again.' };
   }
 
@@ -119,6 +147,7 @@ export function checkInquirySpam(input: InquirySpamCheckInput): InquirySpamResul
     return { ok: false, status: 400, error: 'Message is too long.' };
   }
 
+  const now = Date.now();
   const ipCount = touchBucket(ipBuckets, input.ip || 'unknown', now);
   if (ipCount > MAX_PER_IP) {
     return {

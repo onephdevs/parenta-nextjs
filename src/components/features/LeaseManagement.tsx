@@ -8,17 +8,18 @@ import {
   Eye,
   FileText,
   Plus,
-  Search,
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { Spinner } from '@/components/ui/Spinner';
 import { FormField } from '@/components/forms/FormField';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import Pagination from '@/components/ui/Pagination';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { LeaseStatusBadge } from '@/components/domain/StatusBadges';
 import {
   formatLeaseTermShort,
@@ -275,63 +276,59 @@ export default function LeaseManagement() {
 
       {activeTab === 'leases' && (
         <>
-          <Card className="mb-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <FormField label="Search" htmlFor="lease-search">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    id="lease-search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Tenant, unit..."
-                    className="pl-10"
-                  />
-                </div>
-              </FormField>
-              <FormField label="Status" htmlFor="lease-status">
-                <Select
-                  id="lease-status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as LeaseUiStatus | 'all')}
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="expiring_soon">Expiring soon</option>
-                  <option value="draft">Draft</option>
-                  <option value="terminated">Terminated</option>
-                </Select>
-              </FormField>
-              <FormField label="Building" htmlFor="lease-building">
-                <Select
-                  id="lease-building"
-                  value={buildingId}
-                  onChange={(e) => setBuildingId(e.target.value)}
-                >
-                  <option value="">All Buildings</option>
-                  {buildings.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-          </Card>
+          <FilterBar columns={4}>
+            <FormField label="Search" htmlFor="lease-search">
+              <SearchInput
+                id="lease-search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tenant, unit..."
+              />
+            </FormField>
+            <FormField label="Status" htmlFor="lease-status">
+              <Select
+                id="lease-status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as LeaseUiStatus | 'all')}
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="expiring_soon">Expiring soon</option>
+                <option value="draft">Draft</option>
+                <option value="terminated">Terminated</option>
+              </Select>
+            </FormField>
+            <FormField label="Building" htmlFor="lease-building">
+              <Select
+                id="lease-building"
+                value={buildingId}
+                onChange={(e) => setBuildingId(e.target.value)}
+              >
+                <option value="">All Buildings</option>
+                {buildings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </FilterBar>
 
           {loading ? (
-            <div className="overflow-hidden rounded-lg bg-white p-8 text-center shadow text-gray-900">
-              Loading...
+            <div className="flex justify-center overflow-hidden rounded-lg bg-white p-8 shadow">
+              <Spinner label="Loading leases" />
             </div>
           ) : leases.length === 0 ? (
-            <div className="overflow-hidden rounded-lg bg-white p-8 text-center shadow text-gray-900">
-              <p className="mb-2 text-lg font-medium">No leases found</p>
-              <p className="mb-4 text-sm text-gray-600">
-                Create a tenant with a room assignment to start a lease.
-              </p>
-              <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
-                <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
-              </Link>
+            <div className="overflow-hidden rounded-lg bg-white shadow">
+              <EmptyState
+                title="No leases found"
+                description="Create a tenant with a room assignment to start a lease."
+                action={
+                  <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
+                    <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
+                  </Link>
+                }
+              />
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg bg-white shadow">
@@ -416,20 +413,18 @@ export default function LeaseManagement() {
 
       {activeTab !== 'leases' &&
         (loading ? (
-          <div className="overflow-hidden rounded-lg bg-white p-8 text-center shadow text-gray-900">
-            Loading...
+          <div className="flex justify-center overflow-hidden rounded-lg bg-white p-8 shadow">
+            <Spinner label="Loading" />
           </div>
         ) : (
           <>
             {activeTab === 'alerts' && (
               <div className="overflow-hidden rounded-lg bg-white shadow">
                 {alerts.length === 0 ? (
-                  <div className="p-8 text-center text-gray-900">
-                    <p className="mb-2 text-lg font-medium">No pending alerts</p>
-                    <p className="text-sm text-gray-600">
-                      Expiration alerts will appear here when leases are nearing end.
-                    </p>
-                  </div>
+                  <EmptyState
+                    title="No pending alerts"
+                    description="Expiration alerts will appear here when leases are nearing end."
+                  />
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -489,13 +484,11 @@ export default function LeaseManagement() {
             {activeTab === 'renewals' && (
               <div className="overflow-hidden rounded-lg bg-white shadow">
                 {renewals.length === 0 ? (
-                  <div className="p-8 text-center text-gray-900">
-                    <p className="mb-2 text-lg font-medium">No renewal requests</p>
-                    <p className="text-sm text-gray-600">
-                      Renewal requests will show up here when submitted.
-                    </p>
-                  </div>
-                ) : (
+                    <EmptyState
+                      title="No renewal requests"
+                      description="Renewal requests will show up here when submitted."
+                    />
+                  ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
@@ -558,13 +551,11 @@ export default function LeaseManagement() {
             {activeTab === 'moveouts' && (
               <div className="overflow-hidden rounded-lg bg-white shadow">
                 {moveouts.length === 0 ? (
-                  <div className="p-8 text-center text-gray-900">
-                    <p className="mb-2 text-lg font-medium">No move-out records</p>
-                    <p className="text-sm text-gray-600">
-                      Move-out processing records will appear here.
-                    </p>
-                  </div>
-                ) : (
+                    <EmptyState
+                      title="No move-out records"
+                      description="Move-out processing records will appear here."
+                    />
+                  ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">

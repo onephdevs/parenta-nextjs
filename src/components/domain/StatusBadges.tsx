@@ -173,8 +173,56 @@ function DocumentStatusBadge({ status }: { status: string }) {
   return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
 }
 
+function PaymentTypeBadge({ type }: { type: string }) {
+  const map: Record<string, BadgeTone> = {
+    rent: 'info',
+    deposit: 'purple',
+    fee: 'warning',
+    utilities: 'success',
+    other: 'neutral',
+  };
+  return <Badge tone={map[type.toLowerCase()] ?? 'neutral'}>{formatLabel(type)}</Badge>;
+}
+
+function ExpenseCategoryBadge({ category }: { category: string }) {
+  const map: Record<string, BadgeTone> = {
+    maintenance: 'danger',
+    repair: 'warning',
+    cleaning: 'info',
+    upgrade: 'purple',
+    garbage_collection: 'warning',
+    utilities: 'info',
+    supplies: 'success',
+    services: 'neutral',
+    insurance: 'warning',
+    taxes: 'warning',
+    other: 'neutral',
+  };
+  return (
+    <Badge tone={map[category.toLowerCase()] ?? 'neutral'}>
+      {formatLabel(category)}
+    </Badge>
+  );
+}
+
+function MaintenancePriorityBadge({ priority }: { priority: string }) {
+  const map: Record<string, BadgeTone> = {
+    urgent: 'danger',
+    high: 'warning',
+    medium: 'warning',
+    low: 'success',
+  };
+  const key = priority.toLowerCase();
+  return (
+    <Badge tone={map[key] ?? 'neutral'}>
+      {formatLabel(priority)}
+    </Badge>
+  );
+}
+
 export {
   PaymentStatusBadge,
+  PaymentTypeBadge,
   InvoiceStatusBadge,
   RoomStatusBadge,
   TenantStatusBadge,
@@ -182,7 +230,9 @@ export {
   AssetStatusBadge,
   AssetConditionBadge,
   MaintenanceStatusBadge,
+  MaintenancePriorityBadge,
   ReservationStatusBadge,
   LeaseStatusBadge,
   DocumentStatusBadge,
+  ExpenseCategoryBadge,
 };

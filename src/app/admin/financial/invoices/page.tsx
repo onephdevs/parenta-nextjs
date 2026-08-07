@@ -4,16 +4,10 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getInvoices, getInvoiceSummary } from '@/lib/api/invoices';
 import { getAllTenants } from '@/lib/api/tenants';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
-import { Button } from '@/components/ui/Button';
+import { PageHeader, ListSummaryCard, Button, EmptyState, FilterBar, SearchInput, Select, Pagination, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui';
 import { AlertTriangle, CheckCircle2, Clock, Eye, FileText, Plus } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
-import Pagination from '@/components/ui/Pagination';
 
 interface SearchParams {
   page?: string;
@@ -152,11 +146,10 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         />
       </div>
 
-      <Card className="mb-6">
-        <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <form method="GET">
+        <FilterBar columns={4}>
           <FormField label="Search" htmlFor="search">
-            <Input
-              type="text"
+            <SearchInput
               name="search"
               id="search"
               defaultValue={search}
@@ -197,91 +190,77 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
               Apply filters
             </Button>
           </div>
-        </form>
-      </Card>
+        </FilterBar>
+      </form>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {invoicesData.invoices.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="mb-2 text-lg font-medium">No invoices found</p>
-            <p className="mb-4 text-sm text-gray-600">Get started by creating a new invoice</p>
-            <Link href="/admin/financial/invoices/new">
-              <Button leftIcon={<Plus className="h-4 w-4" />}>Create Invoice</Button>
-            </Link>
-          </div>
+          <EmptyState
+            title="No invoices found"
+            description="Get started by creating a new invoice"
+            action={
+              <Link href="/admin/financial/invoices/new">
+                <Button leftIcon={<Plus className="h-4 w-4" />}>Create Invoice</Button>
+              </Link>
+            }
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Invoice
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Tenant
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Due Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {invoicesData.invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {invoice.invoiceNumber}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Tenant</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoicesData.invoices.map((invoice) => (
+                  <TableRow key={invoice.id}>
+                    <TableCell>
+                      <div className="text-sm font-medium text-gray-900">
+                        {invoice.invoiceNumber}
+                      </div>
+                      {invoice.description && (
+                        <div className="mt-0.5 max-w-xs truncate text-xs text-gray-500">
+                          {invoice.description}
                         </div>
-                        {invoice.description && (
-                          <div className="mt-0.5 max-w-xs truncate text-xs text-gray-500">
-                            {invoice.description}
-                          </div>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {invoice.tenantName || '—'}
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium text-gray-900">
+                        {invoice.tenantName || '—'}
+                      </div>
+                      {(invoice as { buildingName?: string }).buildingName && (
+                        <div className="text-sm text-gray-600">
+                          {(invoice as { buildingName?: string }).buildingName}{' '}
+                          {(invoice as { roomNumber?: string }).roomNumber || ''}
                         </div>
-                        {(invoice as { buildingName?: string }).buildingName && (
-                          <div className="text-sm text-gray-600">
-                            {(invoice as { buildingName?: string }).buildingName}{' '}
-                            {(invoice as { roomNumber?: string }).roomNumber || ''}
-                          </div>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        {formatDate(invoice.dueDate)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                        {formatCurrency(invoice.totalAmount)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <InvoiceStatusBadge status={invoice.status} />
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                        <Link
-                          href={`/admin/financial/invoices/${invoice.id}`}
-                          className="inline-flex text-gray-500 hover:text-gray-900"
-                          title="View"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                    <TableCell className="font-medium">
+                      {formatCurrency(invoice.totalAmount)}
+                    </TableCell>
+                    <TableCell>
+                      <InvoiceStatusBadge status={invoice.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Link
+                        href={`/admin/financial/invoices/${invoice.id}`}
+                        className="inline-flex text-gray-500 hover:text-gray-900"
+                        title="View"
+                      >
+                        <Eye className="h-5 w-5" />
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
             <Pagination
               currentPage={page}
               totalPages={Math.max(1, totalPages)}

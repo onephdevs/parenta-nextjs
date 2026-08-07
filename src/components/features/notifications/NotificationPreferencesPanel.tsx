@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Card } from '@/components/ui/Card';
+import { Card, Switch } from '@/components/ui';
 import type { ActivityCategory } from '@/lib/services/activity-taxonomy';
 
 interface PreferenceRow {
@@ -11,35 +11,6 @@ interface PreferenceRow {
   description: string;
   inAppEnabled: boolean;
   emailEnabled: boolean;
-}
-
-function Toggle({
-  enabled,
-  onChange,
-  label,
-}: {
-  enabled: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={label}
-      onClick={() => onChange(!enabled)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        enabled ? 'bg-purple-600' : 'bg-gray-200'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          enabled ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  );
 }
 
 export default function NotificationPreferencesPanel() {
@@ -129,18 +100,22 @@ export default function NotificationPreferencesPanel() {
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-600">In-app</span>
-                <Toggle
-                  label={`${pref.label} in-app`}
-                  enabled={pref.inAppEnabled}
-                  onChange={(inAppEnabled) => updatePref(pref.category, { inAppEnabled })}
+                <Switch
+                  aria-label={`${pref.label} in-app`}
+                  checked={pref.inAppEnabled}
+                  onCheckedChange={(inAppEnabled) =>
+                    updatePref(pref.category, { inAppEnabled })
+                  }
                 />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-600">Email</span>
-                <Toggle
-                  label={`${pref.label} email`}
-                  enabled={pref.emailEnabled}
-                  onChange={(emailEnabled) => updatePref(pref.category, { emailEnabled })}
+                <Switch
+                  aria-label={`${pref.label} email`}
+                  checked={pref.emailEnabled}
+                  onCheckedChange={(emailEnabled) =>
+                    updatePref(pref.category, { emailEnabled })
+                  }
                 />
               </div>
             </div>

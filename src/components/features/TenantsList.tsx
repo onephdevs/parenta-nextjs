@@ -5,14 +5,23 @@ import Link from 'next/link';
 import { Tenant, Building } from '@/types/database';
 import TenantCard from './TenantCard';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/IconButton';
-import { Avatar } from '@/components/ui/Avatar';
+import {
+  Avatar,
+  Button,
+  EmptyState,
+  FilterBar,
+  IconButton,
+  Pagination,
+  SearchInput,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import Pagination from '@/components/ui/Pagination';
 import { TenantStatusBadge } from '@/components/domain/StatusBadges';
 import { cn } from '@/lib/utils';
 import {
@@ -23,7 +32,6 @@ import {
   LayoutGrid,
   List,
   Plus,
-  Search,
 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -174,133 +182,131 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
 
   return (
     <div className="space-y-6">
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <FormField label="Search" htmlFor="tenant-search" className="lg:col-span-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                type="text"
-                id="tenant-search"
-                className="pl-10"
-                placeholder="Name, email, phone, or unit..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </FormField>
-
-          <FormField label="Building" htmlFor="tenant-property">
-            <Select
-              id="tenant-property"
-              value={selectedBuildingId}
-              onChange={(e) => setSelectedBuildingId(e.target.value)}
-            >
-              <option value="">All Buildings</option>
-              {buildingOptions.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-              <option value={UNASSIGNED_KEY}>Unassigned</option>
-            </Select>
-          </FormField>
-
-          <FormField label="Status" htmlFor="tenant-status">
-            <Select
-              id="tenant-status"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="pending">Pending</option>
-              <option value="inactive">Inactive</option>
-              <option value="terminated">Terminated</option>
-            </Select>
-          </FormField>
-
-          <FormField label="Sort" htmlFor="tenant-sort">
-            <div className="flex gap-2">
-              <Select
-                id="tenant-sort"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="min-w-0 flex-1"
-              >
-                <option value="lastName">Last Name</option>
-                <option value="firstName">First Name</option>
-                <option value="property">Property</option>
-                <option value="email">Email</option>
-                <option value="tenantStatus">Status</option>
-                <option value="monthlyIncome">Income</option>
-                <option value="moveInDate">Move-in Date</option>
-              </Select>
-              <IconButton
-                label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
-                variant="outline"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                {sortOrder === 'asc' ? (
-                  <ArrowUpAZ className="h-4 w-4" />
-                ) : (
-                  <ArrowDownAZ className="h-4 w-4" />
+      <FilterBar
+        columns={5}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
+              Showing {filteredAndSortedTenants.length} of {tenants.length} tenants
+            </p>
+            <div className="inline-flex rounded-md shadow-sm">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                aria-label="Grid view"
+                className={cn(
+                  'inline-flex items-center justify-center rounded-l-md border px-3 py-2 text-sm font-medium',
+                  viewMode === 'grid'
+                    ? 'border-gray-800 bg-gray-900 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 )}
-              </IconButton>
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                aria-label="List view"
+                className={cn(
+                  'inline-flex items-center justify-center rounded-r-md border border-l-0 px-3 py-2 text-sm font-medium',
+                  viewMode === 'list'
+                    ? 'border-gray-800 bg-gray-900 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                )}
+              >
+                <List className="h-4 w-4" />
+              </button>
             </div>
-          </FormField>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-gray-600">
-            Showing {filteredAndSortedTenants.length} of {tenants.length} tenants
-          </p>
-          <div className="inline-flex rounded-md shadow-sm">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              aria-label="Grid view"
-              className={cn(
-                'inline-flex items-center justify-center rounded-l-md border px-3 py-2 text-sm font-medium',
-                viewMode === 'grid'
-                  ? 'border-gray-800 bg-gray-900 text-white'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              )}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              aria-label="List view"
-              className={cn(
-                'inline-flex items-center justify-center rounded-r-md border border-l-0 px-3 py-2 text-sm font-medium',
-                viewMode === 'list'
-                  ? 'border-gray-800 bg-gray-900 text-white'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              )}
-            >
-              <List className="h-4 w-4" />
-            </button>
           </div>
-        </div>
-      </Card>
+        }
+      >
+        <FormField label="Search" htmlFor="tenant-search" className="lg:col-span-2">
+          <SearchInput
+            id="tenant-search"
+            placeholder="Name, email, phone, or unit..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Building" htmlFor="tenant-property">
+          <Select
+            id="tenant-property"
+            value={selectedBuildingId}
+            onChange={(e) => setSelectedBuildingId(e.target.value)}
+          >
+            <option value="">All Buildings</option>
+            {buildingOptions.map((building) => (
+              <option key={building.id} value={building.id}>
+                {building.name}
+              </option>
+            ))}
+            <option value={UNASSIGNED_KEY}>Unassigned</option>
+          </Select>
+        </FormField>
+
+        <FormField label="Status" htmlFor="tenant-status">
+          <Select
+            id="tenant-status"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="inactive">Inactive</option>
+            <option value="terminated">Terminated</option>
+          </Select>
+        </FormField>
+
+        <FormField label="Sort" htmlFor="tenant-sort">
+          <div className="flex gap-2">
+            <Select
+              id="tenant-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="min-w-0 flex-1"
+            >
+              <option value="lastName">Last Name</option>
+              <option value="firstName">First Name</option>
+              <option value="property">Property</option>
+              <option value="email">Email</option>
+              <option value="tenantStatus">Status</option>
+              <option value="monthlyIncome">Income</option>
+              <option value="moveInDate">Move-in Date</option>
+            </Select>
+            <IconButton
+              label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
+              variant="outline"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            >
+              {sortOrder === 'asc' ? (
+                <ArrowUpAZ className="h-4 w-4" />
+              ) : (
+                <ArrowDownAZ className="h-4 w-4" />
+              )}
+            </IconButton>
+          </div>
+        </FormField>
+      </FilterBar>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {filteredAndSortedTenants.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="mb-2 text-lg font-medium">No tenants found</p>
-            <p className="mb-4 text-sm text-gray-600">
-              {hasActiveFilters
+          <EmptyState
+            title="No tenants found"
+            description={
+              hasActiveFilters
                 ? 'Try adjusting your search or filters.'
-                : 'Get started by adding your first tenant.'}
-            </p>
-            {!hasActiveFilters && (
-              <Link href="/admin/tenants/new">
-                <Button leftIcon={<Plus className="h-4 w-4" />}>Add Tenant</Button>
-              </Link>
-            )}
-          </div>
+                : 'Get started by adding your first tenant.'
+            }
+            action={
+              !hasActiveFilters ? (
+                <Link href="/admin/tenants/new">
+                  <Button leftIcon={<Plus className="h-4 w-4" />}>Add Tenant</Button>
+                </Link>
+              ) : undefined
+            }
+          />
         ) : viewMode === 'grid' ? (
           <>
             <div className="space-y-8 p-6">
@@ -332,104 +338,88 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
           </>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Tenant
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Property / Unit
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Income
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Move-in Date
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {groupedTenants.map((group) => (
-                    <Fragment key={group.key}>
-                      <tr className="bg-gray-50">
-                        <td colSpan={7} className="px-6 py-2">
-                          <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
-                            <Building2 className="h-3.5 w-3.5 text-gray-500" />
-                            {group.title}
-                            <span className="font-normal text-gray-500">
-                              · {group.tenants.length}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                      {group.tenants.map((tenant) => {
-                        const unitLabel = propertyUnitLabel(tenant);
-                        return (
-                          <tr key={tenant.id} className="hover:bg-gray-50">
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <Avatar name={`${tenant.firstName} ${tenant.lastName}`} />
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {tenant.firstName} {tenant.lastName}
-                                  </div>
-                                  {tenant.email && (
-                                    <div className="text-xs text-gray-500">{tenant.email}</div>
-                                  )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tenant</TableHead>
+                  <TableHead>Property / Unit</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Income</TableHead>
+                  <TableHead>Move-in Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedTenants.map((group) => (
+                  <Fragment key={group.key}>
+                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableCell colSpan={7} className="py-2">
+                        <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                          <Building2 className="h-3.5 w-3.5 text-gray-500" />
+                          {group.title}
+                          <span className="font-normal text-gray-500">
+                            · {group.tenants.length}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {group.tenants.map((tenant) => {
+                      const unitLabel = propertyUnitLabel(tenant);
+                      return (
+                        <TableRow key={tenant.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar name={`${tenant.firstName} ${tenant.lastName}`} />
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {tenant.firstName} {tenant.lastName}
                                 </div>
+                                {tenant.email && (
+                                  <div className="text-xs text-gray-500">{tenant.email}</div>
+                                )}
                               </div>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {unitLabel || <span className="text-gray-400">Unassigned</span>}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {tenant.phone || <span className="text-gray-400">—</span>}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <TenantStatusBadge status={tenant.tenantStatus} />
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {tenant.monthlyIncome ? (
-                                formatCurrency(tenant.monthlyIncome)
-                              ) : (
-                                <span className="text-gray-400">—</span>
-                              )}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {tenant.moveInDate ? (
-                                new Date(tenant.moveInDate).toLocaleDateString()
-                              ) : (
-                                <span className="text-gray-400">—</span>
-                              )}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                              <Link
-                                href={`/admin/tenants/${tenant.id}`}
-                                className="inline-flex text-gray-500 hover:text-gray-900"
-                                title="View"
-                              >
-                                <Eye className="h-5 w-5" />
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {unitLabel || <span className="text-gray-400">Unassigned</span>}
+                          </TableCell>
+                          <TableCell>
+                            {tenant.phone || <span className="text-gray-400">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            <TenantStatusBadge status={tenant.tenantStatus} />
+                          </TableCell>
+                          <TableCell>
+                            {tenant.monthlyIncome ? (
+                              formatCurrency(tenant.monthlyIncome)
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {tenant.moveInDate ? (
+                              new Date(tenant.moveInDate).toLocaleDateString()
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Link
+                              href={`/admin/tenants/${tenant.id}`}
+                              className="inline-flex text-gray-500 hover:text-gray-900"
+                              title="View"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}

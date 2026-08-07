@@ -52,6 +52,10 @@ export async function getAllRooms(filters?: {
   search?: string;
   page?: number;
   limit?: number;
+  /** Hide units held by other open onboarding cards with move-in payment confirmed */
+  excludePipelineHeld?: boolean;
+  /** When editing, keep this card's room selectable even if held */
+  excludeCardId?: string;
 }): Promise<PaginatedRoomsResponse> {
   try {
     const page = filters?.page || 1;
@@ -89,6 +93,22 @@ export async function getAllRooms(filters?: {
         r.description ILIKE $${paramCount}
       )`;
       values.push(`%${filters.search}%`);
+    }
+
+    if (filters?.excludePipelineHeld) {
+      paramCount++;
+      values.push(filters.excludeCardId || null);
+      whereClause += `
+        AND r.room_status NOT IN ('occupied', 'reserved')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pipeline_cards c
+          INNER JOIN pipeline_boards pb ON pb.id = c.board_id AND pb.slug = 'onboarding'
+          WHERE c.room_id = r.id
+            AND c.card_status = 'open'
+            AND c.move_in_payment_status = 'paid'
+            AND ($${paramCount}::uuid IS NULL OR c.id <> $${paramCount}::uuid)
+        )`;
     }
 
     // Get total count for pagination

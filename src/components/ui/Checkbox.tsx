@@ -15,11 +15,12 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     const inputId = id ?? generatedId;
     const blocked = Boolean(isDisabled ?? disabled);
 
+    // Do not set htmlFor when the input is nested inside the label — that can
+    // double-toggle the control so clicks appear to do nothing.
     return (
       <label
-        htmlFor={inputId}
         className={cn(
-          'inline-flex items-center gap-2 text-sm text-gray-900',
+          'inline-flex cursor-pointer items-center gap-2 text-sm text-gray-900',
           blocked && 'cursor-not-allowed opacity-50',
           className
         )}
@@ -29,7 +30,7 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           id={inputId}
           type="checkbox"
           disabled={blocked}
-          className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           {...props}
         />
         {label}

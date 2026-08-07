@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import DashboardClient from '@/components/features/dashboard/DashboardClient';
 import { getAllDashboardMetrics } from '@/lib/services/dashboard-service';
 

@@ -6,6 +6,17 @@ import { getPaymentById } from '@/lib/api/payments';
 import DownloadReceiptButton from '@/components/features/DownloadReceiptButton';
 import ConfirmPaymentActions from '@/components/features/ConfirmPaymentActions';
 import { formatPaymentNotesDisplay } from '@/lib/format-payment-notes';
+import {
+  Alert,
+  DetailSection,
+  DescriptionItem,
+  DescriptionList,
+  PageHeader,
+} from '@/components/ui';
+import {
+  PaymentStatusBadge,
+  PaymentTypeBadge,
+} from '@/components/domain/StatusBadges';
 
 interface PaymentDetailPageProps {
   params: Promise<{
@@ -13,16 +24,50 @@ interface PaymentDetailPageProps {
   }>;
 }
 
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+  }).format(amount);
+}
+
+function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDateOnly(date: Date) {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function getPaymentMethodDisplay(method: string) {
+  switch (method) {
+    case 'bank_transfer':
+      return 'Bank Transfer';
+    case 'credit_card':
+      return 'Credit Card';
+    default:
+      return method ? method.charAt(0).toUpperCase() + method.slice(1) : 'N/A';
+  }
+}
+
 export default async function PaymentDetailPage({ params }: PaymentDetailPageProps) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  
+
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/admin/signin');
   }
 
-  // Payment IDs are UUIDs (strings), not integers
-  // Basic validation: check if it looks like a UUID
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {
     notFound();
@@ -39,307 +84,157 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
     notFound();
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-    }).format(amount);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',  
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const formatDateOnly = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'refunded':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPaymentTypeClass = (type: string) => {
-    switch (type) {
-      case 'rent':
-        return 'bg-blue-100 text-blue-800';
-      case 'deposit':
-        return 'bg-purple-100 text-purple-800';
-      case 'fee':
-        return 'bg-orange-100 text-orange-800';
-      case 'utilities':
-        return 'bg-teal-100 text-teal-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPaymentMethodDisplay = (method: string) => {
-    switch (method) {
-      case 'bank_transfer':
-        return 'Bank Transfer';
-      case 'credit_card':
-        return 'Credit Card';
-      default:
-        return method.charAt(0).toUpperCase() + method.slice(1);
-    }
-  };
-
   const { label: descriptionLabel, billingPeriodLabel } = formatPaymentNotesDisplay(
     payment.notes
   );
+  const lateFeeAmount = (payment as { lateFeeAmount?: number }).lateFeeAmount;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin/financial/payments"
-                className="text-gray-900 hover:text-gray-900"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Payment Details</h1>
-                <p className="text-sm text-gray-900">Payment #{payment.id}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              {payment.paymentStatus === 'pending' && (
-                <ConfirmPaymentActions
-                  paymentId={payment.id}
-                  referenceNumber={payment.referenceNumber}
-                  amountLabel={formatCurrency(payment.amount)}
-                />
-              )}
-              <DownloadReceiptButton
+    <div className="space-y-8">
+      <PageHeader
+        title="Payment Details"
+        description={`Payment #${payment.id}`}
+        backHref="/admin/financial/payments"
+        backLabel="Back to payments"
+        actions={
+          <>
+            {payment.paymentStatus === 'pending' && (
+              <ConfirmPaymentActions
                 paymentId={payment.id}
-                hasReceipt={Boolean(payment.receiptFilePath)}
+                referenceNumber={payment.referenceNumber}
+                amountLabel={formatCurrency(payment.amount)}
               />
-            </div>
-          </div>
-        </div>
-      </div>
+            )}
+            <DownloadReceiptButton
+              paymentId={payment.id}
+              hasReceipt={Boolean(payment.receiptFilePath)}
+            />
+          </>
+        }
+      />
 
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {payment.paymentStatus === 'pending' && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 sm:px-6">
-              <h2 className="text-base font-semibold text-amber-950">
-                Awaiting verification
+      {payment.paymentStatus === 'pending' && (
+        <Alert variant="warning" title="Awaiting verification">
+          <p>
+            Cross-check the tenant&apos;s Transaction ID against their bank/GCash receipt,
+            then confirm or reject this claim. Invoice balances stay unchanged until you confirm.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="rounded-md bg-white/80 px-3 py-2 text-sm text-gray-900">
+              <span className="font-medium text-gray-600">Transaction ID: </span>
+              <span className="font-mono font-semibold">
+                {payment.referenceNumber || 'Not provided'}
+              </span>
+            </div>
+            <ConfirmPaymentActions
+              paymentId={payment.id}
+              referenceNumber={payment.referenceNumber}
+              amountLabel={formatCurrency(payment.amount)}
+            />
+          </div>
+        </Alert>
+      )}
+
+      <DetailSection title="Overview">
+        <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-sm font-medium text-gray-500">Description</p>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {descriptionLabel || 'No description'}
               </h2>
-              <p className="mt-1 text-sm text-amber-900">
-                Cross-check the tenant&apos;s Transaction ID against their bank/GCash receipt,
-                then confirm or reject this claim. Invoice balances stay unchanged until you confirm.
+              {billingPeriodLabel && (
+                <p className="mt-2 text-sm text-gray-600">
+                  Billing period: {billingPeriodLabel}
+                </p>
+              )}
+              <p className="mt-3 text-2xl font-bold text-gray-900">
+                {formatCurrency(payment.amount)}
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <div className="rounded-md bg-white/80 px-3 py-2 text-sm">
-                  <span className="font-medium text-gray-600">Transaction ID: </span>
-                  <span className="font-mono font-semibold text-gray-900">
-                    {payment.referenceNumber || 'Not provided'}
-                  </span>
-                </div>
-                <ConfirmPaymentActions
-                  paymentId={payment.id}
-                  referenceNumber={payment.referenceNumber}
-                  amountLabel={formatCurrency(payment.amount)}
-                />
-              </div>
+              <p className="text-sm text-gray-600">
+                Paid on {formatDateOnly(payment.paymentDate)}
+              </p>
             </div>
-          )}
-
-          {/* Description first — what this payment is for */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-500 mb-1">Description</p>
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    {descriptionLabel || 'No description'}
-                  </h2>
-                  {billingPeriodLabel && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Billing period: {billingPeriodLabel}
-                    </p>
-                  )}
-                  <p className="mt-3 text-2xl font-bold text-gray-900">
-                    {formatCurrency(payment.amount)}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Paid on {formatDateOnly(payment.paymentDate)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(payment.paymentStatus)}`}
-                  >
-                    {payment.paymentStatus.charAt(0).toUpperCase() + payment.paymentStatus.slice(1)}
-                  </span>
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPaymentTypeClass(payment.paymentType)}`}
-                  >
-                    {payment.paymentType.charAt(0).toUpperCase() + payment.paymentType.slice(1)}
-                  </span>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <PaymentStatusBadge status={payment.paymentStatus} />
+              <PaymentTypeBadge type={payment.paymentType} />
             </div>
           </div>
-
-          {/* Payment Details */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Payment Details</h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Payment Method</span>
-                    <span className="text-sm text-gray-900">{getPaymentMethodDisplay(payment.paymentMethod || '')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Payment Date</span>
-                    <span className="text-sm text-gray-900">{formatDateOnly(payment.paymentDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Due Date</span>
-                    <span className="text-sm text-gray-900">{payment.dueDate ? formatDateOnly(payment.dueDate) : 'N/A'}</span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-sm font-medium text-gray-900">Transaction ID</span>
-                    <span className="text-sm font-mono font-semibold text-gray-900 text-right break-all">
-                      {payment.referenceNumber || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Created</span>
-                    <span className="text-sm text-gray-900">{formatDate(payment.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Last Updated</span>
-                    <span className="text-sm text-gray-900">{formatDate(payment.updatedAt)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Tenant Information */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Tenant Information</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Name</span>
-                    <span className="text-sm text-gray-900">{payment.tenantName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Email</span>
-                    <span className="text-sm text-gray-900">{payment.tenantEmail}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Phone</span>
-                    <span className="text-sm text-gray-900">{payment.tenantPhone || 'N/A'}</span>
-                  </div>
-                  <div className="pt-3 border-t">
-                    <Link
-                      href={`/admin/tenants/${payment.tenantId}`}
-                      className="text-purple-600 hover:text-purple-900 text-sm font-medium"
-                    >
-                      View Tenant Profile →
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Room Information */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Room Information</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Building</span>
-                    <span className="text-sm text-gray-900">{payment.buildingName || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Room Number</span>
-                    <span className="text-sm text-gray-900">{payment.roomNumber || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-900">Monthly Rent</span>
-                    <span className="text-sm text-gray-900">
-                      {payment.monthlyRate ? formatCurrency(payment.monthlyRate) : 'N/A'}
-                    </span>
-                  </div>
-                  {payment.roomId && (
-                    <div className="pt-3 border-t">
-                      <Link
-                        href={`/admin/rooms/${payment.roomId}`}
-                        className="text-purple-600 hover:text-purple-900 text-sm font-medium"
-                      >
-                        View Room Details →
-                      </Link>
-                    </div>
-                  )}
-                  {!payment.roomId && payment.roomNumber && (
-                    <div className="pt-3 border-t">
-                      <p className="text-sm text-gray-900 italic">No room assignment linked to this payment</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Late Fee Information (if applicable) */}
-          {payment.lateFeeAmount && payment.lateFeeAmount > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-yellow-800">Late Fee Applied</h3>
-                    <div className="mt-2 text-sm text-yellow-700">
-                      <p>A late fee of {formatCurrency(payment.lateFeeAmount)} was applied to this payment.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
+      </DetailSection>
+
+      <DetailSection title="Payment Details">
+        <DescriptionList>
+          <DescriptionItem label="Payment Method">
+            {getPaymentMethodDisplay(payment.paymentMethod || '')}
+          </DescriptionItem>
+          <DescriptionItem label="Payment Date">
+            {formatDateOnly(payment.paymentDate)}
+          </DescriptionItem>
+          <DescriptionItem label="Due Date">
+            {payment.dueDate ? formatDateOnly(payment.dueDate) : 'N/A'}
+          </DescriptionItem>
+          <DescriptionItem label="Transaction ID">
+            <span className="font-mono font-semibold">
+              {payment.referenceNumber || 'N/A'}
+            </span>
+          </DescriptionItem>
+          <DescriptionItem label="Created">{formatDate(payment.createdAt)}</DescriptionItem>
+          <DescriptionItem label="Last Updated">{formatDate(payment.updatedAt)}</DescriptionItem>
+        </DescriptionList>
+      </DetailSection>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <DetailSection title="Tenant Information">
+          <DescriptionList>
+            <DescriptionItem label="Name">{payment.tenantName}</DescriptionItem>
+            <DescriptionItem label="Email">{payment.tenantEmail}</DescriptionItem>
+            <DescriptionItem label="Phone">{payment.tenantPhone || 'N/A'}</DescriptionItem>
+          </DescriptionList>
+          <div className="border-t border-gray-200 px-4 py-4 sm:px-6">
+            <Link
+              href={`/admin/tenants/${payment.tenantId}`}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              View Tenant Profile →
+            </Link>
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Room Information">
+          <DescriptionList>
+            <DescriptionItem label="Building">
+              {payment.buildingName || 'N/A'}
+            </DescriptionItem>
+            <DescriptionItem label="Room Number">
+              {payment.roomNumber || 'N/A'}
+            </DescriptionItem>
+            <DescriptionItem label="Monthly Rent">
+              {payment.monthlyRate ? formatCurrency(payment.monthlyRate) : 'N/A'}
+            </DescriptionItem>
+          </DescriptionList>
+          <div className="border-t border-gray-200 px-4 py-4 sm:px-6">
+            {payment.roomId ? (
+              <Link
+                href={`/admin/rooms/${payment.roomId}`}
+                className="text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                View Room Details →
+              </Link>
+            ) : payment.roomNumber ? (
+              <p className="text-sm italic text-gray-600">
+                No room assignment linked to this payment
+              </p>
+            ) : null}
+          </div>
+        </DetailSection>
       </div>
+
+      {lateFeeAmount != null && lateFeeAmount > 0 && (
+        <Alert variant="warning" title="Late Fee Applied">
+          A late fee of {formatCurrency(lateFeeAmount)} was applied to this payment.
+        </Alert>
+      )}
     </div>
   );
-} 
+}

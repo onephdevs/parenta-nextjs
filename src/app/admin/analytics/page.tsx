@@ -2,19 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Calendar, 
   TrendingUp, 
   DollarSign, 
   Users, 
   Home,
-  Zap,
   Building,
   BarChart3,
-  Download,
-  Filter,
   RefreshCw
 } from 'lucide-react';
-import SkeletonCard from '../../../components/ui/SkeletonCard';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 import {
   MetricCard,
   FinancialTrendChart,
@@ -22,17 +18,28 @@ import {
   UtilityBreakdownChart,
   BuildingPerformanceChart,
   CashFlowChart
-} from '../../../components/features/Charts';
-import { useNotifications } from '../../../hooks/useNotifications';
+} from '@/components/features/Charts';
+import { useNotifications } from '@/hooks/useNotifications';
 import { 
   DashboardMetrics,
   AnalyticsFilter,
   FinancialTrend,
   OccupancyTrend,
   CashFlowData
-} from '../../../types/analytics';
-import { Building as BuildingType } from '../../../types/database';
-import { format, subDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+} from '@/types/analytics';
+import { Building as BuildingType } from '@/types/database';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import {
+  Button,
+  FilterBar,
+  Input,
+  PageHeader,
+  Select,
+  Tab,
+  TabList,
+  Tabs,
+} from '@/components/ui';
+import { FormField } from '@/components/forms/FormField';
 
 export default function AnalyticsPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -198,154 +205,124 @@ export default function AnalyticsPage() {
 
   if (isLoading && !metrics) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="space-y-6">
-            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <SkeletonCard key={i} showHeader={false} lines={2} />
-              ))}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <SkeletonCard showHeader={true} lines={8} />
-              <SkeletonCard showHeader={true} lines={8} />
-            </div>
-            <SkeletonCard showHeader={true} lines={10} />
-          </div>
+      <div className="space-y-6 p-6">
+        <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} showHeader={false} lines={2} />
+          ))}
         </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <SkeletonCard showHeader={true} lines={8} />
+          <SkeletonCard showHeader={true} lines={8} />
+        </div>
+        <SkeletonCard showHeader={true} lines={10} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Page Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="md:flex md:items-center md:justify-between">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-                Analytics & Reporting
-              </h1>
-              <p className="mt-1 text-sm text-gray-900">
-                Comprehensive insights into your property management business
-              </p>
-            </div>
-            <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-              <select
-                onChange={(e) => handleExport(e.target.value as 'pdf' | 'excel' | 'csv')}
-                defaultValue=""
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <option value="" disabled>Export</option>
-                <option value="pdf">Export PDF</option>
-                <option value="excel">Export Excel</option>
-                <option value="csv">Export CSV</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Analytics & Reporting"
+        description="Comprehensive insights into your property management business"
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              leftIcon={
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              }
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              Refresh
+            </Button>
+            <Select
+              aria-label="Export analytics"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleExport(e.target.value as 'pdf' | 'excel' | 'csv');
+                  e.target.value = '';
+                }
+              }}
+            >
+              <option value="" disabled>
+                Export
+              </option>
+              <option value="pdf">Export PDF</option>
+              <option value="excel">Export Excel</option>
+              <option value="csv">Export CSV</option>
+            </Select>
+          </>
+        }
+      />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
+      <FilterBar columns={4}>
+        <FormField label="Building" htmlFor="analytics-building">
+          <Select
+            id="analytics-building"
+            value={selectedBuildingId}
+            onChange={(e) => setSelectedBuildingId(e.target.value)}
+          >
+            <option value="">All Buildings</option>
+            {buildings.map((building) => (
+              <option key={building.id} value={building.id}>
+                {building.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Start Date" htmlFor="analytics-start">
+          <Input
+            id="analytics-start"
+            type="date"
+            value={dateRange.startDate}
+            onChange={(e) =>
+              setDateRange((prev) => ({ ...prev, startDate: e.target.value }))
+            }
+          />
+        </FormField>
+        <FormField label="End Date" htmlFor="analytics-end">
+          <Input
+            id="analytics-end"
+            type="date"
+            value={dateRange.endDate}
+            onChange={(e) =>
+              setDateRange((prev) => ({ ...prev, endDate: e.target.value }))
+            }
+          />
+        </FormField>
+        <FormField label="Period" htmlFor="analytics-period">
+          <Select
+            id="analytics-period"
+            value={period}
+            onChange={(e) =>
+              setPeriod(e.target.value as 'monthly' | 'quarterly' | 'yearly')
+            }
+          >
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="yearly">Yearly</option>
+          </Select>
+        </FormField>
+      </FilterBar>
 
-          {/* Filters */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center mb-4">
-              <Filter className="h-5 w-5 text-purple-600 mr-2" />
-              <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Building
-              </label>
-              <select
-                value={selectedBuildingId}
-                onChange={(e) => setSelectedBuildingId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-              >
-                <option value="">All Buildings</option>
-                {buildings.map(building => (
-                  <option key={building.id} value={building.id}>
-                    {building.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                End Date
-              </label>
-              <input
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Period
-              </label>
-              <select
-                value={period}
-                onChange={(e) => setPeriod(e.target.value as 'monthly' | 'quarterly' | 'yearly')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-              >
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-            </div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`${
-                        activeTab === tab.id
-                          ? 'border-purple-500 text-purple-600'
-                          : 'border-transparent text-gray-900 hover:text-gray-900 hover:border-gray-300'
-                      } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-                    >
-                      <Icon className="h-5 w-5 mr-2" />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+      <div className="rounded-lg bg-white shadow">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="px-6 pt-2">
+          <TabList>
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <Tab key={tab.id} value={tab.id} className="inline-flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </Tab>
+              );
+            })}
+          </TabList>
+        </Tabs>
 
             {/* Content */}
             {activeTab === 'overview' && metrics && (
@@ -535,8 +512,6 @@ export default function AnalyticsPage() {
               </div>
             )}
           </div>
-        </div>
-      </main>
     </div>
   );
 } 

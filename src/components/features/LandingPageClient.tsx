@@ -80,6 +80,11 @@ export default function LandingPageClient({
   const formStartedAt = useRef(Date.now());
 
   useEffect(() => {
+    // Prefer client clock at mount so static/SSR prerender timestamps are not reused.
+    formStartedAt.current = Date.now();
+  }, []);
+
+  useEffect(() => {
     if (initialPortfolio) return;
     fetchPortfolio();
   }, [initialPortfolio]);
@@ -172,6 +177,7 @@ export default function LandingPageClient({
           contact,
           source: 'hero_banner',
           formStartedAt: formStartedAt.current,
+          formElapsedMs: Date.now() - formStartedAt.current,
           hp_confirm: '',
         }),
       });

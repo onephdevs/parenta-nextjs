@@ -18,12 +18,22 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonCard from '@/components/ui/SkeletonCard';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
+import { MetricTile } from '@/components/ui/MetricTile';
+import { TableCard } from '@/components/ui/TableCard';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/Table';
 
 export default function DepositsReportPage() {
   const { data: session, status } = useSession();
@@ -360,78 +370,57 @@ export default function DepositsReportPage() {
         {reportData && reportData.summary && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Summary</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Deposits Received</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.totalDepositsReceived)}</p>
-              </div>
-              <div className="bg-red-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Refunds Issued</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.totalRefundsIssued)}</p>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Net Deposit Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.netDepositBalance)}</p>
-              </div>
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Transactions</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalTransactions}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <MetricTile
+                tone="green"
+                label="Total Deposits Received"
+                value={formatCurrency(reportData.summary.totalDepositsReceived)}
+              />
+              <MetricTile
+                tone="red"
+                label="Total Refunds Issued"
+                value={formatCurrency(reportData.summary.totalRefundsIssued)}
+              />
+              <MetricTile
+                tone="blue"
+                label="Net Deposit Balance"
+                value={formatCurrency(reportData.summary.netDepositBalance)}
+              />
+              <MetricTile
+                tone="yellow"
+                label="Total Transactions"
+                value={reportData.summary.totalTransactions}
+              />
             </div>
           </div>
         )}
 
         {/* By Period Table */}
         {reportData && reportData.byPeriod && reportData.byPeriod.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Deposits by Period</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Period
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Deposits Received
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Refunds Issued
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Net Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tenants
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reportData.byPeriod.map((item: any, index: number) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.period}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.depositsReceived)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.refundsIssued)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.netAmount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.tenantCount}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TableCard title="Deposits by Period" className="mb-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Deposits Received</TableHead>
+                  <TableHead>Refunds Issued</TableHead>
+                  <TableHead>Net Amount</TableHead>
+                  <TableHead>Tenants</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportData.byPeriod.map((item: any, index: number) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{item.period}</TableCell>
+                    <TableCell>{formatCurrency(item.depositsReceived)}</TableCell>
+                    <TableCell>{formatCurrency(item.refundsIssued)}</TableCell>
+                    <TableCell>{formatCurrency(item.netAmount)}</TableCell>
+                    <TableCell>{item.tenantCount}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableCard>
         )}
 
         {isGenerating && (

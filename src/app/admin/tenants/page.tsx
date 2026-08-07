@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getAllTenants, getTenantStats } from '@/lib/api/tenants';
 import { getAllBuildings } from '@/lib/api/buildings';
 import TenantsList from '@/components/features/TenantsList';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
 import { Tenant } from '@/types/database';

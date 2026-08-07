@@ -12,6 +12,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Spinner } from '@/components/ui/Spinner';
 import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/Tabs';
 
 interface AdvancedExportManagerProps {
@@ -226,7 +227,7 @@ export default function AdvancedExportManager({ onExportCreated }: AdvancedExpor
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        <Spinner label="Loading exports" />
       </div>
     );
   }

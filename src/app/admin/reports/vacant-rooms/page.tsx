@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  ArrowLeft, 
   FileText, 
   Download, 
   FileSpreadsheet, 
@@ -18,11 +17,12 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import SkeletonCard from '@/components/ui/SkeletonCard';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
+import { MetricTile } from '@/components/ui/MetricTile';
 
 export default function VacantRoomsReportPage() {
   const { data: session, status } = useSession();
@@ -176,16 +176,11 @@ export default function VacantRoomsReportPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <Link
-        href="/admin/reports"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4 mr-1" />
-        Back to Reports
-      </Link>
       <PageHeader
         title="Vacant Rooms Report"
         description="List of vacant rooms/apartments"
+        backHref="/admin/reports"
+        backLabel="Back to Reports"
         actions={
           reportData ? (
             <>
@@ -252,23 +247,27 @@ export default function VacantRoomsReportPage() {
         {reportData && reportData.summary && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Summary</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-red-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Vacant</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalVacant}</p>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Total Rooms</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalRooms}</p>
-              </div>
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Vacancy Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.summary.vacancyRate.toFixed(1)}%</p>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Potential Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(reportData.summary.totalPotentialRevenue)}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <MetricTile
+                tone="red"
+                label="Total Vacant"
+                value={reportData.summary.totalVacant}
+              />
+              <MetricTile
+                tone="blue"
+                label="Total Rooms"
+                value={reportData.summary.totalRooms}
+              />
+              <MetricTile
+                tone="yellow"
+                label="Vacancy Rate"
+                value={`${reportData.summary.vacancyRate.toFixed(1)}%`}
+              />
+              <MetricTile
+                tone="green"
+                label="Potential Revenue"
+                value={formatCurrency(reportData.summary.totalPotentialRevenue)}
+              />
             </div>
           </div>
         )}

@@ -16,6 +16,12 @@ export async function GET(request: Request) {
       roomType: searchParams.get('roomType') || undefined,
       roomStatus: searchParams.get('roomStatus') || undefined,
       search: searchParams.get('search') || undefined,
+      excludePipelineHeld:
+        searchParams.get('excludePipelineHeld') === '1' ||
+        searchParams.get('excludePipelineHeld') === 'true'
+          ? true
+          : undefined,
+      excludeCardId: searchParams.get('excludeCardId') || undefined,
     };
 
     // Remove undefined values

@@ -12,7 +12,7 @@ import {
   Package,
   Zap
 } from 'lucide-react';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 
 export default async function ReportsPage() {

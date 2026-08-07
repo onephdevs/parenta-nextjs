@@ -12,22 +12,27 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Search,
   MessageSquare,
   X,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/Textarea';
+import {
+  Button,
+  EmptyState,
+  Input,
+  PageHeader,
+  SearchInput,
+  Select,
+  StatCard,
+  Textarea,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import { IconButton } from '@/components/ui/IconButton';
-import { MaintenanceStatusBadge } from '@/components/domain/StatusBadges';
-import { Badge, BadgeTone } from '@/components/ui/Badge';
+import {
+  MaintenancePriorityBadge,
+  MaintenanceStatusBadge,
+} from '@/components/domain/StatusBadges';
 import { Card } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantMaintenance } from '@/hooks/useTenantPortalData';
@@ -184,19 +189,6 @@ export default function MaintenancePage() {
     }
   };
 
-  const getPriorityTone = (priority: string): BadgeTone => {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return 'danger';
-      case 'medium':
-        return 'warning';
-      case 'low':
-        return 'success';
-      default:
-        return 'neutral';
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -266,77 +258,29 @@ export default function MaintenancePage() {
             <div className="space-y-6">
               {/* Summary Stats */}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-4">
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <Clock className="h-6 w-6 text-gray-900" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className="text-sm font-medium text-gray-900 truncate">Active Requests</dt>
-                          <dd className="text-lg font-medium text-gray-900">
-                            {maintenanceData?.active || 0}
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <Wrench className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className="text-sm font-medium text-gray-900 truncate">In Progress</dt>
-                          <dd className="text-lg font-medium text-gray-900">
-                            {filteredRequests.filter(r => r.status === 'in_progress').length}
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <CheckCircle2 className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className="text-sm font-medium text-gray-900 truncate">Completed</dt>
-                          <dd className="text-lg font-medium text-gray-900">
-                            {filteredRequests.filter(r => r.status === 'completed').length}
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <AlertCircle className="h-6 w-6 text-red-600" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className="text-sm font-medium text-gray-900 truncate">High Priority</dt>
-                          <dd className="text-lg font-medium text-gray-900">
-                            {filteredRequests.filter(r => r.priority === 'high').length}
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <StatCard
+                  title="Active Requests"
+                  value={maintenanceData?.active || 0}
+                  icon={<Clock className="h-5 w-5" />}
+                />
+                <StatCard
+                  title="In Progress"
+                  value={filteredRequests.filter((r) => r.status === 'in_progress').length}
+                  tone="blue"
+                  icon={<Wrench className="h-5 w-5" />}
+                />
+                <StatCard
+                  title="Completed"
+                  value={filteredRequests.filter((r) => r.status === 'completed').length}
+                  tone="green"
+                  icon={<CheckCircle2 className="h-5 w-5" />}
+                />
+                <StatCard
+                  title="High Priority"
+                  value={filteredRequests.filter((r) => r.priority === 'high').length}
+                  tone="red"
+                  icon={<AlertCircle className="h-5 w-5" />}
+                />
               </div>
 
               {/* Maintenance Requests List */}
@@ -349,17 +293,13 @@ export default function MaintenancePage() {
                     
                     {/* Filters */}
                     <div className="flex flex-wrap items-center gap-3">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        <Input
-                          type="text"
-                          placeholder="Search requests..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                          aria-label="Search requests"
-                        />
-                      </div>
+                      <SearchInput
+                        placeholder="Search requests..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        aria-label="Search requests"
+                        className="w-56"
+                      />
                       <Select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
@@ -393,9 +333,7 @@ export default function MaintenancePage() {
                               <div className="flex items-center space-x-3 mb-2">
                                 <h4 className="text-lg font-medium text-gray-900">{request.title}</h4>
                                 <MaintenanceStatusBadge status={request.status} />
-                                <Badge tone={getPriorityTone(request.priority)}>
-                                  {request.priority} priority
-                                </Badge>
+                                <MaintenancePriorityBadge priority={request.priority} />
                               </div>
                               <p className="text-gray-900 mb-3">{request.description}</p>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-900">

@@ -137,6 +137,7 @@ export async function POST(request: Request) {
     const spam = checkInquirySpam({
       honeypot,
       formStartedAt: body.formStartedAt,
+      formElapsedMs: body.formElapsedMs,
       firstName,
       lastName,
       email: emailOk ? email : '',

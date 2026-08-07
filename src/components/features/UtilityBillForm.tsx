@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { UtilityBill, Building, CreateUtilityBillData } from '../../types/database';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card } from '@/components/ui/Card';
+import { FormActions } from '@/components/ui/FormActions';
 import { FormField } from '@/components/forms/FormField';
 
 interface UtilityBillFormProps {
@@ -371,14 +371,12 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
             />
           </FormField>
 
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" isLoading={loading}>
-              {loading ? 'Saving...' : bill ? 'Update Bill' : 'Create Bill'}
-            </Button>
-          </div>
+          <FormActions
+            className="border-t border-gray-200 pt-6"
+            onCancel={onCancel}
+            primaryLabel={loading ? 'Saving...' : bill ? 'Update Bill' : 'Create Bill'}
+            primaryLoading={loading}
+          />
         </form>
       </Card>
     </div>

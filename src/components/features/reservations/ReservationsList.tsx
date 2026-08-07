@@ -7,13 +7,16 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  SearchInput,
+  Select,
+} from '@/components/ui';
 import { ReservationStatusBadge } from '@/components/domain/StatusBadges';
-import { Badge } from '@/components/ui/Badge';
-import { Search } from 'lucide-react';
+import { ArrowDownAZ, ArrowUpAZ } from 'lucide-react';
 
 interface ReservationsListProps {
   reservations: ReservationWithDetails[];
@@ -163,17 +166,13 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
     <Card padding="none" className="overflow-hidden">
       {dialog}
       <div className="border-b border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              type="text"
-              className="pl-10"
-              placeholder="Search by tenant, room, or building..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <SearchInput
+            wrapperClassName="max-w-md flex-1"
+            placeholder="Search by tenant, room, or building..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
 
           <div className="flex flex-wrap items-center gap-3">
             <Select
@@ -205,8 +204,15 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
               variant="outline"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
+              leftIcon={
+                sortOrder === 'asc' ? (
+                  <ArrowUpAZ className="h-4 w-4" />
+                ) : (
+                  <ArrowDownAZ className="h-4 w-4" />
+                )
+              }
             >
-              {sortOrder === 'asc' ? '↑' : '↓'}
+              Sort
             </Button>
           </div>
         </div>
@@ -246,8 +252,8 @@ export default function ReservationsList({ reservations, onRefresh }: Reservatio
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredAndSortedReservations.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">
-                  No reservations found
+                <td colSpan={8}>
+                  <EmptyState title="No reservations found" />
                 </td>
               </tr>
             ) : (

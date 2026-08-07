@@ -7,7 +7,7 @@ import { getAllBuildings } from '@/lib/api/buildings';
 import { getAllTenants } from '@/lib/api/tenants';
 import DocumentsList from '@/components/features/DocumentsList';
 import AdminDocumentUpload from '@/components/features/AdminDocumentUpload';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, FileSignature, FileText, Link2Off, Tags } from 'lucide-react';

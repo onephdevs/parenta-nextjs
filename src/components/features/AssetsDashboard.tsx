@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import AppLoader from '@/components/ui/AppLoader';
 
 interface AssetFilters {

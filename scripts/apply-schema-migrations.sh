@@ -80,6 +80,7 @@ MIGRATIONS=(
   remove-pipeline-nurture-board.sql
   add-pipeline-payments-refund-stage.sql
   remove-pipeline-reconciled-and-closed.sql
+  add-pipeline-utility-bill-sync.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

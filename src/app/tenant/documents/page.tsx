@@ -7,7 +7,6 @@ import {
   FileText, 
   Download, 
   Calendar,
-  Search,
   Eye,
   File,
   FileImage,
@@ -16,9 +15,16 @@ import {
   FileCode
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  PageHeader,
+  SearchInput,
+  Select,
+  type BadgeTone,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
@@ -160,20 +166,20 @@ export default function DocumentsPage() {
     }
   };
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryTone = (category: string): BadgeTone => {
     switch (category.toLowerCase()) {
       case 'lease':
-        return 'bg-blue-100 text-blue-800';
+        return 'info';
       case 'payment':
-        return 'bg-green-100 text-green-800';
+        return 'success';
       case 'maintenance':
-        return 'bg-orange-100 text-orange-800';
+        return 'warning';
       case 'insurance':
-        return 'bg-purple-100 text-purple-800';
+        return 'purple';
       case 'legal':
-        return 'bg-red-100 text-red-800';
+        return 'danger';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'neutral';
     }
   };
 
@@ -210,12 +216,10 @@ export default function DocumentsPage() {
 
   return (
     <div className={theme.pagePad}>
-      <div>
-        <h1 className={theme.title}>Documents</h1>
-        <p className={cn('mt-1', theme.muted)}>
-          Lease agreement, addenda, and files shared with you
-        </p>
-      </div>
+      <PageHeader
+        title="Documents"
+        description="Lease agreement, addenda, and files shared with you"
+      />
           {documentsData && (
             <div className="space-y-6">
               {/* Document Categories Overview */}
@@ -240,17 +244,12 @@ export default function DocumentsPage() {
               <div className={cn(theme.formPanel, 'p-4 sm:p-5')}>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <FormField htmlFor="document-search" className="mb-0 flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      <Input
-                        id="document-search"
-                        type="text"
-                        placeholder="Search documents..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
+                    <SearchInput
+                      id="document-search"
+                      placeholder="Search documents..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Category" htmlFor="document-category" className="mb-0 sm:w-48">
                     <Select
@@ -289,9 +288,9 @@ export default function DocumentsPage() {
                                   {document.name}
                                 </h4>
                                 <div className="flex items-center space-x-4 mt-1 text-sm text-gray-900">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(document.category)}`}>
+                                  <Badge tone={getCategoryTone(document.category)}>
                                     {document.category}
-                                  </span>
+                                  </Badge>
                                   <span className="flex items-center">
                                     <Calendar className="h-4 w-4 mr-1" />
                                     {formatDate(document.uploadedAt)}
@@ -329,43 +328,42 @@ export default function DocumentsPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-900 text-lg">
-                        {searchTerm || filterCategory !== 'all'
+                    <EmptyState
+                      icon={<FileText className="h-12 w-12" />}
+                      title={
+                        searchTerm || filterCategory !== 'all'
                           ? 'No documents found matching your criteria.'
-                          : 'No documents available yet.'}
-                      </p>
-                      <p className="text-gray-400 text-sm mt-2">
-                        {searchTerm || filterCategory !== 'all'
+                          : 'No documents available yet.'
+                      }
+                      description={
+                        searchTerm || filterCategory !== 'all'
                           ? 'Try adjusting your search or filter settings.'
-                          : 'Documents such as lease agreements, payment receipts, and maintenance records will appear here.'}
-                      </p>
-                      {(searchTerm || filterCategory !== 'all') && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSearchTerm('');
-                            setFilterCategory('all');
-                          }}
-                          className="mt-4"
-                        >
-                          Clear filters
-                        </Button>
-                      )}
-                    </div>
+                          : 'Documents such as lease agreements, payment receipts, and maintenance records will appear here.'
+                      }
+                      action={
+                        searchTerm || filterCategory !== 'all' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSearchTerm('');
+                              setFilterCategory('all');
+                            }}
+                          >
+                            Clear filters
+                          </Button>
+                        ) : undefined
+                      }
+                    />
                   )}
                 </div>
               </div>
 
-              {/* Document Information */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-blue-900 mb-4">Document Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Alert variant="info" title="Document Information" className="border-blue-200 bg-blue-50 text-blue-900">
+                <div className="mt-2 grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
-                    <h4 className="text-sm font-medium text-blue-800 mb-2">Available Document Types</h4>
-                    <ul className="text-sm text-blue-700 space-y-1">
+                    <h4 className="mb-2 text-sm font-medium text-blue-800">Available Document Types</h4>
+                    <ul className="space-y-1 text-sm text-blue-700">
                       <li>• Lease agreements and amendments</li>
                       <li>• Payment receipts and invoices</li>
                       <li>• Maintenance records and reports</li>
@@ -374,8 +372,8 @@ export default function DocumentsPage() {
                     </ul>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-blue-800 mb-2">Important Notes</h4>
-                    <ul className="text-sm text-blue-700 space-y-1">
+                    <h4 className="mb-2 text-sm font-medium text-blue-800">Important Notes</h4>
+                    <ul className="space-y-1 text-sm text-blue-700">
                       <li>• Keep copies of all important documents</li>
                       <li>• Documents are available 24/7</li>
                       <li>• Contact support if you need additional documents</li>
@@ -384,7 +382,7 @@ export default function DocumentsPage() {
                     </ul>
                   </div>
                 </div>
-              </div>
+              </Alert>
             </div>
           )}
     </div>

@@ -6,26 +6,34 @@ import Link from 'next/link';
 import {
   FileText,
   Pencil,
-  Search,
   Trash2,
   Download,
   Eye,
   Shield,
   IdCard,
   Bell,
-  AlertCircle,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Document, DocumentCategory } from '@/types/document';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import PDFPreview from './PDFPreview';
 import BulkDocumentOperations from './BulkDocumentOperations';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Checkbox } from '@/components/ui/Checkbox';
+import {
+  Checkbox,
+  EmptyState,
+  FilterBar,
+  Pagination,
+  SearchInput,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import Pagination from '@/components/ui/Pagination';
 import { DocumentStatusBadge } from '@/components/domain/StatusBadges';
 import {
   formatDocumentLinkedTo,
@@ -46,27 +54,80 @@ interface DocumentsListProps {
   total: number;
 }
 
-function getDocumentIcon(doc: Document) {
-  const status = getDocumentUiStatus(doc);
+function isImageDocument(doc: Document): boolean {
+  if (doc.mimeType?.startsWith('image/')) return true;
+  const name = (doc.fileName || doc.documentName || '').toLowerCase();
+  return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(name);
+}
+
+function documentPreviewSrc(doc: Document): string {
+  const path = doc.filePath || '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  if (path.startsWith('/')) {
+    return path;
+  }
+  if (path.startsWith('uploads/') || path.startsWith('public/')) {
+    return `/${path.replace(/^public\//, '')}`;
+  }
+  return `/api/documents/${doc.id}/download`;
+}
+
+function DocumentTypeIcon({ doc }: { doc: Document }) {
   const type = (doc.documentType || '').toLowerCase();
   const category = (doc.categoryName || '').toLowerCase();
 
-  if (status === 'needs_review') {
-    return <AlertCircle className="h-5 w-5 text-red-500" />;
+  if (isImageDocument(doc)) {
+    return <ImageIcon className="h-5 w-5 text-emerald-600" aria-hidden />;
   }
   if (type === 'lease' || category.includes('lease') || category.includes('agreement')) {
-    return <FileText className="h-5 w-5 text-blue-500" />;
+    return <FileText className="h-5 w-5 text-blue-500" aria-hidden />;
   }
   if (type === 'insurance' || category.includes('insurance')) {
-    return <Shield className="h-5 w-5 text-amber-500" />;
+    return <Shield className="h-5 w-5 text-amber-500" aria-hidden />;
   }
   if (category.includes('id') || category.includes('identity')) {
-    return <IdCard className="h-5 w-5 text-violet-500" />;
+    return <IdCard className="h-5 w-5 text-violet-500" aria-hidden />;
   }
   if (type === 'legal' || category.includes('notice')) {
-    return <Bell className="h-5 w-5 text-orange-500" />;
+    return <Bell className="h-5 w-5 text-orange-500" aria-hidden />;
   }
-  return <FileText className="h-5 w-5 text-gray-500" />;
+  return <FileText className="h-5 w-5 text-gray-500" aria-hidden />;
+}
+
+function DocumentThumb({ doc }: { doc: Document }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!isImageDocument(doc) || failed) {
+    return (
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-gray-100">
+        <DocumentTypeIcon doc={doc} />
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- document thumbs from blob/local paths
+    <img
+      src={documentPreviewSrc(doc)}
+      alt=""
+      className="h-10 w-10 flex-shrink-0 rounded-md object-cover ring-1 ring-gray-200"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function documentPrimaryLabel(doc: Document): string {
+  return (doc.documentName || doc.fileName || 'Untitled').trim();
+}
+
+function documentSecondaryLabel(doc: Document): string | null {
+  const primary = documentPrimaryLabel(doc);
+  const file = (doc.fileName || '').trim();
+  if (!file) return null;
+  if (file.toLowerCase() === primary.toLowerCase()) return null;
+  return file;
 }
 
 export default function DocumentsList({
@@ -219,207 +280,186 @@ export default function DocumentsList({
         tenants={tenants}
       />
 
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FormField label="Search" htmlFor="document-search">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                id="document-search"
-                value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
-                placeholder="Filename, tenant..."
-                className="pl-10"
-              />
-            </div>
-          </FormField>
-          <FormField label="Category" htmlFor="document-category">
-            <Select
-              id="document-category"
-              value={categoryDraft}
-              onChange={(e) => {
-                const value = e.target.value;
-                setCategoryDraft(value);
-                applyFilters({ categoryId: value });
-              }}
-            >
-              <option value="">All Categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Building" htmlFor="document-building">
-            <Select
-              id="document-building"
-              value={buildingDraft}
-              onChange={(e) => {
-                const value = e.target.value;
-                setBuildingDraft(value);
-                applyFilters({ buildingId: value });
-              }}
-            >
-              <option value="">All Buildings</option>
-              {buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Status" htmlFor="document-status">
-            <Select
-              id="document-status"
-              value={statusDraft}
-              onChange={(e) => {
-                const value = e.target.value;
-                setStatusDraft(value);
-                applyFilters({ status: value });
-              }}
-            >
-              <option value="">All Status</option>
-              <option value="signed">Signed</option>
-              <option value="on_file">On file</option>
-              <option value="expiring_soon">Expiring soon</option>
-              <option value="needs_review">Needs review</option>
-            </Select>
-          </FormField>
-        </div>
-      </Card>
+      <FilterBar columns={4}>
+        <FormField label="Search" htmlFor="document-search">
+          <SearchInput
+            id="document-search"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            placeholder="Filename, tenant..."
+          />
+        </FormField>
+        <FormField label="Category" htmlFor="document-category">
+          <Select
+            id="document-category"
+            value={categoryDraft}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCategoryDraft(value);
+              applyFilters({ categoryId: value });
+            }}
+          >
+            <option value="">All Categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Building" htmlFor="document-building">
+          <Select
+            id="document-building"
+            value={buildingDraft}
+            onChange={(e) => {
+              const value = e.target.value;
+              setBuildingDraft(value);
+              applyFilters({ buildingId: value });
+            }}
+          >
+            <option value="">All Buildings</option>
+            {buildings.map((building) => (
+              <option key={building.id} value={building.id}>
+                {building.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Status" htmlFor="document-status">
+          <Select
+            id="document-status"
+            value={statusDraft}
+            onChange={(e) => {
+              const value = e.target.value;
+              setStatusDraft(value);
+              applyFilters({ status: value });
+            }}
+          >
+            <option value="">All Status</option>
+            <option value="signed">Signed</option>
+            <option value="on_file">On file</option>
+            <option value="expiring_soon">Expiring soon</option>
+            <option value="needs_review">Needs review</option>
+          </Select>
+        </FormField>
+      </FilterBar>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {documents.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="mb-2 text-lg font-medium">No documents found</p>
-            <p className="text-sm text-gray-600">Upload a document or adjust your filters.</p>
-          </div>
+          <EmptyState
+            title="No documents found"
+            description="Upload a document or adjust your filters."
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      <Checkbox
-                        checked={
-                          selectedDocuments.length === documents.length && documents.length > 0
-                        }
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        aria-label="Select all documents"
-                      />
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Document
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Linked to
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Uploaded
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {documents.map((document) => {
-                    const status: DocumentUiStatus = getDocumentUiStatus(document);
-                    const linkedTo = formatDocumentLinkedTo(document);
-                    const unlinked = !linkedTo;
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <Checkbox
+                      checked={
+                        selectedDocuments.length === documents.length && documents.length > 0
+                      }
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      aria-label="Select all documents"
+                    />
+                  </TableHead>
+                  <TableHead>Document</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Linked to</TableHead>
+                  <TableHead>Uploaded</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {documents.map((document) => {
+                  const status: DocumentUiStatus = getDocumentUiStatus(document);
+                  const linkedTo = formatDocumentLinkedTo(document);
+                  const unlinked = !linkedTo;
+                  const secondary = documentSecondaryLabel(document);
 
-                    return (
-                      <tr key={document.id} className="hover:bg-gray-50">
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <Checkbox
-                            checked={isDocumentSelected(document.id)}
-                            onChange={(e) => handleDocumentSelect(document, e.target.checked)}
-                            aria-label={`Select ${document.documentName}`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0">{getDocumentIcon(document)}</div>
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-gray-900">
-                                {document.documentName}
-                              </div>
-                              <div className="truncate text-xs text-gray-500">
-                                {document.fileName}
-                              </div>
+                  return (
+                    <TableRow key={document.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={isDocumentSelected(document.id)}
+                          onChange={(e) => handleDocumentSelect(document, e.target.checked)}
+                          aria-label={`Select ${document.documentName}`}
+                        />
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
+                        <div className="flex items-center gap-3">
+                          <DocumentThumb doc={document} />
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-gray-900">
+                              {documentPrimaryLabel(document)}
                             </div>
+                            {secondary && (
+                              <div className="truncate text-xs text-gray-500">{secondary}</div>
+                            )}
                           </div>
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {document.categoryName || (
-                            <span className="text-gray-400">Uncategorized</span>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          {unlinked ? (
-                            <span className="font-medium text-red-600">Not linked</span>
-                          ) : (
-                            <span className="text-gray-900">{linkedTo}</span>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                          {formatDate(document.createdAt)}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <DocumentStatusBadge status={status} />
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setPreviewDocument(document)}
-                              className="text-gray-500 hover:text-gray-900"
-                              title="Preview"
-                            >
-                              <Eye className="h-5 w-5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadDocument(document)}
-                              className="text-gray-500 hover:text-gray-900"
-                              title="Download"
-                            >
-                              <Download className="h-5 w-5" />
-                            </button>
-                            <Link
-                              href={`/admin/documents/${document.id}/edit`}
-                              className="text-gray-500 hover:text-gray-900"
-                              title="Edit"
-                            >
-                              <Pencil className="h-5 w-5" />
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleDeleteDocument(document.id, document.documentName)
-                              }
-                              disabled={isDeleting === document.id}
-                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {document.categoryName || (
+                          <span className="text-gray-400">Uncategorized</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {unlinked ? (
+                          <span className="font-medium text-red-600">Not linked</span>
+                        ) : (
+                          linkedTo
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(document.createdAt)}</TableCell>
+                      <TableCell>
+                        <DocumentStatusBadge status={status} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDocument(document)}
+                            className="text-gray-500 hover:text-gray-900"
+                            title="Preview"
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDocument(document)}
+                            className="text-gray-500 hover:text-gray-900"
+                            title="Download"
+                          >
+                            <Download className="h-5 w-5" />
+                          </button>
+                          <Link
+                            href={`/admin/documents/${document.id}/edit`}
+                            className="text-gray-500 hover:text-gray-900"
+                            title="Edit"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteDocument(document.id, document.documentName)
+                            }
+                            disabled={isDeleting === document.id}
+                            className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
 
             <Pagination
               currentPage={currentPage}

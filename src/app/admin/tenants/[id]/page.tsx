@@ -9,7 +9,7 @@ import TenantCreditsManager from '@/components/features/TenantCreditsManager';
 import DepositLedgerManager from '@/components/features/DepositLedgerManager';
 import TenantDetailClient from '@/components/features/TenantDetailClient';
 import { PreviewTenantPortalButton } from '@/components/features/tenant/PreviewTenantPortalButton';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 
 interface TenantDetailPageProps {

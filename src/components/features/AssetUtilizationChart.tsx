@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Package, Clock } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface UtilizationData {
   utilizationRate: number;
@@ -67,7 +68,7 @@ export function AssetUtilizationChart({ refreshTrigger }: AssetUtilizationChartP
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <Spinner size="lg" label="Loading utilization" />
         </div>
       </div>
     );

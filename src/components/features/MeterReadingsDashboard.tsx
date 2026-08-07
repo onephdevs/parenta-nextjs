@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
+import { StatCard } from '@/components/ui/StatCard';
 import { FormField } from '@/components/forms/FormField';
 
 interface MeterReading {
@@ -169,10 +170,10 @@ export default function MeterReadingsDashboard() {
       </Card>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Readings" value={readings.length} />
-        <StatCard label="Unique Meters" value={uniqueMeters} />
-        <StatCard label="This Month" value={monthCount} />
-        <StatCard label="Buildings" value={buildings.length} />
+        <StatCard title="Total Readings" value={readings.length} />
+        <StatCard title="Unique Meters" value={uniqueMeters} />
+        <StatCard title="This Month" value={monthCount} />
+        <StatCard title="Buildings" value={buildings.length} />
       </div>
 
       {showForm && (
@@ -311,13 +312,5 @@ export default function MeterReadingsDashboard() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <Card padding="sm">
-      <dl>
-        <dt className="text-sm font-medium text-gray-900 truncate">{label}</dt>
-        <dd className="text-lg font-medium text-gray-900">{value}</dd>
-      </dl>
-    </Card>
-  );
-}
+
+

@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import MeterReadingsDashboard from '@/components/features/MeterReadingsDashboard';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default async function MeterReadingsPage() {
   const session = await getServerSession(authOptions);

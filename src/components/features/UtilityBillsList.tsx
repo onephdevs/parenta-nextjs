@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { UtilityBill, Building } from '@/types/database';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Card } from '@/components/ui/Card';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  SearchInput,
+  Select,
+} from '@/components/ui';
+import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
+import { FormField } from '@/components/forms/FormField';
 
 interface Filters {
   buildingId?: string;
@@ -79,18 +85,10 @@ export default function UtilityBillsList({
   ];
 
   const getStatusBadge = (status: string) => {
-    const styles = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-green-100 text-green-800',
-      overdue: 'bg-red-100 text-red-800',
-      disputed: 'bg-orange-100 text-orange-800',
-    };
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800'}`}>
-        {status}
-      </span>
-    );
+    if (status === 'disputed') {
+      return <Badge tone="warning">Disputed</Badge>;
+    }
+    return <InvoiceStatusBadge status={status} />;
   };
 
   const getUtilityIcon = (type: string) => {
@@ -132,82 +130,95 @@ export default function UtilityBillsList({
   const hasActiveFilters = Object.values(filters).some(value => value && value !== '');
 
   return (
-    <Card padding="none">
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex flex-col space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium text-gray-900">Utility Bills</h3>
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={onClearFilters}>
-                Clear all filters
-              </Button>
-            )}
-          </div>
+    <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="border-b border-gray-200 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900">Utility Bills</h3>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={onClearFilters}>
+              Clear all filters
+            </Button>
+          )}
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="lg:col-span-2">
-              <Input
-                type="text"
-                placeholder="Search provider, account, notes..."
-                value={filters.search || ''}
-                onChange={(e) => onFilterChange({ search: e.target.value })}
-              />
-            </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
+          <FormField label="Search" htmlFor="utility-bills-search" className="lg:col-span-2">
+            <SearchInput
+              id="utility-bills-search"
+              placeholder="Search provider, account, notes..."
+              value={filters.search || ''}
+              onChange={(e) => onFilterChange({ search: e.target.value })}
+            />
+          </FormField>
 
-            <div>
-              <Select
-                value={filters.buildingId || ''}
-                onChange={(e) => onFilterChange({ buildingId: e.target.value || undefined })}
-              >
-                <option value="">All Buildings</option>
-                {buildings.map((building) => (
-                  <option key={building.id} value={building.id}>
-                    {building.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
+          <FormField label="Building" htmlFor="utility-bills-building">
+            <Select
+              id="utility-bills-building"
+              value={filters.buildingId || ''}
+              onChange={(e) => onFilterChange({ buildingId: e.target.value || undefined })}
+            >
+              <option value="">All Buildings</option>
+              {buildings.map((building) => (
+                <option key={building.id} value={building.id}>
+                  {building.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
 
-            <div>
-              <Select
-                value={filters.utilityType || ''}
-                onChange={(e) => onFilterChange({ utilityType: e.target.value || undefined })}
-              >
-                <option value="">All Types</option>
-                {utilityTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {getUtilityIcon(type)} {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            </div>
+          <FormField label="Type" htmlFor="utility-bills-type">
+            <Select
+              id="utility-bills-type"
+              value={filters.utilityType || ''}
+              onChange={(e) => onFilterChange({ utilityType: e.target.value || undefined })}
+            >
+              <option value="">All Types</option>
+              {utilityTypes.map((type) => (
+                <option key={type} value={type}>
+                  {getUtilityIcon(type)} {type.charAt(0).toUpperCase() + type.slice(1)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
 
-            <div>
-              <Select
-                value={filters.billStatus || ''}
-                onChange={(e) => onFilterChange({ billStatus: e.target.value || undefined })}
-              >
-                <option value="">All Statuses</option>
-                {billStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            </div>
+          <FormField label="Status" htmlFor="utility-bills-status">
+            <Select
+              id="utility-bills-status"
+              value={filters.billStatus || ''}
+              onChange={(e) => onFilterChange({ billStatus: e.target.value || undefined })}
+            >
+              <option value="">All Statuses</option>
+              {billStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
 
-            <div className="lg:col-span-1">
-              <Input
-                type="date"
-                placeholder="Start Date"
-                value={filters.startDate || ''}
-                onChange={(e) => onFilterChange({ startDate: e.target.value || undefined })}
-                min="2000-01-01"
-                max="2099-12-31"
-                style={{ colorScheme: 'light' }}
-              />
-            </div>
-          </div>
+          <FormField label="From" htmlFor="utility-bills-from">
+            <Input
+              id="utility-bills-from"
+              type="date"
+              value={filters.startDate || ''}
+              onChange={(e) => onFilterChange({ startDate: e.target.value || undefined })}
+              min="2000-01-01"
+              max="2099-12-31"
+              style={{ colorScheme: 'light' }}
+            />
+          </FormField>
+
+          <FormField label="To" htmlFor="utility-bills-to">
+            <Input
+              id="utility-bills-to"
+              type="date"
+              value={filters.endDate || ''}
+              onChange={(e) => onFilterChange({ endDate: e.target.value || undefined })}
+              min="2000-01-01"
+              max="2099-12-31"
+              style={{ colorScheme: 'light' }}
+            />
+          </FormField>
         </div>
       </div>
 
@@ -267,8 +278,14 @@ export default function UtilityBillsList({
               ))
             ) : bills.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-gray-900">
-                  {hasActiveFilters ? 'No bills match your filters' : 'No utility bills found'}
+                <td colSpan={7}>
+                  <EmptyState
+                    title={
+                      hasActiveFilters
+                        ? 'No bills match your filters'
+                        : 'No utility bills found'
+                    }
+                  />
                 </td>
               </tr>
             ) : (
@@ -415,6 +432,6 @@ export default function UtilityBillsList({
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

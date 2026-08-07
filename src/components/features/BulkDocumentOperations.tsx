@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { Dialog } from '@/components/ui/Dialog';
+import { Progress } from '@/components/ui/Progress';
 import { FolderUp, Tags, Package, Trash2 } from 'lucide-react';
 
 interface BulkDocumentOperationsProps {
@@ -376,12 +377,7 @@ export default function BulkDocumentOperations({
                 </div>
 
                 {file.status === 'uploading' && (
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${file.progress}%` }}
-                    />
-                  </div>
+                  <Progress value={file.progress} size="md" tone="default" className="mt-0" />
                 )}
 
                 {file.status === 'error' && file.error && (

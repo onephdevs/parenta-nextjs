@@ -6,7 +6,7 @@ import { getPayments } from '@/lib/api/payments';
 import { getPaymentsHubStats, getUpcomingAndDueInvoices } from '@/lib/api/payments-hub';
 import { getAllBuildings } from '@/lib/api/buildings';
 import PaymentsHub from '@/components/features/PaymentsHub';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Banknote, Plus, Receipt, Wallet } from 'lucide-react';

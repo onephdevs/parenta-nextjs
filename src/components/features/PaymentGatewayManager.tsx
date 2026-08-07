@@ -7,7 +7,10 @@ import { Select } from '@/components/ui/Select';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
+import { FormActions } from '@/components/ui/FormActions';
+import { Switch } from '@/components/ui/Switch';
 import { FormField } from '@/components/forms/FormField';
+import { Spinner } from '@/components/ui/Spinner';
 
 export default function PaymentGatewayManager() {
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
@@ -60,7 +63,7 @@ export default function PaymentGatewayManager() {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        <Spinner label="Loading gateways" />
       </div>
     );
   }
@@ -106,15 +109,13 @@ export default function PaymentGatewayManager() {
                         <p className="text-sm text-gray-900 capitalize">{gateway.type}</p>
                       </div>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={gateway.isActive}
-                        onChange={() => handleToggleGateway(gateway.id, gateway.isActive)}
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+                    <Switch
+                      aria-label={`Toggle ${gateway.name}`}
+                      checked={gateway.isActive}
+                      onCheckedChange={() =>
+                        handleToggleGateway(gateway.id, gateway.isActive)
+                      }
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -355,14 +356,14 @@ function GatewayConfigForm({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleSave} isLoading={saving}>
-            {saving ? 'Saving...' : 'Save Configuration'}
-          </Button>
-        </div>
+        <FormActions
+          className="border-t border-gray-200 pt-6"
+          onCancel={onCancel}
+          primaryLabel={saving ? 'Saving...' : 'Save Configuration'}
+          primaryType="button"
+          onPrimary={handleSave}
+          primaryLoading={saving}
+        />
       </div>
     </div>
   );

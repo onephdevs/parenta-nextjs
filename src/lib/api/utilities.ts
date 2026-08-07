@@ -38,6 +38,27 @@ interface UtilityBillResult {
   totalPages: number;
 }
 
+async function syncUtilityBillToExpensesBoard(bill: UtilityBill): Promise<void> {
+  try {
+    const { ensureUtilityBillPipelineCard } = await import('@/lib/api/pipeline');
+    await ensureUtilityBillPipelineCard({
+      utilityBillId: bill.id,
+      utilityType: bill.utilityType,
+      amount: bill.amount,
+      billStatus: bill.billStatus,
+      dueDate: bill.dueDate,
+      providerName: bill.provider,
+      buildingId: bill.buildingId,
+      roomId: bill.roomId,
+      buildingName: bill.buildingName,
+      roomNumber: bill.roomNumber,
+      notes: bill.notes,
+    });
+  } catch (err) {
+    console.error('Expenses pipeline sync after utility bill failed:', err);
+  }
+}
+
 /**
  * Get all utility bills with filtering and pagination
  */
@@ -199,7 +220,9 @@ export async function createUtilityBill(billData: Partial<UtilityBill>): Promise
     ];
     
     const result = await pool.query(query, values);
-    return mapRowToUtilityBill(result.rows[0]);
+    const bill = mapRowToUtilityBill(result.rows[0]);
+    await syncUtilityBillToExpensesBoard(bill);
+    return bill;
   } catch (error) {
     console.error('Error creating utility bill:', error);
     throw new Error('Failed to create utility bill');
@@ -265,8 +288,10 @@ export async function updateUtilityBill(
     if (result.rows.length === 0) {
       throw new Error('Utility bill not found');
     }
-    
-    return mapRowToUtilityBill(result.rows[0]);
+
+    const bill = mapRowToUtilityBill(result.rows[0]);
+    await syncUtilityBillToExpensesBoard(bill);
+    return bill;
   } catch (error) {
     console.error('Error updating utility bill:', error);
     throw error;
@@ -312,8 +337,10 @@ export async function markUtilityBillPaid(id: string): Promise<UtilityBill> {
     if (result.rows.length === 0) {
       throw new Error('Utility bill not found');
     }
-    
-    return mapRowToUtilityBill(result.rows[0]);
+
+    const bill = mapRowToUtilityBill(result.rows[0]);
+    await syncUtilityBillToExpensesBoard(bill);
+    return bill;
   } catch (error) {
     console.error('Error marking utility bill as paid:', error);
     throw error;
@@ -463,7 +490,9 @@ export async function updateBillStatus(id: string, status: string): Promise<Util
     RETURNING *
   `;
   const result = await pool.query(query, [status, id]);
-  return mapRowToUtilityBill(result.rows[0]);
+  const bill = mapRowToUtilityBill(result.rows[0]);
+  await syncUtilityBillToExpensesBoard(bill);
+  return bill;
 }
 
 /**

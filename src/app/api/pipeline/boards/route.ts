@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import {
   createPipelineBoard,
+  ensureExpensesBoardExists,
   ensureMaintenanceBoardExists,
   getCardsForBoard,
   getPipelineBoards,
   reorderPipelineBoards,
   syncActiveLeasesToPipelineCards,
   syncOpenMaintenanceToPipelineCards,
+  syncPendingUtilityBillsToPipelineCards,
 } from '@/lib/api/pipeline';
 import type { PipelineBoardSlug } from '@/types/database';
 
@@ -21,6 +23,7 @@ export async function GET(request: Request) {
     const autoSync = searchParams.get('sync') === '1';
 
     await ensureMaintenanceBoardExists();
+    await ensureExpensesBoardExists();
 
     // Opt-in sync only (?sync=1). Never block board loads on lease/maintenance sync —
     // that can take tens of seconds with many active leases.
@@ -36,6 +39,13 @@ export async function GET(request: Request) {
         await syncOpenMaintenanceToPipelineCards();
       } catch (syncErr) {
         console.error('Auto-sync maintenance pipeline failed:', syncErr);
+      }
+    }
+    if (autoSync && slug === 'expenses') {
+      try {
+        await syncPendingUtilityBillsToPipelineCards();
+      } catch (syncErr) {
+        console.error('Auto-sync expenses pipeline failed:', syncErr);
       }
     }
 

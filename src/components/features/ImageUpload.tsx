@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Alert } from '@/components/ui/Alert';
+import { FileDropzone } from '@/components/ui/FileDropzone';
+import { Progress } from '@/components/ui/Progress';
 
 // Supported image types
 const SUPPORTED_IMAGE_TYPES = [
@@ -60,7 +62,6 @@ export default function ImageUpload({
   const { showNotification } = useNotifications();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [isDragOver, setIsDragOver] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -163,7 +164,7 @@ export default function ImageUpload({
     });
   };
 
-  const handleFileSelect = async (selectedFiles: FileList) => {
+  const handleFileSelect = async (selectedFiles: FileList | File[]) => {
     const remainingSlots = maxImages - files.length;
     const filesToProcess = Array.from(selectedFiles).slice(0, remainingSlots);
 
@@ -173,7 +174,7 @@ export default function ImageUpload({
       size: f.size
     })));
 
-    if (selectedFiles.length > remainingSlots) {
+    if (Array.from(selectedFiles).length > remainingSlots) {
       showNotification({
         type: 'warning',
         title: 'Upload limit',
@@ -221,8 +222,8 @@ export default function ImageUpload({
         name: file.name,
         size: file.size,
         type: file.type,
-        preview,
-        error
+        preview: preview || undefined,
+        error: error || undefined,
       };
       
       console.log('📦 Created UploadFile:', { 
@@ -240,26 +241,6 @@ export default function ImageUpload({
 
     setFiles(prev => [...prev, ...newFiles]);
   };
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      handleFileSelect(droppedFiles);
-    }
-  }, []);
 
   const removeFile = (fileId: string) => {
     setFiles(prev => {
@@ -464,65 +445,26 @@ export default function ImageUpload({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Upload Area */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-          isDragOver
-            ? 'border-blue-500 bg-blue-50'
-            : files.length >= maxImages
-            ? 'border-gray-200 bg-gray-50 opacity-50'
-            : 'border-gray-300 hover:border-gray-400'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <svg 
-          className={`w-12 h-12 mx-auto mb-4 ${
-            files.length >= maxImages ? 'text-gray-300' : 'text-gray-400'
-          }`} 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={2} 
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
-          />
-        </svg>
-        <p className={`text-sm mb-2 ${files.length >= maxImages ? 'text-gray-400' : 'text-gray-900'}`}>
-          {files.length >= maxImages ? (
+      <FileDropzone
+        multiple
+        accept={SUPPORTED_IMAGE_TYPES.join(',')}
+        disabled={files.length >= maxImages}
+        inputRef={fileInputRef}
+        onFiles={(selected) => {
+          void handleFileSelect(selected);
+        }}
+        label={
+          files.length >= maxImages ? (
             `Maximum ${maxImages} images reached`
           ) : (
             <>
               Drag and drop images here, or{' '}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="inline h-auto p-0 text-blue-600 hover:text-blue-500 hover:bg-transparent"
-                onClick={() => fileInputRef.current?.click()}
-                isDisabled={files.length >= maxImages}
-              >
-                browse
-              </Button>
+              <span className="font-medium text-blue-600">browse</span>
             </>
-          )}
-        </p>
-        <p className="text-xs text-gray-900">
-          JPEG, PNG, GIF, WebP up to {MAX_IMAGE_SIZE / 1024 / 1024}MB each
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={SUPPORTED_IMAGE_TYPES.join(',')}
-          onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
-          disabled={files.length >= maxImages}
-          className="hidden"
-        />
-      </div>
+          )
+        }
+        hint={`JPEG, PNG, GIF, WebP up to ${MAX_IMAGE_SIZE / 1024 / 1024}MB each`}
+      />
 
       {/* Selected Images Preview */}
       {files.length > 0 && (
@@ -616,12 +558,7 @@ export default function ImageUpload({
                   
                   {file.progress !== undefined && !file.error && (
                     <div className="mt-1">
-                      <div className="bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-                          style={{ width: `${file.progress}%` }}
-                        ></div>
-                      </div>
+                      <Progress value={file.progress} size="sm" tone="primary" />
                       {file.progress < 100 && (
                         <p className="text-xs text-gray-900 mt-0.5">Uploading... {file.progress}%</p>
                       )}

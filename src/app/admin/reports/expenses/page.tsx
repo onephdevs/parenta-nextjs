@@ -19,7 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useNotifications } from '@/hooks/useNotifications';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';

@@ -13,7 +13,7 @@ import {
   MapPin,
   BarChart3,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button, EmptyState } from '@/components/ui';
 import { PaymentStatusBadge } from '@/components/domain/StatusBadges';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import {
@@ -544,7 +544,11 @@ export default function TenantDashboard() {
                 ))}
               </ul>
             ) : (
-              <p className={theme.muted}>No payments yet. History will appear here.</p>
+              <EmptyState
+                className="py-6"
+                title="No payments yet"
+                description="History will appear here."
+              />
             )}
           </div>
 
@@ -568,7 +572,7 @@ export default function TenantDashboard() {
                 ))}
               </ul>
             ) : (
-              <p className={theme.muted}>No open requests.</p>
+              <EmptyState className="py-6" title="No open requests" />
             )}
             <Link href="/tenant/maintenance" className="mt-4 block">
               <Button

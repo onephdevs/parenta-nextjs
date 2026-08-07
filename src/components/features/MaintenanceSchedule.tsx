@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface MaintenanceItem {
   asset: {
@@ -141,7 +142,7 @@ export function MaintenanceSchedule({ refreshTrigger }: MaintenanceScheduleProps
     return (
       <Card>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <Spinner size="lg" label="Loading schedule" />
         </div>
       </Card>
     );

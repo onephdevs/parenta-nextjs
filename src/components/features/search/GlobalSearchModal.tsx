@@ -6,6 +6,7 @@ import { Search, Building, Users, FileText, DollarSign, Wrench } from 'lucide-re
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface SearchResult {
   id: string;
@@ -145,7 +146,7 @@ export default function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModal
         <div className="max-h-96 overflow-y-auto -mx-2">
           {isSearching && (
             <div className="p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <Spinner label="Searching" />
               <p className="mt-2 text-sm text-gray-900">Searching...</p>
             </div>
           )}

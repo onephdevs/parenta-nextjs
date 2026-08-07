@@ -52,6 +52,7 @@ interface DbCard {
   expense_id: string | null;
   invoice_id?: string | null;
   maintenance_request_id?: string | null;
+  utility_bill_id?: string | null;
   amount: string | number | null;
   source: string | null;
   tags: string[] | null;
@@ -146,6 +147,7 @@ function mapCard(row: DbCard): PipelineCard {
     expenseId: row.expense_id || undefined,
     invoiceId: row.invoice_id || undefined,
     maintenanceRequestId: row.maintenance_request_id || undefined,
+    utilityBillId: row.utility_bill_id || undefined,
     amount: row.amount != null ? Number(row.amount) : undefined,
     source: row.source || undefined,
     tags: row.tags || [],
@@ -376,7 +378,7 @@ export async function createPipelineCard(
        board_id, stage_id, title,
        contact_first_name, contact_last_name, contact_email, contact_phone,
        building_id, room_id, tenant_id, assignment_id, expense_id,
-       invoice_id, maintenance_request_id,
+       invoice_id, maintenance_request_id, utility_bill_id,
        amount, source, tags, due_at, next_action_at, viewing_at, notes,
        lost_reason, card_status, lost_at,
        position, created_by
@@ -384,10 +386,10 @@ export async function createPipelineCard(
        $1, $2, $3,
        $4, $5, $6, $7,
        $8, $9, $10, $11, $12,
-       $13, $14,
-       $15, $16, $17, $18, $19, $20, $21,
-       $22, $23, $24,
-       $25, $26
+       $13, $14, $15,
+       $16, $17, $18, $19, $20, $21, $22,
+       $23, $24, $25,
+       $26, $27
      )
      RETURNING *`,
     [
@@ -405,6 +407,7 @@ export async function createPipelineCard(
       data.expenseId || null,
       data.invoiceId || null,
       data.maintenanceRequestId || null,
+      data.utilityBillId || null,
       amount,
       data.source || null,
       finalTags,
@@ -593,6 +596,24 @@ export async function convertOnboardingCardToLeaseSigned(
   if (!room) throw new Error('Room not found');
   if (room.room_status === 'occupied') {
     throw new Error('Room is already occupied — pick another unit before generating a lease');
+  }
+  if (room.room_status === 'reserved') {
+    const heldByOther = await pool.query<{ id: string }>(
+      `SELECT c.id
+       FROM pipeline_cards c
+       INNER JOIN pipeline_boards pb ON pb.id = c.board_id AND pb.slug = 'onboarding'
+       WHERE c.room_id = $1
+         AND c.id <> $2
+         AND c.card_status = 'open'
+         AND c.move_in_payment_status = 'paid'
+       LIMIT 1`,
+      [card.roomId, cardId]
+    );
+    if (heldByOther.rows[0]) {
+      throw new Error(
+        'Room is reserved by another opportunity with payment confirmed — pick another unit'
+      );
+    }
   }
 
   const email = card.contactEmail?.trim().toLowerCase() || '';
@@ -1394,7 +1415,8 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
   await pool.query(
     `ALTER TABLE pipeline_cards
        ADD COLUMN IF NOT EXISTS invoice_id UUID,
-       ADD COLUMN IF NOT EXISTS maintenance_request_id UUID`
+       ADD COLUMN IF NOT EXISTS maintenance_request_id UUID,
+       ADD COLUMN IF NOT EXISTS utility_bill_id UUID`
   ).catch(() => undefined);
 }
 
@@ -1562,6 +1584,250 @@ export async function ensureMaintenancePipelineCard(input: {
   });
 
   return { card, created: true };
+}
+
+/** Map utility_bills.bill_status → expenses board stage slug. */
+export function utilityBillStatusToStageSlug(status: string | null | undefined): string {
+  switch ((status || 'pending').toLowerCase()) {
+    case 'paid':
+      return 'paid';
+    case 'disputed':
+      return 'verification';
+    case 'overdue':
+    case 'pending':
+    default:
+      return 'bill_received';
+  }
+}
+
+/** Soft-ensure expenses board exists (seeded by migrations; idempotent). */
+export async function ensureExpensesBoardExists(): Promise<void> {
+  await pool.query(
+    `INSERT INTO pipeline_boards (slug, name, description, sort_order)
+     VALUES ('expenses', 'Building expenses', 'Vendor / utility bill follow-up', 3)
+     ON CONFLICT (slug) DO NOTHING`
+  );
+
+  await pool.query(
+    `INSERT INTO pipeline_stages (board_id, slug, name, color, sort_order, is_won, is_lost, is_terminal)
+     SELECT b.id, s.slug, s.name, s.color, s.sort_order, s.is_won, s.is_lost, s.is_terminal
+     FROM pipeline_boards b
+     JOIN (
+       VALUES
+         ('expenses', 'bill_received', 'Bill received', '#7c3aed', 1, false, false, false),
+         ('expenses', 'verification', 'Verification', '#8b5cf6', 2, false, false, false),
+         ('expenses', 'approval_pending', 'Approval pending', '#f59e0b', 3, false, false, false),
+         ('expenses', 'approved', 'Approved', '#3b82f6', 4, false, false, false),
+         ('expenses', 'payment_scheduled', 'Payment scheduled', '#14b8a6', 5, false, false, false),
+         ('expenses', 'paid', 'Paid', '#22c55e', 6, true, false, true)
+     ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
+       ON b.slug = s.board_slug
+     WHERE NOT EXISTS (
+       SELECT 1 FROM pipeline_stages ps
+       WHERE ps.board_id = b.id AND ps.slug = s.slug
+     )`
+  );
+
+  await pool.query(
+    `ALTER TABLE pipeline_cards
+       ADD COLUMN IF NOT EXISTS utility_bill_id UUID`
+  ).catch(() => undefined);
+}
+
+/**
+ * Create/update an Expenses pipeline card from a utility_bills row.
+ */
+export async function ensureUtilityBillPipelineCard(input: {
+  utilityBillId: string;
+  utilityType: string;
+  amount: number;
+  billStatus?: string | null;
+  dueDate?: Date | string | null;
+  providerName?: string | null;
+  buildingId?: string | null;
+  roomId?: string | null;
+  buildingName?: string | null;
+  roomNumber?: string | null;
+  notes?: string | null;
+}): Promise<{ card: PipelineCard; created: boolean }> {
+  await ensureExpensesBoardExists();
+
+  const stageSlug = utilityBillStatusToStageSlug(input.billStatus);
+  const utilityLabel = String(input.utilityType || 'Utility')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const location =
+    [input.buildingName, input.roomNumber].filter(Boolean).join(' ') ||
+    'Property';
+  const title = `${utilityLabel} — ${location}`;
+  const provider = (input.providerName || '').trim() || utilityLabel;
+  const dueAt = (() => {
+    if (input.dueDate == null) return null;
+    const d =
+      input.dueDate instanceof Date ? input.dueDate : new Date(input.dueDate);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}T12:00:00.000Z`;
+  })();
+  const tags = ['Utility', utilityLabel].filter(
+    (t, i, arr) => arr.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i
+  );
+
+  const existing = await pool.query<{ id: string }>(
+    `SELECT c.id
+     FROM pipeline_cards c
+     INNER JOIN pipeline_boards b ON b.id = c.board_id
+     WHERE b.slug = 'expenses'
+       AND c.utility_bill_id = $1
+     ORDER BY c.updated_at DESC
+     LIMIT 1`,
+    [input.utilityBillId]
+  );
+
+  if (existing.rows[0]) {
+    await updatePipelineCard(existing.rows[0].id, {
+      title,
+      contactFirstName: provider,
+      buildingId: input.buildingId || null,
+      roomId: input.roomId || null,
+      amount: input.amount,
+      dueAt,
+      notes: input.notes || null,
+      tags,
+      source: 'Utility bill',
+    });
+
+    const board = await getBoardBySlug('expenses');
+    const stage = board?.stages.find((s) => s.slug === stageSlug);
+    if (stage) {
+      const cardRow = await pool.query<{ stage_id: string; board_id: string }>(
+        `SELECT stage_id, board_id FROM pipeline_cards WHERE id = $1`,
+        [existing.rows[0].id]
+      );
+      if (cardRow.rows[0] && cardRow.rows[0].stage_id !== stage.id) {
+        const isPaid = stageSlug === 'paid';
+        await pool.query(
+          `UPDATE pipeline_cards SET
+             stage_id = $1,
+             card_status = $2,
+             won_at = CASE WHEN $3 THEN COALESCE(won_at, CURRENT_TIMESTAMP) ELSE won_at END,
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [stage.id, isPaid ? 'won' : 'open', isPaid, existing.rows[0].id]
+        );
+        await pool.query(
+          `INSERT INTO pipeline_card_events (
+             card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, note
+           ) VALUES ($1, 'stage_changed', $2, $3, $4, $4, $5)`,
+          [
+            existing.rows[0].id,
+            cardRow.rows[0].stage_id,
+            stage.id,
+            cardRow.rows[0].board_id,
+            'Synced from utility bill status',
+          ]
+        );
+      }
+    }
+
+    const card = await getPipelineCardById(existing.rows[0].id);
+    if (!card) throw new Error('Failed to reload utility bill card');
+    return { card, created: false };
+  }
+
+  const card = await createPipelineCard({
+    boardSlug: 'expenses',
+    stageSlug,
+    title,
+    contactFirstName: provider,
+    buildingId: input.buildingId || undefined,
+    roomId: input.roomId || undefined,
+    utilityBillId: input.utilityBillId,
+    amount: input.amount,
+    dueAt: dueAt || undefined,
+    source: 'Utility bill',
+    tags,
+    notes: input.notes || undefined,
+  });
+
+  return { card, created: true };
+}
+
+/** Backfill Expenses board from unpaid / recent utility bills (parent bills only). */
+export async function syncPendingUtilityBillsToPipelineCards(): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  cardIds: string[];
+}> {
+  await ensureExpensesBoardExists();
+
+  const result = await pool.query<{
+    id: string;
+    utility_type: string;
+    amount: string;
+    bill_status: string;
+    due_date: Date | string | null;
+    provider_name: string | null;
+    building_id: string | null;
+    room_id: string | null;
+    building_name: string | null;
+    room_number: string | null;
+    notes: string | null;
+  }>(
+    `SELECT
+       ub.id,
+       ub.utility_type,
+       ub.amount::text AS amount,
+       ub.bill_status,
+       ub.due_date,
+       ub.provider_name,
+       ub.building_id,
+       ub.room_id,
+       b.name AS building_name,
+       r.room_number,
+       ub.notes
+     FROM utility_bills ub
+     LEFT JOIN rooms r ON r.id = ub.room_id
+     LEFT JOIN buildings b ON b.id = COALESCE(ub.building_id, r.building_id)
+     WHERE ub.parent_bill_id IS NULL
+       AND ub.bill_status IN ('pending', 'overdue', 'disputed', 'paid')
+     ORDER BY ub.due_date DESC NULLS LAST
+     LIMIT 500`
+  );
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const cardIds: string[] = [];
+
+  for (const row of result.rows) {
+    try {
+      const synced = await ensureUtilityBillPipelineCard({
+        utilityBillId: row.id,
+        utilityType: row.utility_type,
+        amount: Number(row.amount) || 0,
+        billStatus: row.bill_status,
+        dueDate: row.due_date,
+        providerName: row.provider_name,
+        buildingId: row.building_id,
+        roomId: row.room_id,
+        buildingName: row.building_name,
+        roomNumber: row.room_number,
+        notes: row.notes,
+      });
+      cardIds.push(synced.card.id);
+      if (synced.created) created += 1;
+      else updated += 1;
+    } catch (err) {
+      console.error('Failed to sync utility bill card', row.id, err);
+      skipped += 1;
+    }
+  }
+
+  return { created, updated, skipped, cardIds };
 }
 
 /** Backfill Maintenance board from open/in-progress requests. */
@@ -1903,6 +2169,66 @@ export async function getPipelineCardEvents(
   });
 }
 
+/** Release a reserved room when no other open paid onboarding card still holds it. */
+async function releaseRoomReservationIfUnused(
+  roomId: string,
+  exceptCardId?: string | null
+): Promise<void> {
+  const other = await pool.query<{ id: string }>(
+    `SELECT c.id
+     FROM pipeline_cards c
+     INNER JOIN pipeline_boards pb ON pb.id = c.board_id AND pb.slug = 'onboarding'
+     WHERE c.room_id = $1
+       AND c.card_status = 'open'
+       AND c.move_in_payment_status = 'paid'
+       AND ($2::uuid IS NULL OR c.id <> $2::uuid)
+     LIMIT 1`,
+    [roomId, exceptCardId || null]
+  );
+  if (other.rows[0]) return;
+
+  await pool.query(
+    `UPDATE rooms
+     SET room_status = 'vacant', updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND room_status = 'reserved'`,
+    [roomId]
+  );
+}
+
+/**
+ * When move-in payment is confirmed, hold the unit as reserved so other
+ * opportunities cannot pick it. Unpaid / lost / deleted releases the hold.
+ */
+async function syncRoomReservationForMoveInPayment(input: {
+  cardId: string;
+  roomId: string | null | undefined;
+  previousRoomId?: string | null;
+  paymentStatus: 'paid' | 'unpaid';
+  releaseHold?: boolean;
+}): Promise<void> {
+  const previousRoomId = input.previousRoomId || null;
+  const nextRoomId = input.roomId || null;
+
+  if (previousRoomId && previousRoomId !== nextRoomId) {
+    await releaseRoomReservationIfUnused(previousRoomId, input.cardId);
+  }
+
+  if (!nextRoomId) return;
+
+  if (input.releaseHold || input.paymentStatus === 'unpaid') {
+    await releaseRoomReservationIfUnused(nextRoomId, input.cardId);
+    return;
+  }
+
+  // Paid: reserve vacant/reserved units (never overwrite occupied)
+  await pool.query(
+    `UPDATE rooms
+     SET room_status = 'reserved', updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND room_status IN ('vacant', 'reserved')`,
+    [nextRoomId]
+  );
+}
+
 export interface UpdatePipelineCardData {
   title?: string;
   contactFirstName?: string | null;
@@ -2215,6 +2541,26 @@ export async function updatePipelineCard(
     [existing.boardId]
   );
   const boardSlug = boardRow.rows[0]?.slug;
+
+  if (boardSlug === 'onboarding') {
+    const nextRoomId =
+      data.roomId !== undefined ? data.roomId : existing.roomId || null;
+    const paymentChanged =
+      data.moveInPaymentStatus !== undefined &&
+      data.moveInPaymentStatus !== (existing.moveInPaymentStatus || 'unpaid');
+    const roomChanged =
+      data.roomId !== undefined && data.roomId !== (existing.roomId || null);
+
+    if (markAsLost || paymentChanged || roomChanged || moveInPaymentStatus === 'paid') {
+      await syncRoomReservationForMoveInPayment({
+        cardId,
+        roomId: nextRoomId,
+        previousRoomId: existing.roomId || null,
+        paymentStatus: markAsLost ? 'unpaid' : moveInPaymentStatus,
+        releaseHold: markAsLost,
+      });
+    }
+  }
 
   // Onboarding: mark as lost → move to Lost stage
   if (markAsLost && boardSlug === 'onboarding') {
@@ -2540,6 +2886,14 @@ export async function createPipelineStage(data: {
 export async function deletePipelineCard(cardId: string): Promise<PipelineCard> {
   const existing = await getPipelineCardById(cardId);
   if (!existing) throw new Error('Card not found');
+
+  if (
+    existing.boardSlug === 'onboarding' &&
+    existing.roomId &&
+    existing.moveInPaymentStatus === 'paid'
+  ) {
+    await releaseRoomReservationIfUnused(existing.roomId, cardId);
+  }
 
   const result = await pool.query(
     `DELETE FROM pipeline_cards WHERE id = $1 RETURNING id`,

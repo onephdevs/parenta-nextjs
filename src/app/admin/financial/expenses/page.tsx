@@ -3,14 +3,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useNotifications } from '@/hooks/useNotifications';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import {
+  Button,
+  EmptyState,
+  FilterBar,
+  Input,
+  ListSummaryCard,
+  PageHeader,
+  Pagination,
+  SearchInput,
+  Select,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
-import Pagination from '@/components/ui/Pagination';
+import { ExpenseCategoryBadge } from '@/components/domain/StatusBadges';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_LABELS,
@@ -29,7 +41,6 @@ import {
   PhilippinePeso,
   Plus,
   Receipt,
-  Search,
 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -65,25 +76,6 @@ function formatDate(date: string | Date) {
     month: 'short',
     day: 'numeric',
   });
-}
-
-function categoryBadgeClass(category: string) {
-  switch (category) {
-    case 'cleaning':
-      return 'bg-teal-100 text-teal-800';
-    case 'maintenance':
-      return 'bg-red-100 text-red-800';
-    case 'repair':
-      return 'bg-orange-100 text-orange-800';
-    case 'upgrade':
-      return 'bg-indigo-100 text-indigo-800';
-    case 'garbage_collection':
-      return 'bg-amber-100 text-amber-800';
-    case 'other':
-      return 'bg-gray-100 text-gray-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
 }
 
 export default function ExpensesPage() {
@@ -276,191 +268,164 @@ export default function ExpensesPage() {
         />
       </div>
 
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-          <FormField label="Search" htmlFor="search">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                type="text"
-                id="search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Description or vendor..."
-                className="pl-10"
-              />
-            </div>
-          </FormField>
+      <FilterBar columns={6}>
+        <FormField label="Search" htmlFor="search">
+          <SearchInput
+            id="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Description or vendor..."
+          />
+        </FormField>
 
-          <FormField label="Category" htmlFor="category">
-            <Select
-              id="category"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              <option value="">All Categories</option>
-              {EXPENSE_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory]}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+        <FormField label="Category" htmlFor="category">
+          <Select
+            id="category"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {EXPENSE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory]}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
-          <FormField label="Building" htmlFor="building">
-            <Select
-              id="building"
-              value={buildingFilter}
-              onChange={(e) => setBuildingFilter(e.target.value)}
-            >
-              <option value="">All Buildings</option>
-              {buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+        <FormField label="Building" htmlFor="building">
+          <Select
+            id="building"
+            value={buildingFilter}
+            onChange={(e) => setBuildingFilter(e.target.value)}
+          >
+            <option value="">All Buildings</option>
+            {buildings.map((building) => (
+              <option key={building.id} value={building.id}>
+                {building.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
 
-          <FormField label="Vendor" htmlFor="vendor">
-            <Input
-              type="text"
-              id="vendor"
-              value={vendorFilter}
-              onChange={(e) => setVendorFilter(e.target.value)}
-              placeholder="Filter by vendor..."
-            />
-          </FormField>
+        <FormField label="Vendor" htmlFor="vendor">
+          <Input
+            type="text"
+            id="vendor"
+            value={vendorFilter}
+            onChange={(e) => setVendorFilter(e.target.value)}
+            placeholder="Filter by vendor..."
+          />
+        </FormField>
 
-          <FormField label="From Date" htmlFor="dateFrom">
-            <Input
-              type="date"
-              id="dateFrom"
-              value={dateFromFilter}
-              onChange={(e) => setDateFromFilter(e.target.value)}
-            />
-          </FormField>
+        <FormField label="From Date" htmlFor="dateFrom">
+          <Input
+            type="date"
+            id="dateFrom"
+            value={dateFromFilter}
+            onChange={(e) => setDateFromFilter(e.target.value)}
+          />
+        </FormField>
 
-          <FormField label="To Date" htmlFor="dateTo">
-            <Input
-              type="date"
-              id="dateTo"
-              value={dateToFilter}
-              onChange={(e) => setDateToFilter(e.target.value)}
-            />
-          </FormField>
-        </div>
-      </Card>
+        <FormField label="To Date" htmlFor="dateTo">
+          <Input
+            type="date"
+            id="dateTo"
+            value={dateToFilter}
+            onChange={(e) => setDateToFilter(e.target.value)}
+          />
+        </FormField>
+      </FilterBar>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-900">Loading...</div>
+          <div className="flex justify-center p-8">
+            <Spinner label="Loading expenses" />
+          </div>
         ) : expenses.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <Receipt className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-            <p className="mb-2 text-lg font-medium">No expenses found</p>
-            <p className="mb-4 text-sm text-gray-600">Get started by recording a new expense</p>
-            <Link href="/admin/financial/expenses/new">
-              <Button leftIcon={<Plus className="h-4 w-4" />}>Record Expense</Button>
-            </Link>
-          </div>
+          <EmptyState
+            icon={<Receipt className="h-10 w-10" />}
+            title="No expenses found"
+            description="Get started by recording a new expense"
+            action={
+              <Link href="/admin/financial/expenses/new">
+                <Button leftIcon={<Plus className="h-4 w-4" />}>Record Expense</Button>
+              </Link>
+            }
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Description
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Property
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Vendor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {expenses.map((expense) => {
-                  const notesDisplay = formatPaymentNotesDisplay(expense.notes);
-                  const descriptionLabel = formatPaymentNotesLabel(
-                    expense.description,
-                    expense.description || '—'
-                  );
-                  return (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {descriptionLabel}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Property</TableHead>
+                <TableHead>Vendor</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenses.map((expense) => {
+                const notesDisplay = formatPaymentNotesDisplay(expense.notes);
+                const descriptionLabel = formatPaymentNotesLabel(
+                  expense.description,
+                  expense.description || '—'
+                );
+                return (
+                  <TableRow key={expense.id}>
+                    <TableCell className="whitespace-normal">
+                      <div className="text-sm font-medium text-gray-900">
+                        {descriptionLabel}
+                      </div>
+                      {notesDisplay.label && notesDisplay.label !== descriptionLabel && (
+                        <div className="mt-0.5 text-xs text-gray-500">{notesDisplay.label}</div>
+                      )}
+                      {notesDisplay.billingPeriodLabel && (
+                        <div className="mt-0.5 text-xs text-gray-500">
+                          Period: {notesDisplay.billingPeriodLabel}
                         </div>
-                        {notesDisplay.label && notesDisplay.label !== descriptionLabel && (
-                          <div className="mt-0.5 text-xs text-gray-500">{notesDisplay.label}</div>
-                        )}
-                        {notesDisplay.billingPeriodLabel && (
-                          <div className="mt-0.5 text-xs text-gray-500">
-                            Period: {notesDisplay.billingPeriodLabel}
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <ExpenseCategoryBadge category={expense.category} />
+                    </TableCell>
+                    <TableCell>
+                      {expense.buildingName ? (
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {expense.buildingName}
                           </div>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryBadgeClass(expense.category)}`}
-                        >
-                          {formatReportCategoryLabel(expense.category)}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        {expense.buildingName ? (
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {expense.buildingName}
+                          {expense.roomNumber && (
+                            <div className="text-sm text-gray-600">
+                              Room {expense.roomNumber}
                             </div>
-                            {expense.roomNumber && (
-                              <div className="text-sm text-gray-600">
-                                Room {expense.roomNumber}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        {expense.vendorName || expense.vendor || '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                        {formatDate(expense.expenseDate)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-gray-900">
-                        {formatCurrency(expense.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                        <Link
-                          href={`/admin/financial/expenses/${expense.id}`}
-                          className="inline-flex text-gray-500 hover:text-gray-900"
-                          title="View"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{expense.vendorName || expense.vendor || '—'}</TableCell>
+                    <TableCell>{formatDate(expense.expenseDate)}</TableCell>
+                    <TableCell className="font-semibold">
+                      {formatCurrency(expense.amount)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Link
+                        href={`/admin/financial/expenses/${expense.id}`}
+                        className="inline-flex text-gray-500 hover:text-gray-900"
+                        title="View"
+                      >
+                        <Eye className="h-5 w-5" />
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
         {!isLoading && expenses.length > 0 && (
           <Pagination

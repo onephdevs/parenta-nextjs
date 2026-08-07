@@ -67,6 +67,7 @@ export function HomeContactForm({
           message,
           hp_confirm: honeypot,
           formStartedAt: formStartedAt.current,
+          formElapsedMs: Date.now() - formStartedAt.current,
         }),
       });
       const json = await res.json();
@@ -140,7 +141,7 @@ export function HomeContactForm({
 
       <div className="mt-6 space-y-4">
         <div
-          className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
+          className="sr-only"
           aria-hidden="true"
         >
           <label htmlFor="contact-hp-confirm">Leave blank</label>

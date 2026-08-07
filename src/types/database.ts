@@ -979,6 +979,7 @@ export interface PipelineCard {
   expenseId?: string;
   invoiceId?: string;
   maintenanceRequestId?: string;
+  utilityBillId?: string;
   amount?: number;
   source?: string;
   tags: string[];
@@ -1039,6 +1040,7 @@ export interface CreatePipelineCardData {
   expenseId?: string;
   invoiceId?: string;
   maintenanceRequestId?: string;
+  utilityBillId?: string;
   amount?: number;
   source?: string;
   tags?: string[];

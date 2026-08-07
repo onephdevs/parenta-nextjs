@@ -326,6 +326,8 @@ export function AddOpportunityModal({
   const [generatingLease, setGeneratingLease] = useState(false);
   const [moveInTotalPaid, setMoveInTotalPaid] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
+  const [depositMonths, setDepositMonths] = useState(1);
+  const [advanceMonths, setAdvanceMonths] = useState(1);
   const [moveInPaymentType, setMoveInPaymentType] = useState('rent');
   const [moveInPaymentDate, setMoveInPaymentDate] = useState(() => todayLocalISO());
   const [moveInPaymentStatus, setMoveInPaymentStatus] = useState<'unpaid' | 'paid'>(
@@ -394,6 +396,25 @@ export function AddOpportunityModal({
           ? String((savedDeposit || 0) + (savedAdvance || 0) || '')
           : ''
       );
+      {
+        const rentHint =
+          card.amount != null && Number(card.amount) > 0 ? Number(card.amount) : 0;
+        if (rentHint > 0) {
+          const dMonths =
+            savedDeposit != null && savedDeposit > 0
+              ? Math.max(0, Math.round(savedDeposit / rentHint))
+              : 1;
+          const aMonths =
+            savedAdvance != null && savedAdvance > 0
+              ? Math.max(0, Math.round(savedAdvance / rentHint))
+              : 1;
+          setDepositMonths(dMonths);
+          setAdvanceMonths(aMonths);
+        } else {
+          setDepositMonths(1);
+          setAdvanceMonths(1);
+        }
+      }
       setMoveInPaymentStatus(card.moveInPaymentStatus === 'paid' ? 'paid' : 'unpaid');
       setMoveInPaymentMethod(card.moveInPaymentMethod || 'cash');
       setMoveInTransactionId(card.moveInPaymentNotes || '');
@@ -430,6 +451,8 @@ export function AddOpportunityModal({
       setCustomLeaseMonths('');
       setMoveInTotalPaid('');
       setDepositAmount('');
+      setDepositMonths(1);
+      setAdvanceMonths(1);
       setMoveInPaymentStatus('unpaid');
       setMoveInPaymentMethod('cash');
       setMoveInTransactionId('');
@@ -466,11 +489,14 @@ export function AddOpportunityModal({
     }
     void (async () => {
       try {
-        // Onboarding opportunities: only offer vacant rooms (no active tenant).
-        // Keep the card's current room in the list when editing so saves still work.
+        // Onboarding: vacant rooms only, and hide units already paid/held by other opportunities.
         const params = new URLSearchParams({ buildingId });
         if (isOnboarding) {
           params.set('roomStatus', 'vacant');
+          params.set('excludePipelineHeld', '1');
+          if (card?.id) {
+            params.set('excludeCardId', card.id);
+          }
         }
         const res = await fetch(`/api/rooms?${params.toString()}`);
         const json = await res.json();
@@ -517,9 +543,9 @@ export function AddOpportunityModal({
         setRooms([]);
       }
     })();
-    // roomId/card intentionally omitted from deps — only reload when building changes
+    // roomId intentionally omitted — only reload when building / card context changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buildingId, isEditing, isOnboarding]);
+  }, [buildingId, isEditing, isOnboarding, card?.id]);
 
   useEffect(() => {
     if (!roomId || rooms.length === 0) return;
@@ -578,6 +604,32 @@ export function AddOpportunityModal({
         : 0;
     const advance = Math.max(0, safeTotal - safeDeposit);
     return { total: safeTotal, deposit: safeDeposit, advance };
+  }
+
+  function getMonthlyRentForPayment(): number {
+    if (amount.trim() !== '') {
+      const n = Number(amount);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const room = rooms.find((r) => r.id === roomId);
+    const rate = room ? Number(room.monthlyRate) : 0;
+    return Number.isFinite(rate) && rate > 0 ? rate : 0;
+  }
+
+  function applyMoveInMonths(nextDepositMonths: number, nextAdvanceMonths: number) {
+    const rent = getMonthlyRentForPayment();
+    if (rent <= 0) {
+      setError('Set monthly rent (or select a room with a rate) before choosing months');
+      return;
+    }
+    const deposit = Math.round(rent * nextDepositMonths * 100) / 100;
+    const advance = Math.round(rent * nextAdvanceMonths * 100) / 100;
+    const total = Math.round((deposit + advance) * 100) / 100;
+    setDepositMonths(nextDepositMonths);
+    setAdvanceMonths(nextAdvanceMonths);
+    setDepositAmount(deposit > 0 ? String(deposit) : '');
+    setMoveInTotalPaid(total > 0 ? String(total) : '');
+    setError(null);
   }
 
   function buildMoveInPaymentNotes() {
@@ -976,10 +1028,10 @@ export function AddOpportunityModal({
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting || submitting}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
           >
-            <Trash2 className="h-4 w-4" />
-            Delete opportunity
+            <Trash2 className="h-3.5 w-3.5 shrink-0" />
+            <span>Delete</span>
           </button>
         ) : undefined
       }
@@ -1272,6 +1324,78 @@ export function AddOpportunityModal({
                 )}
 
                 <div className="grid grid-cols-6 gap-5">
+                  {!card?.assignmentId && moveInPaymentStatus !== 'paid' && (
+                    <div className="col-span-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <p className="text-sm font-medium text-gray-900">
+                        Calculate from monthly rent
+                      </p>
+                      <p className="mt-1 text-xs text-gray-600">
+                        {getMonthlyRentForPayment() > 0 ? (
+                          <>
+                            Base rent ₱
+                            {getMonthlyRentForPayment().toLocaleString('en-PH')}
+                            /mo — choose how many months for deposit and advance.
+                          </>
+                        ) : (
+                          <>
+                            Select a room or enter monthly rent under Property first, then pick
+                            months.
+                          </>
+                        )}
+                      </p>
+                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <FormField
+                          label="Deposit months"
+                          htmlFor="opp-deposit-months"
+                          hint="Added to the deposit ledger"
+                        >
+                          <Select
+                            id="opp-deposit-months"
+                            value={String(depositMonths)}
+                            disabled={savingPayment || getMonthlyRentForPayment() <= 0}
+                            onChange={(e) => {
+                              applyMoveInMonths(Number(e.target.value), advanceMonths);
+                            }}
+                          >
+                            {[0, 1, 2, 3, 4, 5, 6].map((m) => (
+                              <option key={`dep-${m}`} value={m}>
+                                {m === 0
+                                  ? '0 months (none)'
+                                  : `${m} month${m === 1 ? '' : 's'} — ₱${(
+                                      getMonthlyRentForPayment() * m
+                                    ).toLocaleString('en-PH')}`}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                        <FormField
+                          label="Advance months"
+                          htmlFor="opp-advance-months"
+                          hint="Applied to rent invoices"
+                        >
+                          <Select
+                            id="opp-advance-months"
+                            value={String(advanceMonths)}
+                            disabled={savingPayment || getMonthlyRentForPayment() <= 0}
+                            onChange={(e) => {
+                              applyMoveInMonths(depositMonths, Number(e.target.value));
+                            }}
+                          >
+                            {[0, 1, 2, 3, 4, 5, 6].map((m) => (
+                              <option key={`adv-${m}`} value={m}>
+                                {m === 0
+                                  ? '0 months (none)'
+                                  : `${m} month${m === 1 ? '' : 's'} — ₱${(
+                                      getMonthlyRentForPayment() * m
+                                    ).toLocaleString('en-PH')}`}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                      </div>
+                    </div>
+                  )}
+
                   <FormField
                     label="Total Amount Paid"
                     htmlFor="opp-total-paid"
@@ -1325,13 +1449,19 @@ export function AddOpportunityModal({
                     <Alert variant="info" title="Payment Breakdown" className="col-span-6">
                       <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span>To Deposit Ledger:</span>
+                          <span>
+                            To Deposit Ledger
+                            {depositMonths > 0 ? ` (${depositMonths} mo)` : ''}:
+                          </span>
                           <span className="ml-2 font-semibold">
                             ₱{getMoveInSplit().deposit.toLocaleString('en-PH')}
                           </span>
                         </div>
                         <div>
-                          <span>To Invoice Payment:</span>
+                          <span>
+                            To Invoice Payment
+                            {advanceMonths > 0 ? ` (${advanceMonths} mo)` : ''}:
+                          </span>
                           <span className="ml-2 font-semibold">
                             ₱{getMoveInSplit().advance.toLocaleString('en-PH')}
                           </span>
@@ -1439,25 +1569,6 @@ export function AddOpportunityModal({
                         Generate lease.
                       </p>
                     </div>
-
-                    {moveInPaymentStatus !== 'paid' && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          const monthly =
-                            amount.trim() !== ''
-                              ? Number(amount)
-                              : rooms.find((r) => r.id === roomId)?.monthlyRate;
-                          if (monthly) {
-                            setMoveInTotalPaid(String(monthly * 2));
-                            setDepositAmount(String(monthly));
-                          }
-                        }}
-                      >
-                        Suggest 1 month deposit + 1 month advance from rent
-                      </Button>
-                    )}
                   </div>
                 )}
               </div>
