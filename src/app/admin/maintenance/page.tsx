@@ -12,6 +12,7 @@ import {
   User,
   Save,
   Pencil,
+  Camera,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
@@ -40,8 +41,16 @@ import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
+import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
 
 const PAGE_SIZE = 20;
+
+interface MaintenanceAttachment {
+  id: string;
+  fileName?: string;
+  url: string;
+  mimeType?: string;
+}
 
 interface MaintenanceRequest {
   id: string;
@@ -61,6 +70,8 @@ interface MaintenanceRequest {
   completed_date?: string;
   notes?: string;
   assigned_to?: string;
+  attachments?: MaintenanceAttachment[];
+  attachmentCount?: number;
 }
 
 interface MaintenanceStats {
@@ -367,6 +378,15 @@ export default function AdminMaintenancePage() {
                       <div className="line-clamp-1 text-sm text-gray-600">
                         {request.description}
                       </div>
+                      {(request.attachmentCount || request.attachments?.length || 0) > 0 && (
+                        <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
+                          <Camera className="h-3.5 w-3.5" />
+                          {request.attachmentCount || request.attachments?.length} photo
+                          {(request.attachmentCount || request.attachments?.length || 0) === 1
+                            ? ''
+                            : 's'}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm font-medium text-gray-900">
@@ -444,6 +464,11 @@ export default function AdminMaintenancePage() {
                 <User className="h-4 w-4" />
                 {selectedRequest.tenant_name}
               </div>
+              <MaintenancePhotoGallery
+                photos={selectedRequest.attachments || []}
+                emptyLabel="No photos attached by tenant"
+                className="mt-4"
+              />
             </Card>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

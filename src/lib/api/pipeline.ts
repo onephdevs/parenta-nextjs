@@ -1225,7 +1225,7 @@ export async function ensurePaymentFollowUpCard(input: {
       : null;
 
   if (existing.rows[0]) {
-    const updated = await updatePipelineCard(existing.rows[0].id, {
+    const { card: updated } = await updatePipelineCard(existing.rows[0].id, {
       assignmentId: input.assignmentId,
       buildingId: input.buildingId,
       roomId: input.roomId,
@@ -1632,6 +1632,11 @@ export async function ensureExpensesBoardExists(): Promise<void> {
     `ALTER TABLE pipeline_cards
        ADD COLUMN IF NOT EXISTS utility_bill_id UUID`
   ).catch(() => undefined);
+
+  await pool.query(
+    `ALTER TABLE pipeline_cards
+       ADD COLUMN IF NOT EXISTS expense_id UUID`
+  ).catch(() => undefined);
 }
 
 /**
@@ -1823,6 +1828,224 @@ export async function syncPendingUtilityBillsToPipelineCards(): Promise<{
       else updated += 1;
     } catch (err) {
       console.error('Failed to sync utility bill card', row.id, err);
+      skipped += 1;
+    }
+  }
+
+  return { created, updated, skipped, cardIds };
+}
+
+/** Map expenses.expense_status → expenses board stage slug. */
+export function expenseStatusToStageSlug(status: string | null | undefined): string {
+  switch ((status || 'pending').toLowerCase()) {
+    case 'paid':
+      return 'paid';
+    case 'approved':
+      return 'approved';
+    case 'rejected':
+      return 'verification';
+    case 'pending':
+    default:
+      return 'bill_received';
+  }
+}
+
+/**
+ * Create/update an Expenses pipeline card from an expenses row (vendor / building cost).
+ */
+export async function ensureExpensePipelineCard(input: {
+  expenseId: string;
+  category: string;
+  amount: number;
+  expenseStatus?: string | null;
+  expenseDate?: Date | string | null;
+  vendorName?: string | null;
+  description?: string | null;
+  buildingId?: string | null;
+  roomId?: string | null;
+  buildingName?: string | null;
+  roomNumber?: string | null;
+  notes?: string | null;
+}): Promise<{ card: PipelineCard; created: boolean }> {
+  await ensureExpensesBoardExists();
+
+  const stageSlug = expenseStatusToStageSlug(input.expenseStatus);
+  const categoryLabel = String(input.category || 'Expense')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const location =
+    [input.buildingName, input.roomNumber].filter(Boolean).join(' ') ||
+    'Property';
+  const title =
+    (input.description || '').trim() ||
+    `${categoryLabel} — ${location}`;
+  const vendor = (input.vendorName || '').trim() || categoryLabel;
+  const dueAt = (() => {
+    if (input.expenseDate == null) return null;
+    const d =
+      input.expenseDate instanceof Date
+        ? input.expenseDate
+        : new Date(input.expenseDate);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}T12:00:00.000Z`;
+  })();
+  const tags = ['Expense', categoryLabel].filter(
+    (t, i, arr) => arr.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i
+  );
+
+  const existing = await pool.query<{ id: string }>(
+    `SELECT c.id
+     FROM pipeline_cards c
+     INNER JOIN pipeline_boards b ON b.id = c.board_id
+     WHERE b.slug = 'expenses'
+       AND c.expense_id = $1
+     ORDER BY c.updated_at DESC
+     LIMIT 1`,
+    [input.expenseId]
+  );
+
+  if (existing.rows[0]) {
+    await updatePipelineCard(existing.rows[0].id, {
+      title,
+      contactFirstName: vendor,
+      buildingId: input.buildingId || null,
+      roomId: input.roomId || null,
+      amount: input.amount,
+      dueAt,
+      notes: input.notes || input.description || null,
+      tags,
+      source: 'Expense',
+    });
+
+    const board = await getBoardBySlug('expenses');
+    const stage = board?.stages.find((s) => s.slug === stageSlug);
+    if (stage) {
+      const cardRow = await pool.query<{ stage_id: string; board_id: string }>(
+        `SELECT stage_id, board_id FROM pipeline_cards WHERE id = $1`,
+        [existing.rows[0].id]
+      );
+      if (cardRow.rows[0] && cardRow.rows[0].stage_id !== stage.id) {
+        const isPaid = stageSlug === 'paid';
+        await pool.query(
+          `UPDATE pipeline_cards SET
+             stage_id = $1,
+             card_status = $2,
+             won_at = CASE WHEN $3 THEN COALESCE(won_at, CURRENT_TIMESTAMP) ELSE won_at END,
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [stage.id, isPaid ? 'won' : 'open', isPaid, existing.rows[0].id]
+        );
+        await pool.query(
+          `INSERT INTO pipeline_card_events (
+             card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, note
+           ) VALUES ($1, 'stage_changed', $2, $3, $4, $4, $5)`,
+          [
+            existing.rows[0].id,
+            cardRow.rows[0].stage_id,
+            stage.id,
+            cardRow.rows[0].board_id,
+            'Synced from expense status',
+          ]
+        );
+      }
+    }
+
+    const card = await getPipelineCardById(existing.rows[0].id);
+    if (!card) throw new Error('Failed to reload expense card');
+    return { card, created: false };
+  }
+
+  const card = await createPipelineCard({
+    boardSlug: 'expenses',
+    stageSlug,
+    title,
+    contactFirstName: vendor,
+    buildingId: input.buildingId || undefined,
+    roomId: input.roomId || undefined,
+    expenseId: input.expenseId,
+    amount: input.amount,
+    dueAt: dueAt || undefined,
+    source: 'Expense',
+    tags,
+    notes: input.notes || input.description || undefined,
+  });
+
+  return { card, created: true };
+}
+
+/** Backfill Expenses board from recent vendor expenses. */
+export async function syncPendingExpensesToPipelineCards(): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  cardIds: string[];
+}> {
+  await ensureExpensesBoardExists();
+
+  const result = await pool.query<{
+    id: string;
+    category: string;
+    amount: string;
+    expense_status: string | null;
+    expense_date: Date | string | null;
+    vendor_name: string | null;
+    description: string | null;
+    building_id: string | null;
+    room_id: string | null;
+    building_name: string | null;
+    room_number: string | null;
+    notes: string | null;
+  }>(
+    `SELECT
+       e.id,
+       e.category,
+       e.amount::text AS amount,
+       e.expense_status,
+       e.expense_date,
+       e.vendor_name,
+       e.description,
+       e.building_id,
+       e.room_id,
+       b.name AS building_name,
+       r.room_number,
+       e.notes
+     FROM expenses e
+     LEFT JOIN buildings b ON b.id = e.building_id
+     LEFT JOIN rooms r ON r.id = e.room_id
+     WHERE COALESCE(e.expense_status, 'pending') IN ('pending', 'approved', 'paid', 'rejected')
+     ORDER BY e.expense_date DESC NULLS LAST
+     LIMIT 500`
+  );
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const cardIds: string[] = [];
+
+  for (const row of result.rows) {
+    try {
+      const synced = await ensureExpensePipelineCard({
+        expenseId: row.id,
+        category: row.category,
+        amount: Number(row.amount),
+        expenseStatus: row.expense_status,
+        expenseDate: row.expense_date,
+        vendorName: row.vendor_name,
+        description: row.description,
+        buildingId: row.building_id,
+        roomId: row.room_id,
+        buildingName: row.building_name,
+        roomNumber: row.room_number,
+        notes: row.notes,
+      });
+      cardIds.push(synced.card.id);
+      if (synced.created) created += 1;
+      else updated += 1;
+    } catch (err) {
+      console.error('Failed to sync expense card', row.id, err);
       skipped += 1;
     }
   }
@@ -2091,8 +2314,20 @@ function summarizePipelineEvent(row: {
   from_stage_name: string | null;
   to_stage_name: string | null;
 }): string {
+  const metaChanges = Array.isArray(row.metadata?.changes)
+    ? (row.metadata.changes as unknown[]).filter(
+        (c): c is string => typeof c === 'string' && c.trim().length > 0
+      )
+    : [];
+
   const note = row.note?.trim();
-  if (note) return note;
+  const noteIsGeneric =
+    !note ||
+    note === 'Opportunity updated' ||
+    note.toLowerCase() === 'updated';
+
+  if (note && !noteIsGeneric) return note;
+  if (metaChanges.length > 0) return metaChanges.join('; ');
 
   switch (row.event_type) {
     case 'created':
@@ -2109,10 +2344,53 @@ function summarizePipelineEvent(row: {
     case 'lease_generated':
       return 'Lease generated';
     case 'updated':
-      return 'Opportunity updated';
+      return noteIsGeneric
+        ? 'Updated (details not recorded)'
+        : note || 'Opportunity updated';
     default:
       return row.event_type.replace(/_/g, ' ');
   }
+}
+
+function formatHistoryDate(iso?: string | null): string {
+  if (!iso) return '(cleared)';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatHistoryMoney(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(Number(value))) return '(cleared)';
+  return `₱${Number(value).toLocaleString('en-PH', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function sameInstant(a?: string | null, b?: string | null): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return a === b;
+  return ta === tb;
+}
+
+function sameNumber(a?: number | null, b?: number | null): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Number(a) === Number(b);
+}
+
+function formatTagsList(tags: string[]): string {
+  if (!tags.length) return '(none)';
+  return tags.join(', ');
 }
 
 export async function getPipelineCardEvents(
@@ -2264,11 +2542,17 @@ export interface UpdatePipelineCardData {
   assignedTo?: string | null;
 }
 
+export interface UpdatePipelineCardResult {
+  card: PipelineCard;
+  /** Human-readable field diffs written to pipeline_card_events (empty if no-op). */
+  changeNotes: string[];
+}
+
 export async function updatePipelineCard(
   cardId: string,
   data: UpdatePipelineCardData,
   userId?: string | null
-): Promise<PipelineCard> {
+): Promise<UpdatePipelineCardResult> {
   const existing = await getPipelineCardById(cardId);
   if (!existing) throw new Error('Card not found');
 
@@ -2416,32 +2700,239 @@ export async function updatePipelineCard(
       changeNotes.push(`Assigned to ${name}`);
     }
   }
+  if (data.title !== undefined && data.title.trim() !== existing.title) {
+    changeNotes.push(`Title set to "${data.title.trim()}"`);
+  }
   if (data.contactFirstName !== undefined || data.contactLastName !== undefined) {
     const prev = [existing.contactFirstName, existing.contactLastName].filter(Boolean).join(' ');
     const next = [firstName, lastName].filter(Boolean).join(' ');
-    if (prev !== next) changeNotes.push(`Contact updated to ${next || '(cleared)'}`);
+    if (prev !== next) {
+      changeNotes.push(
+        prev
+          ? `Contact renamed ${prev} → ${next || '(cleared)'}`
+          : `Contact set to ${next || '(cleared)'}`
+      );
+    }
+  }
+  if (data.contactEmail !== undefined) {
+    const next = data.contactEmail?.trim() || null;
+    const prev = existing.contactEmail || null;
+    if (next !== prev) {
+      changeNotes.push(
+        prev ? `Email ${prev} → ${next || '(cleared)'}` : `Email set to ${next || '(cleared)'}`
+      );
+    }
+  }
+  if (data.contactPhone !== undefined) {
+    const next = data.contactPhone?.trim() || null;
+    const prev = existing.contactPhone || null;
+    if (next !== prev) {
+      changeNotes.push(
+        prev ? `Phone ${prev} → ${next || '(cleared)'}` : `Phone set to ${next || '(cleared)'}`
+      );
+    }
   }
   if (data.buildingId !== undefined && data.buildingId !== (existing.buildingId || null)) {
-    changeNotes.push('Building updated');
+    if (data.buildingId) {
+      const b = await pool.query<{ name: string }>(
+        `SELECT name FROM buildings WHERE id = $1`,
+        [data.buildingId]
+      );
+      changeNotes.push(
+        existing.buildingName
+          ? `Building ${existing.buildingName} → ${b.rows[0]?.name || 'selected'}`
+          : `Building set to ${b.rows[0]?.name || 'selected'}`
+      );
+    } else {
+      changeNotes.push(
+        existing.buildingName
+          ? `Building cleared (was ${existing.buildingName})`
+          : 'Building cleared'
+      );
+    }
   }
   if (data.roomId !== undefined && data.roomId !== (existing.roomId || null)) {
-    changeNotes.push('Room updated');
+    if (data.roomId) {
+      const r = await pool.query<{ room_number: string }>(
+        `SELECT room_number FROM rooms WHERE id = $1`,
+        [data.roomId]
+      );
+      const nextRoom = r.rows[0]?.room_number || 'selected';
+      changeNotes.push(
+        existing.roomNumber
+          ? `Room ${existing.roomNumber} → ${nextRoom}`
+          : `Room set to ${nextRoom}`
+      );
+    } else {
+      changeNotes.push(
+        existing.roomNumber ? `Room cleared (was ${existing.roomNumber})` : 'Room cleared'
+      );
+    }
   }
-  if (data.amount !== undefined && data.amount !== (existing.amount ?? null)) {
-    changeNotes.push('Amount updated');
+  if (data.amount !== undefined && !sameNumber(data.amount, existing.amount ?? null)) {
+    changeNotes.push(
+      `Amount ${formatHistoryMoney(existing.amount)} → ${formatHistoryMoney(data.amount)}`
+    );
+  } else if (
+    data.amount === undefined &&
+    data.roomId &&
+    data.roomId !== existing.roomId &&
+    !sameNumber(amount, existing.amount ?? null)
+  ) {
+    changeNotes.push(
+      `Amount ${formatHistoryMoney(existing.amount)} → ${formatHistoryMoney(amount)} (from room rate)`
+    );
   }
-  if (data.tags !== undefined) changeNotes.push('Tags updated');
+  if (data.source !== undefined) {
+    const next = data.source?.trim() || null;
+    const prev = existing.source || null;
+    if (next !== prev) {
+      changeNotes.push(
+        prev ? `Source ${prev} → ${next || '(cleared)'}` : `Source set to ${next || '(cleared)'}`
+      );
+    }
+  }
+  if (data.tags !== undefined) {
+    const prev = [...(existing.tags || [])].map(String).sort().join('\0');
+    const next = [...tags].map(String).sort().join('\0');
+    if (prev !== next) {
+      changeNotes.push(
+        `Tags ${formatTagsList(existing.tags || [])} → ${formatTagsList(tags)}`
+      );
+    }
+  } else if (
+    (data.viewingAt !== undefined) &&
+    formatTagsList(existing.tags || []) !== formatTagsList(tags)
+  ) {
+    changeNotes.push(
+      `Tags ${formatTagsList(existing.tags || [])} → ${formatTagsList(tags)}`
+    );
+  }
+  if (data.dueAt !== undefined && !sameInstant(data.dueAt, existing.dueAt || null)) {
+    changeNotes.push(
+      `Due date ${formatHistoryDate(existing.dueAt)} → ${formatHistoryDate(data.dueAt)}`
+    );
+  }
+  if (
+    data.nextActionAt !== undefined &&
+    !sameInstant(data.nextActionAt, existing.nextActionAt || null)
+  ) {
+    changeNotes.push(
+      `Next follow-up ${formatHistoryDate(existing.nextActionAt)} → ${formatHistoryDate(data.nextActionAt)}`
+    );
+  }
+  if (data.viewingAt !== undefined && !sameInstant(data.viewingAt, existing.viewingAt || null)) {
+    changeNotes.push(
+      `Viewing ${formatHistoryDate(existing.viewingAt)} → ${formatHistoryDate(data.viewingAt)}`
+    );
+  }
   if (data.notes !== undefined && (data.notes?.trim() || null) !== (existing.notes || null)) {
-    changeNotes.push('Notes updated');
+    const nextNotes = data.notes?.trim() || '';
+    if (!nextNotes) {
+      changeNotes.push('Follow-up notes cleared');
+    } else if (!(existing.notes || '').trim()) {
+      changeNotes.push(
+        `Follow-up notes added: ${nextNotes.length > 120 ? `${nextNotes.slice(0, 117)}…` : nextNotes}`
+      );
+    } else {
+      changeNotes.push('Follow-up notes updated');
+    }
   }
-  if (markAsLost) changeNotes.push(lostReason ? `Marked lost: ${lostReason}` : 'Marked as lost');
-  if (data.backgroundCheckStatus !== undefined &&
-      data.backgroundCheckStatus !== (existing.backgroundCheckStatus || 'not_started')) {
-    changeNotes.push(`Screening set to ${data.backgroundCheckStatus.replace(/_/g, ' ')}`);
+  if (markAsLost) {
+    changeNotes.push(lostReason ? `Marked lost: ${lostReason}` : 'Marked as lost');
+  } else if (
+    data.lostReason !== undefined &&
+    (data.lostReason?.trim() || null) !== (existing.lostReason || null)
+  ) {
+    changeNotes.push(
+      data.lostReason?.trim()
+        ? `Lost reason set to ${data.lostReason.trim()}`
+        : 'Lost reason cleared'
+    );
   }
-  if (data.moveInPaymentStatus !== undefined &&
-      data.moveInPaymentStatus !== (existing.moveInPaymentStatus || 'unpaid')) {
-    changeNotes.push(`Move-in payment marked ${data.moveInPaymentStatus}`);
+  if (
+    data.backgroundCheckStatus !== undefined &&
+    data.backgroundCheckStatus !== (existing.backgroundCheckStatus || 'not_started')
+  ) {
+    changeNotes.push(
+      `Screening ${(existing.backgroundCheckStatus || 'not_started').replace(/_/g, ' ')} → ${data.backgroundCheckStatus.replace(/_/g, ' ')}`
+    );
+  }
+  if (
+    data.backgroundCheckNotes !== undefined &&
+    (data.backgroundCheckNotes?.trim() || null) !== (existing.backgroundCheckNotes || null)
+  ) {
+    changeNotes.push('Screening notes updated');
+  }
+  if (
+    data.leaseStatus !== undefined &&
+    data.leaseStatus !== (existing.leaseStatus || 'not_started')
+  ) {
+    changeNotes.push(
+      `Lease status ${(existing.leaseStatus || 'not_started').replace(/_/g, ' ')} → ${data.leaseStatus.replace(/_/g, ' ')}`
+    );
+  }
+  if (
+    data.leaseStartDate !== undefined &&
+    !sameInstant(data.leaseStartDate, existing.leaseStartDate || null)
+  ) {
+    changeNotes.push(
+      `Lease start ${formatHistoryDate(existing.leaseStartDate)} → ${formatHistoryDate(data.leaseStartDate)}`
+    );
+  }
+  if (
+    data.leaseEndDate !== undefined &&
+    !sameInstant(data.leaseEndDate, existing.leaseEndDate || null)
+  ) {
+    changeNotes.push(
+      `Lease end ${formatHistoryDate(existing.leaseEndDate)} → ${formatHistoryDate(data.leaseEndDate)}`
+    );
+  }
+  if (
+    data.moveInDate !== undefined &&
+    !sameInstant(data.moveInDate, existing.moveInDate || null)
+  ) {
+    changeNotes.push(
+      `Move-in date ${formatHistoryDate(existing.moveInDate)} → ${formatHistoryDate(data.moveInDate)}`
+    );
+  }
+  if (
+    data.depositAmount !== undefined &&
+    !sameNumber(data.depositAmount, existing.depositAmount ?? null)
+  ) {
+    changeNotes.push(
+      `Deposit ${formatHistoryMoney(existing.depositAmount)} → ${formatHistoryMoney(data.depositAmount)}`
+    );
+  }
+  if (
+    data.advanceAmount !== undefined &&
+    !sameNumber(data.advanceAmount, existing.advanceAmount ?? null)
+  ) {
+    changeNotes.push(
+      `Advance ${formatHistoryMoney(existing.advanceAmount)} → ${formatHistoryMoney(data.advanceAmount)}`
+    );
+  }
+  if (
+    data.moveInPaymentStatus !== undefined &&
+    data.moveInPaymentStatus !== (existing.moveInPaymentStatus || 'unpaid')
+  ) {
+    changeNotes.push(
+      `Move-in payment ${(existing.moveInPaymentStatus || 'unpaid')} → ${data.moveInPaymentStatus}`
+    );
+  }
+  if (
+    data.moveInPaymentMethod !== undefined &&
+    (data.moveInPaymentMethod?.trim() || null) !== (existing.moveInPaymentMethod || null)
+  ) {
+    const next = data.moveInPaymentMethod?.trim() || '(cleared)';
+    const prev = existing.moveInPaymentMethod || '(none)';
+    changeNotes.push(`Payment method ${prev.replace(/_/g, ' ')} → ${next.replace(/_/g, ' ')}`);
+  }
+  if (
+    data.moveInPaymentNotes !== undefined &&
+    (data.moveInPaymentNotes?.trim() || null) !== (existing.moveInPaymentNotes || null)
+  ) {
+    changeNotes.push('Payment notes updated');
   }
 
   await pool.query(
@@ -2522,19 +3013,21 @@ export async function updatePipelineCard(
       ? 'assignee_changed'
       : 'updated';
 
-  await pool.query(
-    `INSERT INTO pipeline_card_events (
-       card_id, event_type, from_board_id, to_board_id, note, metadata, created_by
-     ) VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6)`,
-    [
-      cardId,
-      eventType,
-      existing.boardId,
-      changeNotes.length > 0 ? changeNotes.join('; ') : markAsLost ? lostReason : 'Opportunity updated',
-      JSON.stringify({ changes: changeNotes }),
-      userId || null,
-    ]
-  );
+  if (changeNotes.length > 0) {
+    await pool.query(
+      `INSERT INTO pipeline_card_events (
+         card_id, event_type, from_board_id, to_board_id, note, metadata, created_by
+       ) VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6)`,
+      [
+        cardId,
+        eventType,
+        existing.boardId,
+        changeNotes.join('; '),
+        JSON.stringify({ changes: changeNotes }),
+        userId || null,
+      ]
+    );
+  }
 
   const boardRow = await pool.query<{ slug: string }>(
     `SELECT slug FROM pipeline_boards WHERE id = $1`,
@@ -2631,7 +3124,7 @@ export async function updatePipelineCard(
   }
 
   if (data.markLeaseSigned || data.generateLease) {
-    return convertOnboardingCardToLeaseSigned(cardId, {
+    const card = await convertOnboardingCardToLeaseSigned(cardId, {
       userId,
       note: data.generateLease
         ? 'Lease generated from opportunity form'
@@ -2640,11 +3133,18 @@ export async function updatePipelineCard(
       leaseEndDate,
       moveInDate,
     });
+    return {
+      card,
+      changeNotes: [
+        ...changeNotes,
+        data.generateLease ? 'Lease generated' : 'Marked lease signed',
+      ],
+    };
   }
 
   const updated = await getPipelineCardById(cardId);
   if (!updated) throw new Error('Failed to reload card');
-  return updated;
+  return { card: updated, changeNotes };
 }
 
 export async function updatePipelineStage(

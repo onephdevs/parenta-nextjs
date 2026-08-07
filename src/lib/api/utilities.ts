@@ -13,6 +13,9 @@ export interface UtilityBill {
   provider: string;
   accountNumber?: string;
   meterReading?: number;
+  usageAmount?: number;
+  usageUnit?: string;
+  billUrl?: string;
   notes?: string;
   isActive: boolean;
   createdAt: Date;
@@ -471,6 +474,9 @@ function mapRowToUtilityBill(row: Record<string, unknown>): UtilityBill {
         ? Number(row.meter_reading)
         : undefined,
     notes: row.notes ? String(row.notes) : undefined,
+    billUrl: row.bill_url ? String(row.bill_url) : undefined,
+    usageAmount: row.usage_amount != null ? Number(row.usage_amount) : undefined,
+    usageUnit: row.usage_unit ? String(row.usage_unit) : undefined,
     isActive: row.is_active != null ? Boolean(row.is_active) : String(row.bill_status) !== 'cancelled',
     createdAt: new Date(String(row.created_at)),
     updatedAt: new Date(String(row.updated_at)),

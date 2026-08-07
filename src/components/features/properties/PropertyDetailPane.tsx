@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import type { PropertyBuildingDetail } from '@/lib/api/properties';
 import MainPropertyCard from './MainPropertyCard';
 import PropertyRoomCard from './PropertyRoomCard';
+import PropertyReportPanel from './PropertyReportPanel';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 
@@ -67,13 +68,15 @@ export default function PropertyDetailPane({
         )}
 
         {!loading && detail && (
-          <div className="mx-auto max-w-[720px] space-y-8">
+          <div className="mx-auto max-w-[880px] space-y-8">
             <MainPropertyCard
               detail={detail}
               onBuildingUpdated={onBuildingUpdated}
               onBuildingDeleted={onBuildingDeleted}
               onRoomAdded={onBuildingUpdated}
             />
+
+            <PropertyReportPanel buildingId={detail.building.id} />
 
             <div>
               <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Rooms</p>

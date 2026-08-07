@@ -177,6 +177,51 @@ export async function POST(request: NextRequest) {
     const document = await createDocument(documentData);
     const documentId = String(document.id || '');
 
+    let contextLabel: string | null = null;
+    let activityLink =
+      documentId ? `/admin/documents/${documentId}/edit` : '/admin/documents';
+
+    if (pipelineCardId) {
+      try {
+        const { getPipelineCardById } = await import('@/lib/api/pipeline');
+        const card = await getPipelineCardById(pipelineCardId);
+        if (card?.title) {
+          contextLabel = `opportunity “${card.title}”`;
+          activityLink = card.boardSlug
+            ? `/admin/tasks?board=${card.boardSlug}`
+            : '/admin/tasks';
+        }
+      } catch {
+        /* non-fatal for activity label */
+      }
+    } else if (tenantId) {
+      try {
+        const pool = (await import('@/lib/db')).default;
+        const tenant = await pool.query<{ first_name: string | null; last_name: string | null }>(
+          `SELECT first_name, last_name FROM tenants WHERE id = $1`,
+          [tenantId]
+        );
+        const name = [tenant.rows[0]?.first_name, tenant.rows[0]?.last_name]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        if (name) contextLabel = `tenant ${name}`;
+      } catch {
+        /* non-fatal */
+      }
+    } else if (buildingId) {
+      try {
+        const pool = (await import('@/lib/db')).default;
+        const building = await pool.query<{ name: string }>(
+          `SELECT name FROM buildings WHERE id = $1`,
+          [buildingId]
+        );
+        if (building.rows[0]?.name) contextLabel = `property ${building.rows[0].name}`;
+      } catch {
+        /* non-fatal */
+      }
+    }
+
     logActivitySafe({
       actorUserId: session.user.id || null,
       actorRole: 'admin',
@@ -184,10 +229,18 @@ export async function POST(request: NextRequest) {
       category: 'documents',
       entityType: 'document',
       entityId: documentId || null,
-      entityLabel: documentName,
+      entityLabel: displayName || documentName,
       afterData: document as unknown as Record<string, unknown>,
-      link: documentId ? `/admin/documents/${documentId}/edit` : '/admin/documents',
-      metadata: { link: documentId ? `/admin/documents/${documentId}/edit` : '/admin/documents' },
+      link: activityLink,
+      metadata: {
+        link: activityLink,
+        documentType: documentType || null,
+        fileName: originalFileName || null,
+        pipelineCardId: pipelineCardId || null,
+        tenantId: tenantId || null,
+        buildingId: buildingId || null,
+        contextLabel,
+      },
     });
     
     return NextResponse.json({ 

@@ -114,6 +114,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           actionType: row.action_type,
           entityLabel,
           actorName,
+          metadata: (row.metadata as Record<string, unknown>) || {},
         }),
       },
     });

@@ -16,7 +16,7 @@ interface CardDocument {
   createdAt?: string | Date;
 }
 
-const DOC_TYPE_OPTIONS = [
+const DEFAULT_DOC_TYPE_OPTIONS = [
   { value: 'id_proof', label: 'ID / government ID' },
   { value: 'income_proof', label: 'Income proof' },
   { value: 'lease', label: 'Lease agreement' },
@@ -24,10 +24,19 @@ const DOC_TYPE_OPTIONS = [
   { value: 'other', label: 'Other' },
 ];
 
+export const PAYMENT_DOC_TYPE_OPTIONS = [
+  { value: 'receipt', label: 'Payment receipt' },
+  { value: 'invoice', label: 'Invoice copy' },
+  { value: 'other', label: 'Other' },
+];
+
 interface OpportunityDocumentsPanelProps {
   cardId: string;
   buildingId?: string;
   roomId?: string;
+  description?: string;
+  docTypeOptions?: Array<{ value: string; label: string }>;
+  defaultDocType?: string;
   onUploaded?: (doc: CardDocument) => void;
 }
 
@@ -35,13 +44,18 @@ export function OpportunityDocumentsPanel({
   cardId,
   buildingId,
   roomId,
+  description = 'Upload ID, income proof, lease drafts, and screening reports for this prospect.',
+  docTypeOptions = DEFAULT_DOC_TYPE_OPTIONS,
+  defaultDocType,
   onUploaded,
 }: OpportunityDocumentsPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [docs, setDocs] = useState<CardDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState('id_proof');
+  const [docType, setDocType] = useState(
+    defaultDocType || docTypeOptions[0]?.value || 'other'
+  );
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -115,9 +129,7 @@ export function OpportunityDocumentsPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
-        Upload ID, income proof, lease drafts, and screening reports for this prospect.
-      </p>
+      <p className="text-sm text-gray-500">{description}</p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <FormField label="Document type" htmlFor="opp-doc-type" className="flex-1">
@@ -126,7 +138,7 @@ export function OpportunityDocumentsPanel({
             value={docType}
             onChange={(e) => setDocType(e.target.value)}
           >
-            {DOC_TYPE_OPTIONS.map((o) => (
+            {docTypeOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -185,7 +197,7 @@ export function OpportunityDocumentsPanel({
                     {doc.documentName || doc.fileName || 'Document'}
                   </a>
                   <p className="truncate text-xs text-gray-500">
-                    {DOC_TYPE_OPTIONS.find((o) => o.value === doc.documentType)?.label ||
+                    {docTypeOptions.find((o) => o.value === doc.documentType)?.label ||
                       doc.documentType ||
                       'Document'}
                     {doc.fileSize != null ? ` · ${(doc.fileSize / 1024).toFixed(0)} KB` : ''}

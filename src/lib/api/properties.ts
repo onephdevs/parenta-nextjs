@@ -161,7 +161,10 @@ export async function getBuildingsForPropertiesPage(options?: {
     LEFT JOIN rooms r ON r.building_id = b.id AND r.is_active = true
     ${whereClause}
     GROUP BY b.id
-    ORDER BY b.name ASC
+    ORDER BY
+      regexp_replace(lower(b.name), '[0-9]+', '', 'g'),
+      COALESCE(NULLIF(regexp_replace(b.name, '[^0-9]', '', 'g'), '')::bigint, 0),
+      lower(b.name)
   `;
 
   const result = await pool.query(query, values);
@@ -739,3 +742,370 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     assignmentHistory,
   };
 }
+
+export interface PropertyReportUnitThumb {
+  roomId: string;
+  roomNumber: string;
+  tenantName?: string | null;
+  imagePath?: string | null;
+}
+
+export interface PropertyUnsignedUnit {
+  roomId: string;
+  roomNumber: string;
+  roomStatus: string;
+  monthlyRate: number;
+  imagePath?: string | null;
+  reason: 'vacant' | 'awaiting_signature';
+}
+
+export interface PropertyMaintenanceCategoryCount {
+  category: string;
+  count: number;
+}
+
+export interface PropertyBuildingReport {
+  buildingId: string;
+  month: string; // YYYY-MM
+  monthLabel: string;
+  rent: {
+    totalRent: number;
+    rentCollected: number;
+    rentOutstanding: number;
+    rentProcessing: number;
+    unpaidPercent: number;
+    collectedPercent: number;
+    unitsWithInvoiceDue: number;
+    unitsWithInvoicePaid: number;
+    unitsWithInvoices: number;
+    dueUnitThumbs: PropertyReportUnitThumb[];
+    paidUnitThumbs: PropertyReportUnitThumb[];
+  };
+  availability: {
+    totalUnits: number;
+    occupied: number;
+    vacant: number;
+    occupiedPercent: number;
+    vacantPercent: number;
+  };
+  unsignedUnits: PropertyUnsignedUnit[];
+  maintenance: {
+    newRequests: number;
+    urgentRequests: number;
+    openRequests: number;
+    byCategory: PropertyMaintenanceCategoryCount[];
+  };
+}
+
+function parseYearMonth(input?: string | null): { year: number; month: number; key: string } {
+  const now = new Date();
+  if (input && /^\d{4}-\d{2}$/.test(input)) {
+    const [y, m] = input.split('-').map(Number);
+    if (y >= 2000 && m >= 1 && m <= 12) {
+      return { year: y, month: m, key: `${y}-${String(m).padStart(2, '0')}` };
+    }
+  }
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  return { year: y, month: m, key: `${y}-${String(m).padStart(2, '0')}` };
+}
+
+/**
+ * Monthly rent collection + availability + maintenance snapshot for one building.
+ */
+export async function getPropertyBuildingReport(
+  buildingId: string,
+  monthKey?: string | null
+): Promise<PropertyBuildingReport | null> {
+  const buildingCheck = await pool.query(
+    `SELECT id FROM buildings WHERE id = $1 AND is_active = true`,
+    [buildingId]
+  );
+  if (buildingCheck.rows.length === 0) return null;
+
+  const { year, month, key } = parseYearMonth(monthKey);
+  const monthStart = `${key}-01`;
+  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const [rentResult, availabilityResult, unsignedResult, awaitingResult, maintenanceResult, categoryResult] =
+    await Promise.all([
+      pool.query(
+        `
+        WITH building_tenants AS (
+          SELECT DISTINCT tra.tenant_id, tra.room_id, r.room_number
+          FROM tenant_room_assignments tra
+          INNER JOIN rooms r ON r.id = tra.room_id
+          WHERE r.building_id = $1
+            AND r.is_active = true
+            AND tra.assignment_status = 'active'
+            AND (tra.end_date IS NULL OR tra.end_date >= $2::date)
+            AND tra.start_date < ($2::date + INTERVAL '1 month')
+        ),
+        month_invoices AS (
+          SELECT
+            i.id,
+            i.tenant_id,
+            i.total_amount,
+            i.amount_paid,
+            GREATEST(i.total_amount - COALESCE(i.amount_paid, 0), 0) AS balance_due,
+            i.invoice_status,
+            i.due_date,
+            bt.room_id,
+            bt.room_number
+          FROM invoices i
+          INNER JOIN building_tenants bt ON bt.tenant_id = i.tenant_id
+          WHERE i.invoice_status IS DISTINCT FROM 'cancelled'
+            AND (
+              (i.due_date >= $2::date AND i.due_date < ($2::date + INTERVAL '1 month'))
+              OR (
+                i.billing_period_start IS NOT NULL
+                AND i.billing_period_start < ($2::date + INTERVAL '1 month')
+                AND COALESCE(i.billing_period_end, i.due_date) >= $2::date
+              )
+            )
+        ),
+        room_invoice AS (
+          SELECT DISTINCT ON (room_id)
+            room_id,
+            room_number,
+            total_amount,
+            amount_paid,
+            balance_due,
+            invoice_status,
+            due_date
+          FROM month_invoices
+          ORDER BY room_id, due_date DESC NULLS LAST
+        )
+        SELECT
+          COALESCE((SELECT SUM(total_amount) FROM month_invoices), 0)::float AS total_rent,
+          COALESCE((SELECT SUM(amount_paid) FROM month_invoices), 0)::float AS rent_collected,
+          COALESCE((SELECT SUM(balance_due) FROM month_invoices WHERE balance_due > 0), 0)::float AS rent_outstanding,
+          COALESCE((
+            SELECT SUM(p.amount)
+            FROM payments p
+            INNER JOIN building_tenants bt ON bt.tenant_id = p.tenant_id
+            WHERE p.payment_status = 'pending'
+              AND p.payment_date >= $2::date
+              AND p.payment_date < ($2::date + INTERVAL '1 month')
+          ), 0)::float AS rent_processing,
+          COALESCE((SELECT COUNT(*) FROM room_invoice), 0)::int AS units_with_invoices,
+          COALESCE((SELECT COUNT(*) FROM room_invoice WHERE balance_due > 0.01), 0)::int AS units_due,
+          COALESCE((
+            SELECT COUNT(*) FROM room_invoice
+            WHERE balance_due <= 0.01 OR invoice_status = 'paid'
+          ), 0)::int AS units_paid,
+          COALESCE((
+            SELECT json_agg(json_build_object(
+              'roomId', ri.room_id,
+              'roomNumber', ri.room_number,
+              'imagePath', (
+                SELECT i.file_path FROM images i
+                WHERE i.entity_type = 'room' AND i.entity_id = ri.room_id
+                ORDER BY i.is_primary DESC, i.created_at ASC LIMIT 1
+              )
+            ) ORDER BY ri.room_number)
+            FROM room_invoice ri WHERE ri.balance_due > 0.01
+          ), '[]'::json) AS due_thumbs,
+          COALESCE((
+            SELECT json_agg(json_build_object(
+              'roomId', ri.room_id,
+              'roomNumber', ri.room_number,
+              'imagePath', (
+                SELECT i.file_path FROM images i
+                WHERE i.entity_type = 'room' AND i.entity_id = ri.room_id
+                ORDER BY i.is_primary DESC, i.created_at ASC LIMIT 1
+              )
+            ) ORDER BY ri.room_number)
+            FROM room_invoice ri
+            WHERE ri.balance_due <= 0.01 OR ri.invoice_status = 'paid'
+          ), '[]'::json) AS paid_thumbs
+        `,
+        [buildingId, monthStart]
+      ),
+      pool.query(
+        `
+        SELECT
+          COUNT(*)::int AS total_units,
+          SUM(CASE WHEN room_status = 'occupied' THEN 1 ELSE 0 END)::int AS occupied,
+          SUM(CASE WHEN room_status = 'vacant' THEN 1 ELSE 0 END)::int AS vacant
+        FROM rooms
+        WHERE building_id = $1 AND is_active = true
+        `,
+        [buildingId]
+      ),
+      pool.query(
+        `
+        SELECT
+          r.id AS room_id,
+          r.room_number,
+          r.room_status,
+          r.monthly_rate,
+          (
+            SELECT i.file_path FROM images i
+            WHERE i.entity_type = 'room' AND i.entity_id = r.id
+            ORDER BY i.is_primary DESC, i.created_at ASC LIMIT 1
+          ) AS image_path
+        FROM rooms r
+        WHERE r.building_id = $1
+          AND r.is_active = true
+          AND r.room_status = 'vacant'
+        ORDER BY
+          regexp_replace(lower(r.room_number), '[0-9]+', '', 'g'),
+          COALESCE(NULLIF(regexp_replace(r.room_number, '[^0-9]', '', 'g'), '')::bigint, 0),
+          r.room_number
+        LIMIT 20
+        `,
+        [buildingId]
+      ),
+      pool.query(
+        `
+        SELECT
+          c.id,
+          c.title,
+          c.room_id,
+          r.room_number,
+          r.monthly_rate,
+          r.room_status,
+          (
+            SELECT i.file_path FROM images i
+            WHERE i.entity_type = 'room' AND i.entity_id = r.id
+            ORDER BY i.is_primary DESC, i.created_at ASC LIMIT 1
+          ) AS image_path
+        FROM pipeline_cards c
+        INNER JOIN pipeline_boards b ON b.id = c.board_id AND b.slug = 'onboarding'
+        LEFT JOIN rooms r ON r.id = c.room_id
+        WHERE c.building_id = $1
+          AND c.card_status = 'open'
+          AND c.lease_status = 'awaiting_signature'
+        ORDER BY c.updated_at DESC
+        LIMIT 12
+        `,
+        [buildingId]
+      ).catch(() => ({ rows: [] as Record<string, unknown>[] })),
+      pool.query(
+        `
+        SELECT
+          COUNT(*) FILTER (
+            WHERE status IN ('open', 'submitted', 'pending')
+          )::int AS new_requests,
+          COUNT(*) FILTER (
+            WHERE priority IN ('urgent', 'high')
+              AND status NOT IN ('completed', 'cancelled', 'closed')
+          )::int AS urgent_requests,
+          COUNT(*) FILTER (
+            WHERE status NOT IN ('completed', 'cancelled', 'closed')
+          )::int AS open_requests
+        FROM maintenance_requests
+        WHERE building_id = $1
+        `,
+        [buildingId]
+      ),
+      pool.query(
+        `
+        SELECT
+          COALESCE(NULLIF(trim(category), ''), 'other') AS category,
+          COUNT(*)::int AS count
+        FROM maintenance_requests
+        WHERE building_id = $1
+          AND status NOT IN ('completed', 'cancelled', 'closed')
+        GROUP BY 1
+        ORDER BY count DESC, category ASC
+        `,
+        [buildingId]
+      ),
+    ]);
+
+  const rentRow = rentResult.rows[0] || {};
+  const totalRent = Number(rentRow.total_rent) || 0;
+  const rentCollected = Number(rentRow.rent_collected) || 0;
+  const rentOutstanding = Number(rentRow.rent_outstanding) || 0;
+  const rentProcessing = Number(rentRow.rent_processing) || 0;
+  const unitsWithInvoices = Number(rentRow.units_with_invoices) || 0;
+  const unitsDue = Number(rentRow.units_due) || 0;
+  const unitsPaid = Number(rentRow.units_paid) || 0;
+  const denom = totalRent > 0 ? totalRent : rentCollected + rentOutstanding;
+  const unpaidPercent = denom > 0 ? Math.round((rentOutstanding / denom) * 100) : 0;
+  const collectedPercent = denom > 0 ? Math.max(0, 100 - unpaidPercent) : 0;
+
+  const parseThumbs = (raw: unknown): PropertyReportUnitThumb[] => {
+    const arr = Array.isArray(raw) ? raw : typeof raw === 'string' ? JSON.parse(raw) : [];
+    return (arr as Record<string, unknown>[]).map((t) => ({
+      roomId: String(t.roomId || t.room_id || ''),
+      roomNumber: String(t.roomNumber || t.room_number || ''),
+      imagePath: t.imagePath || t.image_path ? String(t.imagePath || t.image_path) : null,
+    }));
+  };
+
+  const avail = availabilityResult.rows[0] || {};
+  const totalUnits = Number(avail.total_units) || 0;
+  const occupied = Number(avail.occupied) || 0;
+  const vacant = Number(avail.vacant) || 0;
+
+  const unsignedVacant: PropertyUnsignedUnit[] = unsignedResult.rows.map((r) => ({
+    roomId: String(r.room_id),
+    roomNumber: String(r.room_number),
+    roomStatus: String(r.room_status),
+    monthlyRate: Number(r.monthly_rate) || 0,
+    imagePath: r.image_path ? String(r.image_path) : null,
+    reason: 'vacant' as const,
+  }));
+
+  const unsignedAwaiting: PropertyUnsignedUnit[] = (awaitingResult.rows || [])
+    .filter((r) => r.room_id)
+    .map((r) => ({
+      roomId: String(r.room_id),
+      roomNumber: String(r.room_number || '—'),
+      roomStatus: String(r.room_status || 'reserved'),
+      monthlyRate: Number(r.monthly_rate) || 0,
+      imagePath: r.image_path ? String(r.image_path) : null,
+      reason: 'awaiting_signature' as const,
+    }));
+
+  const seenRooms = new Set(unsignedAwaiting.map((u) => u.roomId));
+  const unsignedUnits = [
+    ...unsignedAwaiting,
+    ...unsignedVacant.filter((u) => !seenRooms.has(u.roomId)),
+  ].slice(0, 16);
+
+  const maint = maintenanceResult.rows[0] || {};
+
+  return {
+    buildingId,
+    month: key,
+    monthLabel,
+    rent: {
+      totalRent,
+      rentCollected,
+      rentOutstanding,
+      rentProcessing,
+      unpaidPercent,
+      collectedPercent,
+      unitsWithInvoiceDue: unitsDue,
+      unitsWithInvoicePaid: unitsPaid,
+      unitsWithInvoices,
+      dueUnitThumbs: parseThumbs(rentRow.due_thumbs).slice(0, 6),
+      paidUnitThumbs: parseThumbs(rentRow.paid_thumbs).slice(0, 6),
+    },
+    availability: {
+      totalUnits,
+      occupied,
+      vacant,
+      occupiedPercent: totalUnits > 0 ? Math.round((occupied / totalUnits) * 100) : 0,
+      vacantPercent: totalUnits > 0 ? Math.round((vacant / totalUnits) * 100) : 0,
+    },
+    unsignedUnits,
+    maintenance: {
+      newRequests: Number(maint.new_requests) || 0,
+      urgentRequests: Number(maint.urgent_requests) || 0,
+      openRequests: Number(maint.open_requests) || 0,
+      byCategory: categoryResult.rows.map((r) => ({
+        category: String(r.category),
+        count: Number(r.count) || 0,
+      })),
+    },
+  };
+}
+

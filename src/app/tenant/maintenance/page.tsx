@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,6 +14,8 @@ import {
   AlertCircle,
   MessageSquare,
   X,
+  Camera,
+  ImagePlus,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
@@ -28,16 +30,25 @@ import {
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import { IconButton } from '@/components/ui/IconButton';
+import { FileDropzone } from '@/components/ui/FileDropzone';
 import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
 import { Card } from '@/components/ui/Card';
+import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantMaintenance } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
+
+interface MaintenancePhoto {
+  id: string;
+  fileName?: string;
+  url: string;
+  mimeType?: string;
+}
 
 interface MaintenanceRequest {
   id: string;
@@ -51,6 +62,8 @@ interface MaintenanceRequest {
   scheduledDate?: string;
   completedDate?: string;
   notes?: string;
+  attachments?: MaintenancePhoto[];
+  attachmentCount?: number;
 }
 
 interface MaintenanceData {
@@ -58,6 +71,15 @@ interface MaintenanceData {
   total: number;
   requests: MaintenanceRequest[];
 }
+
+interface PendingPhoto {
+  id: string;
+  file: File;
+  preview: string;
+}
+
+const MAX_PHOTOS = 5;
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 function mapMaintenance(raw: { requests: unknown[] } | Record<string, unknown>): MaintenanceData {
   const requests = Array.isArray((raw as { requests?: unknown[] }).requests)
@@ -89,6 +111,8 @@ export default function MaintenancePage() {
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [newRequest, setNewRequest] = useState({
@@ -97,6 +121,64 @@ export default function MaintenancePage() {
     category: '',
     priority: 'medium'
   });
+
+  const clearPhotos = () => {
+    setPhotos((prev) => {
+      prev.forEach((p) => URL.revokeObjectURL(p.preview));
+      return [];
+    });
+  };
+
+  const addPhotoFiles = (files: File[]) => {
+    const next: PendingPhoto[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        showNotification({
+          type: 'error',
+          title: 'Invalid file',
+          message: 'Please attach photos only (JPEG, PNG, or WEBP)',
+        });
+        continue;
+      }
+      if (file.size > MAX_PHOTO_BYTES) {
+        showNotification({
+          type: 'error',
+          title: 'File too large',
+          message: `${file.name} must be under 5MB`,
+        });
+        continue;
+      }
+      next.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
+        file,
+        preview: URL.createObjectURL(file),
+      });
+    }
+    if (next.length === 0) return;
+    setPhotos((prev) => {
+      const combined = [...prev, ...next].slice(0, MAX_PHOTOS);
+      // revoke previews that didn't make the cut
+      next.forEach((p) => {
+        if (!combined.includes(p)) URL.revokeObjectURL(p.preview);
+      });
+      if (prev.length + next.length > MAX_PHOTOS) {
+        showNotification({
+          type: 'error',
+          title: 'Photo limit',
+          message: `You can attach up to ${MAX_PHOTOS} photos`,
+        });
+      }
+      return combined;
+    });
+  };
+
+  const removePhoto = (id: string) => {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.preview);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
 
   const fetchMaintenanceData = async (force = false) => {
     try {
@@ -145,21 +227,25 @@ export default function MaintenancePage() {
 
     setIsSubmitting(true);
     try {
+      const form = new FormData();
+      form.append('title', newRequest.title);
+      form.append('description', newRequest.description);
+      form.append('category', newRequest.category);
+      form.append('priority', newRequest.priority);
+      photos.forEach((p) => form.append('photos', p.file));
+
       const response = await fetch('/api/tenant/maintenance', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newRequest),
+        body: form,
       });
 
       const data = await response.json();
 
       if (data.success) {
         showNotification({
-          type: 'success',
+          type: data.warning ? 'warning' : 'success',
           title: 'Request Submitted',
-          message: 'Your maintenance request has been submitted successfully!'
+          message: data.message || 'Your maintenance request has been submitted successfully!'
         });
         setNewRequest({
           title: '',
@@ -167,6 +253,7 @@ export default function MaintenancePage() {
           category: '',
           priority: 'medium'
         });
+        clearPhotos();
         setShowNewRequestForm(false);
         invalidate('maintenance');
         void fetchMaintenanceData(true);
@@ -336,6 +423,12 @@ export default function MaintenancePage() {
                                 <MaintenancePriorityBadge priority={request.priority} />
                               </div>
                               <p className="text-gray-900 mb-3">{request.description}</p>
+                              {(request.attachments?.length || 0) > 0 && (
+                                <MaintenancePhotoGallery
+                                  photos={request.attachments || []}
+                                  className="mb-3"
+                                />
+                              )}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-900">
                                 <div>
                                   <span className="font-medium">Category:</span> {request.category.replace('_', ' ')}
@@ -413,7 +506,13 @@ export default function MaintenancePage() {
             <form onSubmit={handleSubmitRequest}>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-medium text-gray-900">Submit Maintenance Request</h3>
-                <IconButton label="Close" onClick={() => setShowNewRequestForm(false)}>
+                <IconButton
+                  label="Close"
+                  onClick={() => {
+                    clearPhotos();
+                    setShowNewRequestForm(false);
+                  }}
+                >
                   <X className="h-5 w-5" />
                 </IconButton>
               </div>
@@ -468,13 +567,79 @@ export default function MaintenancePage() {
                     placeholder="Please provide detailed information about the issue, location, and any relevant details"
                   />
                 </FormField>
+
+                <FormField
+                  label="Photos of the issue"
+                  htmlFor="maintenance-photos"
+                  hint={`Optional — up to ${MAX_PHOTOS} photos so the office can assess what needs fixing.`}
+                >
+                  <div className="space-y-3">
+                    <FileDropzone
+                      accept="image/jpeg,image/png,image/webp,image/*"
+                      multiple
+                      disabled={isSubmitting || photos.length >= MAX_PHOTOS}
+                      onFiles={addPhotoFiles}
+                      icon={<ImagePlus className="mx-auto mb-3 h-10 w-10 text-gray-400" />}
+                      label="Drag photos here, or click to choose from gallery"
+                      hint="JPEG, PNG, or WEBP · max 5MB each"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        leftIcon={<Camera className="h-4 w-4" />}
+                        disabled={isSubmitting || photos.length >= MAX_PHOTOS}
+                        onClick={() => cameraInputRef.current?.click()}
+                      >
+                        Take photo
+                      </Button>
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const list = e.target.files;
+                          if (list?.length) addPhotoFiles(Array.from(list));
+                          e.target.value = '';
+                        }}
+                      />
+                    </div>
+                    {photos.length > 0 && (
+                      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        {photos.map((photo) => (
+                          <li key={photo.id} className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.preview}
+                              alt="Issue preview"
+                              className="h-20 w-full rounded-md object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(photo.id)}
+                              className="absolute -right-1.5 -top-1.5 rounded-full bg-gray-900 p-0.5 text-white shadow"
+                              aria-label="Remove photo"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </FormField>
               </div>
 
               <div className="mt-6 flex items-center justify-end space-x-3">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowNewRequestForm(false)}
+                  onClick={() => {
+                    clearPhotos();
+                    setShowNewRequestForm(false);
+                  }}
                 >
                   Cancel
                 </Button>

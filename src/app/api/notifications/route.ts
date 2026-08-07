@@ -17,6 +17,7 @@ interface NotificationRow {
   actor_first_name: string | null;
   actor_last_name: string | null;
   actor_email: string | null;
+  actor_metadata: Record<string, unknown> | null;
 }
 
 function buildBody(row: NotificationRow): string {
@@ -37,6 +38,7 @@ function buildBody(row: NotificationRow): string {
     actionType: row.actor_action_type,
     entityLabel: row.actor_entity_label,
     actorName,
+    metadata: row.actor_metadata || {},
   });
 }
 
@@ -69,6 +71,7 @@ export async function GET(request: NextRequest) {
              al.action_type AS actor_action_type,
              al.entity_label AS actor_entity_label,
              al.actor_role AS actor_role,
+             al.metadata AS actor_metadata,
              u.first_name AS actor_first_name,
              u.last_name AS actor_last_name,
              u.email AS actor_email

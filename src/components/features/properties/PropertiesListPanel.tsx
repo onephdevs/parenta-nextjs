@@ -9,6 +9,15 @@ import PropertyListCard from './PropertyListCard';
 type FilterValue = 'all' | 'has_vacant' | 'fully_occupied';
 type SortValue = 'name-asc' | 'name-desc' | 'city-asc' | 'vacant-desc';
 
+/** Natural name compare so "Apartment 1" comes before "Apartment 2" / "APRTMENT-2". */
+function comparePropertyNames(a: string, b: string): number {
+  return (a || '').trim().localeCompare((b || '').trim(), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+    ignorePunctuation: true,
+  });
+}
+
 interface PropertiesListPanelProps {
   buildings: PropertyListBuilding[];
   selectedBuildingId: string | null;
@@ -60,33 +69,25 @@ export default function PropertiesListPanel({
       return true;
     });
 
-    list.sort((a, b) => {
+    const sorted = [...list].sort((a, b) => {
       switch (sort) {
         case 'name-desc':
-          return (b.name || '').localeCompare(a.name || '', undefined, { sensitivity: 'base' });
+          return comparePropertyNames(b.name || '', a.name || '');
         case 'city-asc': {
-          const cityCmp = (a.city || '').localeCompare(b.city || '', undefined, {
-            sensitivity: 'base',
-          });
-          return (
-            cityCmp ||
-            (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
-          );
+          const cityCmp = comparePropertyNames(a.city || '', b.city || '');
+          return cityCmp || comparePropertyNames(a.name || '', b.name || '');
         }
         case 'vacant-desc': {
           const vacantCmp = (b.vacantUnits || 0) - (a.vacantUnits || 0);
-          return (
-            vacantCmp ||
-            (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
-          );
+          return vacantCmp || comparePropertyNames(a.name || '', b.name || '');
         }
         case 'name-asc':
         default:
-          return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+          return comparePropertyNames(a.name || '', b.name || '');
       }
     });
 
-    return list;
+    return sorted;
   }, [buildings, search, filter, sort]);
 
   return (

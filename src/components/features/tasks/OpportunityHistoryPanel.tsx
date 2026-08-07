@@ -7,6 +7,8 @@ interface HistoryEvent {
   id: string;
   eventType: string;
   summary: string;
+  note?: string;
+  metadata?: Record<string, unknown>;
   actorName?: string;
   createdAt: string;
   fromStageName?: string;
@@ -36,6 +38,49 @@ function formatWhen(iso: string): string {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function changeLines(event: HistoryEvent): string[] {
+  const fromMeta = Array.isArray(event.metadata?.changes)
+    ? (event.metadata!.changes as unknown[]).filter(
+        (c): c is string => typeof c === 'string' && c.trim().length > 0
+      )
+    : [];
+  if (fromMeta.length > 0) return fromMeta;
+
+  const summary = event.summary?.trim() || '';
+  if (!summary) return [];
+  if (summary.includes('; ')) {
+    return summary
+      .split('; ')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [summary];
+}
+
+function eventTitle(event: HistoryEvent, lines: string[]): string {
+  switch (event.eventType) {
+    case 'created':
+      return 'Opportunity created';
+    case 'assignee_changed':
+      return lines[0] || 'Assignee updated';
+    case 'stage_changed':
+      if (event.fromStageName && event.toStageName) {
+        return `Moved: ${event.fromStageName} → ${event.toStageName}`;
+      }
+      return lines[0] || 'Stage changed';
+    case 'moved_to_board':
+      return lines[0] || 'Moved to another board';
+    case 'lease_generated':
+      return lines[0] || 'Lease generated';
+    case 'updated':
+      if (lines.length === 1) return lines[0];
+      if (lines.length > 1) return `${lines.length} fields updated`;
+      return 'Updated';
+    default:
+      return lines[0] || event.eventType.replace(/_/g, ' ');
+  }
 }
 
 export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps) {
@@ -97,23 +142,44 @@ export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps
 
   return (
     <ul className="max-h-[28rem] space-y-0 overflow-y-auto border-l border-gray-200 pl-4">
-      {events.map((event) => (
-        <li key={event.id} className="relative pb-4 last:pb-0">
-          <span
-            aria-hidden
-            className="absolute -left-[1.3rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-indigo-500 shadow"
-          />
-          <p className="text-sm font-medium text-gray-900">{event.summary}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {[event.actorName || 'System', formatWhen(event.createdAt)].filter(Boolean).join(' · ')}
-          </p>
-          {event.fromStageName && event.toStageName && !event.summary.includes(event.toStageName) && (
-            <p className="mt-0.5 text-xs text-gray-400">
-              {event.fromStageName} → {event.toStageName}
+      {events.map((event) => {
+        const lines = changeLines(event);
+        const title = eventTitle(event, lines);
+        const showDetails =
+          event.eventType === 'updated' &&
+          lines.length > 1 &&
+          lines.some((l) => l !== title);
+
+        return (
+          <li key={event.id} className="relative pb-4 last:pb-0">
+            <span
+              aria-hidden
+              className="absolute -left-[1.3rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-indigo-500 shadow"
+            />
+            <p className="text-sm font-medium text-gray-900">{title}</p>
+            {showDetails && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-gray-700">
+                {lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-0.5 text-xs text-gray-500">
+              {[event.actorName || 'System', formatWhen(event.createdAt)]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
-          )}
-        </li>
-      ))}
+            {event.fromStageName &&
+              event.toStageName &&
+              event.eventType !== 'stage_changed' &&
+              !title.includes(event.toStageName) && (
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {event.fromStageName} → {event.toStageName}
+                </p>
+              )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

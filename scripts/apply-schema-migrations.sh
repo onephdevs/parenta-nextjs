@@ -81,6 +81,7 @@ MIGRATIONS=(
   add-pipeline-payments-refund-stage.sql
   remove-pipeline-reconciled-and-closed.sql
   add-pipeline-utility-bill-sync.sql
+  add-maintenance-request-attachments.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

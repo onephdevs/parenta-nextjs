@@ -43,6 +43,8 @@ import {
 import { OpportunityTagsField } from './OpportunityTagsField';
 import { OpportunityDocumentsPanel } from './OpportunityDocumentsPanel';
 import { OpportunityHistoryPanel } from './OpportunityHistoryPanel';
+import { PaymentFollowUpPanel } from './PaymentFollowUpPanel';
+import { ExpenseFollowUpPanel } from './ExpenseFollowUpPanel';
 
 interface BuildingOption {
   id: string;
@@ -131,7 +133,7 @@ const onboardingSections: SectionedFormSection<FormSection>[] = [
     label: 'Payment',
     icon: <Wallet className="h-4 w-4" />,
     title: 'Payment details',
-    subtitle: 'Enter any deposit/advance amounts, then confirm payment received.',
+    subtitle: 'Set deposit and advance from rent, then mark payment received.',
   },
   {
     id: 'lease',
@@ -179,9 +181,16 @@ const paymentsSections: SectionedFormSection<FormSection>[] = [
     subtitle: 'Set due / next action so you know when to remind or escalate.',
   },
   {
+    id: 'payment',
+    label: 'Payment',
+    icon: <Wallet className="h-4 w-4" />,
+    title: 'Payment & invoice',
+    subtitle: 'See what the payment is for, transaction ID, receipts, and attachments.',
+  },
+  {
     id: 'notes',
     label: 'Follow-up',
-    icon: <Wallet className="h-4 w-4" />,
+    icon: <FileText className="h-4 w-4" />,
     title: 'Follow-up notes',
     subtitle: 'What you said, promised, or need to do next (call, SMS, visit).',
   },
@@ -191,6 +200,51 @@ const paymentsSections: SectionedFormSection<FormSection>[] = [
     icon: <Tag className="h-4 w-4" />,
     title: 'Tags',
     subtitle: 'e.g. Partial paid, Promise-to-pay, Hard to reach.',
+  },
+];
+
+const expensesSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'contact',
+    label: 'Vendor',
+    icon: <User className="h-4 w-4" />,
+    title: 'Vendor / provider',
+    subtitle: 'Who to pay — utility provider or expense vendor.',
+  },
+  {
+    id: 'property',
+    label: 'Property',
+    icon: <Building2 className="h-4 w-4" />,
+    title: 'Building & amount',
+    subtitle: 'Which property this bill belongs to and how much.',
+  },
+  {
+    id: 'schedule',
+    label: 'Due date',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'When payment is due',
+    subtitle: 'Bill due date and next follow-up for approval / payment.',
+  },
+  {
+    id: 'payment',
+    label: 'Expense',
+    icon: <Wallet className="h-4 w-4" />,
+    title: 'Bill & expense details',
+    subtitle: 'See what this is for, paid status, receipts, and attachments.',
+  },
+  {
+    id: 'notes',
+    label: 'Follow-up',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Follow-up notes',
+    subtitle: 'Approval notes, payment schedule, or vendor follow-ups.',
+  },
+  {
+    id: 'tags',
+    label: 'Tags',
+    icon: <Tag className="h-4 w-4" />,
+    title: 'Tags',
+    subtitle: 'e.g. Utility, Electric, Recurring.',
   },
 ];
 
@@ -265,8 +319,19 @@ function sectionsForBoard(
     return isEditing ? [...base, historySection] : base;
   }
 
-  const base = board.slug === 'payments' ? paymentsSections : genericSections;
-  if (!isEditing) return base;
+  const base =
+    board.slug === 'payments'
+      ? paymentsSections
+      : board.slug === 'expenses'
+        ? expensesSections
+        : genericSections;
+  if (!isEditing) {
+    // Detail panels need an existing card id
+    if (board.slug === 'payments' || board.slug === 'expenses') {
+      return base.filter((s) => s.id !== 'payment');
+    }
+    return base;
+  }
 
   const withBoardMove = (() => {
     const tagsIdx = base.findIndex((s) => s.id === 'tags');
@@ -290,6 +355,7 @@ export function AddOpportunityModal({
   const isEditing = Boolean(card?.id);
   const isOnboarding = board.slug === 'onboarding';
   const isPayments = board.slug === 'payments';
+  const isExpenses = board.slug === 'expenses';
   const sections = sectionsForBoard(board, isEditing);
 
   const [activeSection, setActiveSection] = useState<FormSection>('contact');
@@ -557,6 +623,24 @@ export function AddOpportunityModal({
     });
   }, [roomId, rooms]);
 
+  // Keep Total / Deposit in sync with room rent × selected months (unpaid only)
+  useEffect(() => {
+    if (!isOpen || !isOnboarding) return;
+    if (card?.assignmentId || moveInPaymentStatus === 'paid') return;
+    fillMoveInAmountsFromRent(depositMonths, advanceMonths);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    isOnboarding,
+    roomId,
+    amount,
+    rooms,
+    depositMonths,
+    advanceMonths,
+    card?.assignmentId,
+    moveInPaymentStatus,
+  ]);
+
   async function handleMoveToBoard() {
     if (!card?.id || !moveBoardId) return;
     setMovingBoard(true);
@@ -606,9 +690,11 @@ export function AddOpportunityModal({
     return { total: safeTotal, deposit: safeDeposit, advance };
   }
 
-  function getMonthlyRentForPayment(): number {
-    if (amount.trim() !== '') {
-      const n = Number(amount);
+  function getMonthlyRentForPayment(overrideAmount?: string): number {
+    const amountSource =
+      overrideAmount !== undefined ? overrideAmount : amount;
+    if (amountSource.trim() !== '') {
+      const n = Number(amountSource);
       if (Number.isFinite(n) && n > 0) return n;
     }
     const room = rooms.find((r) => r.id === roomId);
@@ -616,19 +702,31 @@ export function AddOpportunityModal({
     return Number.isFinite(rate) && rate > 0 ? rate : 0;
   }
 
-  function applyMoveInMonths(nextDepositMonths: number, nextAdvanceMonths: number) {
-    const rent = getMonthlyRentForPayment();
-    if (rent <= 0) {
-      setError('Set monthly rent (or select a room with a rate) before choosing months');
-      return;
-    }
+  function fillMoveInAmountsFromRent(
+    nextDepositMonths: number,
+    nextAdvanceMonths: number,
+    rentOverride?: number
+  ) {
+    const rent =
+      rentOverride != null && rentOverride > 0
+        ? rentOverride
+        : getMonthlyRentForPayment();
+    if (rent <= 0) return false;
     const deposit = Math.round(rent * nextDepositMonths * 100) / 100;
     const advance = Math.round(rent * nextAdvanceMonths * 100) / 100;
     const total = Math.round((deposit + advance) * 100) / 100;
-    setDepositMonths(nextDepositMonths);
-    setAdvanceMonths(nextAdvanceMonths);
     setDepositAmount(deposit > 0 ? String(deposit) : '');
     setMoveInTotalPaid(total > 0 ? String(total) : '');
+    return true;
+  }
+
+  function applyMoveInMonths(nextDepositMonths: number, nextAdvanceMonths: number) {
+    setDepositMonths(nextDepositMonths);
+    setAdvanceMonths(nextAdvanceMonths);
+    if (!fillMoveInAmountsFromRent(nextDepositMonths, nextAdvanceMonths)) {
+      setError('Select a room (or enter monthly rent under Property) to calculate amounts');
+      return;
+    }
     setError(null);
   }
 
@@ -827,6 +925,11 @@ export function AddOpportunityModal({
         }
       }
 
+      if (isExpenses && !firstName.trim()) {
+        setActiveSection('contact');
+        throw new Error('Vendor / provider name is required');
+      }
+
       if (roomId && !buildingId) {
         setActiveSection('property');
         throw new Error('Select a building for the room');
@@ -1008,10 +1111,14 @@ export function AddOpportunityModal({
         isEditing
           ? isPayments
             ? 'Payment follow-up'
-            : 'Edit opportunity'
+            : isExpenses
+              ? 'Expense follow-up'
+              : 'Edit opportunity'
           : isPayments
             ? 'Add payment follow-up'
-            : 'Add opportunity'
+            : isExpenses
+              ? 'Add expense follow-up'
+              : 'Add opportunity'
       }
       entityLabel={entityLabel}
       sections={sections}
@@ -1148,8 +1255,16 @@ export function AddOpportunityModal({
                       const nextRoomId = e.target.value;
                       setRoomId(nextRoomId);
                       const room = rooms.find((r) => r.id === nextRoomId);
-                      // Opportunity value = monthly rent for the selected unit
+                      const rate = room ? Number(room.monthlyRate) : 0;
                       setAmount(room ? String(room.monthlyRate) : '');
+                      if (
+                        isOnboarding &&
+                        !card?.assignmentId &&
+                        moveInPaymentStatus !== 'paid' &&
+                        rate > 0
+                      ) {
+                        fillMoveInAmountsFromRent(depositMonths, advanceMonths, rate);
+                      }
                     }}
                     disabled={!buildingId}
                   >
@@ -1284,16 +1399,15 @@ export function AddOpportunityModal({
               </div>
             )}
 
-            {activeSection === 'payment' && (
+            {activeSection === 'payment' && isOnboarding && (
               <div className="space-y-5">
                 {!buildingId || !roomId ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    Select a building and room under Property first so amounts can default from
-                    monthly rent.
+                    Select a building and room under Property first.
                   </div>
                 ) : null}
 
-                {card?.assignmentId || moveInPaymentStatus === 'paid' ? (
+                {(card?.assignmentId || moveInPaymentStatus === 'paid') && (
                   <Alert variant="success" title="Move-in payment confirmed">
                     <p className="mt-1">
                       Total ₱{Number(moveInTotalPaid || 0).toLocaleString('en-PH')}
@@ -1311,85 +1425,78 @@ export function AddOpportunityModal({
                         onClick={() => void handleMarkMoveInUnpaid()}
                         disabled={savingPayment}
                       >
-                        Uncheck / mark as unpaid again
+                        Mark as unpaid again
                       </button>
                     )}
-                  </Alert>
-                ) : (
-                  <Alert variant="warning" title="Payment required before Generate lease">
-                    Enter payment details below, then check &quot;Payment received&quot; to confirm.
-                    Deposit goes to the deposit ledger; the remainder applies as advance to
-                    invoices.
                   </Alert>
                 )}
 
                 <div className="grid grid-cols-6 gap-5">
                   {!card?.assignmentId && moveInPaymentStatus !== 'paid' && (
                     <div className="col-span-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-sm font-medium text-gray-900">
-                        Calculate from monthly rent
-                      </p>
-                      <p className="mt-1 text-xs text-gray-600">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          Calculate from monthly rent
+                        </p>
                         {getMonthlyRentForPayment() > 0 ? (
-                          <>
-                            Base rent ₱
-                            {getMonthlyRentForPayment().toLocaleString('en-PH')}
-                            /mo — choose how many months for deposit and advance.
-                          </>
+                          <p className="text-xs text-gray-600">
+                            ₱{getMonthlyRentForPayment().toLocaleString('en-PH')}/mo
+                          </p>
                         ) : (
-                          <>
-                            Select a room or enter monthly rent under Property first, then pick
-                            months.
-                          </>
+                          <p className="text-xs text-amber-700">
+                            Set room or monthly rent under Property
+                          </p>
                         )}
-                      </p>
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <FormField
-                          label="Deposit months"
-                          htmlFor="opp-deposit-months"
-                          hint="Added to the deposit ledger"
-                        >
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <FormField label="Deposit months" htmlFor="opp-deposit-months">
                           <Select
                             id="opp-deposit-months"
                             value={String(depositMonths)}
-                            disabled={savingPayment || getMonthlyRentForPayment() <= 0}
+                            disabled={savingPayment}
                             onChange={(e) => {
                               applyMoveInMonths(Number(e.target.value), advanceMonths);
                             }}
                           >
-                            {[0, 1, 2, 3, 4, 5, 6].map((m) => (
-                              <option key={`dep-${m}`} value={m}>
-                                {m === 0
-                                  ? '0 months (none)'
-                                  : `${m} month${m === 1 ? '' : 's'} — ₱${(
-                                      getMonthlyRentForPayment() * m
-                                    ).toLocaleString('en-PH')}`}
-                              </option>
-                            ))}
+                            {[0, 1, 2, 3, 4, 5, 6].map((m) => {
+                              const rent = getMonthlyRentForPayment();
+                              const priced =
+                                rent > 0
+                                  ? ` — ₱${(rent * m).toLocaleString('en-PH')}`
+                                  : '';
+                              return (
+                                <option key={`dep-${m}`} value={m}>
+                                  {m === 0
+                                    ? '0 months'
+                                    : `${m} month${m === 1 ? '' : 's'}${priced}`}
+                                </option>
+                              );
+                            })}
                           </Select>
                         </FormField>
-                        <FormField
-                          label="Advance months"
-                          htmlFor="opp-advance-months"
-                          hint="Applied to rent invoices"
-                        >
+                        <FormField label="Advance months" htmlFor="opp-advance-months">
                           <Select
                             id="opp-advance-months"
                             value={String(advanceMonths)}
-                            disabled={savingPayment || getMonthlyRentForPayment() <= 0}
+                            disabled={savingPayment}
                             onChange={(e) => {
                               applyMoveInMonths(depositMonths, Number(e.target.value));
                             }}
                           >
-                            {[0, 1, 2, 3, 4, 5, 6].map((m) => (
-                              <option key={`adv-${m}`} value={m}>
-                                {m === 0
-                                  ? '0 months (none)'
-                                  : `${m} month${m === 1 ? '' : 's'} — ₱${(
-                                      getMonthlyRentForPayment() * m
-                                    ).toLocaleString('en-PH')}`}
-                              </option>
-                            ))}
+                            {[0, 1, 2, 3, 4, 5, 6].map((m) => {
+                              const rent = getMonthlyRentForPayment();
+                              const priced =
+                                rent > 0
+                                  ? ` — ₱${(rent * m).toLocaleString('en-PH')}`
+                                  : '';
+                              return (
+                                <option key={`adv-${m}`} value={m}>
+                                  {m === 0
+                                    ? '0 months'
+                                    : `${m} month${m === 1 ? '' : 's'}${priced}`}
+                                </option>
+                              );
+                            })}
                           </Select>
                         </FormField>
                       </div>
@@ -1400,7 +1507,6 @@ export function AddOpportunityModal({
                     label="Total Amount Paid"
                     htmlFor="opp-total-paid"
                     required
-                    hint="Total amount received from tenant"
                     className="col-span-6 sm:col-span-3"
                   >
                     <div className="relative">
@@ -1424,7 +1530,6 @@ export function AddOpportunityModal({
                   <FormField
                     label="Deposit Amount"
                     htmlFor="opp-deposit"
-                    hint="Amount to add to deposit ledger (remainder goes to invoices)"
                     className="col-span-6 sm:col-span-3"
                   >
                     <div className="relative">
@@ -1446,28 +1551,22 @@ export function AddOpportunityModal({
                   </FormField>
 
                   {(parseFloat(moveInTotalPaid) || 0) > 0 && (
-                    <Alert variant="info" title="Payment Breakdown" className="col-span-6">
-                      <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span>
-                            To Deposit Ledger
-                            {depositMonths > 0 ? ` (${depositMonths} mo)` : ''}:
-                          </span>
-                          <span className="ml-2 font-semibold">
-                            ₱{getMoveInSplit().deposit.toLocaleString('en-PH')}
-                          </span>
-                        </div>
-                        <div>
-                          <span>
-                            To Invoice Payment
-                            {advanceMonths > 0 ? ` (${advanceMonths} mo)` : ''}:
-                          </span>
-                          <span className="ml-2 font-semibold">
-                            ₱{getMoveInSplit().advance.toLocaleString('en-PH')}
-                          </span>
-                        </div>
+                    <div className="col-span-6 grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                      <div>
+                        Deposit
+                        {depositMonths > 0 ? ` (${depositMonths} mo)` : ''}:{' '}
+                        <span className="font-semibold">
+                          ₱{getMoveInSplit().deposit.toLocaleString('en-PH')}
+                        </span>
                       </div>
-                    </Alert>
+                      <div>
+                        Advance
+                        {advanceMonths > 0 ? ` (${advanceMonths} mo)` : ''}:{' '}
+                        <span className="font-semibold">
+                          ₱{getMoveInSplit().advance.toLocaleString('en-PH')}
+                        </span>
+                      </div>
+                    </div>
                   )}
 
                   <FormField
@@ -1539,36 +1638,28 @@ export function AddOpportunityModal({
                       value={moveInTransactionId}
                       disabled={Boolean(card?.assignmentId)}
                       onChange={(e) => setMoveInTransactionId(e.target.value)}
-                      placeholder="Optional transaction reference"
+                      placeholder="Optional"
                     />
                   </FormField>
                 </div>
 
                 {!card?.assignmentId && (
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                      <Checkbox
-                        id="opp-payment-received"
-                        checked={moveInPaymentStatus === 'paid'}
-                        disabled={savingPayment}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            void handleMarkMoveInPaid();
-                          } else {
-                            void handleMarkMoveInUnpaid();
-                          }
-                        }}
-                        label={
-                          <span className="font-medium text-gray-900">
-                            Payment received — confirm as paid
-                          </span>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                    <Checkbox
+                      id="opp-payment-received"
+                      checked={moveInPaymentStatus === 'paid'}
+                      disabled={savingPayment}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          void handleMarkMoveInPaid();
+                        } else {
+                          void handleMarkMoveInUnpaid();
                         }
-                      />
-                      <p className="mt-2 text-xs text-gray-600">
-                        Enter any amounts above (admin sets the price), then check this to unlock
-                        Generate lease.
-                      </p>
-                    </div>
+                      }}
+                      label={
+                        <span className="font-medium text-gray-900">Payment received</span>
+                      }
+                    />
                   </div>
                 )}
               </div>
@@ -1744,9 +1835,7 @@ export function AddOpportunityModal({
                     {moveInPaymentStatus !== 'paid' ? (
                       <>
                         <p className="text-sm text-amber-900">
-                          Payment required first. Open the <strong>Payment</strong> section, enter
-                          payment details, then check &quot;Payment received&quot;. After that,
-                          Generate lease will be available.
+                          Mark <strong>Payment received</strong> first to unlock Generate lease.
                         </p>
                         <Button
                           type="button"
@@ -1911,6 +2000,9 @@ export function AddOpportunityModal({
                     Drag the card across stages: Upcoming → Due → Reminder sent → Overdue → Paid
                     → Refund (or Escalation).
                   </li>
+                  <li>
+                    Open Payment to see the invoice, transaction IDs, receipts, and attachments.
+                  </li>
                   <li>Set the due date, then log what you did in Follow-up notes.</li>
                   <li>Record the actual money in Payments / Financial — this board tracks chase work.</li>
                 </ol>
@@ -1928,25 +2020,50 @@ export function AddOpportunityModal({
               </div>
             )}
 
+            {isExpenses && isEditing && activeSection === 'contact' && (
+              <div className="rounded-lg border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                <p className="font-medium">How to use Expenses cards</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-4 text-violet-800">
+                  <li>
+                    Open Expense to see the utility bill or vendor expense, paid status, and
+                    attachments.
+                  </li>
+                  <li>Drag across stages as you verify, approve, schedule, and pay.</li>
+                  <li>
+                    Mark paid here or in Financial — the board syncs from utility bills and
+                    expenses.
+                  </li>
+                </ol>
+              </div>
+            )}
+
             {activeSection === 'contact' && (
               <>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <FormField label="First name" htmlFor="opp-first-name" required>
+                  <FormField
+                    label={isExpenses ? 'Vendor / provider' : 'First name'}
+                    htmlFor="opp-first-name"
+                    required
+                  >
                     <Input
                       id="opp-first-name"
                       required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Maria"
+                      placeholder={isExpenses ? 'Meralco / Cleaning Co.' : 'Maria'}
                     />
                   </FormField>
-                  <FormField label="Last name" htmlFor="opp-last-name" required>
+                  <FormField
+                    label={isExpenses ? 'Contact name (optional)' : 'Last name'}
+                    htmlFor="opp-last-name"
+                    required={!isExpenses}
+                  >
                     <Input
                       id="opp-last-name"
-                      required
+                      required={!isExpenses}
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Lopez"
+                      placeholder={isExpenses ? 'Optional' : 'Lopez'}
                     />
                   </FormField>
                 </div>
@@ -2010,13 +2127,32 @@ export function AddOpportunityModal({
                     </Select>
                   </FormField>
                 )}
+                {isExpenses && (
+                  <FormField label="Room (optional)" htmlFor="opp-room-expenses">
+                    <Select
+                      id="opp-room-expenses"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      disabled={!buildingId}
+                    >
+                      <option value="">Building-wide / none</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomNumber}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                )}
                 <FormField
-                  label={isPayments ? 'Monthly rent (₱)' : 'Amount (₱)'}
+                  label={isPayments ? 'Monthly rent (₱)' : isExpenses ? 'Bill amount (₱)' : 'Amount (₱)'}
                   htmlFor="opp-amount"
                   hint={
                     isPayments
                       ? 'Rent you are following up on this cycle.'
-                      : undefined
+                      : isExpenses
+                        ? 'Amount due for this utility bill or vendor expense.'
+                        : undefined
                   }
                 >
                   <Input
@@ -2034,12 +2170,14 @@ export function AddOpportunityModal({
             {activeSection === 'schedule' && (
               <>
                 <FormField
-                  label={isPayments ? 'Rent due' : 'Due'}
+                  label={isPayments ? 'Rent due' : isExpenses ? 'Bill due' : 'Due'}
                   htmlFor="opp-due"
                   hint={
                     isPayments
                       ? 'When this month’s rent should be paid. Drag the card to Due when that day arrives.'
-                      : undefined
+                      : isExpenses
+                        ? 'When this bill should be paid.'
+                        : undefined
                   }
                 >
                   <Input
@@ -2064,6 +2202,29 @@ export function AddOpportunityModal({
                   </FormField>
                 )}
               </>
+            )}
+
+            {activeSection === 'payment' && isPayments && card?.id && (
+              <PaymentFollowUpPanel
+                cardId={card.id}
+                tenantId={card.tenantId}
+                invoiceId={card.invoiceId}
+                buildingId={buildingId || undefined}
+                roomId={roomId || undefined}
+                balanceAmount={card.amount}
+              />
+            )}
+
+            {activeSection === 'payment' && isExpenses && card?.id && (
+              <ExpenseFollowUpPanel
+                cardId={card.id}
+                expenseId={card.expenseId}
+                utilityBillId={card.utilityBillId}
+                buildingId={buildingId || undefined}
+                roomId={roomId || undefined}
+                amount={card.amount}
+                source={card.source || source}
+              />
             )}
 
             {activeSection === 'notes' && (

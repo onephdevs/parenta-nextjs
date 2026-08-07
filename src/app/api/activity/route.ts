@@ -185,6 +185,7 @@ export async function GET(request: NextRequest) {
           actionType: row.action_type,
           entityLabel,
           actorName,
+          metadata: (row.metadata as Record<string, unknown>) || {},
         }),
       };
     });

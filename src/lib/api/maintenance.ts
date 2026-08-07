@@ -131,8 +131,21 @@ export async function listMaintenanceRequests(
   const result = await pool.query(query, params);
   const requests = result.rows;
 
+  const { listAttachmentsForRequests } = await import(
+    '@/lib/api/maintenance-attachments'
+  );
+  const attachmentMap = await listAttachmentsForRequests(
+    requests.map((r) => String(r.id))
+  );
+
+  const withAttachments = requests.map((r) => ({
+    ...r,
+    attachments: attachmentMap.get(String(r.id)) || [],
+    attachmentCount: (attachmentMap.get(String(r.id)) || []).length,
+  }));
+
   return {
-    requests,
+    requests: withAttachments,
     stats: calculateMaintenanceStats(requests),
   };
 }

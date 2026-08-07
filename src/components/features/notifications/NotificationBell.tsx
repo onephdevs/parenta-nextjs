@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
@@ -32,13 +33,19 @@ function formatRelative(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+const PANEL_WIDTH = 384; // w-96
+
 export function NotificationBell() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
+  const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const fetchInbox = useCallback(async () => {
     try {
@@ -58,20 +65,65 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     fetchInbox();
     const id = window.setInterval(fetchInbox, 30000);
     return () => window.clearInterval(id);
   }, [fetchInbox]);
 
+  const updatePanelPosition = useCallback(() => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const gap = 8;
+    const width = Math.min(PANEL_WIDTH, window.innerWidth - 16);
+    let left = rect.right - width;
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    setPanelStyle({
+      position: 'fixed',
+      top: rect.bottom + gap,
+      left,
+      width,
+      zIndex: 200,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePanelPosition();
+    const onResize = () => updatePanelPosition();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
+    };
+  }, [open, updatePanelPosition]);
+
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const target = e.target as Node;
+      if (
+        rootRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
+      ) {
+        return;
       }
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
     };
     document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   const markAllRead = async () => {
@@ -98,28 +150,15 @@ export function NotificationBell() {
     if (item.link) router.push(item.link);
   };
 
-  return (
-    <div className="relative" ref={panelRef}>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen((v) => !v);
-          if (!open) fetchInbox();
-        }}
-        className="relative rounded-md p-2 text-gray-900 hover:bg-gray-100 hover:text-gray-900"
-        aria-label="Notifications"
-        aria-expanded={open}
-      >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white ring-2 ring-white">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 z-[140] mt-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+  const panel = open && mounted
+    ? createPortal(
+        <div
+          ref={panelRef}
+          style={panelStyle}
+          className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+          role="dialog"
+          aria-label="Notifications"
+        >
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-gray-900">Notifications</p>
@@ -205,8 +244,32 @@ export function NotificationBell() {
               </Button>
             </Link>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => {
+          setOpen((v) => !v);
+          if (!open) fetchInbox();
+        }}
+        className="relative rounded-md p-2 text-gray-900 hover:bg-gray-100 hover:text-gray-900"
+        aria-label="Notifications"
+        aria-expanded={open}
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white ring-2 ring-white">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </button>
+      {panel}
     </div>
   );
 }

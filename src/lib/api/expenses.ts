@@ -19,6 +19,28 @@ interface ExpenseResult {
   totalPages: number;
 }
 
+async function syncExpenseToExpensesBoard(expense: Expense): Promise<void> {
+  try {
+    const { ensureExpensePipelineCard } = await import('@/lib/api/pipeline');
+    await ensureExpensePipelineCard({
+      expenseId: expense.id,
+      category: expense.category || expense.expenseCategory || 'other',
+      amount: expense.amount,
+      expenseStatus: expense.expenseStatus,
+      expenseDate: expense.expenseDate,
+      vendorName: expense.vendorName || expense.vendor,
+      description: expense.description,
+      buildingId: expense.buildingId,
+      roomId: expense.roomId,
+      buildingName: expense.buildingName,
+      roomNumber: expense.roomNumber,
+      notes: expense.notes,
+    });
+  } catch (err) {
+    console.error('Expenses pipeline sync after expense failed:', err);
+  }
+}
+
 /**
  * Get all expenses with optional filtering and pagination
  */
@@ -137,9 +159,11 @@ export async function getExpenseById(id: string): Promise<Expense | null> {
       SELECT 
         e.*,
         b.name as building_name,
-        b.address_line1 as building_address
+        b.address_line1 as building_address,
+        r.room_number
       FROM expenses e
       LEFT JOIN buildings b ON e.building_id = b.id
+      LEFT JOIN rooms r ON e.room_id = r.id
       WHERE e.id = $1
     `;
     
@@ -217,7 +241,9 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
     }
     
     const result = await pool.query(query, values);
-    return mapRowToExpense(result.rows[0]);
+    const expense = mapRowToExpense(result.rows[0]);
+    await syncExpenseToExpensesBoard(expense);
+    return expense;
   } catch (error) {
     console.error('Error creating expense:', error);
     // Provide more detailed error message
@@ -248,7 +274,9 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
           ];
           
           const result = await pool.query(query, values);
-          return mapRowToExpense(result.rows[0]);
+          const expense = mapRowToExpense(result.rows[0]);
+          await syncExpenseToExpensesBoard(expense);
+          return expense;
         } catch (retryError) {
           throw new Error(`Failed to create expense: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
         }
@@ -269,12 +297,16 @@ export async function updateExpense(
   try {
     const allowedFields = [
       'building_id',
+      'room_id',
       'category',
       'amount',
       'description',
       'vendor_name',
+      'vendor_contact',
       'expense_date',
+      'payment_method',
       'receipt_url',
+      'expense_status',
       'notes',
     ];
     
@@ -317,8 +349,10 @@ export async function updateExpense(
     if (result.rows.length === 0) {
       throw new Error('Expense not found');
     }
-    
-    return mapRowToExpense(result.rows[0]);
+
+    const expense = mapRowToExpense(result.rows[0]);
+    await syncExpenseToExpensesBoard(expense);
+    return expense;
   } catch (error) {
     console.error('Error updating expense:', error);
     throw error;

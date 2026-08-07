@@ -151,10 +151,10 @@ const ACTION_TITLES: Record<string, string> = {
   'settings.updated': 'Settings updated',
   'job.completed': 'Job completed',
   'job.failed': 'Job failed',
-  'pipeline.website_inquiry': 'Website inquiry',
+  'pipeline.website_inquiry': 'Website inquiry received',
   'pipeline.card_created': 'Opportunity created',
   'pipeline.card_updated': 'Opportunity updated',
-  'pipeline.card_moved': 'Opportunity moved',
+  'pipeline.card_moved': 'Opportunity stage changed',
   'pipeline.card_deleted': 'Opportunity deleted',
   'pipeline.moved_to_nurture': 'Moved to nurture',
   'pipeline.resumed_onboarding': 'Resumed onboarding',
@@ -197,25 +197,128 @@ export function formatActivityDescription(params: {
   actionType: string;
   entityLabel?: string | null;
   actorName?: string | null;
+  metadata?: Record<string, unknown> | null;
 }): string {
   const actor = params.actorName?.trim() || 'Someone';
   const label = params.entityLabel?.trim();
-  const [entity, verb] = params.actionType.split('.');
-  const entityWords = (entity || 'item').replace(/_/g, ' ');
-  const verbWords = (verb || 'updated').replace(/_/g, ' ');
+  const quoted = label ? `“${label}”` : null;
+  const meta =
+    params.metadata && typeof params.metadata === 'object' ? params.metadata : {};
 
-  // Background jobs: "System completed job: notification_queue_process"
+  const metaSummary =
+    typeof meta.summary === 'string' && meta.summary.trim()
+      ? meta.summary.trim()
+      : '';
+  const metaChanges = Array.isArray(meta.changes)
+    ? (meta.changes as unknown[])
+        .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+        .map((c) => c.trim())
+    : [];
+  const changeSummary =
+    metaSummary ||
+    (metaChanges.length > 0
+      ? metaChanges.slice(0, 3).join('; ') +
+        (metaChanges.length > 3 ? ` (+${metaChanges.length - 3} more)` : '')
+      : '');
+
+  const stageName =
+    typeof meta.stageName === 'string' ? meta.stageName.trim() : '';
+  const fromStageName =
+    typeof meta.fromStageName === 'string' ? meta.fromStageName.trim() : '';
+  const boardName =
+    typeof meta.boardName === 'string'
+      ? meta.boardName.trim()
+      : typeof meta.boardSlug === 'string'
+        ? meta.boardSlug.replace(/_/g, ' ')
+        : '';
+  const documentType =
+    typeof meta.documentType === 'string'
+      ? meta.documentType.replace(/_/g, ' ').trim()
+      : '';
+  const contextLabel =
+    typeof meta.contextLabel === 'string' ? meta.contextLabel.trim() : '';
+
+  switch (params.actionType) {
+    case 'pipeline.card_created':
+      return `${actor} created opportunity${quoted ? ` ${quoted}` : ''}${
+        boardName ? ` on ${boardName}` : ''
+      }`;
+    case 'pipeline.card_updated':
+      if (changeSummary) {
+        return `${actor} updated ${quoted || 'opportunity'}: ${changeSummary}`;
+      }
+      return `${actor} updated ${quoted || 'an opportunity'}`;
+    case 'pipeline.card_moved':
+      if (fromStageName && stageName) {
+        return `${actor} moved ${quoted || 'opportunity'} from ${fromStageName} → ${stageName}`;
+      }
+      if (stageName) {
+        return `${actor} moved ${quoted || 'opportunity'} to ${stageName}`;
+      }
+      return `${actor} moved ${quoted || 'an opportunity'} to another stage`;
+    case 'pipeline.card_deleted':
+      return `${actor} deleted opportunity${quoted ? ` ${quoted}` : ''}`;
+    case 'pipeline.moved_to_board':
+      return `${actor} moved ${quoted || 'a card'} to the ${boardName || 'other'} board${
+        stageName ? ` (${stageName})` : ''
+      }`;
+    case 'pipeline.website_inquiry': {
+      const building =
+        typeof meta.buildingName === 'string' ? meta.buildingName.trim() : '';
+      return `New website inquiry${quoted ? `: ${label}` : ''}${
+        building ? ` · ${building}` : ''
+      }`;
+    }
+    case 'pipeline.moved_to_nurture':
+      return `${actor} moved ${quoted || 'opportunity'} to nurture`;
+    case 'pipeline.resumed_onboarding':
+      return `${actor} resumed onboarding for ${quoted || 'opportunity'}`;
+    case 'document.uploaded': {
+      const kind = documentType || 'document';
+      const parts = [`${actor} uploaded ${kind}`];
+      if (quoted) parts.push(quoted);
+      if (contextLabel) parts.push(`for ${contextLabel}`);
+      return parts.join(' ');
+    }
+    case 'document.updated':
+      return `${actor} updated document${quoted ? ` ${quoted}` : ''}`;
+    case 'document.deleted':
+      return `${actor} deleted document${quoted ? ` ${quoted}` : ''}`;
+    case 'maintenance.requested':
+      return `${actor} submitted maintenance request${quoted ? `: ${label}` : ''}`;
+    case 'maintenance.updated':
+    case 'maintenance.status_changed':
+      return changeSummary
+        ? `${actor} updated maintenance ${quoted || 'request'}: ${changeSummary}`
+        : `${actor} updated maintenance ${quoted || 'request'}`;
+    case 'payment.recorded':
+      return `${actor} recorded payment${quoted ? `: ${label}` : ''}`;
+    case 'payment.claim_submitted':
+      return `${actor} submitted payment for verification${quoted ? `: ${label}` : ''}`;
+    case 'invoice.created':
+      return `${actor} created invoice${quoted ? ` ${quoted}` : ''}`;
+    case 'tenant.created':
+      return `${actor} created tenant${quoted ? ` ${quoted}` : ''}`;
+    case 'tenant.updated':
+      return `${actor} updated tenant${quoted ? ` ${quoted}` : ''}`;
+    default:
+      break;
+  }
+
+  const [entity, verb] = params.actionType.split('.');
   if (entity === 'job') {
+    const verbWords = (verb || 'updated').replace(/_/g, ' ');
     const jobName = label ? cleanJobLabel(label, verbWords) : null;
     const phrase = `${actor} ${verbWords} job`;
     if (jobName) return `${phrase}: ${jobName}`;
     return phrase;
   }
 
-  // Prefer natural phrasing: "Ada created tenant: Juan"
-  const phrase = `${actor} ${verbWords} ${entityWords}`;
-  if (label) return `${phrase}: ${label}`;
-  return phrase;
+  // Prefer "Ada updated tenant: Juan" over "Ada tenant updated: Juan"
+  const title = getActionTitle(params.actionType);
+  const titleLower = title.toLowerCase();
+  if (quoted) return `${actor} ${titleLower}: ${label}`;
+  return `${actor} ${titleLower}`;
 }
 
 const SENSITIVE_KEYS = new Set([

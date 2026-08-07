@@ -135,6 +135,7 @@ export async function logActivity(input: LogActivityInput): Promise<LogActivityR
       actionType: input.actionType,
       entityLabel: input.entityLabel,
       actorName,
+      metadata: metadata,
     });
 
     const adminIds = await getAdminUserIds();

@@ -677,8 +677,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {/* Pipeline board tabs + toolbar */}
-      <div className="relative z-30 space-y-3">
+      {/* Pipeline board tabs + toolbar (keep below header/notifications z-40) */}
+      <div className="relative z-10 space-y-3">
         <div className="flex items-end gap-2 border-b border-gray-200">
           <nav
             className="-mb-px flex min-w-0 flex-1 items-end gap-1 overflow-x-auto"

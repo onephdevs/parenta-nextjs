@@ -197,7 +197,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm z-10">
+        <header className="relative z-40 flex-shrink-0 border-b border-gray-200 bg-white shadow-sm">
           <div className="flex items-center justify-between h-16 px-4 lg:px-6">
             <div className="flex min-w-0 flex-1 items-center space-x-2">
               <button

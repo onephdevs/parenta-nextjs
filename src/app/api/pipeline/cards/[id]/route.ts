@@ -13,6 +13,10 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+function boardLink(boardSlug?: string | null): string {
+  return boardSlug ? `/admin/tasks?board=${boardSlug}` : '/admin/tasks';
+}
+
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { error } = await requireAdmin();
@@ -53,6 +57,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           { status: 400 }
         );
       }
+      const before = await getPipelineCardById(id);
       const card = await movePipelineCard(id, body.stageId, {
         position: body.position,
         userId: session?.user?.id,
@@ -67,8 +72,15 @@ export async function PATCH(request: Request, context: RouteContext) {
         entityType: 'pipeline_card',
         entityId: card.id,
         entityLabel: card.title,
-        metadata: { stageId: body.stageId, stageName: card.stageName },
-        link: '/admin/tasks',
+        metadata: {
+          stageId: body.stageId,
+          fromStageName: before?.stageName || null,
+          stageName: card.stageName || null,
+          boardSlug: card.boardSlug || null,
+          note: typeof body.note === 'string' ? body.note.trim() || null : null,
+          link: boardLink(card.boardSlug),
+        },
+        link: boardLink(card.boardSlug),
       });
 
       return NextResponse.json({ success: true, data: { card } });
@@ -97,10 +109,12 @@ export async function PATCH(request: Request, context: RouteContext) {
         metadata: {
           boardId: body.boardId,
           boardSlug: card.boardSlug,
+          boardName: card.boardSlug?.replace(/_/g, ' ') || null,
           stageId: card.stageId,
           stageName: card.stageName,
+          link: boardLink(card.boardSlug),
         },
-        link: '/admin/tasks',
+        link: boardLink(card.boardSlug),
       });
       return NextResponse.json({ success: true, data: { card } });
     }
@@ -129,7 +143,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
       }
 
-      const card = await updatePipelineCard(
+      const { card, changeNotes } = await updatePipelineCard(
         id,
         {
           title: typeof body.title === 'string' ? body.title : undefined,
@@ -201,16 +215,25 @@ export async function PATCH(request: Request, context: RouteContext) {
         session?.user?.id
       );
 
-      logActivitySafe({
-        actorUserId: session?.user?.id || null,
-        actorRole: 'admin',
-        actionType: 'pipeline.card_updated',
-        category: 'leases',
-        entityType: 'pipeline_card',
-        entityId: card.id,
-        entityLabel: card.title,
-        link: '/admin/tasks',
-      });
+      if (changeNotes.length > 0) {
+        logActivitySafe({
+          actorUserId: session?.user?.id || null,
+          actorRole: 'admin',
+          actionType: 'pipeline.card_updated',
+          category: 'leases',
+          entityType: 'pipeline_card',
+          entityId: card.id,
+          entityLabel: card.title,
+          metadata: {
+            changes: changeNotes,
+            summary: changeNotes.slice(0, 3).join('; '),
+            boardSlug: card.boardSlug || null,
+            stageName: card.stageName || null,
+            link: boardLink(card.boardSlug),
+          },
+          link: boardLink(card.boardSlug),
+        });
+      }
 
       return NextResponse.json({ success: true, data: { card } });
     }
@@ -218,8 +241,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          'Unknown action. Use update, move, or move_to_board',
+        error: 'Unknown action. Use update, move, or move_to_board',
       },
       { status: 400 }
     );
@@ -251,7 +273,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
       entityType: 'pipeline_card',
       entityId: card.id,
       entityLabel: card.title,
-      link: '/admin/tasks',
+      metadata: {
+        boardSlug: card.boardSlug || null,
+        link: boardLink(card.boardSlug),
+      },
+      link: boardLink(card.boardSlug),
     });
 
     return NextResponse.json({ success: true, data: { id: card.id } });

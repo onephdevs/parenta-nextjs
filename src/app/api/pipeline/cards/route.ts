@@ -90,8 +90,13 @@ export async function POST(request: Request) {
       entityType: 'pipeline_card',
       entityId: card.id,
       entityLabel: card.title,
-      metadata: { boardSlug: body.boardSlug },
-      link: '/admin/tasks',
+      metadata: {
+        boardSlug: card.boardSlug || body.boardSlug,
+        boardName: (card.boardSlug || body.boardSlug || '').replace(/_/g, ' ') || null,
+        stageName: card.stageName || null,
+        link: card.boardSlug ? `/admin/tasks?board=${card.boardSlug}` : '/admin/tasks',
+      },
+      link: card.boardSlug ? `/admin/tasks?board=${card.boardSlug}` : '/admin/tasks',
     });
 
     return NextResponse.json({ success: true, data: { card } }, { status: 201 });

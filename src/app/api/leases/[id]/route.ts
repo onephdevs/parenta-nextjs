@@ -86,6 +86,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           actionType: String(row.action_type || 'item.updated'),
           entityLabel: row.entity_label as string | null,
           actorName,
+          metadata: (row.metadata as Record<string, unknown>) || {},
         });
       return {
         id: String(row.id),

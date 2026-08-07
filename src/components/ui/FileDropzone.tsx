@@ -19,6 +19,8 @@ export interface FileDropzoneProps {
   accept?: string;
   multiple?: boolean;
   disabled?: boolean;
+  /** Mobile camera hint — use "environment" for rear camera (issue photos). */
+  capture?: 'environment' | 'user';
   /** Primary line under the icon */
   label?: ReactNode;
   /** Secondary hint (types, size limits) */
@@ -38,6 +40,7 @@ export function FileDropzone({
   accept,
   multiple = false,
   disabled = false,
+  capture,
   label,
   hint,
   icon,
@@ -146,6 +149,7 @@ export function FileDropzone({
         accept={accept}
         multiple={multiple}
         disabled={disabled}
+        capture={capture}
         onChange={onChange}
         className="hidden"
         onClick={(e) => e.stopPropagation()}

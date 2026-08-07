@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 import { requireTenantAccess } from '@/lib/api/require-tenant-access';
+import {
+  listAttachmentsForRequests,
+  saveMaintenancePhotos,
+  MAX_PHOTOS,
+} from '@/lib/api/maintenance-attachments';
 
 export async function GET() {
   try {
@@ -10,7 +15,6 @@ export async function GET() {
 
     const tenantId = access.tenant.id;
 
-    // Get tenant's maintenance requests
     const query = `
       SELECT 
         mr.*,
@@ -24,9 +28,11 @@ export async function GET() {
     `;
 
     const result = await pool.query(query, [tenantId]);
+    const attachmentMap = await listAttachmentsForRequests(
+      result.rows.map((row: { id: string }) => String(row.id))
+    );
 
-    // Transform database columns to frontend format
-    const requests = result.rows.map((row: any) => ({
+    const requests = result.rows.map((row: Record<string, unknown>) => ({
       id: row.id,
       title: row.title,
       description: row.description,
@@ -39,31 +45,72 @@ export async function GET() {
       completedDate: row.completed_date,
       notes: row.notes,
       roomNumber: row.room_number,
-      buildingName: row.building_name
+      buildingName: row.building_name,
+      attachments: attachmentMap.get(String(row.id)) || [],
+      attachmentCount: (attachmentMap.get(String(row.id)) || []).length,
     }));
 
     return NextResponse.json({
       success: true,
-      data: { 
+      data: {
         requests,
         total: requests.length,
-        active: requests.filter((r: any) => r.status !== 'completed' && r.status !== 'cancelled').length
-      }
+        active: requests.filter(
+          (r) => r.status !== 'completed' && r.status !== 'cancelled'
+        ).length,
+      },
     });
-
   } catch (error) {
     console.error('❌ Error fetching maintenance requests:', error);
-    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch maintenance requests',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
   }
+}
+
+async function parseCreateBody(request: Request): Promise<{
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  files: File[];
+}> {
+  const contentType = request.headers.get('content-type') || '';
+
+  if (contentType.includes('multipart/form-data')) {
+    const form = await request.formData();
+    const title = String(form.get('title') || '').trim();
+    const description = String(form.get('description') || '').trim();
+    const category = String(form.get('category') || '').trim();
+    const priority = String(form.get('priority') || 'medium').trim() || 'medium';
+
+    const files: File[] = [];
+    for (const [key, value] of form.entries()) {
+      if (
+        (key === 'photos' || key === 'photo' || key === 'files' || key.startsWith('photo')) &&
+        value instanceof File &&
+        value.size > 0
+      ) {
+        files.push(value);
+      }
+    }
+
+    return { title, description, category, priority, files: files.slice(0, MAX_PHOTOS) };
+  }
+
+  const body = await request.json();
+  return {
+    title: String(body.title || '').trim(),
+    description: String(body.description || '').trim(),
+    category: String(body.category || '').trim(),
+    priority: String(body.priority || 'medium').trim() || 'medium',
+    files: [],
+  };
 }
 
 export async function POST(request: Request) {
@@ -71,10 +118,8 @@ export async function POST(request: Request) {
     const access = await requireTenantAccess({ allowMutation: true });
     if (access.error) return access.error;
 
-    const body = await request.json();
-    const { title, description, category, priority } = body;
+    const { title, description, category, priority, files } = await parseCreateBody(request);
 
-    // Validate required fields
     if (!title || !description || !category) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
@@ -82,7 +127,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get tenant's room information
     const tenantQuery = `
       SELECT 
         t.id as tenant_id, 
@@ -94,7 +138,7 @@ export async function POST(request: Request) {
       LEFT JOIN rooms r ON tra.room_id = r.id
       WHERE t.id = $1
     `;
-    
+
     const tenantResult = await pool.query(tenantQuery, [access.tenant.id]);
 
     if (tenantResult.rows.length === 0) {
@@ -106,7 +150,6 @@ export async function POST(request: Request) {
 
     const { tenant_id, room_id, building_id } = tenantResult.rows[0];
 
-    // Insert maintenance request (request_date comes from table DEFAULT CURRENT_DATE for admin listing)
     const insertQuery = `
       INSERT INTO maintenance_requests (
         tenant_id,
@@ -129,11 +172,29 @@ export async function POST(request: Request) {
       description,
       category,
       priority || 'medium',
-      'open'
+      'open',
     ];
 
     const result = await pool.query(insertQuery, values);
     const created = result.rows[0];
+
+    let attachments: Awaited<ReturnType<typeof saveMaintenancePhotos>> = [];
+    let photoWarning: string | null = null;
+    if (files.length > 0) {
+      try {
+        attachments = await saveMaintenancePhotos({
+          maintenanceRequestId: String(created.id),
+          files,
+          tenantId: String(tenant_id),
+        });
+      } catch (photoErr) {
+        console.error('Maintenance photo upload failed:', photoErr);
+        photoWarning =
+          photoErr instanceof Error
+            ? photoErr.message
+            : 'Request saved but some photos could not be uploaded';
+      }
+    }
 
     try {
       const { ensureMaintenancePipelineCard } = await import('@/lib/api/pipeline');
@@ -153,33 +214,40 @@ export async function POST(request: Request) {
     }
 
     logActivitySafe({
-      actorUserId: access.session.user.id || null,
+      actorUserId: access.userId || null,
       actorRole: 'tenant',
       actionType: 'maintenance.requested',
       category: 'maintenance',
       entityType: 'maintenance_request',
       entityId: String(created.id),
       entityLabel: title,
-      afterData: created as Record<string, unknown>,
+      afterData: { ...created, attachmentCount: attachments.length } as Record<
+        string,
+        unknown
+      >,
       link: '/admin/tasks?board=maintenance',
-      metadata: { link: '/admin/tasks?board=maintenance', tenantId: tenant_id },
+      metadata: {
+        link: '/admin/tasks?board=maintenance',
+        tenantId: tenant_id,
+        attachmentCount: attachments.length,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      data: created,
-      message: 'Maintenance request submitted successfully'
+      data: { ...created, attachments },
+      message: photoWarning
+        ? `Request submitted. ${photoWarning}`
+        : 'Maintenance request submitted successfully',
+      warning: photoWarning || undefined,
     });
-
   } catch (error) {
     console.error('❌ Error creating maintenance request:', error);
-    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to submit maintenance request',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
