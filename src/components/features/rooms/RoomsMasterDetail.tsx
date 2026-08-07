@@ -144,7 +144,14 @@ export default function RoomsMasterDetail({
         />
       </div>
 
-      <RoomDetailPane detail={detail} loading={detailLoading} error={detailError} />
+      <RoomDetailPane
+        detail={detail}
+        loading={detailLoading}
+        error={detailError}
+        onDocumentsChanged={() => {
+          if (selectedRoomId) void loadDetail(selectedRoomId);
+        }}
+      />
     </div>
   );
 }

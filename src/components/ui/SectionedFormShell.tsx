@@ -251,7 +251,7 @@ function SectionedFormLayout<T extends string>({
 
 /**
  * Shared CRUD form chrome: left section nav + content header with Cancel/Save.
- * - mode="modal" (default): portaled fullscreen panel beside admin sidebar
+ * - mode="modal" (default): full-height right panel at 70% of main content width
  * - mode="dialog": centered floating panel (not fullscreen)
  * - mode="page": fills the admin main content area (no portal)
  */
@@ -310,7 +310,11 @@ export default function SectionedFormShell<T extends string>(
         onClick={props.onCancel}
         aria-hidden="true"
       />
-      <div className="pointer-events-auto absolute inset-y-0 left-0 right-0 shadow-xl lg:left-64">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="pointer-events-auto absolute inset-y-0 right-0 w-[70%] bg-white shadow-xl lg:w-[calc(0.7*(100%-16rem))]"
+      >
         <SectionedFormLayout {...props} fillViewport />
       </div>
     </div>,

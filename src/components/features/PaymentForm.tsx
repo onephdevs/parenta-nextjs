@@ -5,11 +5,9 @@ import { useRouter } from 'next/navigation';
 import { User, CreditCard, FileText } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import SectionedFormShell, { SectionedFormSection, SectionCard } from '@/components/ui/SectionedFormShell';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
 
@@ -40,6 +38,12 @@ interface PaymentFormProps {
   initialData?: Partial<PaymentFormData>;
   onSubmit?: (data: PaymentFormData) => Promise<void>;
   onCancel?: () => void;
+  /** Called after a successful record when using the default submit path. */
+  onSuccess?: () => void;
+  mode?: 'page' | 'modal';
+  isOpen?: boolean;
+  /** When set, tenant dropdown prefers tenants in this building. */
+  buildingId?: string;
 }
 
 type SectionId = 'tenant' | 'payment' | 'notes';
@@ -68,7 +72,15 @@ const SECTIONS: SectionedFormSection<SectionId>[] = [
   },
 ];
 
-export default function PaymentForm({ initialData, onSubmit, onCancel }: PaymentFormProps) {
+export default function PaymentForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  onSuccess,
+  mode = 'page',
+  isOpen = true,
+  buildingId,
+}: PaymentFormProps) {
   const router = useRouter();
   const { addNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
@@ -117,7 +129,16 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
           }
           
           // Ensure it's always an array
-          setTenants(Array.isArray(tenantsList) ? tenantsList : []);
+          let list = Array.isArray(tenantsList) ? tenantsList : [];
+          if (buildingId) {
+            const filtered = list.filter(
+              (t) =>
+                (t as Tenant & { currentBuildingId?: string }).currentBuildingId === buildingId ||
+                (t as Tenant & { buildingId?: string }).buildingId === buildingId
+            );
+            if (filtered.length > 0) list = filtered;
+          }
+          setTenants(list);
         } else {
           console.error('Failed to fetch tenants:', tenantsRes.status);
           setTenants([]);
@@ -130,7 +151,7 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
     };
 
     loadData();
-  }, [addNotification]);
+  }, [addNotification, buildingId]);
 
   // Update selected tenant when tenantId changes
   useEffect(() => {
@@ -296,9 +317,10 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
         }
         
         addNotification(successMessage, 'success');
-        
-        // Navigate to payment detail page if we have an ID, otherwise to payments list
-        if (paymentId) {
+
+        if (onSuccess) {
+          onSuccess();
+        } else if (paymentId) {
           router.push(`/admin/financial/payments/${paymentId}`);
         } else {
           router.push('/admin/financial/payments');
@@ -330,265 +352,271 @@ export default function PaymentForm({ initialData, onSubmit, onCancel }: Payment
     }
   };
 
+  if (mode === 'modal' && !isOpen) return null;
+
+  const shellProps = {
+    eyebrow: 'Record payment',
+    entityLabel: formData.invoiceNumber
+      ? formData.invoiceNumber
+      : selectedTenant
+        ? `${selectedTenant.firstName} ${selectedTenant.lastName}`
+        : undefined,
+    sections: SECTIONS,
+    activeSection,
+    onSectionChange: setActiveSection,
+    onCancel: handleCancel,
+    primaryLabel: 'Record Payment',
+    primaryLoading: isLoading,
+    primaryType: 'submit' as const,
+    formId: 'payment-form',
+  };
+
+  const formBody = (
+    <form id="payment-form" onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {activeSection === 'tenant' && (
+        <SectionCard title="Tenant Selection">
+          {formData.invoiceNumber && (
+            <Alert variant="info" title="Paying invoice" className="mb-4">
+              Prefilling from <span className="font-medium">{formData.invoiceNumber}</span>
+              {formData.amount
+                ? ` — balance due ₱${Number(formData.amount).toLocaleString('en-PH')}`
+                : ''}
+              .
+            </Alert>
+          )}
+          <FormField label="Tenant" htmlFor="tenantId" required error={errors.tenantId}>
+            <Select
+              id="tenantId"
+              name="tenantId"
+              value={formData.tenantId}
+              onChange={(e) => handleInputChange('tenantId', e.target.value)}
+              isInvalid={Boolean(errors.tenantId)}
+            >
+              <option value="">Select a tenant</option>
+              {Array.isArray(tenants) && tenants.length > 0 ? (
+                tenants.map((tenant) => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.firstName} {tenant.lastName}
+                    {tenant.currentRoomId &&
+                      ` (${tenant.buildingName} ${tenant.roomNumber})`}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  Loading tenants...
+                </option>
+              )}
+            </Select>
+            {selectedTenant && !selectedTenant.currentRoomId && (
+              <p className="mt-2 text-sm text-blue-600">
+                This tenant is not currently assigned to a room. Payment can still be recorded,
+                but it won&apos;t be automatically allocated to invoices.
+              </p>
+            )}
+          </FormField>
+        </SectionCard>
+      )}
+
+      {activeSection === 'payment' && (
+        <SectionCard title="Payment Details">
+          {formData.invoiceNumber && (
+            <Alert variant="info" title="Invoice payment" className="mb-4">
+              Amount and notes are prefilled from{' '}
+              <span className="font-medium">{formData.invoiceNumber}</span>
+              {formData.amount
+                ? ` (balance due ₱${Number(formData.amount).toLocaleString('en-PH')})`
+                : ''}
+              . You can adjust before recording.
+            </Alert>
+          )}
+          <div className="grid grid-cols-6 gap-6">
+            <FormField
+              label="Total Amount Paid"
+              htmlFor="amount"
+              required
+              error={errors.amount}
+              hint="Total amount received from tenant"
+              className="col-span-6 sm:col-span-3"
+            >
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
+                  ₱
+                </span>
+                <Input
+                  type="number"
+                  id="amount"
+                  name="amount"
+                  value={formData.amount === '0' ? '' : formData.amount}
+                  onChange={(e) => handleInputChange('amount', e.target.value)}
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  className="pl-8"
+                  isInvalid={Boolean(errors.amount)}
+                />
+              </div>
+            </FormField>
+
+            <FormField
+              label="Deposit Amount"
+              htmlFor="depositAmount"
+              error={errors.depositAmount}
+              hint="Amount to add to deposit ledger (remainder goes to invoices)"
+              className="col-span-6 sm:col-span-3"
+            >
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
+                  ₱
+                </span>
+                <Input
+                  type="number"
+                  id="depositAmount"
+                  name="depositAmount"
+                  value={formData.depositAmount === '0' ? '' : formData.depositAmount}
+                  onChange={(e) => handleInputChange('depositAmount', e.target.value)}
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  className="pl-8"
+                  isInvalid={Boolean(errors.depositAmount)}
+                />
+              </div>
+            </FormField>
+
+            {(parseFloat(formData.amount) || 0) > 0 && (
+              <Alert variant="info" title="Payment Breakdown" className="col-span-6">
+                <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span>To Deposit Ledger:</span>
+                    <span className="ml-2 font-semibold">
+                      ₱{(parseFloat(formData.depositAmount) || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span>To Invoice Payment:</span>
+                    <span className="ml-2 font-semibold">
+                      ₱
+                      {(
+                        (parseFloat(formData.amount) || 0) -
+                        (parseFloat(formData.depositAmount) || 0)
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </Alert>
+            )}
+
+            <FormField
+              label="Payment Type"
+              htmlFor="type"
+              required
+              error={errors.type}
+              className="col-span-6 sm:col-span-3"
+            >
+              <Select
+                id="type"
+                name="type"
+                value={formData.type}
+                onChange={(e) => handleInputChange('type', e.target.value)}
+                isInvalid={Boolean(errors.type)}
+              >
+                <option value="rent">Rent</option>
+                <option value="deposit">Deposit</option>
+                <option value="advance">Advance</option>
+                <option value="fee">Fee</option>
+                <option value="utilities">Utilities</option>
+                <option value="other">Other</option>
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Payment Date"
+              htmlFor="paymentDate"
+              required
+              error={errors.paymentDate}
+              className="col-span-6 sm:col-span-3"
+            >
+              <Input
+                type="date"
+                id="paymentDate"
+                name="paymentDate"
+                value={formData.paymentDate}
+                onChange={(e) => handleInputChange('paymentDate', e.target.value)}
+                min="2000-01-01"
+                max={new Date().toISOString().split('T')[0]}
+                isInvalid={Boolean(errors.paymentDate)}
+                style={{ colorScheme: 'light' }}
+              />
+            </FormField>
+
+            <FormField
+              label="Payment Method"
+              htmlFor="paymentMethod"
+              required
+              error={errors.paymentMethod}
+              className="col-span-6 sm:col-span-3"
+            >
+              <Select
+                id="paymentMethod"
+                name="paymentMethod"
+                value={formData.paymentMethod}
+                onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                isInvalid={Boolean(errors.paymentMethod)}
+              >
+                <option value="cash">Cash</option>
+                <option value="check">Check</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="online">Online Payment</option>
+              </Select>
+            </FormField>
+
+            <FormField
+              label="Transaction ID"
+              htmlFor="transactionId"
+              className="col-span-6 sm:col-span-3"
+            >
+              <Input
+                type="text"
+                id="transactionId"
+                name="transactionId"
+                value={formData.transactionId}
+                onChange={(e) => handleInputChange('transactionId', e.target.value)}
+                placeholder="Optional transaction reference"
+              />
+            </FormField>
+          </div>
+        </SectionCard>
+      )}
+
+      {activeSection === 'notes' && (
+        <SectionCard title="Description & Notes">
+          <FormField label="Description" htmlFor="description">
+            <Textarea
+              id="description"
+              name="description"
+              rows={4}
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              placeholder="Optional payment description or notes"
+            />
+          </FormField>
+        </SectionCard>
+      )}
+    </form>
+  );
+
   return (
     <div className="text-gray-900">
-      <SectionedFormShell
-        mode="page"
-        eyebrow="Record payment"
-        entityLabel={
-          formData.invoiceNumber
-            ? formData.invoiceNumber
-            : selectedTenant
-              ? `${selectedTenant.firstName} ${selectedTenant.lastName}`
-              : undefined
-        }
-        sections={SECTIONS}
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        onCancel={handleCancel}
-        primaryLabel="Record Payment"
-        primaryLoading={isLoading}
-        primaryType="submit"
-        formId="payment-form"
-      >
-        <form id="payment-form" onSubmit={handleSubmit} className="space-y-6" noValidate>
-          {activeSection === 'tenant' && (
-            <SectionCard title="Tenant Selection">
-              {formData.invoiceNumber && (
-                <Alert variant="info" title="Paying invoice" className="mb-4">
-                  Prefilling from <span className="font-medium">{formData.invoiceNumber}</span>
-                  {formData.amount
-                    ? ` — balance due ₱${Number(formData.amount).toLocaleString('en-PH')}`
-                    : ''}
-                  .
-                </Alert>
-              )}
-              <FormField
-                label="Tenant"
-                htmlFor="tenantId"
-                required
-                error={errors.tenantId}
-              >
-                <Select
-                  id="tenantId"
-                  name="tenantId"
-                  value={formData.tenantId}
-                  onChange={(e) => handleInputChange('tenantId', e.target.value)}
-                  isInvalid={Boolean(errors.tenantId)}
-                >
-                  <option value="">Select a tenant</option>
-                  {Array.isArray(tenants) && tenants.length > 0 ? (
-                    tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.firstName} {tenant.lastName}
-                        {tenant.currentRoomId &&
-                          ` (${tenant.buildingName} ${tenant.roomNumber})`}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>
-                      Loading tenants...
-                    </option>
-                  )}
-                </Select>
-                {selectedTenant && !selectedTenant.currentRoomId && (
-                  <p className="mt-2 text-sm text-blue-600">
-                    This tenant is not currently assigned to a room. Payment can still be recorded,
-                    but it won&apos;t be automatically allocated to invoices.
-                  </p>
-                )}
-              </FormField>
-            </SectionCard>
-          )}
-
-          {activeSection === 'payment' && (
-            <SectionCard title="Payment Details">
-              {formData.invoiceNumber && (
-                <Alert variant="info" title="Invoice payment" className="mb-4">
-                  Amount and notes are prefilled from{' '}
-                  <span className="font-medium">{formData.invoiceNumber}</span>
-                  {formData.amount
-                    ? ` (balance due ₱${Number(formData.amount).toLocaleString('en-PH')})`
-                    : ''}
-                  . You can adjust before recording.
-                </Alert>
-              )}
-              <div className="grid grid-cols-6 gap-6">
-                <FormField
-                  label="Total Amount Paid"
-                  htmlFor="amount"
-                  required
-                  error={errors.amount}
-                  hint="Total amount received from tenant"
-                  className="col-span-6 sm:col-span-3"
-                >
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
-                      ₱
-                    </span>
-                    <Input
-                      type="number"
-                      id="amount"
-                      name="amount"
-                      value={formData.amount === '0' ? '' : formData.amount}
-                      onChange={(e) => handleInputChange('amount', e.target.value)}
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      className="pl-8"
-                      isInvalid={Boolean(errors.amount)}
-                    />
-                  </div>
-                </FormField>
-
-                <FormField
-                  label="Deposit Amount"
-                  htmlFor="depositAmount"
-                  error={errors.depositAmount}
-                  hint="Amount to add to deposit ledger (remainder goes to invoices)"
-                  className="col-span-6 sm:col-span-3"
-                >
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base font-medium text-gray-900">
-                      ₱
-                    </span>
-                    <Input
-                      type="number"
-                      id="depositAmount"
-                      name="depositAmount"
-                      value={formData.depositAmount === '0' ? '' : formData.depositAmount}
-                      onChange={(e) => handleInputChange('depositAmount', e.target.value)}
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      className="pl-8"
-                      isInvalid={Boolean(errors.depositAmount)}
-                    />
-                  </div>
-                </FormField>
-
-                {(parseFloat(formData.amount) || 0) > 0 && (
-                  <Alert variant="info" title="Payment Breakdown" className="col-span-6">
-                    <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span>To Deposit Ledger:</span>
-                        <span className="ml-2 font-semibold">
-                          ₱{(parseFloat(formData.depositAmount) || 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <div>
-                        <span>To Invoice Payment:</span>
-                        <span className="ml-2 font-semibold">
-                          ₱
-                          {(
-                            (parseFloat(formData.amount) || 0) -
-                            (parseFloat(formData.depositAmount) || 0)
-                          ).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </Alert>
-                )}
-
-                <FormField
-                  label="Payment Type"
-                  htmlFor="type"
-                  required
-                  error={errors.type}
-                  className="col-span-6 sm:col-span-3"
-                >
-                  <Select
-                    id="type"
-                    name="type"
-                    value={formData.type}
-                    onChange={(e) => handleInputChange('type', e.target.value)}
-                    isInvalid={Boolean(errors.type)}
-                  >
-                    <option value="rent">Rent</option>
-                    <option value="deposit">Deposit</option>
-                    <option value="advance">Advance</option>
-                    <option value="fee">Fee</option>
-                    <option value="utilities">Utilities</option>
-                    <option value="other">Other</option>
-                  </Select>
-                </FormField>
-
-                <FormField
-                  label="Payment Date"
-                  htmlFor="paymentDate"
-                  required
-                  error={errors.paymentDate}
-                  className="col-span-6 sm:col-span-3"
-                >
-                  <Input
-                    type="date"
-                    id="paymentDate"
-                    name="paymentDate"
-                    value={formData.paymentDate}
-                    onChange={(e) => handleInputChange('paymentDate', e.target.value)}
-                    min="2000-01-01"
-                    max={new Date().toISOString().split('T')[0]}
-                    isInvalid={Boolean(errors.paymentDate)}
-                    style={{ colorScheme: 'light' }}
-                  />
-                </FormField>
-
-                <FormField
-                  label="Payment Method"
-                  htmlFor="paymentMethod"
-                  required
-                  error={errors.paymentMethod}
-                  className="col-span-6 sm:col-span-3"
-                >
-                  <Select
-                    id="paymentMethod"
-                    name="paymentMethod"
-                    value={formData.paymentMethod}
-                    onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                    isInvalid={Boolean(errors.paymentMethod)}
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="check">Check</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="credit_card">Credit Card</option>
-                    <option value="online">Online Payment</option>
-                  </Select>
-                </FormField>
-
-                <FormField
-                  label="Transaction ID"
-                  htmlFor="transactionId"
-                  className="col-span-6 sm:col-span-3"
-                >
-                  <Input
-                    type="text"
-                    id="transactionId"
-                    name="transactionId"
-                    value={formData.transactionId}
-                    onChange={(e) => handleInputChange('transactionId', e.target.value)}
-                    placeholder="Optional transaction reference"
-                  />
-                </FormField>
-              </div>
-            </SectionCard>
-          )}
-
-          {activeSection === 'notes' && (
-            <SectionCard title="Description & Notes">
-              <FormField label="Description" htmlFor="description">
-                <Textarea
-                  id="description"
-                  name="description"
-                  rows={4}
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Optional payment description or notes"
-                />
-              </FormField>
-            </SectionCard>
-          )}
-        </form>
-      </SectionedFormShell>
+      {mode === 'page' ? (
+        <SectionedFormShell mode="page" {...shellProps}>
+          {formBody}
+        </SectionedFormShell>
+      ) : (
+        <SectionedFormShell mode="modal" isOpen={isOpen} {...shellProps}>
+          {formBody}
+        </SectionedFormShell>
+      )}
     </div>
   );
 }

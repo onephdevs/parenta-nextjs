@@ -50,10 +50,20 @@ export interface PropertyRoomTenant {
   lastName: string;
   email?: string | null;
   phone?: string | null;
+  previousAddress?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  notes?: string | null;
   startDate: string | Date;
+  /** Next rent due date when known (from open invoice or lease). */
+  dueDate?: string | Date | null;
   monthlyRate: number;
   overdueAmount: number;
   pendingAmount: number;
+  depositPaid?: number;
+  advancePaid?: number;
+  utilityDepositPaid?: number;
+  profileImagePath?: string | null;
 }
 
 export interface PropertyRoomImage {
@@ -69,6 +79,15 @@ export interface PropertyRoomDocument {
   fileSize?: number;
   mimeType?: string;
   documentType?: string;
+}
+
+export interface PropertyRoomAsset {
+  id: string;
+  assetName: string;
+  assetType: string;
+  brand?: string | null;
+  model?: string | null;
+  condition?: string | null;
 }
 
 export interface PropertyRoomDetail {
@@ -97,6 +116,12 @@ export interface RoomFinancialSummary {
   currentMonthlyRate: number;
   currentAssignmentStart: string | Date | null;
   depositReceived: number;
+  lastPaymentAmount?: number;
+  lastPaymentDate?: string | Date | null;
+  unpaidBalance?: number;
+  electricBillAmount?: number;
+  waterBillAmount?: number;
+  nextDueDate?: string | Date | null;
 }
 
 export interface RoomOccupancyMetrics {
@@ -427,6 +452,7 @@ export interface RoomPageDetail {
   financialSummary: RoomFinancialSummary;
   occupancyMetrics: RoomOccupancyMetrics;
   assignmentHistory: RoomAssignmentHistoryItem[];
+  assets: PropertyRoomAsset[];
 }
 
 function mapRoomRowToPropertyRoomDetail(
@@ -444,13 +470,27 @@ function mapRoomRowToPropertyRoomDetail(
           lastName: r.tenant_last_name as string,
           email: (r.tenant_email as string | null) ?? null,
           phone: (r.tenant_phone as string | null) ?? null,
+          previousAddress: (r.tenant_previous_address as string | null) ?? null,
+          emergencyContactName: (r.tenant_emergency_contact_name as string | null) ?? null,
+          emergencyContactPhone: (r.tenant_emergency_contact_phone as string | null) ?? null,
+          notes: (r.tenant_notes as string | null) ?? null,
           startDate: r.assignment_start as string | Date,
+          dueDate: (r.next_due_date as string | Date | null) ?? null,
           monthlyRate:
             parseFloat(String(r.assignment_monthly_rate)) ||
             parseFloat(String(r.monthly_rate)) ||
             0,
           overdueAmount: parseFloat(String(r.overdue_amount)) || 0,
           pendingAmount: parseFloat(String(r.pending_amount)) || 0,
+          depositPaid:
+            r.deposit_paid != null ? parseFloat(String(r.deposit_paid)) || 0 : undefined,
+          advancePaid:
+            r.advance_paid != null ? parseFloat(String(r.advance_paid)) || 0 : undefined,
+          utilityDepositPaid:
+            r.utility_deposit_paid != null
+              ? parseFloat(String(r.utility_deposit_paid)) || 0
+              : undefined,
+          profileImagePath: (r.tenant_profile_image as string | null) ?? null,
         }
       : null;
 
@@ -551,7 +591,14 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       t.last_name AS tenant_last_name,
       t.email AS tenant_email,
       t.phone AS tenant_phone,
+      t.previous_address AS tenant_previous_address,
+      t.emergency_contact_name AS tenant_emergency_contact_name,
+      t.emergency_contact_phone AS tenant_emergency_contact_phone,
+      t.notes AS tenant_notes,
       tra.start_date AS assignment_start,
+      tra.deposit_paid,
+      tra.advance_paid,
+      tra.utility_deposit_paid,
       COALESCE(tra.monthly_rate, r.monthly_rate) AS assignment_monthly_rate,
       COALESCE((
         SELECT SUM(p.amount)
@@ -565,6 +612,22 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
         WHERE p.assignment_id = tra.id
           AND p.payment_status = 'pending'
       ), 0) AS pending_amount,
+      (
+        SELECT i.due_date
+        FROM invoices i
+        WHERE i.tenant_id = t.id
+          AND i.invoice_status IS DISTINCT FROM 'cancelled'
+          AND GREATEST(i.total_amount - COALESCE(i.amount_paid, 0), 0) > 0.01
+        ORDER BY i.due_date ASC NULLS LAST
+        LIMIT 1
+      ) AS next_due_date,
+      (
+        SELECT img.file_path
+        FROM images img
+        WHERE img.entity_type = 'tenant' AND img.entity_id = t.id
+        ORDER BY img.is_primary DESC, img.created_at ASC
+        LIMIT 1
+      ) AS tenant_profile_image,
       (
         SELECT COUNT(*)::int FROM rooms rr
         WHERE rr.building_id = r.building_id AND rr.is_active = true
@@ -606,6 +669,9 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     financialRaw,
     occupancyRaw,
     historyRaw,
+    assetsResult,
+    lastPaymentResult,
+    utilityResult,
   ] = await Promise.all([
     pool.query(
       `
@@ -632,14 +698,70 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       FROM documents d
       WHERE d.room_id = $1
          OR ($2::uuid IS NOT NULL AND d.tenant_id = $2::uuid)
-      ORDER BY d.created_at DESC
-      LIMIT 5
+      ORDER BY
+        CASE
+          WHEN lower(COALESCE(d.document_type, '')) LIKE '%lease%' THEN 0
+          WHEN lower(COALESCE(d.document_name, '')) LIKE '%lease%' THEN 0
+          ELSE 1
+        END,
+        d.created_at DESC
+      LIMIT 12
       `,
       [roomId, tenantId]
     ),
     getRoomFinancialSummary(roomId),
     getRoomOccupancyMetrics(roomId),
     getRoomAssignmentHistory(roomId),
+    pool.query(
+      `
+      SELECT
+        a.id,
+        a.asset_name,
+        a.asset_type,
+        a.brand,
+        a.model,
+        a.asset_condition
+      FROM assets a
+      INNER JOIN asset_assignments aa ON a.id = aa.asset_id
+      WHERE aa.room_id = $1
+        AND aa.assignment_status = 'active'
+        AND a.is_active = true
+      ORDER BY a.asset_type ASC, a.asset_name ASC
+      `,
+      [roomId]
+    ).catch(() => ({ rows: [] as Record<string, unknown>[] })),
+    tenantId
+      ? pool.query(
+          `
+          SELECT amount, payment_date
+          FROM payments
+          WHERE tenant_id = $1
+            AND payment_status IN ('paid', 'completed', 'confirmed')
+          ORDER BY payment_date DESC NULLS LAST, created_at DESC
+          LIMIT 1
+          `,
+          [tenantId]
+        ).catch(() => ({ rows: [] as Record<string, unknown>[] }))
+      : Promise.resolve({ rows: [] as Record<string, unknown>[] }),
+    pool.query(
+      `
+      SELECT
+        utility_type,
+        amount,
+        due_date,
+        bill_status
+      FROM utility_bills
+      WHERE is_active = true
+        AND bill_status IS DISTINCT FROM 'cancelled'
+        AND (
+          room_id = $1
+          OR (room_id IS NULL AND building_id = $2)
+        )
+        AND utility_type IN ('electricity', 'water')
+      ORDER BY due_date DESC NULLS LAST, created_at DESC
+      `,
+      [roomId, buildingId]
+    ).catch(() => ({ rows: [] as Record<string, unknown>[] })),
   ]);
 
   const occupants: PropertyRoomOccupant[] = occupantsResult.rows.map((occ) => ({
@@ -696,6 +818,20 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     updatedAt: row.building_updated_at,
   };
 
+  const lastPay = lastPaymentResult.rows[0] || null;
+  let electricBillAmount = 0;
+  let waterBillAmount = 0;
+  for (const bill of utilityResult.rows) {
+    const type = String(bill.utility_type || '');
+    const amount = parseFloat(String(bill.amount)) || 0;
+    if (type === 'electricity' && electricBillAmount === 0) electricBillAmount = amount;
+    if (type === 'water' && waterBillAmount === 0) waterBillAmount = amount;
+  }
+
+  const unpaidBalance =
+    (parseFloat(String(financialRaw.overdue_amount)) || 0) +
+    (parseFloat(String(financialRaw.pending_amount)) || 0);
+
   const financialSummary: RoomFinancialSummary = {
     totalPayments: parseFloat(String(financialRaw.total_payments)) || 0,
     overdueAmount: parseFloat(String(financialRaw.overdue_amount)) || 0,
@@ -703,6 +839,12 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     currentMonthlyRate: parseFloat(String(financialRaw.current_monthly_rate)) || 0,
     currentAssignmentStart: financialRaw.current_assignment_start ?? null,
     depositReceived: parseFloat(String(financialRaw.deposit_received)) || 0,
+    lastPaymentAmount: lastPay ? parseFloat(String(lastPay.amount)) || 0 : 0,
+    lastPaymentDate: lastPay?.payment_date ?? null,
+    unpaidBalance,
+    electricBillAmount,
+    waterBillAmount,
+    nextDueDate: (row.next_due_date as string | Date | null) ?? null,
   };
 
   const occupancyMetrics: RoomOccupancyMetrics = {
@@ -729,6 +871,15 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       };
     });
 
+  const assets: PropertyRoomAsset[] = (assetsResult.rows || []).map((a) => ({
+    id: String(a.id),
+    assetName: String(a.asset_name || ''),
+    assetType: String(a.asset_type || ''),
+    brand: a.brand ? String(a.brand) : null,
+    model: a.model ? String(a.model) : null,
+    condition: a.asset_condition ? String(a.asset_condition) : null,
+  }));
+
   return {
     room,
     building,
@@ -740,6 +891,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     financialSummary,
     occupancyMetrics,
     assignmentHistory,
+    assets,
   };
 }
 
@@ -756,7 +908,7 @@ export interface PropertyUnsignedUnit {
   roomStatus: string;
   monthlyRate: number;
   imagePath?: string | null;
-  reason: 'vacant' | 'awaiting_signature';
+  reason: 'vacant' | 'unassigned' | 'awaiting_signature';
 }
 
 export interface PropertyMaintenanceCategoryCount {
@@ -785,8 +937,11 @@ export interface PropertyBuildingReport {
     totalUnits: number;
     occupied: number;
     vacant: number;
+    /** Units that are neither occupied nor vacant (reserved, maintenance, etc.) */
+    unassigned: number;
     occupiedPercent: number;
     vacantPercent: number;
+    unassignedPercent: number;
   };
   unsignedUnits: PropertyUnsignedUnit[];
   maintenance: {
@@ -930,7 +1085,14 @@ export async function getPropertyBuildingReport(
         SELECT
           COUNT(*)::int AS total_units,
           SUM(CASE WHEN room_status = 'occupied' THEN 1 ELSE 0 END)::int AS occupied,
-          SUM(CASE WHEN room_status = 'vacant' THEN 1 ELSE 0 END)::int AS vacant
+          SUM(CASE WHEN room_status = 'vacant' THEN 1 ELSE 0 END)::int AS vacant,
+          SUM(
+            CASE
+              WHEN room_status IS DISTINCT FROM 'occupied'
+               AND room_status IS DISTINCT FROM 'vacant'
+              THEN 1 ELSE 0
+            END
+          )::int AS unassigned
         FROM rooms
         WHERE building_id = $1 AND is_active = true
         `,
@@ -951,8 +1113,13 @@ export async function getPropertyBuildingReport(
         FROM rooms r
         WHERE r.building_id = $1
           AND r.is_active = true
-          AND r.room_status = 'vacant'
+          AND r.room_status IS DISTINCT FROM 'occupied'
         ORDER BY
+          CASE
+            WHEN r.room_status = 'vacant' THEN 0
+            WHEN r.room_status = 'reserved' THEN 1
+            ELSE 2
+          END,
           regexp_replace(lower(r.room_number), '[0-9]+', '', 'g'),
           COALESCE(NULLIF(regexp_replace(r.room_number, '[^0-9]', '', 'g'), '')::bigint, 0),
           r.room_number
@@ -1043,15 +1210,22 @@ export async function getPropertyBuildingReport(
   const totalUnits = Number(avail.total_units) || 0;
   const occupied = Number(avail.occupied) || 0;
   const vacant = Number(avail.vacant) || 0;
+  const unassigned = Math.max(
+    0,
+    Number(avail.unassigned) || totalUnits - occupied - vacant
+  );
 
-  const unsignedVacant: PropertyUnsignedUnit[] = unsignedResult.rows.map((r) => ({
-    roomId: String(r.room_id),
-    roomNumber: String(r.room_number),
-    roomStatus: String(r.room_status),
-    monthlyRate: Number(r.monthly_rate) || 0,
-    imagePath: r.image_path ? String(r.image_path) : null,
-    reason: 'vacant' as const,
-  }));
+  const unsignedVacant: PropertyUnsignedUnit[] = unsignedResult.rows.map((r) => {
+    const status = String(r.room_status || 'vacant');
+    return {
+      roomId: String(r.room_id),
+      roomNumber: String(r.room_number),
+      roomStatus: status,
+      monthlyRate: Number(r.monthly_rate) || 0,
+      imagePath: r.image_path ? String(r.image_path) : null,
+      reason: (status === 'vacant' ? 'vacant' : 'unassigned') as 'vacant' | 'unassigned',
+    };
+  });
 
   const unsignedAwaiting: PropertyUnsignedUnit[] = (awaitingResult.rows || [])
     .filter((r) => r.room_id)
@@ -1093,8 +1267,10 @@ export async function getPropertyBuildingReport(
       totalUnits,
       occupied,
       vacant,
+      unassigned,
       occupiedPercent: totalUnits > 0 ? Math.round((occupied / totalUnits) * 100) : 0,
       vacantPercent: totalUnits > 0 ? Math.round((vacant / totalUnits) * 100) : 0,
+      unassignedPercent: totalUnits > 0 ? Math.round((unassigned / totalUnits) * 100) : 0,
     },
     unsignedUnits,
     maintenance: {

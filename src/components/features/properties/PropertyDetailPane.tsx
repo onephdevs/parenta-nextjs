@@ -1,7 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { PropertyBuildingDetail } from '@/lib/api/properties';
+import AddRoomModal from '@/components/features/AddRoomModal';
+import TenantForm from '@/components/features/TenantForm';
+import PaymentForm from '@/components/features/PaymentForm';
+import CreateMaintenanceRequestModal from '@/components/features/CreateMaintenanceRequestModal';
 import MainPropertyCard from './MainPropertyCard';
 import PropertyRoomCard from './PropertyRoomCard';
 import PropertyReportPanel from './PropertyReportPanel';
@@ -31,6 +35,11 @@ export default function PropertyDetailPane({
   onBuildingDeleted,
   onViewRoomDetails,
 }: PropertyDetailPaneProps) {
+  const [addRoomOpen, setAddRoomOpen] = useState(false);
+  const [addTenantOpen, setAddTenantOpen] = useState(false);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+
   useEffect(() => {
     if (!scrollToRoomId || loading || !detail) return;
 
@@ -73,10 +82,15 @@ export default function PropertyDetailPane({
               detail={detail}
               onBuildingUpdated={onBuildingUpdated}
               onBuildingDeleted={onBuildingDeleted}
-              onRoomAdded={onBuildingUpdated}
             />
 
-            <PropertyReportPanel buildingId={detail.building.id} />
+            <PropertyReportPanel
+              buildingId={detail.building.id}
+              onAddRoom={() => setAddRoomOpen(true)}
+              onAddTenant={() => setAddTenantOpen(true)}
+              onRecordPayment={() => setRecordPaymentOpen(true)}
+              onMaintenance={() => setMaintenanceOpen(true)}
+            />
 
             <div>
               <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Rooms</p>
@@ -97,6 +111,52 @@ export default function PropertyDetailPane({
                 </div>
               )}
             </div>
+
+            <AddRoomModal
+              buildingId={detail.building.id}
+              building={detail.building}
+              isOpen={addRoomOpen}
+              onClose={() => setAddRoomOpen(false)}
+              onRoomAdded={() => {
+                setAddRoomOpen(false);
+                onBuildingUpdated();
+              }}
+            />
+
+            <TenantForm
+              mode="modal"
+              isOpen={addTenantOpen}
+              initialBuildingId={detail.building.id}
+              lockHousing={false}
+              onClose={() => setAddTenantOpen(false)}
+              onCreated={() => {
+                setAddTenantOpen(false);
+                onBuildingUpdated();
+              }}
+            />
+
+            <PaymentForm
+              mode="modal"
+              isOpen={recordPaymentOpen}
+              buildingId={detail.building.id}
+              onCancel={() => setRecordPaymentOpen(false)}
+              onSuccess={() => {
+                setRecordPaymentOpen(false);
+                onBuildingUpdated();
+              }}
+            />
+
+            <CreateMaintenanceRequestModal
+              isOpen={maintenanceOpen}
+              buildingId={detail.building.id}
+              buildingName={detail.building.name}
+              rooms={detail.rooms.map((r) => ({ id: r.id, roomNumber: r.roomNumber }))}
+              onClose={() => setMaintenanceOpen(false)}
+              onCreated={() => {
+                setMaintenanceOpen(false);
+                onBuildingUpdated();
+              }}
+            />
           </div>
         )}
       </div>

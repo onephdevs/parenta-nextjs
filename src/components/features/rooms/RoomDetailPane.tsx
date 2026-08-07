@@ -1,22 +1,32 @@
 'use client';
 
 import type { RoomPageDetail } from '@/lib/api/properties';
+import AppLoader from '@/components/ui/AppLoader';
 import RoomDetailsContent from './RoomDetailsContent';
 
 interface RoomDetailPaneProps {
   detail: RoomPageDetail | null;
   loading: boolean;
   error: string | null;
+  onDocumentsChanged?: () => void;
 }
 
-export default function RoomDetailPane({ detail, loading, error }: RoomDetailPaneProps) {
+export default function RoomDetailPane({
+  detail,
+  loading,
+  error,
+  onDocumentsChanged,
+}: RoomDetailPaneProps) {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-[#E2E5F7]">
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {loading && (
-          <div className="flex h-48 items-center justify-center text-sm text-gray-500">
-            Loading room…
-          </div>
+          <AppLoader
+            variant="inline"
+            label="Loading room…"
+            size={96}
+            className="min-h-[16rem] bg-transparent"
+          />
         )}
 
         {!loading && error && (
@@ -35,8 +45,11 @@ export default function RoomDetailPane({ detail, loading, error }: RoomDetailPan
         )}
 
         {!loading && detail && (
-          <div className="mx-auto max-w-[720px]">
-            <RoomDetailsContent detail={detail} />
+          <div className="mx-auto max-w-[920px]">
+            <RoomDetailsContent
+              detail={detail}
+              onDocumentsChanged={onDocumentsChanged}
+            />
           </div>
         )}
       </div>

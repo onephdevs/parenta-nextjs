@@ -117,6 +117,7 @@ const ACTION_TITLES: Record<string, string> = {
   'payment.deleted': 'Payment deleted',
   'payment.allocated': 'Payment allocated',
   'payment.claim_submitted': 'Payment claim submitted',
+  'payment.reminder_sent': 'Payment reminder',
   'invoice.created': 'Invoice created',
   'invoice.updated': 'Invoice updated',
   'invoice.deleted': 'Invoice deleted',
@@ -295,6 +296,21 @@ export function formatActivityDescription(params: {
       return `${actor} recorded payment${quoted ? `: ${label}` : ''}`;
     case 'payment.claim_submitted':
       return `${actor} submitted payment for verification${quoted ? `: ${label}` : ''}`;
+    case 'payment.reminder_sent': {
+      const amountLabel =
+        typeof meta.amountLabel === 'string' ? meta.amountLabel : null;
+      const dueLabel = typeof meta.dueLabel === 'string' ? meta.dueLabel : null;
+      const custom = typeof meta.message === 'string' ? meta.message : null;
+      if (custom) {
+        return `${actor} sent a payment reminder${quoted ? ` to ${label}` : ''}. ${custom}`;
+      }
+      const bits = [
+        `${actor} sent a payment reminder${quoted ? ` to ${label}` : ''}`,
+        amountLabel ? `Amount due: ${amountLabel}` : null,
+        dueLabel ? `Due: ${dueLabel}` : null,
+      ].filter(Boolean);
+      return bits.join('. ');
+    }
     case 'invoice.created':
       return `${actor} created invoice${quoted ? ` ${quoted}` : ''}`;
     case 'tenant.created':

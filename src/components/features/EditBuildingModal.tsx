@@ -37,6 +37,8 @@ interface EditBuildingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImagesChanged?: () => void;
+  /** Open directly on a section (e.g. photos from the property dashboard CTA). */
+  initialSection?: EditSection;
 }
 
 const SECTIONS: SectionedFormSection<EditSection>[] = [
@@ -179,10 +181,11 @@ export default function EditBuildingModal({
   isOpen,
   onClose,
   onImagesChanged,
+  initialSection = 'basic',
 }: EditBuildingModalProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
-  const [section, setSection] = useState<EditSection>('basic');
+  const [section, setSection] = useState<EditSection>(initialSection);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -274,7 +277,7 @@ export default function EditBuildingModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    setSection('basic');
+    setSection(initialSection);
     setError(null);
     setFormData({
       name: building.name,
@@ -294,7 +297,7 @@ export default function EditBuildingModal({
     });
     void fetchDepositConfig();
     void fetchImages();
-  }, [isOpen, building, fetchDepositConfig, fetchImages]);
+  }, [isOpen, building, initialSection, fetchDepositConfig, fetchImages]);
 
   useEffect(() => {
     if (!isOpen) return;

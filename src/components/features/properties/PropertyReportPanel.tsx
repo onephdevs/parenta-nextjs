@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   FileSignature,
   Home,
+  Info,
   Plus,
   UserPlus,
   Wallet,
@@ -31,6 +32,9 @@ const LATO = 'var(--font-lato), Lato, sans-serif';
 interface PropertyReportPanelProps {
   buildingId: string;
   onAddTenant?: () => void;
+  onAddRoom?: () => void;
+  onRecordPayment?: () => void;
+  onMaintenance?: () => void;
 }
 
 function formatCurrency(amount: number) {
@@ -95,6 +99,9 @@ function UnitThumbs({
 export default function PropertyReportPanel({
   buildingId,
   onAddTenant,
+  onAddRoom,
+  onRecordPayment,
+  onMaintenance,
 }: PropertyReportPanelProps) {
   const months = useMemo(() => monthOptions(12), []);
   const [month, setMonth] = useState(months[0]?.value || '');
@@ -132,6 +139,15 @@ export default function PropertyReportPanel({
     };
   }, [buildingId, month]);
 
+  const noInvoicesYet =
+    !!report &&
+    report.rent.unitsWithInvoices === 0 &&
+    report.rent.totalRent <= 0 &&
+    report.rent.rentCollected <= 0 &&
+    report.rent.rentOutstanding <= 0;
+
+  const occupiedDenom = report?.availability.occupied || 0;
+
   const pieData = useMemo(() => {
     if (!report) return [];
     const collected = Math.max(report.rent.rentCollected, 0);
@@ -153,34 +169,80 @@ export default function PropertyReportPanel({
     }));
   }, [report]);
 
+  const vacantCount = report?.availability.vacant ?? 0;
+
   return (
     <div className="space-y-5" style={{ fontFamily: LATO }}>
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/admin/financial/payments/new">
-          <Button leftIcon={<Wallet className="h-4 w-4" />}>Record Payment</Button>
-        </Link>
+        {onRecordPayment ? (
+          <Button
+            type="button"
+            leftIcon={<Wallet className="h-4 w-4" />}
+            onClick={onRecordPayment}
+          >
+            Record Payment
+          </Button>
+        ) : (
+          <Link href="/admin/financial/payments/new">
+            <Button leftIcon={<Wallet className="h-4 w-4" />}>Record Payment</Button>
+          </Link>
+        )}
         {onAddTenant ? (
           <Button
             type="button"
             variant="outline"
             leftIcon={<UserPlus className="h-4 w-4" />}
             onClick={onAddTenant}
+            className="relative"
           >
             Add Tenant
+            {vacantCount > 0 && (
+              <span className="absolute -right-2 -top-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                {vacantCount} vacant
+              </span>
+            )}
           </Button>
         ) : (
-          <Link href={`/admin/tenants/new?buildingId=${encodeURIComponent(buildingId)}`}>
+          <Link
+            href={`/admin/tenants/new?buildingId=${encodeURIComponent(buildingId)}`}
+            className="relative inline-flex"
+          >
             <Button variant="outline" leftIcon={<UserPlus className="h-4 w-4" />}>
               Add Tenant
             </Button>
+            {vacantCount > 0 && (
+              <span className="absolute -right-2 -top-2 z-10 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                {vacantCount} vacant
+              </span>
+            )}
           </Link>
         )}
-        <Link href={`/admin/maintenance?buildingId=${encodeURIComponent(buildingId)}`}>
-          <Button variant="ghost" leftIcon={<Wrench className="h-4 w-4" />}>
+        {onAddRoom ? (
+          <Button
+            type="button"
+            leftIcon={<Plus className="h-4 w-4" />}
+            onClick={onAddRoom}
+          >
+            Add Room
+          </Button>
+        ) : null}
+        {onMaintenance ? (
+          <Button
+            type="button"
+            variant="outline"
+            leftIcon={<Wrench className="h-4 w-4" />}
+            onClick={onMaintenance}
+          >
             Maintenance
           </Button>
-        </Link>
+        ) : (
+          <Link href={`/admin/maintenance?buildingId=${encodeURIComponent(buildingId)}`}>
+            <Button variant="outline" leftIcon={<Wrench className="h-4 w-4" />}>
+              Maintenance
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Collection of Rent */}
@@ -215,138 +277,192 @@ export default function PropertyReportPanel({
           <p className="text-sm text-red-600">{error}</p>
         )}
         {report && !loading && (
-          <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[1fr_auto_1fr]">
-            {/* Outstanding */}
-            <div className="space-y-2 text-left">
-              <p className="text-sm text-gray-500">Rent Outstanding</p>
-              <p className="text-2xl font-bold text-red-600">
-                {formatCurrency(report.rent.rentOutstanding)}
-              </p>
-              <p className="text-4xl font-bold leading-none text-red-600">
-                {report.rent.unpaidPercent}%
-              </p>
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-500">
-                Unpaid
-              </p>
-              <p className="text-sm text-gray-600">
-                Units with Invoices Due{' '}
-                <span className="font-semibold text-gray-900">
-                  {report.rent.unitsWithInvoiceDue}/{report.rent.unitsWithInvoices || report.availability.occupied || 0}
-                </span>
-              </p>
-              <UnitThumbs
-                thumbs={report.rent.dueUnitThumbs}
-                moreCount={Math.max(
-                  0,
-                  report.rent.unitsWithInvoiceDue - report.rent.dueUnitThumbs.length
-                )}
-              />
-            </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(220px,0.9fr)_1.4fr]">
+              {/* Left: legend / stats */}
+              <div className="flex flex-col justify-center gap-7">
+                <div className="flex items-start gap-3">
+                  <span className="mt-2.5 h-3 w-3 flex-shrink-0 rounded-full bg-red-500" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-base font-medium text-gray-800">Rent Outstanding</p>
+                      <p className="text-right text-2xl font-bold text-red-600">
+                        {formatCurrency(report.rent.rentOutstanding)}
+                      </p>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between gap-3">
+                      <p className="text-sm text-gray-500">
+                        Units due:{' '}
+                        <span className="font-semibold text-gray-700">
+                          {report.rent.unitsWithInvoiceDue}/
+                          {report.rent.unitsWithInvoices || occupiedDenom || 0}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {noInvoicesYet ? '—' : `${report.rent.unpaidPercent}%`}
+                      </p>
+                    </div>
+                    {!noInvoicesYet && (
+                      <UnitThumbs
+                        thumbs={report.rent.dueUnitThumbs}
+                        moreCount={Math.max(
+                          0,
+                          report.rent.unitsWithInvoiceDue - report.rent.dueUnitThumbs.length
+                        )}
+                      />
+                    )}
+                  </div>
+                </div>
 
-            {/* Pie */}
-            <div className="mx-auto w-full max-w-[220px]">
-              <div className="relative h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={52}
-                      outerRadius={78}
-                      paddingAngle={2}
-                    >
-                      {pieData.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-xs font-medium text-gray-500">{report.monthLabel}</p>
+                <div className="flex items-start gap-3">
+                  <span className="mt-2.5 h-3 w-3 flex-shrink-0 rounded-full bg-green-500" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-base font-medium text-gray-800">Rent Collected</p>
+                      <p className="text-right text-2xl font-bold text-green-600">
+                        {formatCurrency(report.rent.rentCollected)}
+                      </p>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between gap-3">
+                      <p className="text-sm text-gray-500">
+                        Units paid:{' '}
+                        <span className="font-semibold text-gray-700">
+                          {report.rent.unitsWithInvoicePaid}/
+                          {report.rent.unitsWithInvoices || occupiedDenom || 0}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {noInvoicesYet ? '—' : `${report.rent.collectedPercent}%`}
+                      </p>
+                    </div>
+                    {!noInvoicesYet && (
+                      <UnitThumbs
+                        thumbs={report.rent.paidUnitThumbs}
+                        moreCount={Math.max(
+                          0,
+                          report.rent.unitsWithInvoicePaid - report.rent.paidUnitThumbs.length
+                        )}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {!noInvoicesYet && (
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-sm text-gray-500">Total Rent</p>
+                      <p className="text-base font-semibold text-indigo-700">
+                        {formatCurrency(report.rent.totalRent)}
+                      </p>
+                    </div>
+                    {report.rent.rentProcessing > 0 && (
+                      <div className="mt-1 flex items-baseline justify-between gap-3">
+                        <p className="text-sm text-gray-500">Processing</p>
+                        <p className="text-sm font-medium text-gray-700">
+                          {formatCurrency(report.rent.rentProcessing)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Right: chart */}
+              <div className="min-h-[200px] w-full">
+                <div className="relative h-[200px] w-full sm:h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={58}
+                        outerRadius={88}
+                        paddingAngle={noInvoicesYet ? 0 : 2}
+                      >
+                        {pieData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      {!noInvoicesYet && (
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      )}
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="text-xs font-medium text-gray-500">{report.monthLabel}</p>
+                    {!noInvoicesYet && (
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                        {report.rent.collectedPercent}% collected
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-              <p className="mt-1 text-center text-sm text-gray-600">
-                Rent Processing:{' '}
-                <span className="font-semibold text-gray-900">
-                  {formatCurrency(report.rent.rentProcessing)}
-                </span>
-              </p>
-              <p className="text-center text-sm font-semibold text-indigo-700">
-                Total Rent: {formatCurrency(report.rent.totalRent)}
-              </p>
             </div>
 
-            {/* Collected */}
-            <div className="space-y-2 text-left lg:text-right">
-              <p className="text-4xl font-bold leading-none text-green-600">
-                {report.rent.collectedPercent}%
-              </p>
-              <p className="text-xs font-semibold uppercase tracking-wide text-green-600">
-                Collected
-              </p>
-              <p className="text-sm text-gray-500">Rent Collected</p>
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(report.rent.rentCollected)}
-              </p>
-              <p className="text-sm text-gray-600">
-                Units with Invoices Paid{' '}
-                <span className="font-semibold text-gray-900">
-                  {report.rent.unitsWithInvoicePaid}/{report.rent.unitsWithInvoices || report.availability.occupied || 0}
-                </span>
-              </p>
-              <div className="flex lg:justify-end">
-                <UnitThumbs
-                  thumbs={report.rent.paidUnitThumbs}
-                  moreCount={Math.max(
-                    0,
-                    report.rent.unitsWithInvoicePaid - report.rent.paidUnitThumbs.length
-                  )}
-                />
+            {noInvoicesYet && (
+              <div className="flex flex-wrap items-start gap-2 rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-600" />
+                <p>
+                  No invoices generated yet for {report.monthLabel} —{' '}
+                  <Link
+                    href="/admin/financial/invoices"
+                    className="font-semibold text-sky-700 underline-offset-2 hover:underline"
+                  >
+                    view billing schedule →
+                  </Link>
+                </p>
               </div>
-            </div>
+            )}
           </div>
         )}
       </section>
 
       {/* Availability */}
       {report && (
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs text-gray-500">Total units</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {report.availability.totalUnits}
-            </p>
+        <section className="space-y-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+              <p className="text-xs text-gray-500">Total units</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {report.availability.totalUnits}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+              <p className="text-xs text-gray-500">Occupied</p>
+              <p className="mt-1 text-2xl font-bold text-blue-700">
+                {report.availability.occupied}
+                <span className="ml-1 text-sm font-medium text-blue-500">
+                  ({report.availability.occupiedPercent}%)
+                </span>
+              </p>
+            </div>
+            <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+              <p className="text-xs text-gray-500">Vacant</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-700">
+                {report.availability.vacant}
+                <span className="ml-1 text-sm font-medium text-emerald-500">
+                  ({report.availability.vacantPercent}%)
+                </span>
+              </p>
+            </div>
+            <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+              <p className="text-xs text-gray-500">Unassigned</p>
+              <p className="mt-1 text-2xl font-bold text-orange-600">
+                {report.availability.unassigned}
+                <span className="ml-1 text-sm font-medium text-orange-500">
+                  ({report.availability.unassignedPercent}%)
+                </span>
+              </p>
+            </div>
           </div>
-          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs text-gray-500">Occupied</p>
-            <p className="mt-1 text-2xl font-bold text-blue-700">
-              {report.availability.occupied}
-              <span className="ml-1 text-sm font-medium text-blue-500">
-                ({report.availability.occupiedPercent}%)
-              </span>
-            </p>
-          </div>
-          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs text-gray-500">Vacant</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-700">
-              {report.availability.vacant}
-              <span className="ml-1 text-sm font-medium text-emerald-500">
-                ({report.availability.vacantPercent}%)
-              </span>
-            </p>
-          </div>
-          <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs text-gray-500">Availability</p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">
-              {report.availability.vacant} vacant · {report.availability.occupied} occupied
-            </p>
-          </div>
+          <p className="px-1 text-xs text-gray-500">
+            {report.availability.totalUnits} total = {report.availability.occupied} occupied +{' '}
+            {report.availability.vacant} vacant + {report.availability.unassigned} unassigned
+          </p>
         </section>
       )}
 
@@ -388,7 +504,11 @@ export default function PropertyReportPanel({
                         Unit {unit.roomNumber}
                       </p>
                       <span className="text-xs text-gray-500">
-                        {unit.reason === 'awaiting_signature' ? '0/1' : 'Vacant'}
+                        {unit.reason === 'awaiting_signature'
+                          ? '0/1'
+                          : unit.reason === 'unassigned'
+                            ? 'Unassigned'
+                            : 'Vacant'}
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs text-gray-500">

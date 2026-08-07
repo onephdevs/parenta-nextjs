@@ -20,6 +20,8 @@ import { Pencil, Trash2, Home, Info, DollarSign, Shield, FileText, Star } from '
 interface EditRoomFormProps {
   room: Room & { buildingName?: string };
   onRoomUpdated?: () => void;
+  /** Called when the user cancels the edit modal (useful when parent controls open state). */
+  onCancel?: () => void;
   startInEditMode?: boolean;
 }
 
@@ -70,7 +72,12 @@ const formSections: SectionedFormSection<FormSection>[] = [
   },
 ];
 
-export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = false }: EditRoomFormProps) {
+export default function EditRoomForm({
+  room,
+  onRoomUpdated,
+  onCancel,
+  startInEditMode = false,
+}: EditRoomFormProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
@@ -296,6 +303,7 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
       amenities: room.amenities || ''
     });
     setAmenitiesInput(room.amenities || '');
+    onCancel?.();
   };
 
   const renderSectionContent = () => {
@@ -593,6 +601,11 @@ export default function EditRoomForm({ room, onRoomUpdated, startInEditMode = fa
         </SectionedFormShell>
       </>
     );
+  }
+
+  // Parent-controlled modal: don't fall back to nested "Room Actions" card
+  if (startInEditMode || onCancel) {
+    return dialog;
   }
 
   return (

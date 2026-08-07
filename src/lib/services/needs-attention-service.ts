@@ -328,15 +328,45 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
 }
 
 export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
-  const [inquiries, payments, utilities, maintenance] = await Promise.all([
+  const empty = (
+    key: NeedsAttentionCard['key'],
+    title: string,
+    viewAllHref: string,
+    viewAllLabel: string
+  ): NeedsAttentionCard => ({
+    key,
+    title,
+    count: 0,
+    items: [],
+    viewAllHref,
+    viewAllLabel,
+  });
+
+  const settled = await Promise.allSettled([
     getNewInquiries(),
     getPaymentsDue(),
     getUtilitiesDue(),
     getMaintenanceOpen(),
   ]);
 
+  const fallbacks: NeedsAttentionCard[] = [
+    empty('inquiries', 'New inquiries', '/admin/tasks?board=onboarding', 'View onboarding pipeline'),
+    empty('payments', 'Payments due', '/admin/tasks?board=payments', 'View payments pipeline'),
+    empty('utilities', 'Utilities due', '/admin/tasks?board=expenses', 'View expenses pipeline'),
+    empty('maintenance', 'Maintenance', '/admin/tasks?board=maintenance', 'View maintenance pipeline'),
+  ];
+
+  const cards = settled.map((result, i) => {
+    if (result.status === 'fulfilled') return result.value;
+    console.error(
+      `needs-attention card failed (${fallbacks[i].key}):`,
+      result.reason instanceof Error ? result.reason.message : result.reason
+    );
+    return fallbacks[i];
+  });
+
   return {
     updatedAt: new Date().toISOString(),
-    cards: [inquiries, payments, utilities, maintenance],
+    cards,
   };
 }

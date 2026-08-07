@@ -61,17 +61,41 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    const {
-      tenantId,
-      roomId,
-      buildingId,
-      title,
-      description,
-      category,
-      priority,
-      scheduledDate,
-    } = body;
+    const contentType = request.headers.get('content-type') || '';
+    let tenantId: string | undefined;
+    let roomId: string | undefined;
+    let buildingId: string | undefined;
+    let title = '';
+    let description = '';
+    let category = '';
+    let priority = 'medium';
+    let scheduledDate: string | undefined;
+    let photoFiles: File[] = [];
+
+    if (contentType.includes('multipart/form-data')) {
+      const form = await request.formData();
+      tenantId = String(form.get('tenantId') || '').trim() || undefined;
+      roomId = String(form.get('roomId') || '').trim() || undefined;
+      buildingId = String(form.get('buildingId') || '').trim() || undefined;
+      title = String(form.get('title') || '').trim();
+      description = String(form.get('description') || '').trim();
+      category = String(form.get('category') || '').trim();
+      priority = String(form.get('priority') || 'medium').trim() || 'medium';
+      scheduledDate = String(form.get('scheduledDate') || '').trim() || undefined;
+      photoFiles = form
+        .getAll('photos')
+        .filter((v): v is File => typeof File !== 'undefined' && v instanceof File && v.size > 0);
+    } else {
+      const body = await request.json();
+      tenantId = body.tenantId;
+      roomId = body.roomId;
+      buildingId = body.buildingId;
+      title = String(body.title || '').trim();
+      description = String(body.description || '').trim();
+      category = String(body.category || '').trim();
+      priority = String(body.priority || 'medium').trim() || 'medium';
+      scheduledDate = body.scheduledDate;
+    }
 
     if (!title || !description || !category) {
       return NextResponse.json(
@@ -90,6 +114,27 @@ export async function POST(request: Request) {
       priority,
       scheduledDate,
     });
+
+    let attachments: { id: string }[] = [];
+    let photoWarning: string | null = null;
+    if (photoFiles.length > 0) {
+      try {
+        const { saveMaintenancePhotos, MAX_PHOTOS } = await import(
+          '@/lib/api/maintenance-attachments'
+        );
+        attachments = await saveMaintenancePhotos({
+          maintenanceRequestId: String(created.id),
+          files: photoFiles.slice(0, MAX_PHOTOS),
+          tenantId: tenantId || null,
+        });
+      } catch (photoErr) {
+        console.error('Admin maintenance photo upload failed:', photoErr);
+        photoWarning =
+          photoErr instanceof Error
+            ? photoErr.message
+            : 'Request saved but some photos could not be uploaded';
+      }
+    }
 
     try {
       const { ensureMaintenancePipelineCard } = await import('@/lib/api/pipeline');
@@ -117,15 +162,24 @@ export async function POST(request: Request) {
       entityType: 'maintenance_request',
       entityId: String(created.id),
       entityLabel: title,
-      afterData: created as Record<string, unknown>,
+      afterData: { ...created, attachmentCount: attachments.length } as Record<
+        string,
+        unknown
+      >,
       link: '/admin/tasks?board=maintenance',
-      metadata: { link: '/admin/tasks?board=maintenance' },
+      metadata: {
+        link: '/admin/tasks?board=maintenance',
+        attachmentCount: attachments.length,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      data: created,
-      message: 'Maintenance request created successfully',
+      data: { ...created, attachments },
+      message: photoWarning
+        ? `Maintenance request created. ${photoWarning}`
+        : 'Maintenance request created successfully',
+      warning: photoWarning || undefined,
     });
   } catch (error) {
     console.error('❌ Error creating maintenance request:', error);

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, UserPlus, X } from 'lucide-react';
 import type { RoomPageDetail } from '@/lib/api/properties';
 import TenantForm from '@/components/features/TenantForm';
+import AppLoader from '@/components/ui/AppLoader';
 import RoomDetailsContent from './RoomDetailsContent';
 
 interface RoomDetailsModalProps {
@@ -154,9 +155,12 @@ export default function RoomDetailsModal({
           <div className="min-h-0 flex-1 overflow-y-auto bg-[#E2E5F7]">
             <div className="mx-auto max-w-4xl p-4 sm:p-6">
               {loading && (
-                <div className="flex h-48 items-center justify-center text-sm text-gray-500">
-                  Loading room…
-                </div>
+                <AppLoader
+                  variant="inline"
+                  label="Loading room…"
+                  size={96}
+                  className="min-h-[16rem] bg-transparent"
+                />
               )}
 
               {!loading && error && (
@@ -166,7 +170,14 @@ export default function RoomDetailsModal({
               )}
 
               {!loading && !error && detail && (
-                <RoomDetailsContent detail={detail} hideRoomEdit />
+                <RoomDetailsContent
+                  detail={detail}
+                  hideRoomEdit
+                  onDocumentsChanged={() => {
+                    void loadDetail(detail.room.id);
+                    onRoomUpdated?.();
+                  }}
+                />
               )}
             </div>
           </div>
