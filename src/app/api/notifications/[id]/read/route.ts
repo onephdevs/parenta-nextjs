@@ -11,7 +11,7 @@ interface RouteParams {
 
 export async function PATCH(_request: NextRequest, { params }: RouteParams) {
   try {
-    const { session, error } = await requireRole(['admin', 'tenant']);
+    const { session, error } = await requireRole(['admin', 'staff', 'tenant']);
     if (error || !session?.user?.id) return error;
 
     const { id } = await params;

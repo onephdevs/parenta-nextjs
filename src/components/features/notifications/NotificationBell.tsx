@@ -33,7 +33,15 @@ function formatRelative(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+function isBenignFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'AbortError') return true;
+  // Dev HMR / tab sleep / transient network often surfaces as this TypeError.
+  return error.name === 'TypeError' && /failed to fetch/i.test(error.message);
+}
+
 const PANEL_WIDTH = 384; // w-96
+const POLL_MS = 30000;
 
 export function NotificationBell() {
   const router = useRouter();
@@ -46,11 +54,27 @@ export function NotificationBell() {
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const inFlightRef = useRef(false);
 
-  const fetchInbox = useCallback(async () => {
+  const fetchInbox = useCallback(async (opts?: { showLoading?: boolean }) => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    inFlightRef.current = true;
+
     try {
-      setLoading(true);
-      const res = await fetch('/api/notifications?limit=10', { credentials: 'include' });
+      if (opts?.showLoading) setLoading(true);
+      const res = await fetch('/api/notifications?limit=10', {
+        credentials: 'include',
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      if (controller.signal.aborted) return;
       if (!res.ok) return;
       const data = await res.json();
       if (data.success) {
@@ -58,9 +82,16 @@ export function NotificationBell() {
         setUnreadCount(data.data.unreadCount || 0);
       }
     } catch (error) {
-      console.error('Failed to load notifications', error);
+      if (!isBenignFetchError(error)) {
+        console.error('Failed to load notifications', error);
+      }
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) {
+        inFlightRef.current = false;
+      }
+      if (opts?.showLoading && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -69,9 +100,24 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    fetchInbox();
-    const id = window.setInterval(fetchInbox, 30000);
-    return () => window.clearInterval(id);
+    void fetchInbox({ showLoading: true });
+
+    const id = window.setInterval(() => {
+      void fetchInbox();
+    }, POLL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchInbox();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+      abortRef.current?.abort();
+    };
   }, [fetchInbox]);
 
   const updatePanelPosition = useCallback(() => {
@@ -127,24 +173,36 @@ export function NotificationBell() {
   }, [open]);
 
   const markAllRead = async () => {
-    await fetch('/api/notifications/read-all', {
-      method: 'PATCH',
-      credentials: 'include',
-    });
-    setItems((prev) => prev.map((i) => ({ ...i, isRead: true })));
-    setUnreadCount(0);
+    try {
+      await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      setItems((prev) => prev.map((i) => ({ ...i, isRead: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      if (!isBenignFetchError(error)) {
+        console.error('Failed to mark notifications read', error);
+      }
+    }
   };
 
   const openItem = async (item: InboxItem) => {
     if (!item.isRead) {
-      await fetch(`/api/notifications/${item.id}/read`, {
-        method: 'PATCH',
-        credentials: 'include',
-      });
-      setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i))
-      );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      try {
+        await fetch(`/api/notifications/${item.id}/read`, {
+          method: 'PATCH',
+          credentials: 'include',
+        });
+        setItems((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i))
+        );
+        setUnreadCount((c) => Math.max(0, c - 1));
+      } catch (error) {
+        if (!isBenignFetchError(error)) {
+          console.error('Failed to mark notification read', error);
+        }
+      }
     }
     setOpen(false);
     if (item.link) router.push(item.link);
@@ -256,7 +314,7 @@ export function NotificationBell() {
         type="button"
         onClick={() => {
           setOpen((v) => !v);
-          if (!open) fetchInbox();
+          if (!open) void fetchInbox({ showLoading: items.length === 0 });
         }}
         className="relative rounded-md p-2 text-gray-900 hover:bg-gray-100 hover:text-gray-900"
         aria-label="Notifications"

@@ -44,7 +44,7 @@ function buildBody(row: NotificationRow): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const { session, error } = await requireRole(['admin', 'tenant']);
+    const { session, error } = await requireRole(['admin', 'staff', 'tenant']);
     if (error || !session?.user?.id) return error;
 
     const { searchParams } = new URL(request.url);

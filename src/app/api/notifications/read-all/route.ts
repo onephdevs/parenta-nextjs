@@ -7,7 +7,7 @@ import pool from '@/lib/db';
 
 export async function PATCH() {
   try {
-    const { session, error } = await requireRole(['admin', 'tenant']);
+    const { session, error } = await requireRole(['admin', 'staff', 'tenant']);
     if (error || !session?.user?.id) return error;
 
     const result = await pool.query(
