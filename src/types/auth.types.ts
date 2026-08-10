@@ -1,6 +1,6 @@
 // Authentication related types
 
-export type UserRole = 'admin' | 'tenant';
+export type UserRole = 'admin' | 'tenant' | 'staff' | 'caretaker';
 
 export interface User {
   id: string;
@@ -32,7 +32,8 @@ export interface LoginCredentials {
   /** Email or username */
   email: string;
   password: string;
-  role: UserRole;
+  /** Optional — when omitted, role is detected from the matching account */
+  role?: UserRole | 'auto';
 }
 
 export interface AuthSession {

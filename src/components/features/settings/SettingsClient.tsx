@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Session } from 'next-auth';
-import { Bell, Lock, Globe, Shield, Database, Smartphone } from 'lucide-react';
+import { Bell, Lock, Globe, Shield, Database, Smartphone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
@@ -68,6 +68,10 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
   const [paymentInstructions, setPaymentInstructions] = useState<TenantPaymentInstructions>({
     ...DEFAULT_TENANT_PAYMENT_INSTRUCTIONS,
   });
+  const [tenantPortalEnabled, setTenantPortalEnabled] = useState(false);
+  const [lateFeesEnabled, setLateFeesEnabled] = useState(false);
+  const [nearbyRefreshDays, setNearbyRefreshDays] = useState(7);
+  const [isRefreshingNearby, setIsRefreshingNearby] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -92,6 +96,27 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
           timezone: data.settings.timezone || 'Asia/Manila',
           dateFormat: data.settings.date_format || 'MM/DD/YYYY',
         }));
+        const portalRaw = String(
+          data.settings.tenant_portal_enabled ?? 'false'
+        ).toLowerCase();
+        setTenantPortalEnabled(
+          portalRaw === 'true' || portalRaw === '1' || portalRaw === 'on'
+        );
+        const lateRaw = String(
+          data.settings.late_fees_enabled ?? 'false'
+        ).toLowerCase();
+        setLateFeesEnabled(
+          lateRaw === 'true' || lateRaw === '1' || lateRaw === 'on'
+        );
+        const refreshRaw = parseInt(
+          String(data.settings.nearby_refresh_days ?? '7'),
+          10
+        );
+        setNearbyRefreshDays(
+          Number.isFinite(refreshRaw) && refreshRaw >= 1
+            ? Math.min(refreshRaw, 90)
+            : 7
+        );
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -145,6 +170,38 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
           type: 'success',
           title: 'Payment details saved',
           message: 'Tenants can now see where to send GCash / transfers.',
+        });
+      } else if (activeTab === 'system') {
+        const response = await fetch('/api/settings/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            settings: {
+              currency: settings.currency,
+              language: settings.language,
+              timezone: settings.timezone,
+              date_format: settings.dateFormat,
+              tenant_portal_enabled: tenantPortalEnabled ? 'true' : 'false',
+              late_fees_enabled: lateFeesEnabled ? 'true' : 'false',
+              nearby_refresh_days: String(
+                Math.min(Math.max(1, Math.round(nearbyRefreshDays)), 90)
+              ),
+            },
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to save settings');
+        }
+
+        setSaveMessage('Settings saved successfully!');
+        setSaveMessageVariant('success');
+        showNotification({
+          type: 'success',
+          title: 'Settings saved',
+          message: 'Access, nearby map, and billing policy settings updated.',
         });
       } else {
         const response = await fetch('/api/settings/bulk', {
@@ -216,6 +273,34 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
         message: 'Unable to clear cache. Try refreshing the page.',
       });
       setIsClearingCache(false);
+    }
+  };
+
+  const handleRefreshNearby = async () => {
+    setIsRefreshingNearby(true);
+    try {
+      const response = await fetch('/api/admin/nearby/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to refresh nearby places');
+      }
+      showNotification({
+        type: 'success',
+        title: 'Nearby places refreshed',
+        message: `Updated ${data.data?.refreshed ?? 0} properties from OpenStreetMap.`,
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: 'Refresh failed',
+        message: error instanceof Error ? error.message : 'Unable to refresh nearby data',
+      });
+    } finally {
+      setIsRefreshingNearby(false);
     }
   };
 
@@ -541,6 +626,81 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
 
             {activeTab === 'system' && (
               <div className="space-y-6">
+                <div>
+                  <h3 className="mb-4 text-lg font-medium text-gray-900">Access</h3>
+                  <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={tenantPortalEnabled}
+                      onChange={(e) => setTenantPortalEnabled(e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-800">
+                      <span className="font-medium text-gray-900">
+                        Enable tenant portal
+                      </span>
+                      <span className="mt-1 block text-gray-600">
+                        When off, tenants cannot open /tenant or use tenant sign-in.
+                        Use this for owner/admin-only deployments (Alfonso).
+                      </span>
+                    </span>
+                  </label>
+                  <label className="mt-3 flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={lateFeesEnabled}
+                      onChange={(e) => setLateFeesEnabled(e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-800">
+                      <span className="font-medium text-gray-900">
+                        Enable late-fee penalties
+                      </span>
+                      <span className="mt-1 block text-gray-600">
+                        Off by default. Prefer renegotiating invoice due dates. When on,
+                        Apply Late Fees APIs are allowed again.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <h3 className="mb-4 text-lg font-medium text-gray-900">Nearby map</h3>
+                  <p className="mb-4 text-sm text-gray-600">
+                    Landing-page “What’s nearby” stores places in the database and only
+                    re-fetches from OpenStreetMap when this interval expires (or when you
+                    force a refresh).
+                  </p>
+                  <FormField
+                    label="Refresh nearby places every (days)"
+                    htmlFor="nearby-refresh-days"
+                    hint="Default 7 (weekly). Range 1–90."
+                  >
+                    <Input
+                      id="nearby-refresh-days"
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={nearbyRefreshDays}
+                      onChange={(e) =>
+                        setNearbyRefreshDays(
+                          Math.min(Math.max(1, parseInt(e.target.value, 10) || 7), 90)
+                        )
+                      }
+                    />
+                  </FormField>
+                  <div className="mt-4">
+                    <Button
+                      variant="outline"
+                      leftIcon={<MapPin className="h-4 w-4" />}
+                      onClick={handleRefreshNearby}
+                      isLoading={isRefreshingNearby}
+                    >
+                      Refresh nearby places now
+                    </Button>
+                  </div>
+                </div>
+
                 <div>
                   <h3 className="mb-4 text-lg font-medium text-gray-900">System Information</h3>
                   <div className="space-y-3">

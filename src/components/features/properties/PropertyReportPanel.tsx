@@ -26,6 +26,8 @@ import {
 import type { PropertyBuildingReport } from '@/lib/api/properties';
 import { getImageUrl } from '@/lib/format/image-url';
 import { Button } from '@/components/ui/Button';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import { LightboxImage } from '@/components/ui/ImageLightbox';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 
@@ -35,6 +37,8 @@ interface PropertyReportPanelProps {
   onAddRoom?: () => void;
   onRecordPayment?: () => void;
   onMaintenance?: () => void;
+  /** Refresh parent after creating a tenant from a unit card / fallback button. */
+  onTenantCreated?: () => void;
 }
 
 function formatCurrency(amount: number) {
@@ -76,10 +80,11 @@ function UnitThumbs({
           title={t.roomNumber}
         >
           {t.imagePath ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <LightboxImage
               src={getImageUrl(t.imagePath)}
               alt={t.roomNumber}
+              title={`Unit ${t.roomNumber}`}
+              wrapperClassName="h-full w-full focus:outline-none"
               className="h-full w-full object-cover"
             />
           ) : (
@@ -102,6 +107,7 @@ export default function PropertyReportPanel({
   onAddRoom,
   onRecordPayment,
   onMaintenance,
+  onTenantCreated,
 }: PropertyReportPanelProps) {
   const months = useMemo(() => monthOptions(12), []);
   const [month, setMonth] = useState(months[0]?.value || '');
@@ -204,19 +210,20 @@ export default function PropertyReportPanel({
             )}
           </Button>
         ) : (
-          <Link
-            href={`/admin/tenants/new?buildingId=${encodeURIComponent(buildingId)}`}
-            className="relative inline-flex"
+          <AddTenantButton
+            buildingId={buildingId}
+            variant="outline"
+            leftIcon={<UserPlus className="h-4 w-4" />}
+            className="relative"
+            lockHousing={false}
+            onCreated={() => onTenantCreated?.()}
           >
-            <Button variant="outline" leftIcon={<UserPlus className="h-4 w-4" />}>
-              Add Tenant
-            </Button>
-            {vacantCount > 0 && (
-              <span className="absolute -right-2 -top-2 z-10 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+            {vacantCount > 0 ? (
+              <span className="absolute -right-2 -top-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
                 {vacantCount} vacant
               </span>
-            )}
-          </Link>
+            ) : null}
+          </AddTenantButton>
         )}
         {onAddRoom ? (
           <Button
@@ -462,6 +469,59 @@ export default function PropertyReportPanel({
           <p className="px-1 text-xs text-gray-500">
             {report.availability.totalUnits} total = {report.availability.occupied} occupied +{' '}
             {report.availability.vacant} vacant + {report.availability.unassigned} unassigned
+            {report.availability.reconciles === false
+              ? ' — reconciliation failed'
+              : ''}
+          </p>
+        </section>
+      )}
+
+      {/* Vacancy duration & lost rent */}
+      {report && report.vacantUnits && report.vacantUnits.length > 0 && (
+        <section className="rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.06)]">
+          <h3 className="mb-3 text-base font-semibold text-gray-900">
+            Vacant units — days vacant &amp; estimated lost rent
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-500 border-b">
+                  <th className="pb-2">Unit</th>
+                  <th className="pb-2 text-right">Days vacant</th>
+                  <th className="pb-2 text-right">Monthly rent</th>
+                  <th className="pb-2 text-right">Est. lost rent</th>
+                  <th className="pb-2 text-right">Owner utilities</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.vacantUnits.map((u) => (
+                  <tr key={u.roomId} className="border-b border-gray-50">
+                    <td className="py-2 font-medium text-indigo-900">
+                      <Link
+                        href={`/admin/rooms/${u.roomId}`}
+                        className="hover:underline"
+                      >
+                        {u.roomNumber}
+                      </Link>
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{u.daysVacant}</td>
+                    <td className="py-2 text-right tabular-nums">
+                      {formatCurrency(u.monthlyRate)}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-amber-700">
+                      {formatCurrency(u.estimatedLostRent)}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {formatCurrency(u.ownerAbsorbedUtility)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Lost rent = days vacant × (monthly rent ÷ 30). Owner utilities are
+            vacant-unit provider charges (not tenant balance).
           </p>
         </section>
       )}
@@ -486,10 +546,11 @@ export default function PropertyReportPanel({
                 >
                   <div className="relative h-24 bg-gray-200">
                     {unit.imagePath ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <LightboxImage
                         src={getImageUrl(unit.imagePath)}
                         alt={unit.roomNumber}
+                        title={`Unit ${unit.roomNumber}`}
+                        wrapperClassName="block h-full w-full focus:outline-none"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -514,21 +575,32 @@ export default function PropertyReportPanel({
                     <p className="mt-0.5 text-xs text-gray-500">
                       {formatCurrency(unit.monthlyRate)}/mo
                     </p>
-                    <Link
-                      href={
-                        unit.reason === 'awaiting_signature'
-                          ? '/admin/tasks?board=onboarding'
-                          : `/admin/tenants/new?buildingId=${encodeURIComponent(buildingId)}&roomId=${encodeURIComponent(unit.roomId)}`
-                      }
-                      className="mt-2 flex w-full items-center justify-center rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
-                    >
-                      {unit.reason === 'awaiting_signature' ? 'Send Reminder' : (
-                        <>
-                          <Plus className="mr-1 h-3 w-3" />
-                          Add Tenant
-                        </>
-                      )}
-                    </Link>
+                    {unit.reason === 'awaiting_signature' ? (
+                      <Link
+                        href="/admin/tasks?board=onboarding"
+                        className="mt-2 flex w-full items-center justify-center rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                      >
+                        Send Reminder
+                      </Link>
+                    ) : (
+                      <AddTenantButton
+                        buildingId={buildingId}
+                        roomId={unit.roomId}
+                        lockHousing
+                        refreshOnCreated={false}
+                        onCreated={() => onTenantCreated?.()}
+                        renderTrigger={(open) => (
+                          <button
+                            type="button"
+                            onClick={open}
+                            className="mt-2 flex w-full items-center justify-center rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                          >
+                            <Plus className="mr-1 h-3 w-3" />
+                            Add Tenant
+                          </button>
+                        )}
+                      />
+                    )}
                   </div>
                 </div>
               ))}

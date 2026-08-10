@@ -14,7 +14,7 @@ interface RegistrationSuccessModalProps {
 export function RegistrationSuccessModal({
   isOpen,
   onClose,
-  loginHref = '/auth/tenant/signin',
+  loginHref = '/auth/signin',
 }: RegistrationSuccessModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 

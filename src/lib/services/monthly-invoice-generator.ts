@@ -7,6 +7,8 @@
 import pool from '@/lib/db';
 import { generateInvoicesForTenant } from './invoice-generator';
 import { autoApplyAdvanceToUnpaidRentInvoices } from './payment-allocator';
+import { dueDateForBillingMonth } from '@/lib/billing/invoice-due';
+import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
 
 /**
  * Generate next month's rent invoice for a tenant with an active lease
@@ -34,9 +36,10 @@ export async function generateNextMonthRentInvoice(
         tra.id,
         tra.tenant_id,
         tra.room_id,
-        tra.assignment_start,
-        tra.assignment_end,
+        tra.start_date,
+        tra.end_date,
         tra.monthly_rate,
+        tra.billing_cycle_start_day,
         r.room_number,
         b.name as building_name
       FROM tenant_room_assignments tra
@@ -44,8 +47,8 @@ export async function generateNextMonthRentInvoice(
       LEFT JOIN buildings b ON r.building_id = b.id
       WHERE tra.tenant_id = $1
         AND tra.assignment_status = 'active'
-        AND tra.assignment_end >= CURRENT_DATE
-      ORDER BY tra.assignment_start DESC
+        AND (tra.end_date IS NULL OR tra.end_date >= CURRENT_DATE)
+      ORDER BY tra.start_date DESC
       LIMIT 1`,
       [tenantId]
     );
@@ -60,9 +63,19 @@ export async function generateNextMonthRentInvoice(
     }
 
     const assignment = assignmentResult.rows[0];
-    const assignmentStart = new Date(assignment.assignment_start);
-    const assignmentEnd = new Date(assignment.assignment_end);
+    const assignmentStart = new Date(assignment.start_date);
+    const assignmentEnd = assignment.end_date
+      ? new Date(assignment.end_date)
+      : new Date(assignmentStart.getFullYear() + 1, assignmentStart.getMonth(), assignmentStart.getDate());
     const monthlyRent = parseFloat(assignment.monthly_rate);
+    const rentDueDay = resolveRentDueDay({
+      billingCycleStartDay:
+        assignment.billing_cycle_start_day != null
+          ? Number(assignment.billing_cycle_start_day)
+          : null,
+      startDate: assignment.start_date,
+      fallbackDay: 5,
+    });
 
     // Calculate next month
     const nextMonth = new Date();
@@ -101,8 +114,11 @@ export async function generateNextMonthRentInvoice(
     }
 
     // Generate invoice for next month only
-    const dueDate = new Date(nextMonth);
-    dueDate.setDate(5); // Due on the 5th of the month
+    const dueDate = dueDateForBillingMonth(
+      nextMonth.getFullYear(),
+      nextMonth.getMonth(),
+      rentDueDay
+    );
 
     const billingPeriodStart = new Date(nextMonth);
     const billingPeriodEnd = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0);

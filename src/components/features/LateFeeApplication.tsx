@@ -1,14 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Alert';
 
 export default function LateFeeApplication() {
   const { alert, confirm, dialog } = useAppDialog();
   const [loading, setLoading] = useState(false);
   const [calculations, setCalculations] = useState<any[]>([]);
   const [hasCalculated, setHasCalculated] = useState(false);
+  const [lateFeesEnabled, setLateFeesEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        const raw = String(data?.settings?.late_fees_enabled ?? 'false').toLowerCase();
+        setLateFeesEnabled(raw === 'true' || raw === '1' || raw === 'on');
+      } catch {
+        setLateFeesEnabled(false);
+      }
+    })();
+  }, []);
 
   const handleCalculate = async () => {
     setLoading(true);
@@ -104,6 +120,24 @@ export default function LateFeeApplication() {
       {dialog}
       <h2 className="text-2xl font-bold mb-6 text-gray-900">Late Fee Application</h2>
 
+      {lateFeesEnabled === false && (
+        <Alert variant="warning" title="Late fees are disabled" className="mb-6">
+          <p className="mt-1 text-sm">
+            This property uses renegotiated due dates instead of penalties. Open an invoice and
+            use <strong>Negotiate due date</strong>, or turn late fees on under Settings →
+            System if you intentionally need them.
+          </p>
+          <p className="mt-3">
+            <Link
+              href="/admin/financial/invoices"
+              className="font-medium text-gray-900 underline underline-offset-2"
+            >
+              Go to invoices
+            </Link>
+          </p>
+        </Alert>
+      )}
+
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
         <h3 className="font-semibold mb-2 text-gray-900">How It Works</h3>
         <ol className="list-decimal list-inside text-sm space-y-1 text-gray-900">
@@ -115,20 +149,27 @@ export default function LateFeeApplication() {
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
-        <Button onClick={handleCalculate} isDisabled={loading} isLoading={loading}>
+        <Button
+          onClick={handleCalculate}
+          isDisabled={loading || lateFeesEnabled === false}
+          isLoading={loading}
+        >
           {loading ? 'Calculating...' : 'Calculate Eligible Fees'}
         </Button>
-
-        {hasCalculated && calculations.length > 0 && (
-          <>
-            <Button variant="outline" onClick={() => handleApply(true)} isDisabled={loading}>
-              {loading ? 'Processing...' : 'Dry Run (Preview)'}
-            </Button>
-            <Button variant="danger" onClick={() => handleApply(false)} isDisabled={loading}>
-              {loading ? 'Applying...' : 'Apply Late Fees'}
-            </Button>
-          </>
-        )}
+        <Button
+          variant="primary"
+          onClick={() => void handleApply(false)}
+          isDisabled={loading || !hasCalculated || lateFeesEnabled === false}
+        >
+          Apply Late Fees
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => void handleApply(true)}
+          isDisabled={loading || lateFeesEnabled === false}
+        >
+          Dry run
+        </Button>
       </div>
 
       {hasCalculated && (

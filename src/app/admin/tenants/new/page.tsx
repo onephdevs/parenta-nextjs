@@ -12,7 +12,7 @@ export default async function NewTenantPage({
   const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const params = await searchParams;

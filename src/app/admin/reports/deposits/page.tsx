@@ -47,7 +47,7 @@ export default function DepositsReportPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated' || (session && session.user.role !== 'admin')) {
-      redirect('/auth/admin/signin');
+      redirect('/auth/signin');
     }
     
     // Set default date range (last month)

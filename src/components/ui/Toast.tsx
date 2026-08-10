@@ -21,7 +21,8 @@ const Toast: React.FC<ToastProps> = ({ notification, onRemove }) => {
   }, [id, duration, type, onRemove]);
 
   const getToastStyles = (type: NotificationType) => {
-    const baseStyles = "relative flex items-center p-4 rounded-lg shadow-lg border-l-4 max-w-md w-full";
+    const baseStyles =
+      'relative flex items-start p-4 rounded-lg shadow-lg border-l-4 w-full max-w-md sm:max-w-lg';
     
     switch (type) {
       case 'success':
@@ -40,7 +41,7 @@ const Toast: React.FC<ToastProps> = ({ notification, onRemove }) => {
   };
 
   const getIcon = (type: NotificationType) => {
-    const iconClass = "w-5 h-5 mr-3 flex-shrink-0";
+    const iconClass = 'mt-0.5 w-5 h-5 mr-3 flex-shrink-0';
     
     switch (type) {
       case 'success':
@@ -87,15 +88,20 @@ const Toast: React.FC<ToastProps> = ({ notification, onRemove }) => {
       }}
     >
       {getIcon(type)}
-      <div className="flex-1">
-        <h4 className="font-medium text-sm">{title}</h4>
-        {message && <p className="text-sm opacity-90 mt-1">{message}</p>}
+      <div className="min-w-0 flex-1">
+        <h4 className="text-sm font-semibold leading-snug">{title}</h4>
+        {message && (
+          <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed opacity-90">
+            {message}
+          </p>
+        )}
       </div>
       
       {type !== 'loading' && (
         <button
           onClick={() => onRemove(id)}
-          className="ml-3 text-gray-400 hover:text-gray-900 focus:outline-none"
+          className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-900 focus:outline-none"
+          aria-label="Dismiss"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

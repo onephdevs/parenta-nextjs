@@ -83,11 +83,17 @@ export async function listMaintenanceRequests(
         NULLIF(TRIM(CONCAT_WS(', ', b.address_line1, b.address_line2, b.city, b.state, b.postal_code)), ''),
         b.address_line1,
         ''
-      ) as building_address
+      ) as building_address,
+      NULLIF(TRIM(CONCAT_WS(' ', au.first_name, au.last_name)), '') as assigned_to_name,
+      CASE
+        WHEN au.id IS NULL THEN NULL
+        ELSE UPPER(CONCAT(LEFT(COALESCE(au.first_name, ''), 1), LEFT(COALESCE(au.last_name, ''), 1)))
+      END as assigned_to_initials
     FROM maintenance_requests mr
     LEFT JOIN tenants t ON mr.tenant_id = t.id
     LEFT JOIN rooms r ON mr.room_id = r.id
     LEFT JOIN buildings b ON b.id = COALESCE(mr.building_id, r.building_id)
+    LEFT JOIN users au ON au.id = mr.assigned_to
     WHERE 1=1
   `;
 
@@ -209,6 +215,52 @@ export async function getMaintenanceRequestById(
   }
 
   return result.rows[0];
+}
+
+/** Detail row with tenant/unit labels and photo attachments for admin UI. */
+export async function getMaintenanceRequestDetail(
+  id: string,
+  viewerUserId?: string | null
+): Promise<Record<string, unknown> | null> {
+  const result = await pool.query(
+    `SELECT
+       mr.*,
+       t.first_name || ' ' || t.last_name AS tenant_name,
+       t.email AS tenant_email,
+       t.phone AS tenant_phone,
+       r.room_number,
+       b.name AS building_name,
+       NULLIF(TRIM(CONCAT_WS(' ', au.first_name, au.last_name)), '') AS assigned_to_name
+     FROM maintenance_requests mr
+     LEFT JOIN tenants t ON mr.tenant_id = t.id
+     LEFT JOIN rooms r ON mr.room_id = r.id
+     LEFT JOIN buildings b ON b.id = COALESCE(mr.building_id, r.building_id)
+     LEFT JOIN users au ON au.id = mr.assigned_to
+     WHERE mr.id = $1
+     LIMIT 1`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const { listAttachmentsForRequests } = await import(
+    '@/lib/api/maintenance-attachments'
+  );
+  const { listMaintenanceUpdates } = await import(
+    '@/lib/api/maintenance-updates'
+  );
+  const attachmentMap = await listAttachmentsForRequests([id]);
+  const attachments = attachmentMap.get(id) || [];
+  const updates = await listMaintenanceUpdates(id, viewerUserId);
+
+  return {
+    ...result.rows[0],
+    attachments,
+    attachmentCount: attachments.length,
+    updates,
+  };
 }
 
 export async function updateMaintenanceRequest(

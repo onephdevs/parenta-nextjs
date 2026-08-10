@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       const result = await createTenantWithUser({
         email: tenantData.email || null,
         username: tenantData.username || null,
-        password: tenantData.password, // Optional: if not provided, generates random
+        password: tenantData.password, // Optional: defaults to tenant123
         sendInvitation: tenantData.sendInvitation || false,
         profileCompleted: tenantData.profileCompleted,
         tenantStatus: tenantData.tenantStatus,

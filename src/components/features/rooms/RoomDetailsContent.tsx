@@ -10,7 +10,6 @@ import {
   Home,
   MapPin,
   Plus,
-  StickyNote,
   User,
   Users,
   Wallet,
@@ -23,6 +22,7 @@ import type {
 import { getImageUrl } from '@/lib/format/image-url';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { Button } from '@/components/ui/Button';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 import {
   displayStatusLabel,
   formatBuildingAddress,
@@ -33,6 +33,8 @@ import {
 import { useNotifications } from '@/hooks/useNotifications';
 import { MAX_FILE_SIZE, SUPPORTED_FILE_TYPES } from '@/types/document';
 import TenantProfileModal from '@/components/features/tenants/TenantProfileModal';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import { AddNotesButton, EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 const TEAL = '#39CCCC';
@@ -43,6 +45,8 @@ interface RoomDetailsContentProps {
   hideRoomEdit?: boolean;
   /** Called after a lease document is uploaded so the parent can refresh. */
   onDocumentsChanged?: () => void;
+  /** Called after a tenant is created/assigned from the in-page modal. */
+  onTenantCreated?: () => void;
 }
 
 function cardClassName() {
@@ -128,6 +132,7 @@ function statusLabel(roomStatus: string) {
 export default function RoomDetailsContent({
   detail,
   onDocumentsChanged,
+  onTenantCreated,
 }: RoomDetailsContentProps) {
   const { showSuccess, showError } = useNotifications();
   const leaseInputRef = useRef<HTMLInputElement>(null);
@@ -165,7 +170,6 @@ export default function RoomDetailsContent({
     0;
   const advance = tenant?.advancePaid ?? 0;
   const utilityDeposit = tenant?.utilityDepositPaid ?? 0;
-  const remarks = [room.description, tenant?.notes].filter(Boolean) as string[];
 
   const handleLeaseAttach = async (file: File) => {
     if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
@@ -333,17 +337,13 @@ export default function RoomDetailsContent({
                 Add
               </Button>
             </Link>
-            <Link
-              href={
-                tenant
-                  ? `/admin/tenants/${tenant.tenantId}`
-                  : `/admin/rooms/${room.id}`
-              }
-            >
-              <Button variant="outline" size="sm" leftIcon={<StickyNote className="h-3.5 w-3.5" />}>
-                Notes
-              </Button>
-            </Link>
+            <AddNotesButton
+              entityType="room"
+              entityId={room.id}
+              entityLabel={`Unit ${room.roomNumber}`}
+              label="Add note"
+              onSaved={() => onDocumentsChanged?.()}
+            />
           </div>
         </div>
       </div>
@@ -462,11 +462,16 @@ export default function RoomDetailsContent({
           ) : (
             <div className="flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-gray-500">No tenant assigned to this unit.</p>
-              <Link
-                href={`/admin/tenants/new?buildingId=${encodeURIComponent(building.id)}&roomId=${encodeURIComponent(room.id)}`}
-              >
-                <Button leftIcon={<Plus className="h-4 w-4" />}>Add Tenant</Button>
-              </Link>
+              <AddTenantButton
+                buildingId={building.id}
+                roomId={room.id}
+                lockHousing
+                refreshOnCreated={false}
+                onCreated={() => {
+                  onTenantCreated?.();
+                  onDocumentsChanged?.();
+                }}
+              />
             </div>
           )}
         </div>
@@ -554,6 +559,14 @@ export default function RoomDetailsContent({
                 >
                   {leaseDoc ? 'Replace' : 'Attach'}
                 </Button>
+                <TakePhotoButton
+                  size="sm"
+                  disabled={uploadingLease}
+                  onCapture={(file) => void handleLeaseAttach(file)}
+                  title="Take lease photo"
+                  description="Allow camera access if prompted, then capture the lease document."
+                  fileNamePrefix="lease"
+                />
               </div>
               <p className="mt-2 text-[11px] leading-snug text-gray-400">
                 Lease contract agreement for this tenant. Attach a PDF or photo here — no need to leave this page.
@@ -567,27 +580,26 @@ export default function RoomDetailsContent({
             <Field label="1 Month Deposit" value={formatCurrency(deposit)} />
             <Field label="1 Month Advance" value={formatCurrency(advance)} />
             <Field label="Utility Deposit" value={formatCurrency(utilityDeposit)} />
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                Additional Notes or Remarks
-              </p>
-              <div className="mt-1 min-h-[100px] rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">
-                {remarks[0] || '—'}
-              </div>
-            </div>
           </div>
 
-          {/* Remarks */}
-          <div className="space-y-3">
-            <p className="text-sm font-bold text-gray-900">Remarks</p>
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
-              >
-                {remarks[i] || '—'}
-              </div>
-            ))}
+          {/* Historical notes — room + tenant (if assigned) */}
+          <div className="space-y-4 lg:col-span-1">
+            <EntityNotesPanel
+              entityType="room"
+              entityId={room.id}
+              entityLabel={`Unit ${room.roomNumber}`}
+              title="Room notes"
+              compact
+            />
+            {tenant && (
+              <EntityNotesPanel
+                entityType="tenant"
+                entityId={tenant.tenantId}
+                entityLabel={`${tenant.firstName} ${tenant.lastName}`.trim()}
+                title="Tenant notes"
+                compact
+              />
+            )}
           </div>
         </div>
       </section>

@@ -24,8 +24,8 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   const params = await searchParams;
   const session = await getServerSession(authOptions);
   
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+  if (!session || !['admin','caretaker'].includes(session.user.role)) {
+    redirect('/auth/signin');
   }
 
   const page = parseInt(params.page || '1');

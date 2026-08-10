@@ -6,6 +6,9 @@
 import { Pool } from 'pg';
 import pool from '../db';
 import { generateInvoicesForTenant } from './invoice-generator';
+import { dueDateForBillingMonth } from '@/lib/billing/invoice-due';
+import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
+import { toCanonicalPaymentMethod } from '@/lib/constants/payment-methods';
 
 interface BulkInvoiceResult {
   tenant_id: string;
@@ -60,25 +63,44 @@ export async function generateMonthlyInvoicesForAllTenants(
     
     // Get all active tenants with room assignments
     let query = `
-      SELECT DISTINCT
+      SELECT DISTINCT ON (t.id)
         t.id as tenant_id,
         t.first_name || ' ' || t.last_name as tenant_name,
         tra.room_id,
-        tra.lease_start_date,
-        tra.lease_end_date,
-        tra.monthly_rent
+        tra.start_date,
+        tra.end_date,
+        tra.monthly_rate as monthly_rent,
+        tra.billing_cycle_start_day
       FROM tenants t
       JOIN tenant_room_assignments tra ON tra.tenant_id = t.id
-      WHERE t.status = 'active'
-        AND tra.status = 'current'
-        AND tra.lease_end_date >= CURRENT_DATE
+      WHERE COALESCE(t.is_active, true) = true
+        AND t.tenant_status = 'active'
+        AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date >= CURRENT_DATE)
+      ORDER BY t.id, tra.start_date DESC
     `;
     
     const params: any[] = [];
     if (buildingId) {
-      query += ` AND tra.room_id IN (
-        SELECT id FROM rooms WHERE building_id = $1
-      )`;
+      query = `
+      SELECT DISTINCT ON (t.id)
+        t.id as tenant_id,
+        t.first_name || ' ' || t.last_name as tenant_name,
+        tra.room_id,
+        tra.start_date,
+        tra.end_date,
+        tra.monthly_rate as monthly_rent,
+        tra.billing_cycle_start_day
+      FROM tenants t
+      JOIN tenant_room_assignments tra ON tra.tenant_id = t.id
+      JOIN rooms r ON r.id = tra.room_id
+      WHERE COALESCE(t.is_active, true) = true
+        AND t.tenant_status = 'active'
+        AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date >= CURRENT_DATE)
+        AND r.building_id = $1
+      ORDER BY t.id, tra.start_date DESC
+      `;
       params.push(buildingId);
     }
     
@@ -142,9 +164,6 @@ export async function generateMonthlyInvoicesForAllTenants(
         );
         let nextNum = parseInt(numberResult.rows[0].max_num, 10) || 0;
 
-        const dueDate = new Date(targetDate);
-        dueDate.setDate(5);
-        const dueDateStr = dueDate.toISOString().slice(0, 10);
         const issueDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
         const issueDateStr = issueDate.toISOString().slice(0, 10);
         const { initialInvoiceStatusForIssueDate } = await import(
@@ -159,8 +178,22 @@ export async function generateMonthlyInvoicesForAllTenants(
         for (const tenant of toCreate) {
           nextNum += 1;
           const invoiceNumber = `INV-${String(nextNum).padStart(6, '0')}`;
+          const rentDueDay = resolveRentDueDay({
+            billingCycleStartDay:
+              tenant.billing_cycle_start_day != null
+                ? Number(tenant.billing_cycle_start_day)
+                : null,
+            startDate: tenant.start_date,
+            fallbackDay: 5,
+          });
+          const dueDate = dueDateForBillingMonth(
+            targetDate.getFullYear(),
+            targetDate.getMonth(),
+            rentDueDay
+          );
+          const dueDateStr = dueDate.toISOString().slice(0, 10);
           placeholders.push(
-            `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, 0, $${p++})`
+            `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, 0, $${p++}, 'UNPAID')`
           );
           insertValues.push(
             tenant.tenant_id,
@@ -176,7 +209,7 @@ export async function generateMonthlyInvoicesForAllTenants(
         const insertResult = await client.query(
           `INSERT INTO invoices (
             tenant_id, invoice_number, invoice_status, issue_date, due_date,
-            total_amount, amount_paid, description
+            total_amount, amount_paid, notes, bill_status
           ) VALUES ${placeholders.join(', ')}
           RETURNING id, tenant_id`,
           insertValues

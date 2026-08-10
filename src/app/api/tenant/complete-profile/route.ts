@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import bcrypt from 'bcryptjs';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
+import { DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
 
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,50}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Complete first-login profile: email, username, phone, first/last name.
+ * Complete first-login profile: name, email, phone, username, and new password.
  * Sets profile_completed = true and syncs tenants row.
  */
 export async function POST(request: NextRequest) {
@@ -23,6 +25,9 @@ export async function POST(request: NextRequest) {
     const email = String(body.email || '').trim().toLowerCase();
     const username = String(body.username || '').trim();
     const phone = String(body.phone || '').trim();
+    const currentPassword = String(body.currentPassword || '');
+    const newPassword = String(body.newPassword || '');
+    const confirmPassword = String(body.confirmPassword || '');
 
     if (!firstName || !lastName || !email || !username || !phone) {
       return NextResponse.json(
@@ -34,8 +39,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Current password and a new password are required',
+        },
+        { status: 400 }
+      );
+    }
+
     if (!EMAIL_RE.test(email)) {
-      return NextResponse.json({ success: false, error: 'Enter a valid email address' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Enter a valid email address' },
+        { status: 400 }
+      );
     }
 
     if (!USERNAME_RE.test(username)) {
@@ -48,9 +66,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (newPassword !== confirmPassword) {
+      return NextResponse.json(
+        { success: false, error: 'New passwords do not match' },
+        { status: 400 }
+      );
+    }
+
+    if (newPassword.length < 8) {
+      return NextResponse.json(
+        { success: false, error: 'New password must be at least 8 characters' },
+        { status: 400 }
+      );
+    }
+
+    if (newPassword === currentPassword || newPassword === DEFAULT_TENANT_PASSWORD) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Choose a new password different from the temporary one',
+        },
+        { status: 400 }
+      );
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      const userRow = await client.query<{ password_hash: string }>(
+        `SELECT password_hash FROM users WHERE id = $1 AND is_active = true LIMIT 1`,
+        [session.user.id]
+      );
+      if (userRow.rows.length === 0) {
+        throw Object.assign(new Error('User not found'), { status: 404 });
+      }
+
+      const valid = await bcrypt.compare(
+        currentPassword,
+        userRow.rows[0].password_hash
+      );
+      if (!valid) {
+        throw Object.assign(new Error('Current password is incorrect'), {
+          status: 400,
+        });
+      }
 
       const emailTaken = await client.query(
         `SELECT id FROM users
@@ -72,17 +132,20 @@ export async function POST(request: NextRequest) {
         throw Object.assign(new Error('Username is already in use'), { status: 409 });
       }
 
+      const passwordHash = await bcrypt.hash(newPassword, 12);
+
       const updated = await client.query(
         `UPDATE users
          SET first_name = $1,
              last_name = $2,
              email = $3,
              username = $4,
+             password_hash = $5,
              profile_completed = true,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5 AND is_active = true
+         WHERE id = $6 AND is_active = true
          RETURNING id, email, username, first_name, last_name, profile_completed`,
-        [firstName, lastName, email, username, session.user.id]
+        [firstName, lastName, email, username, passwordHash, session.user.id]
       );
 
       if (updated.rows.length === 0) {
@@ -100,7 +163,6 @@ export async function POST(request: NextRequest) {
         [firstName, lastName, email, phone, session.user.id]
       );
 
-      // Keep optional profile extras phone in sync
       await client.query(
         `INSERT INTO app_settings (key, value, description)
          VALUES ($1, $2, $3)
@@ -185,6 +247,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Get profile completion status error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to load profile status' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to load profile status' },
+      { status: 500 }
+    );
   }
 }

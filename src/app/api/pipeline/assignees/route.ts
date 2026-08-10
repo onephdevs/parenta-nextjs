@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdminOrStaff } from '@/lib/api-auth';
 import pool from '@/lib/db';
 
 interface AssigneeRow {
@@ -9,11 +9,11 @@ interface AssigneeRow {
 }
 
 /**
- * List admin/staff users available as opportunity assignees.
+ * List admin/staff users available as opportunity / maintenance assignees.
  */
 export async function GET() {
   try {
-    const { error } = await requireAdmin();
+    const { error } = await requireAdminOrStaff();
     if (error) return error;
 
     const result = await pool.query<AssigneeRow>(

@@ -82,6 +82,22 @@ MIGRATIONS=(
   remove-pipeline-reconciled-and-closed.sql
   add-pipeline-utility-bill-sync.sql
   add-maintenance-request-attachments.sql
+  add-phase1-foundational-schema.sql
+  add-phase2-payments-schema.sql
+  add-phase3-expenses-disbursement.sql
+  add-phase4-reporting-schema.sql
+  add-phase6-moveout-inspection-history.sql
+  seed-default-utility-vendors.sql
+  add-caretaker-role.sql
+  seed-alfonso-ops-defaults.sql
+  add-maya-payment-method.sql
+  add-entity-notes.sql
+  add-entity-notes-author-name.sql
+  add-maintenance-request-updates.sql
+  add-maintenance-update-reactions.sql
+  add-maintenance-assignee-user-id.sql
+  add-building-coordinates.sql
+  add-building-nearby-snapshots.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

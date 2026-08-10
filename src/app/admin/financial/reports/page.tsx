@@ -39,7 +39,7 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
   const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const today = new Date();

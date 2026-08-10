@@ -22,7 +22,7 @@ export default async function PaymentGatewaysPage() {
   const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   return (

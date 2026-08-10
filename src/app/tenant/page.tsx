@@ -24,6 +24,7 @@ import {
   fetchTenantMaintenance,
 } from '@/hooks/useTenantPortalData';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
+import { TenantInboxPreview } from '@/components/features/tenant/TenantInboxPreview';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 
@@ -290,7 +291,7 @@ export default function TenantDashboard() {
     }
 
     if (status === 'unauthenticated') {
-      router.push('/auth/tenant/signin');
+      router.push('/auth/signin');
       return;
     }
 
@@ -436,6 +437,8 @@ export default function TenantDashboard() {
           </Link>
         </section>
 
+        <TenantInboxPreview />
+
         {/* Unit + rent — shown once */}
         <section className="grid gap-4 sm:grid-cols-2">
           <div className={theme.cardPad}>
@@ -566,8 +569,13 @@ export default function TenantDashboard() {
               <ul className="space-y-2.5">
                 {openMaintenance.map((request) => (
                   <li key={request.id} className="text-sm">
-                    <p className={cn('truncate', theme.listValue)}>{request.title}</p>
-                    <p className={cn('capitalize', theme.subtle)}>{request.status}</p>
+                    <Link
+                      href={`/tenant/maintenance/${request.id}`}
+                      className="block hover:opacity-80"
+                    >
+                      <p className={cn('truncate', theme.listValue)}>{request.title}</p>
+                      <p className={cn('capitalize', theme.subtle)}>{request.status}</p>
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -8,6 +8,10 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Card } from '@/components/ui/Card';
 import { FormActions } from '@/components/ui/FormActions';
 import { FormField } from '@/components/forms/FormField';
+import {
+  formatPaymentNotesForPeople,
+  preserveLedgerTagOnSave,
+} from '@/lib/format-payment-notes';
 
 interface UtilityBillFormProps {
   bill?: UtilityBill | null;
@@ -57,7 +61,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
         usageUnit: bill.usageUnit || '',
         billStatus: bill.billStatus,
         billUrl: bill.billUrl || '',
-        notes: bill.notes || '',
+        notes: formatPaymentNotesForPeople(bill.notes || ''),
       });
     }
   }, [bill]);
@@ -128,6 +132,7 @@ export default function UtilityBillForm({ bill, onSubmit, onCancel }: UtilityBil
         ...formData,
         amount: formData.amount ?? 0,
         usageAmount: formData.usageAmount ?? 0,
+        notes: preserveLedgerTagOnSave(String(formData.notes || ''), bill?.notes),
       });
     } catch (error) {
       console.error('Error submitting form:', error);

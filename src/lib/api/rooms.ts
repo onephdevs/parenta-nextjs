@@ -26,6 +26,7 @@ function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
     description: dbRoom.description,
     amenities: Array.isArray(dbRoom.amenities) ? dbRoom.amenities.join(', ') : (dbRoom.amenities || ''),
     isActive: dbRoom.is_active,
+    isRevenueUnit: dbRoom.is_revenue_unit !== false,
     createdAt: dbRoom.created_at,
     updatedAt: dbRoom.updated_at
   };
@@ -211,9 +212,9 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
       INSERT INTO rooms (
         building_id, room_number, floor_number, room_type, square_footage,
         monthly_rate, deposit_amount, deposit_required, deposit_type, 
-        deposit_percentage, room_status, amenities, description
+        deposit_percentage, room_status, amenities, description, is_revenue_unit
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `;
     
@@ -232,7 +233,8 @@ export async function createRoom(roomData: CreateRoomData): Promise<Room> {
       roomData.depositPercentage,
       'vacant', // Default status
       amenitiesArray,
-      roomData.description
+      roomData.description,
+      roomData.isRevenueUnit !== false,
     ];
     
     const result = await pool.query(query, values);
@@ -396,6 +398,7 @@ export async function updateRoom(id: string, roomData: Partial<CreateRoomData>):
                    key === 'depositType' ? 'deposit_type' :
                    key === 'depositPercentage' ? 'deposit_percentage' :
                    key === 'roomStatus' ? 'room_status' :
+                   key === 'isRevenueUnit' ? 'is_revenue_unit' :
                    key === 'amenities' ? 'amenities' :
                    key === 'description' ? 'description' :
                    key;
@@ -673,9 +676,12 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
     const assignmentQuery = `
       INSERT INTO tenant_room_assignments (
         tenant_id, room_id, start_date, monthly_rate, deposit_paid, notes, assignment_status,
-        tenant_name_snapshot, tenant_email_snapshot
+        tenant_name_snapshot, tenant_email_snapshot, billing_cycle_start_day
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)
+      VALUES (
+        $1, $2, $3, $4, $5, $6, 'active', $7, $8,
+        LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31)
+      )
       RETURNING *
     `;
     

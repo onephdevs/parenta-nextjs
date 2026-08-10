@@ -27,6 +27,10 @@ import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import {
+  formatPaymentNotesForPeople,
+  formatPaymentNotesLabel,
+} from '@/lib/format-payment-notes';
+import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_LABELS,
   formatReportCategoryLabel,
@@ -562,13 +566,13 @@ export default function ExpenseReportPage() {
                           {formatReportCategoryLabel(row.category)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
-                          {row.description || '—'}
+                          {formatPaymentNotesLabel(row.description, '—')}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium text-gray-900">
                           {formatCurrency(row.amount)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {row.notes?.trim() || '—'}
+                          {formatPaymentNotesForPeople(row.notes) || '—'}
                         </td>
                       </tr>
                     ))}

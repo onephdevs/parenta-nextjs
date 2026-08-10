@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import type { PoolClient } from 'pg';
+import { toCanonicalPaymentMethod } from '@/lib/constants/payment-methods';
 
 export interface Payment {
   id: string;
@@ -7,7 +8,7 @@ export interface Payment {
   roomAssignmentId?: string;
   amount: number;
   paymentType: 'rent' | 'deposit' | 'advance' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
-  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'online';
+  paymentMethod?: 'cash' | 'cheque' | 'check' | 'credit_card' | 'bank_transfer' | 'online' | 'gcash' | 'other';
   paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;
   dueDate?: Date;
@@ -46,7 +47,7 @@ export interface CreatePaymentData {
   roomAssignmentId?: string;
   amount: number;
   paymentType: 'rent' | 'deposit' | 'advance' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
-  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'online';
+  paymentMethod?: 'cash' | 'cheque' | 'check' | 'credit_card' | 'bank_transfer' | 'online' | 'gcash' | 'other';
   paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;
   dueDate?: Date;
@@ -57,7 +58,7 @@ export interface CreatePaymentData {
 export interface UpdatePaymentData {
   amount?: number;
   paymentType?: 'rent' | 'deposit' | 'downpayment' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
-  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'online';
+  paymentMethod?: 'cash' | 'cheque' | 'check' | 'credit_card' | 'bank_transfer' | 'online' | 'gcash' | 'other';
   paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate?: Date;
   dueDate?: Date;
@@ -123,13 +124,16 @@ export async function createPayment(
   
   const paymentStatus = mapPaymentStatusToDb(paymentData.paymentStatus);
   const paymentType = mapPaymentTypeToDb(paymentData.paymentType);
+  const paymentMethod = paymentData.paymentMethod
+    ? toCanonicalPaymentMethod(paymentData.paymentMethod)
+    : null;
   
   const values = [
     paymentData.tenantId,
     paymentData.roomAssignmentId || null,
     paymentData.amount,
     paymentType,
-    paymentData.paymentMethod || null,
+    paymentMethod,
     paymentData.paymentDate.toISOString().split('T')[0],
     paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0], // Default to payment_date if not provided
     paymentData.referenceNumber || null,

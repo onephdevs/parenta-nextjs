@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
       providerName,
       allocationMethod,
       distributeAcrossUnits,
+      floorNumber,
+      utilityUnitGroupId,
     } = body;
 
     if (
@@ -183,6 +185,11 @@ export async function POST(request: NextRequest) {
       notes: body.notes || undefined,
       distributeAcrossUnits:
         distributeAcrossUnits === undefined ? true : Boolean(distributeAcrossUnits),
+      floorNumber:
+        floorNumber != null && floorNumber !== ''
+          ? Number(floorNumber)
+          : undefined,
+      utilityUnitGroupId: utilityUnitGroupId || null,
     });
 
     return NextResponse.json(

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import {
@@ -15,6 +15,7 @@ import {
   Camera,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { formatMaintenanceCategory } from '@/lib/constants/maintenance';
 import {
   AppLoader,
   Button,
@@ -42,6 +43,10 @@ import {
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
 import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
+import {
+  MaintenanceThreadPanel,
+  type MaintenanceThreadHandle,
+} from '@/components/features/maintenance/MaintenanceThreadPanel';
 
 const PAGE_SIZE = 20;
 
@@ -70,8 +75,17 @@ interface MaintenanceRequest {
   completed_date?: string;
   notes?: string;
   assigned_to?: string;
+  assigned_to_name?: string;
+  assigned_to_initials?: string;
   attachments?: MaintenanceAttachment[];
   attachmentCount?: number;
+}
+
+interface AssigneeOption {
+  id: string;
+  firstName: string;
+  lastName: string;
+  initials: string;
 }
 
 interface MaintenanceStats {
@@ -115,6 +129,9 @@ export default function AdminMaintenancePage() {
     notes: '',
     assignedTo: '',
   });
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const threadRef = useRef<MaintenanceThreadHandle>(null);
 
   const fetchMaintenanceRequests = useCallback(async () => {
     try {
@@ -150,6 +167,14 @@ export default function AdminMaintenancePage() {
       (session?.user.role === 'admin' || session?.user.role === 'staff')
     ) {
       fetchMaintenanceRequests();
+      void fetch('/api/pipeline/assignees')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success) {
+            setAssignees(json.data.assignees || []);
+          }
+        })
+        .catch((err) => console.error('Failed to load assignees', err));
     }
   }, [status, session, fetchMaintenanceRequests]);
 
@@ -195,59 +220,172 @@ export default function AdminMaintenancePage() {
   }
 
   if (!session || (session.user.role !== 'admin' && session.user.role !== 'staff')) {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
+
+  const toDateInputValue = (value?: string | null) => {
+    if (!value) return '';
+    const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+  };
 
   const handleUpdateRequest = (request: MaintenanceRequest) => {
     setSelectedRequest(request);
     setUpdateData({
       status: request.status || '',
       priority: request.priority || '',
-      scheduledDate: request.scheduled_date?.split('T')[0] || '',
-      completedDate: request.completed_date?.split('T')[0] || '',
+      scheduledDate: toDateInputValue(request.scheduled_date),
+      completedDate: toDateInputValue(request.completed_date),
       notes: request.notes || '',
       assignedTo: request.assigned_to || '',
     });
     setShowUpdateModal(true);
   };
 
-  const submitUpdate = async () => {
+  const buildPersistFields = () => ({
+    status: updateData.status,
+    priority: updateData.priority,
+    assignedTo: updateData.assignedTo.trim() || null,
+    scheduledDate: updateData.scheduledDate || null,
+    completedDate: updateData.completedDate || null,
+    notes: updateData.notes,
+  });
+
+  const applySavedRequest = (saved?: {
+    status?: string;
+    priority?: string;
+    assignedTo?: string | null;
+    scheduledDate?: string | null;
+    completedDate?: string | null;
+    notes?: string | null;
+  }) => {
+    if (!saved) return;
+    setUpdateData((prev) => ({
+      ...prev,
+      status: saved.status != null ? String(saved.status) : prev.status,
+      priority: saved.priority != null ? String(saved.priority) : prev.priority,
+      assignedTo: saved.assignedTo != null ? String(saved.assignedTo) : '',
+      scheduledDate: toDateInputValue(
+        saved.scheduledDate != null
+          ? String(saved.scheduledDate)
+          : prev.scheduledDate
+      ),
+      completedDate: toDateInputValue(
+        saved.completedDate != null
+          ? String(saved.completedDate)
+          : prev.completedDate
+      ),
+      notes: saved.notes != null ? String(saved.notes) : prev.notes,
+    }));
+    setSelectedRequest((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: saved.status != null ? String(saved.status) : prev.status,
+            priority:
+              saved.priority != null ? String(saved.priority) : prev.priority,
+            assigned_to:
+              saved.assignedTo != null ? String(saved.assignedTo) : undefined,
+            scheduled_date:
+              saved.scheduledDate != null
+                ? String(saved.scheduledDate)
+                : prev.scheduled_date,
+            completed_date:
+              saved.completedDate != null
+                ? String(saved.completedDate)
+                : prev.completed_date,
+            notes: saved.notes != null ? String(saved.notes) : prev.notes,
+          }
+        : prev
+    );
+  };
+
+  const persistFormFields = async () => {
     if (!selectedRequest) return;
 
+    const assignedToValue = updateData.assignedTo?.trim()
+      ? updateData.assignedTo.trim()
+      : null;
+
+    const response = await fetch('/api/maintenance', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: selectedRequest.id,
+        status: updateData.status || null,
+        priority: updateData.priority || null,
+        scheduledDate: updateData.scheduledDate || null,
+        completedDate: updateData.completedDate || null,
+        notes: updateData.notes ?? '',
+        assignedTo: assignedToValue,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Failed to update request');
+    }
+
+    setSelectedRequest((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: updateData.status || prev.status,
+            priority: updateData.priority || prev.priority,
+            scheduled_date: updateData.scheduledDate || undefined,
+            completed_date: updateData.completedDate || undefined,
+            notes: updateData.notes,
+            assigned_to: assignedToValue || undefined,
+            assigned_to_name: assignedToValue
+              ? (() => {
+                  const user = assignees.find((a) => a.id === assignedToValue);
+                  return user
+                    ? `${user.firstName} ${user.lastName}`.trim()
+                    : prev.assigned_to_name;
+                })()
+              : undefined,
+          }
+        : prev
+    );
+  };
+
+  const submitUpdate = async () => {
+    if (!selectedRequest) return;
+    setIsSaving(true);
     try {
-      const response = await fetch('/api/maintenance', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedRequest.id,
-          ...updateData,
-        }),
-      });
+      const fields = buildPersistFields();
+      const threadResult = await threadRef.current?.save(fields);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (!threadResult || threadResult.mode === 'fields-only') {
+        await persistFormFields();
         showNotification({
           type: 'success',
-          title: 'Success',
+          title: 'Saved',
           message: 'Maintenance request updated successfully',
         });
-        setShowUpdateModal(false);
-        fetchMaintenanceRequests();
       } else {
+        applySavedRequest(threadResult.request);
         showNotification({
-          type: 'error',
-          title: 'Error',
-          message: data.error || 'Failed to update request',
+          type: 'success',
+          title: 'Saved',
+          message: 'Fields and reply saved — tenant notified.',
         });
       }
+
+      setShowUpdateModal(false);
+      await fetchMaintenanceRequests();
     } catch (error) {
       console.error('Error updating request:', error);
       showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to update maintenance request',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update maintenance request',
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -264,7 +402,7 @@ export default function AdminMaintenancePage() {
     <div className="space-y-6 p-6">
       <PageHeader
         title="Maintenance Requests"
-        description="Synced with the Maintenance pipeline — Submitted, In Progress, and Resolved match board stages"
+        description="Synced with the Maintenance pipeline — Open, In Progress, and Resolved match board stages"
       />
 
       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -275,7 +413,7 @@ export default function AdminMaintenancePage() {
           icon={<Wrench className="h-8 w-8 text-blue-600" />}
         />
         <ListSummaryCard
-          title="Submitted"
+          title="Open"
           value={stats.open}
           footer="awaiting action"
           icon={<AlertCircle className="h-8 w-8 text-yellow-600" />}
@@ -311,7 +449,7 @@ export default function AdminMaintenancePage() {
             onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="">All Status</option>
-            <option value="open">Submitted</option>
+            <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
             <option value="completed">Resolved</option>
             <option value="cancelled">Cancelled</option>
@@ -363,6 +501,7 @@ export default function AdminMaintenancePage() {
                   <TableHead>Request</TableHead>
                   <TableHead>Property</TableHead>
                   <TableHead>Tenant</TableHead>
+                  <TableHead>Assigned</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
@@ -400,8 +539,13 @@ export default function AdminMaintenancePage() {
                       <div className="text-sm text-gray-900">{request.tenant_name || '—'}</div>
                       <div className="text-xs text-gray-500">{request.tenant_email || ''}</div>
                     </TableCell>
-                    <TableCell className="capitalize">
-                      {request.category?.replace(/_/g, ' ') || '—'}
+                    <TableCell>
+                      <div className="text-sm text-gray-900">
+                        {request.assigned_to_name || 'Unassigned'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {formatMaintenanceCategory(request.category)}
                     </TableCell>
                     <TableCell>
                       <MaintenancePriorityBadge priority={request.priority} />
@@ -445,14 +589,19 @@ export default function AdminMaintenancePage() {
             <Button variant="outline" onClick={() => setShowUpdateModal(false)}>
               Cancel
             </Button>
-            <Button leftIcon={<Save className="h-4 w-4" />} onClick={submitUpdate}>
+            <Button
+              leftIcon={<Save className="h-4 w-4" />}
+              onClick={submitUpdate}
+              isLoading={isSaving}
+              isDisabled={isSaving}
+            >
               Save Changes
             </Button>
           </>
         }
       >
         {selectedRequest && (
-          <div className="space-y-4">
+          <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             <Card padding="sm" className="bg-gray-50">
               <h4 className="mb-2 font-medium text-gray-900">{selectedRequest.title}</h4>
               <p className="text-sm text-gray-600">{selectedRequest.description}</p>
@@ -478,7 +627,7 @@ export default function AdminMaintenancePage() {
                   value={updateData.status}
                   onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
                 >
-                  <option value="open">Submitted</option>
+                  <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Resolved</option>
                   <option value="cancelled">Cancelled</option>
@@ -521,25 +670,46 @@ export default function AdminMaintenancePage() {
               </FormField>
 
               <FormField label="Assigned To" htmlFor="update-assignedTo" className="md:col-span-2">
-                <Input
-                  type="text"
+                <Select
                   id="update-assignedTo"
                   value={updateData.assignedTo}
-                  onChange={(e) => setUpdateData({ ...updateData, assignedTo: e.target.value })}
-                  placeholder="Staff member or contractor name"
-                />
+                  onChange={(e) =>
+                    setUpdateData({ ...updateData, assignedTo: e.target.value })
+                  }
+                >
+                  <option value="">Unassigned</option>
+                  {assignees.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {`${user.firstName} ${user.lastName}`.trim() || user.initials}
+                    </option>
+                  ))}
+                </Select>
+                {assignees.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    No admin/staff users available to assign yet.
+                  </p>
+                )}
               </FormField>
 
-              <FormField label="Notes" htmlFor="update-notes" className="md:col-span-2">
+              <FormField label="Internal notes" htmlFor="update-notes" className="md:col-span-2">
                 <Textarea
                   id="update-notes"
                   value={updateData.notes}
                   onChange={(e) => setUpdateData({ ...updateData, notes: e.target.value })}
-                  rows={4}
-                  placeholder="Add notes about the maintenance work..."
+                  rows={3}
+                  placeholder="Office-only notes (not shown as a tenant conversation message)…"
                 />
               </FormField>
             </div>
+
+            <MaintenanceThreadPanel
+              ref={threadRef}
+              requestId={selectedRequest.id}
+              hideSubmitButton
+              disabled={['closed', 'cancelled'].includes(
+                String(updateData.status || selectedRequest.status).toLowerCase()
+              )}
+            />
           </div>
         )}
       </Dialog>

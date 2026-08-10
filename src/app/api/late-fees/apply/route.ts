@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { applyLateFees } from '@/lib/services/late-fee-service';
 import { LateFeeApplicationRequest } from '@/types/financial';
+import { isLateFeesEnabled } from '@/lib/ops-policy-settings';
 
 /**
  * POST /api/late-fees/apply
@@ -19,6 +20,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
+      );
+    }
+
+    if (!(await isLateFeesEnabled())) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Late fees are disabled. Renegotiate the invoice due date instead of applying penalties.',
+        },
+        { status: 403 }
       );
     }
     

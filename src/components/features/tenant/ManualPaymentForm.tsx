@@ -9,6 +9,8 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { PAYMENT_METHOD_SELECT_OPTIONS } from '@/lib/constants/payment-methods';
+import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 
 interface ManualPaymentFormProps {
   onPaymentComplete?: () => void;
@@ -21,9 +23,10 @@ export default function ManualPaymentForm({
 }: ManualPaymentFormProps) {
   const [paymentType, setPaymentType] = useState<string>('rent');
   const [amount, setAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('online');
+  const [paymentMethod, setPaymentMethod] = useState<string>('gcash');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { showNotification } = useNotifications();
 
@@ -40,21 +43,38 @@ export default function ManualPaymentForm({
       return;
     }
 
+    if (!referenceNumber.trim()) {
+      showNotification({
+        type: 'error',
+        title: 'Reference required',
+        message: 'Enter the transaction / reference number from your receipt',
+      });
+      return;
+    }
+
+    if (!selectedFile) {
+      showNotification({
+        type: 'error',
+        title: 'Receipt required',
+        message: 'Take a photo or choose a screenshot of your payment receipt',
+      });
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('amount', String(amountValue));
+      formData.append('paymentType', paymentType);
+      formData.append('paymentMethod', paymentMethod);
+      formData.append('referenceNumber', referenceNumber.trim());
+      if (notes.trim()) formData.append('notes', notes.trim());
+
       const response = await fetch('/api/tenant/payments/manual', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: amountValue,
-          paymentType,
-          paymentMethod,
-          referenceNumber: referenceNumber || undefined,
-          notes: notes || undefined,
-        }),
+        body: formData,
       });
 
       const data = await response.json();
@@ -62,9 +82,15 @@ export default function ManualPaymentForm({
       if (data.success) {
         showNotification({
           type: 'success',
-          title: 'Payment Recorded',
-          message: data.message || 'Your payment has been recorded successfully',
+          title: 'Payment submitted',
+          message:
+            data.message ||
+            'Receipt uploaded. Balance updates after the office verifies the transaction ID.',
         });
+        setSelectedFile(null);
+        setReferenceNumber('');
+        setNotes('');
+        setAmount('');
         onPaymentComplete?.();
       } else {
         showNotification({
@@ -107,8 +133,8 @@ export default function ManualPaymentForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <Alert variant="info">
-        <strong>Note:</strong> Enter the payment amount you have paid. This will be recorded in
-        your payment history.
+        <strong>Note:</strong> Attach your receipt and enter the transaction /
+        reference number. The office will confirm it before your balance updates.
       </Alert>
 
       <FormField label="Payment Type" htmlFor="paymentType" required>
@@ -156,23 +182,35 @@ export default function ManualPaymentForm({
           onChange={(e) => setPaymentMethod(e.target.value)}
           required
         >
-          <option value="online">Online Payment</option>
-          <option value="credit_card">Credit Card</option>
-          <option value="bank_transfer">Bank Transfer</option>
-          <option value="cash">Cash</option>
-          <option value="check">Check</option>
+          {PAYMENT_METHOD_SELECT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
         </Select>
       </FormField>
 
-      <FormField label="Reference Number (Optional)" htmlFor="referenceNumber">
+      <FormField
+        label="Reference / transaction number"
+        htmlFor="referenceNumber"
+        required
+        hint="From your GCash, Maya, or bank transfer confirmation"
+      >
         <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
-          placeholder="Transaction reference, receipt number, etc."
+          placeholder="e.g. 1234567890"
+          required
         />
       </FormField>
+
+      <ReceiptImageField
+        file={selectedFile}
+        onChange={setSelectedFile}
+        disabled={isProcessing}
+      />
 
       <FormField label="Notes (Optional)" htmlFor="notes">
         <Textarea
@@ -215,10 +253,10 @@ export default function ManualPaymentForm({
           type="submit"
           variant="success"
           isLoading={isProcessing}
-          isDisabled={!amount || parseFloat(amount) <= 0}
+          isDisabled={!amount || parseFloat(amount) <= 0 || !selectedFile || !referenceNumber.trim()}
           leftIcon={<CreditCard className="h-5 w-5" />}
         >
-          Record Payment
+          Submit for verification
         </Button>
       </div>
     </form>

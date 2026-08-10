@@ -276,9 +276,26 @@ export async function PUT(request: Request) {
         tenantId: updated.tenant_id != null ? String(updated.tenant_id) : null,
         roomId: updated.room_id != null ? String(updated.room_id) : null,
         buildingId: updated.building_id != null ? String(updated.building_id) : null,
+        assignedTo:
+          assignedTo !== undefined
+            ? assignedTo || null
+            : updated.assigned_to != null
+              ? String(updated.assigned_to)
+              : null,
       });
     } catch (pipelineErr) {
       console.error('Maintenance pipeline card sync failed:', pipelineErr);
+    }
+
+    let tenantUserId: string | null = null;
+    try {
+      const { getMaintenanceTenantNotifyUserId } = await import(
+        '@/lib/api/maintenance-updates'
+      );
+      const notify = await getMaintenanceTenantNotifyUserId(String(id));
+      tenantUserId = notify.userId;
+    } catch {
+      // optional
     }
 
     logActivitySafe({
@@ -291,8 +308,12 @@ export async function PUT(request: Request) {
       entityLabel: updated.title || before.title || id,
       beforeData: before as Record<string, unknown>,
       afterData: updated as Record<string, unknown>,
-      link: '/admin/tasks?board=maintenance',
-      metadata: { link: '/admin/tasks?board=maintenance' },
+      link: tenantUserId ? '/tenant/maintenance' : '/admin/tasks?board=maintenance',
+      metadata: {
+        link: tenantUserId ? '/tenant/maintenance' : '/admin/tasks?board=maintenance',
+      },
+      notifyUserIds: tenantUserId ? [tenantUserId] : undefined,
+      notifyActor: false,
     });
 
     return NextResponse.json({

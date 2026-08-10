@@ -4,6 +4,16 @@
  */
 
 import pool from '@/lib/db';
+import { estimateLostRent } from '@/lib/occupancy/reconcile';
+import { previewLifetimeCollection } from '@/lib/services/collection-lifetime';
+import {
+  formatPaymentNotesForPeople,
+  formatPaymentNotesLabel,
+} from '@/lib/format-payment-notes';
+import {
+  PAYMENT_IS_REVENUE_UNIT,
+  ROOM_IS_REVENUE,
+} from '@/lib/sql/revenue-unit-filter';
 
 export interface RevenueReportData {
   summary: {
@@ -161,6 +171,14 @@ export interface CollectedAmountReportData {
     previousPeriodCollected?: number;
     growth?: number;
   };
+  /** Persisted running total: Previous + Current Period = Overall */
+  lifetime: {
+    previousTotal: number;
+    currentPeriodCollection: number;
+    overallCollection: number;
+    alreadyCommitted: boolean;
+    asOfDate: string | null;
+  };
   byPeriod: Array<{
     period: string;
     amount: number;
@@ -224,6 +242,8 @@ export interface VacantRoomsReportData {
     vacancyRate: number;
     averageMonthlyRate: number;
     totalPotentialRevenue: number;
+    totalEstimatedLostRent: number;
+    totalOwnerAbsorbedUtility: number;
   };
   rooms: Array<{
     id: string;
@@ -234,7 +254,10 @@ export interface VacantRoomsReportData {
     roomType?: string;
     monthlyRate: number;
     daysVacant?: number;
+    estimatedLostRent?: number;
+    lastMoveOutDate?: string;
     lastTenantName?: string;
+    ownerAbsorbedUtility?: number;
     maintenanceStatus?: string;
   }>;
 }
@@ -519,8 +542,9 @@ export async function generateOccupancyReport(
         COUNT(CASE WHEN room_status = 'occupied' THEN 1 END) as occupied,
         COUNT(*) as total,
         COUNT(CASE WHEN room_status = 'vacant' THEN 1 END) as vacant
-      FROM rooms
+      FROM rooms r
       WHERE is_active = true
+        AND ${ROOM_IS_REVENUE}
     `);
     
     const occupiedRooms = parseInt(summaryResult.rows[0].occupied);
@@ -544,7 +568,7 @@ export async function generateOccupancyReport(
         COUNT(CASE WHEN r.room_status = 'occupied' THEN 1 END) as occupied,
         COUNT(r.id) as total
       FROM buildings b
-      LEFT JOIN rooms r ON r.building_id = b.id AND r.is_active = true
+      LEFT JOIN rooms r ON r.building_id = b.id AND r.is_active = true AND ${ROOM_IS_REVENUE}
       WHERE b.is_active = true
       GROUP BY b.id, b.name
       ORDER BY b.name
@@ -710,7 +734,7 @@ export async function generateExpenseReport(
     
     const topExpenses = topExpensesResult.rows.map(row => ({
       id: row.id,
-      description: row.description,
+      description: formatPaymentNotesLabel(row.description, row.description || '—'),
       amount: parseFloat(row.amount),
       category: row.category,
       date: row.expense_date,
@@ -956,7 +980,7 @@ export async function generateExpenseReportByPeriod(
     // Details (all expenses)
     const details = expenses.map((row: any) => ({
       id: row.id,
-      description: row.description,
+      description: formatPaymentNotesLabel(row.description, row.description || '—'),
       amount: parseFloat(row.amount),
       category: row.category,
       buildingName: row.building_name,
@@ -964,7 +988,7 @@ export async function generateExpenseReportByPeriod(
       expenseDate: row.expense_date,
       vendorName: row.vendor_name,
       expenseStatus: row.expense_status,
-      notes: row.notes || undefined,
+      notes: formatPaymentNotesForPeople(row.notes) || undefined,
     }));
 
     // Monthly trend per category (for multi-line chart)
@@ -1258,6 +1282,7 @@ export async function generateCollectedAmountReport(
       FROM payments p
       WHERE p.payment_date BETWEEN $1 AND $2
         AND p.payment_status = 'paid'
+        AND ${PAYMENT_IS_REVENUE_UNIT}
       ORDER BY p.payment_date ASC
     `;
     
@@ -1275,10 +1300,11 @@ export async function generateCollectedAmountReport(
     const prevEndDate = startDate;
     
     const prevPaymentsQuery = `
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM payments
-      WHERE payment_date BETWEEN $1 AND $2
-        AND payment_status = 'paid'
+      SELECT COALESCE(SUM(p.amount), 0) as total
+      FROM payments p
+      WHERE p.payment_date BETWEEN $1 AND $2
+        AND p.payment_status = 'paid'
+        AND ${PAYMENT_IS_REVENUE_UNIT}
     `;
     
     const prevResult = await client.query(prevPaymentsQuery, [prevStartDate, prevEndDate]);
@@ -1380,6 +1406,11 @@ export async function generateCollectedAmountReport(
     const timeline = Array.from(timelineMap.entries())
       .map(([date, data]) => ({ date, amount: data.amount, count: data.count }))
       .sort((a, b) => a.date.localeCompare(b.date));
+
+    const lifetime = await previewLifetimeCollection({
+      startDate,
+      endDate,
+    });
     
     return {
       summary: {
@@ -1389,6 +1420,13 @@ export async function generateCollectedAmountReport(
         period: `${startDate} to ${endDate}`,
         previousPeriodCollected,
         growth,
+      },
+      lifetime: {
+        previousTotal: lifetime.previousTotal,
+        currentPeriodCollection: lifetime.currentPeriodCollection,
+        overallCollection: lifetime.overallCollection,
+        alreadyCommitted: lifetime.alreadyCommitted,
+        asOfDate: lifetime.asOfDate,
       },
       byPeriod,
       byPaymentMethod,
@@ -1595,6 +1633,7 @@ export async function generateDepositReport(
 
 /**
  * Generate Vacant Rooms Report
+ * daysVacant from last move-out (assignment end_date); lost rent = days × (rent/30)
  */
 export async function generateVacantRoomsReport(
   filters?: { buildingId?: string }
@@ -1614,58 +1653,107 @@ export async function generateVacantRoomsReport(
         b.name as building_name,
         b.address_line1,
         b.city,
-        CASE 
-          WHEN tra.end_date IS NOT NULL THEN (CURRENT_DATE - tra.end_date)
+        last_asn.end_date AS last_move_out_date,
+        GREATEST(
+          0,
+          (
+            CURRENT_DATE - COALESCE(last_asn.end_date, r.updated_at::date)
+          )
+        )::int AS days_vacant,
+        CASE
+          WHEN last_t.id IS NOT NULL THEN last_t.first_name || ' ' || last_t.last_name
           ELSE NULL
-        END as days_vacant,
-        t.first_name || ' ' || t.last_name as last_tenant_name
+        END AS last_tenant_name,
+        COALESCE((
+          SELECT SUM(ub.amount)
+          FROM utility_bills ub
+          WHERE ub.room_id = r.id
+            AND COALESCE(ub.cost_bearer, 'TENANT') = 'OWNER'
+            AND COALESCE(ub.bill_status, 'pending') IS DISTINCT FROM 'cancelled'
+        ), 0)::float AS owner_absorbed_utility
       FROM rooms r
       INNER JOIN buildings b ON r.building_id = b.id
-      LEFT JOIN tenant_room_assignments tra ON r.id = tra.room_id 
-        AND tra.assignment_status = 'active'
-      LEFT JOIN tenants t ON tra.tenant_id = t.id
+      LEFT JOIN LATERAL (
+        SELECT tra.end_date, tra.tenant_id
+        FROM tenant_room_assignments tra
+        WHERE tra.room_id = r.id
+          AND tra.end_date IS NOT NULL
+        ORDER BY tra.end_date DESC
+        LIMIT 1
+      ) last_asn ON true
+      LEFT JOIN tenants last_t ON last_t.id = last_asn.tenant_id
       WHERE r.room_status = 'vacant' AND r.is_active = true
+        AND ${ROOM_IS_REVENUE}
     `;
     
-    const params: any[] = [];
+    const params: unknown[] = [];
     if (filters?.buildingId) {
       query += ` AND b.id = $1`;
       params.push(filters.buildingId);
     }
     
-    query += ` ORDER BY b.name, r.room_number`;
+    query += ` ORDER BY days_vacant DESC NULLS LAST, b.name, r.room_number`;
     
     const result = await client.query(query, params);
     
-    const rooms = result.rows.map(row => ({
-      id: row.id,
-      roomNumber: row.room_number,
-      buildingName: row.building_name,
-      buildingId: row.building_id,
-      floorNumber: row.floor_number,
-      roomType: row.room_type,
-      monthlyRate: parseFloat(row.monthly_rate || 0),
-      daysVacant: row.days_vacant ? parseInt(row.days_vacant) : undefined,
-      lastTenantName: row.last_tenant_name || undefined,
-      maintenanceStatus: row.room_status,
-    }));
+    const rooms = result.rows.map((row) => {
+      const monthlyRate = parseFloat(row.monthly_rate || 0);
+      const daysVacant =
+        row.days_vacant != null ? parseInt(String(row.days_vacant), 10) : undefined;
+      return {
+        id: row.id,
+        roomNumber: row.room_number,
+        buildingName: row.building_name,
+        buildingId: row.building_id,
+        floorNumber: row.floor_number,
+        roomType: row.room_type,
+        monthlyRate,
+        daysVacant,
+        estimatedLostRent:
+          daysVacant != null
+            ? estimateLostRent(daysVacant, monthlyRate)
+            : undefined,
+        lastMoveOutDate: row.last_move_out_date
+          ? String(row.last_move_out_date).slice(0, 10)
+          : undefined,
+        lastTenantName: row.last_tenant_name || undefined,
+        ownerAbsorbedUtility: parseFloat(String(row.owner_absorbed_utility || 0)),
+        maintenanceStatus: row.room_status,
+      };
+    });
     
     const totalRoomsQuery = `
       SELECT COUNT(*) as total
-      FROM rooms
-      WHERE is_active = true
-      ${filters?.buildingId ? 'AND building_id = $1' : ''}
+      FROM rooms r
+      WHERE r.is_active = true
+        AND ${ROOM_IS_REVENUE}
+      ${filters?.buildingId ? 'AND r.building_id = $1' : ''}
     `;
     
-    const totalRoomsResult = await client.query(totalRoomsQuery, filters?.buildingId ? [filters.buildingId] : []);
+    const totalRoomsResult = await client.query(
+      totalRoomsQuery,
+      filters?.buildingId ? [filters.buildingId] : []
+    );
     const totalRooms = parseInt(totalRoomsResult.rows[0].total || 0);
     
     const totalVacant = rooms.length;
     const vacancyRate = totalRooms > 0 ? (totalVacant / totalRooms) * 100 : 0;
-    const averageMonthlyRate = rooms.length > 0
-      ? rooms.reduce((sum, r) => sum + r.monthlyRate, 0) / rooms.length
-      : 0;
-    const totalPotentialRevenue = rooms.reduce((sum, r) => sum + r.monthlyRate, 0);
+    const averageMonthlyRate =
+      rooms.length > 0
+        ? rooms.reduce((sum, r) => sum + r.monthlyRate, 0) / rooms.length
+        : 0;
+    const totalPotentialRevenue = rooms.reduce(
+      (sum, r) => sum + r.monthlyRate,
+      0
+    );
+    const totalEstimatedLostRent = rooms.reduce(
+      (sum, r) => sum + (r.estimatedLostRent || 0),
+      0
+    );
+    const totalOwnerAbsorbedUtility = rooms.reduce(
+      (sum, r) => sum + (r.ownerAbsorbedUtility || 0),
+      0
+    );
     
     return {
       summary: {
@@ -1674,6 +1762,8 @@ export async function generateVacantRoomsReport(
         vacancyRate,
         averageMonthlyRate,
         totalPotentialRevenue,
+        totalEstimatedLostRent,
+        totalOwnerAbsorbedUtility,
       },
       rooms,
     };

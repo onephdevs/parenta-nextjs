@@ -10,6 +10,8 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { compareByRoomThenName } from '@/lib/utils/natural-sort';
+import { PAYMENT_METHOD_SELECT_OPTIONS } from '@/lib/constants/payment-methods';
 
 interface Tenant {
   id: string;
@@ -17,14 +19,37 @@ interface Tenant {
   lastName: string;
   email: string;
   currentRoomId?: string;
+  currentRoomNumber?: string;
+  currentBuildingId?: string;
+  currentBuildingName?: string;
   buildingName?: string;
   roomNumber?: string;
+}
+
+function hasActiveRoom(tenant: Tenant | null | undefined): boolean {
+  if (!tenant) return false;
+  return Boolean(
+    tenant.currentRoomId ||
+      tenant.currentRoomNumber ||
+      tenant.roomNumber
+  );
+}
+
+function tenantRoomLabel(tenant: Tenant): string {
+  const building =
+    tenant.currentBuildingName || tenant.buildingName || '';
+  const room = tenant.currentRoomNumber || tenant.roomNumber || '';
+  if (building && room) return `${building} · Unit ${room}`;
+  if (room) return `Unit ${room}`;
+  if (building) return building;
+  return '';
 }
 
 interface PaymentFormData {
   tenantId: string;
   amount: string;
   depositAmount: string;
+  useDeposit: boolean;
   type: string;
   paymentDate: string;
   description: string;
@@ -95,6 +120,7 @@ export default function PaymentForm({
     tenantId: initialData?.tenantId || '',
     amount: initialData?.amount || '',
     depositAmount: initialData?.depositAmount || '0',
+    useDeposit: initialData?.useDeposit !== false,
     type: initialData?.type || 'rent',
     paymentDate: initialData?.paymentDate || new Date().toISOString().split('T')[0],
     description: initialData?.description || '',
@@ -103,8 +129,9 @@ export default function PaymentForm({
     invoiceId: initialData?.invoiceId,
     invoiceNumber: initialData?.invoiceNumber,
   });
+  const [depositBalance, setDepositBalance] = useState<number | null>(null);
 
-  const [errors, setErrors] = useState<Partial<PaymentFormData>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Load tenants on mount
   useEffect(() => {
@@ -130,14 +157,43 @@ export default function PaymentForm({
           
           // Ensure it's always an array
           let list = Array.isArray(tenantsList) ? tenantsList : [];
+          // Normalize assignment fields from API (camelCase variants)
+          list = list.map((t) => {
+            const raw = t as Tenant & Record<string, unknown>;
+            return {
+              ...raw,
+              currentRoomId:
+                raw.currentRoomId ||
+                (raw.current_room_id as string | undefined),
+              currentRoomNumber:
+                raw.currentRoomNumber ||
+                (raw.current_room_number as string | undefined) ||
+                raw.roomNumber,
+              currentBuildingId:
+                raw.currentBuildingId ||
+                (raw.current_building_id as string | undefined) ||
+                (raw.buildingId as string | undefined),
+              currentBuildingName:
+                raw.currentBuildingName ||
+                (raw.current_building_name as string | undefined) ||
+                raw.buildingName,
+              roomNumber:
+                raw.roomNumber ||
+                raw.currentRoomNumber ||
+                (raw.current_room_number as string | undefined),
+              buildingName:
+                raw.buildingName ||
+                raw.currentBuildingName ||
+                (raw.current_building_name as string | undefined),
+            };
+          });
           if (buildingId) {
             const filtered = list.filter(
-              (t) =>
-                (t as Tenant & { currentBuildingId?: string }).currentBuildingId === buildingId ||
-                (t as Tenant & { buildingId?: string }).buildingId === buildingId
+              (t) => t.currentBuildingId === buildingId
             );
             if (filtered.length > 0) list = filtered;
           }
+          list = [...list].sort(compareByRoomThenName);
           setTenants(list);
         } else {
           console.error('Failed to fetch tenants:', tenantsRes.status);
@@ -163,8 +219,41 @@ export default function PaymentForm({
     }
   }, [formData.tenantId, tenants]);
 
+  // Load deposit balance for auto-deduct warning
+  useEffect(() => {
+    if (!formData.tenantId) {
+      setDepositBalance(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/deposit-ledger/${encodeURIComponent(formData.tenantId)}?type=balance`
+        );
+        if (!res.ok) {
+          if (!cancelled) setDepositBalance(null);
+          return;
+        }
+        const data = await res.json();
+        const bal =
+          typeof data?.data === 'number'
+            ? data.data
+            : data?.data?.balance ?? data?.balance ?? null;
+        if (!cancelled) {
+          setDepositBalance(bal != null ? Number(bal) : null);
+        }
+      } catch {
+        if (!cancelled) setDepositBalance(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.tenantId]);
+
   const validateForm = (): boolean => {
-    const newErrors: Partial<PaymentFormData> = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.tenantId) newErrors.tenantId = 'Tenant is required';
     if (!formData.amount) {
@@ -212,7 +301,7 @@ export default function PaymentForm({
         
         // Try to get tenant's current room assignment (optional)
         let roomAssignmentId: string | undefined;
-        if (selectedTenant?.currentRoomId) {
+        if (selectedTenant && hasActiveRoom(selectedTenant)) {
           // If we have currentRoomId, try to fetch the assignment ID
           try {
             const tenantRes = await fetch(`/api/tenants/${formData.tenantId}`);
@@ -252,6 +341,7 @@ export default function PaymentForm({
         if (depositAmount > 0) {
           paymentPayload.depositAmount = depositAmount;
         }
+        paymentPayload.useDeposit = formData.useDeposit;
 
         const response = await fetch('/api/payments', {
           method: 'POST',
@@ -339,8 +429,12 @@ export default function PaymentForm({
 
   const handleInputChange = (field: keyof PaymentFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+    if (errors[field as string]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field as string];
+        return next;
+      });
     }
   };
 
@@ -394,23 +488,30 @@ export default function PaymentForm({
             >
               <option value="">Select a tenant</option>
               {Array.isArray(tenants) && tenants.length > 0 ? (
-                tenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.firstName} {tenant.lastName}
-                    {tenant.currentRoomId &&
-                      ` (${tenant.buildingName} ${tenant.roomNumber})`}
-                  </option>
-                ))
+                tenants.map((tenant) => {
+                  const unit = tenantRoomLabel(tenant);
+                  return (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.firstName} {tenant.lastName}
+                      {unit ? ` (${unit})` : ''}
+                    </option>
+                  );
+                })
               ) : (
                 <option value="" disabled>
                   Loading tenants...
                 </option>
               )}
             </Select>
-            {selectedTenant && !selectedTenant.currentRoomId && (
+            {selectedTenant && !hasActiveRoom(selectedTenant) && (
               <p className="mt-2 text-sm text-blue-600">
                 This tenant is not currently assigned to a room. Payment can still be recorded,
                 but it won&apos;t be automatically allocated to invoices.
+              </p>
+            )}
+            {selectedTenant && hasActiveRoom(selectedTenant) && (
+              <p className="mt-2 text-sm text-gray-600">
+                Assigned to {tenantRoomLabel(selectedTenant)}
               </p>
             )}
           </FormField>
@@ -506,6 +607,28 @@ export default function PaymentForm({
               </Alert>
             )}
 
+            {depositBalance != null && depositBalance > 0 && (
+              <div className="col-span-6 space-y-2">
+                <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={formData.useDeposit}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, useDeposit: e.target.checked }))
+                    }
+                  />
+                  <span>
+                    <span className="font-medium">Apply deposit balance to unpaid invoices</span>
+                    <span className="mt-1 block text-amber-900/80">
+                      Available deposit: ₱{depositBalance.toLocaleString()}. Cash is applied
+                      first; any shortfall is taken from deposit (collections warning).
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
+
             <FormField
               label="Payment Type"
               htmlFor="type"
@@ -563,11 +686,11 @@ export default function PaymentForm({
                 onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
                 isInvalid={Boolean(errors.paymentMethod)}
               >
-                <option value="cash">Cash</option>
-                <option value="check">Check</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="credit_card">Credit Card</option>
-                <option value="online">Online Payment</option>
+                {PAYMENT_METHOD_SELECT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </Select>
             </FormField>
 

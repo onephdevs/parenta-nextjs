@@ -12,17 +12,73 @@ export const BILL_STATUSES = ['pending', 'paid', 'overdue'] as const;
 export type BillStatus = (typeof BILL_STATUSES)[number];
 
 export const ALLOCATION_METHODS = [
+  'SUBMETERED',
+  'SHARED_MANUAL',
+  'NOT_APPLICABLE',
+  // Legacy aliases (still accepted on read/write during transition)
   'per_unit_metered',
   'split_evenly',
   'flat',
 ] as const;
 export type AllocationMethod = (typeof ALLOCATION_METHODS)[number];
 
-export const ALLOCATION_METHOD_LABELS: Record<AllocationMethod, string> = {
+/** Canonical methods from client discovery Phase 1 */
+export const CANONICAL_ALLOCATION_METHODS = [
+  'SUBMETERED',
+  'SHARED_MANUAL',
+  'NOT_APPLICABLE',
+] as const;
+export type CanonicalAllocationMethod = (typeof CANONICAL_ALLOCATION_METHODS)[number];
+
+export const ALLOCATION_METHOD_LABELS: Record<string, string> = {
+  SUBMETERED: 'Submetered (per-unit meter)',
+  SHARED_MANUAL: 'Shared — manual split',
+  NOT_APPLICABLE: 'Not applicable (own account)',
   per_unit_metered: 'Per-unit metered',
   split_evenly: 'Split evenly across units',
   flat: 'Flat (building-wide / common area)',
 };
+
+export const UTILITY_APPLICABILITY_STATUSES = ['APPLICABLE', 'NOT_APPLICABLE'] as const;
+export type UtilityApplicabilityStatus = (typeof UTILITY_APPLICABILITY_STATUSES)[number];
+
+export function toCanonicalAllocationMethod(
+  raw: string | null | undefined
+): CanonicalAllocationMethod {
+  const key = (raw || '').trim();
+  const upper = key.toUpperCase();
+  if (upper === 'SUBMETERED' || key === 'per_unit_metered' || key === 'usage') {
+    return 'SUBMETERED';
+  }
+  if (
+    upper === 'SHARED_MANUAL' ||
+    key === 'split_evenly' ||
+    key === 'equal' ||
+    key === 'room_size' ||
+    key === 'custom'
+  ) {
+    return 'SHARED_MANUAL';
+  }
+  if (upper === 'NOT_APPLICABLE') {
+    return 'NOT_APPLICABLE';
+  }
+  if (key === 'flat') return 'SHARED_MANUAL';
+  return 'SUBMETERED';
+}
+
+/** Format amount for UI: N/A → em dash, else currency-ready number string. */
+export function formatUtilityAmountDisplay(
+  applicabilityStatus: string | null | undefined,
+  amount: number | null | undefined
+): string {
+  if (String(applicabilityStatus || '').toUpperCase() === 'NOT_APPLICABLE') {
+    return '–';
+  }
+  if (amount == null || Number.isNaN(Number(amount))) {
+    return '–';
+  }
+  return String(amount);
+}
 
 /** Canonical expense categories — free-typed values map to OTHER in reports */
 export const EXPENSE_CATEGORIES = [
@@ -31,6 +87,10 @@ export const EXPENSE_CATEGORIES = [
   'repair',
   'upgrade',
   'garbage_collection',
+  'food_allowance',
+  'fuel_diesel',
+  'staff_salary',
+  'refund',
   'other',
 ] as const;
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
@@ -41,6 +101,10 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   repair: 'Repair',
   upgrade: 'Upgrade',
   garbage_collection: 'Garbage collection',
+  food_allowance: 'Food allowance',
+  fuel_diesel: 'Fuel / diesel',
+  staff_salary: 'Staff salary',
+  refund: 'Refund',
   other: 'Other',
 };
 
@@ -53,6 +117,10 @@ export const REPORT_CATEGORY_ORDER = [
   'repair',
   'upgrade',
   'garbage_collection',
+  'food_allowance',
+  'fuel_diesel',
+  'staff_salary',
+  'refund',
   'other',
 ] as const;
 
@@ -65,7 +133,16 @@ export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
 };
 
 export function normalizeExpenseCategory(raw: string | null | undefined): ExpenseCategory {
-  const key = (raw || 'other').toLowerCase().trim().replace(/\s+/g, '_');
+  let key = (raw || 'other').toLowerCase().trim().replace(/\s+/g, '_');
+  // Accept SCREAMING_SNAKE from client docs
+  const upperAliases: Record<string, ExpenseCategory> = {
+    food_allowance: 'food_allowance',
+    fuel_diesel: 'fuel_diesel',
+    staff_salary: 'staff_salary',
+    refund: 'refund',
+    garbage_collection: 'garbage_collection',
+  };
+  if (upperAliases[key]) return upperAliases[key];
   if ((EXPENSE_CATEGORIES as readonly string[]).includes(key)) {
     return key as ExpenseCategory;
   }
@@ -96,11 +173,15 @@ export function normalizeAllocationMethod(
   raw: string | null | undefined,
   hasUnit: boolean
 ): AllocationMethod {
-  const key = (raw || '').toLowerCase().trim();
+  const key = (raw || '').trim();
   if ((ALLOCATION_METHODS as readonly string[]).includes(key)) {
     return key as AllocationMethod;
   }
-  return hasUnit ? 'per_unit_metered' : 'flat';
+  const canonical = toCanonicalAllocationMethod(raw);
+  if (!hasUnit && canonical === 'SUBMETERED') {
+    return 'SHARED_MANUAL';
+  }
+  return canonical;
 }
 
 export type ReportView = 'summary' | 'detail';

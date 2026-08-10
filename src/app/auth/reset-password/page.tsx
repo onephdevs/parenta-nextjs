@@ -11,24 +11,10 @@ import {
   AuthPrimaryButton,
 } from '@/components/features/auth/AuthFields';
 
-type Role = 'admin' | 'tenant' | 'staff';
-
-const signInPaths: Record<Role, string> = {
-  admin: '/auth/admin/signin',
-  tenant: '/auth/tenant/signin',
-  staff: '/auth/staff/signin',
-};
-
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token') || '';
-  const roleParam = searchParams.get('role');
-  const role: Role =
-    roleParam === 'admin' || roleParam === 'tenant' || roleParam === 'staff'
-      ? roleParam
-      : 'tenant';
-  const signInHref = signInPaths[role];
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -56,12 +42,8 @@ function ResetPasswordContent() {
       }
 
       setSuccess(data.message);
-      const nextRole: Role =
-        data.role === 'admin' || data.role === 'tenant' || data.role === 'staff'
-          ? data.role
-          : role;
       setTimeout(() => {
-        router.push(signInPaths[nextRole]);
+        router.push('/auth/signin');
       }, 1500);
     } catch {
       setError('Unable to reset password. Please try again.');
@@ -84,7 +66,7 @@ function ResetPasswordContent() {
               password page.
             </p>
           </div>
-          <Link href={`/auth/forgot-password?role=${role}`}>
+          <Link href="/auth/forgot-password">
             <AuthPrimaryButton type="button">Request a new reset link</AuthPrimaryButton>
           </Link>
         </div>
@@ -147,7 +129,7 @@ function ResetPasswordContent() {
 
         <p className="mt-8 text-center text-sm text-gray-600">
           <Link
-            href={signInHref}
+            href="/auth/signin"
             className="font-semibold text-[#3B82F6] hover:text-blue-600"
           >
             Back to Login

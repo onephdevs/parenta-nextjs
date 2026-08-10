@@ -23,6 +23,8 @@ export interface Building {
   vacantUnits?: number;
   amenities: string[];
   isActive: boolean;
+  /** When false, skip automatic late fees; use negotiated due-date workflow. */
+  autoLateFee: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +46,7 @@ export interface DatabaseBuilding {
   active_units: number;
   amenities: string[];
   is_active: boolean;
+  auto_late_fee?: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -66,6 +69,8 @@ export interface Room {
   description?: string;
   amenities: string;
   isActive: boolean;
+  /** false = ADMIN/owner-use: utilities only, excluded from rent collection */
+  isRevenueUnit: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +79,7 @@ export interface DatabaseRoom {
   id: string;
   building_id: string;
   building_name?: string;
+  is_revenue_unit?: boolean;
   room_number: string;
   floor_number?: number;
   room_type: string;
@@ -118,6 +124,7 @@ export interface Tenant {
   updatedAt: Date;
   /** Present on list queries with active assignment join */
   currentMonthlyRent?: number;
+  currentRoomId?: string;
   currentRoomNumber?: string;
   currentBuildingName?: string;
   currentBuildingId?: string;
@@ -162,6 +169,8 @@ export interface TenantRoomAssignment {
   utilityDepositPaid?: number;
   depositValidUntil?: Date;
   depositRefundable?: boolean;
+  /** Day of month billing cycle starts (from move-in). */
+  billingCycleStartDay?: number;
   assignmentStatus: 'active' | 'terminated' | 'pending';
   notes?: string;
   createdAt: Date;
@@ -259,6 +268,7 @@ export interface DatabaseTenantRoomAssignment {
   utility_deposit_paid?: number;
   deposit_valid_until?: Date;
   deposit_refundable?: boolean;
+  billing_cycle_start_day?: number;
   assignment_status: 'active' | 'terminated' | 'pending';
   notes?: string;
   created_at: Date;
@@ -391,6 +401,9 @@ export interface Expense {
   buildingName?: string;
   buildingAddress?: string;
   roomNumber?: string;
+  tenantId?: string;
+  relatedMoveoutId?: string;
+  relatedAssignmentId?: string;
 }
 
 export interface DatabaseExpense {
@@ -675,6 +688,7 @@ export interface CreateBuildingData {
   yearBuilt?: number;
   totalFloors?: number;
   amenities?: string;
+  autoLateFee?: boolean;
 }
 
 export interface CreateRoomData {
@@ -688,6 +702,9 @@ export interface CreateRoomData {
   depositType?: 'fixed' | 'percentage' | 'one_month';
   depositFixedAmount?: number;
   depositPercentage?: number;
+  depositAmount?: number;
+  /** When false, unit is owner/ADMIN space — utilities only, excluded from rent revenue. */
+  isRevenueUnit?: boolean;
   roomStatus?: 'vacant' | 'occupied' | 'maintenance' | 'reserved';
   description?: string;
   amenities?: string;

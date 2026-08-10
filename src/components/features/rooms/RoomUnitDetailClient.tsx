@@ -193,6 +193,9 @@ export default function RoomUnitDetailClient({ detail: initialDetail }: RoomUnit
         onDocumentsChanged={() => {
           void refresh();
         }}
+        onTenantCreated={() => {
+          void refresh();
+        }}
       />
 
       <section id="photos" className="scroll-mt-6">

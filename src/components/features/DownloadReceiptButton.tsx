@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface DownloadReceiptButtonProps {
   paymentId: string;
@@ -14,6 +15,7 @@ export default function DownloadReceiptButton({
 }: DownloadReceiptButtonProps) {
   const [loading, setLoading] = useState(false);
   const { showNotification } = useNotifications();
+  const { open: openLightbox } = useImageLightbox();
 
   const handleDownload = async () => {
     if (!hasReceipt) {
@@ -39,6 +41,22 @@ export default function DownloadReceiptButton({
       const fileName = match?.[1] || `receipt-${paymentId}.pdf`;
 
       const url = URL.createObjectURL(blob);
+
+      if (
+        looksLikeImage({
+          mimeType: blob.type,
+          fileName,
+        })
+      ) {
+        openLightbox({ src: url, alt: fileName, title: fileName });
+        showNotification({
+          type: 'success',
+          title: 'Receipt opened',
+          message: 'Use zoom controls in the viewer, or close when done.',
+        });
+        return;
+      }
+
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
@@ -78,7 +96,7 @@ export default function DownloadReceiptButton({
           d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
         />
       </svg>
-      {loading ? 'Downloading...' : 'Download Receipt'}
+      {loading ? 'Opening…' : 'View / Download Receipt'}
     </button>
   );
 }

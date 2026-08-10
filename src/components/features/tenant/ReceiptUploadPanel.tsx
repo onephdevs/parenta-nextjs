@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
-import { Upload, X, FileText, ImagePlus } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Upload } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { FileDropzone } from '@/components/ui/FileDropzone';
 import { FormField } from '@/components/forms/FormField';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
+import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 
 export interface ReceiptLinkOption {
   /** Unique select value, e.g. payment:uuid | invoice:uuid | custom */
@@ -43,18 +43,27 @@ export function ReceiptUploadPanel({
 }: ReceiptUploadPanelProps) {
   const theme = useTenantTheme();
   const { showNotification } = useNotifications();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectable = useMemo(
-    () => [...options, { value: 'custom', label: 'Other / custom payment date', kind: 'custom' as const }],
+    () => [
+      ...options,
+      {
+        value: 'custom',
+        label: 'Other / custom payment date',
+        kind: 'custom' as const,
+      },
+    ],
     [options]
   );
 
   const [linkValue, setLinkValue] = useState(selectable[0]?.value || 'custom');
-  const selected = selectable.find((o) => o.value === linkValue) || selectable[selectable.length - 1];
+  const selected =
+    selectable.find((o) => o.value === linkValue) ||
+    selectable[selectable.length - 1];
 
   const [paymentDate, setPaymentDate] = useState(
-    toDateInputValue(selected?.defaultDate) || new Date().toISOString().slice(0, 10)
+    toDateInputValue(selected?.defaultDate) ||
+      new Date().toISOString().slice(0, 10)
   );
   const [amount, setAmount] = useState(
     selected?.defaultAmount != null && selected.defaultAmount > 0
@@ -62,8 +71,8 @@ export function ReceiptUploadPanel({
       : ''
   );
   const [notes, setNotes] = useState('');
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleLinkChange = (value: string) => {
@@ -77,48 +86,22 @@ export function ReceiptUploadPanel({
     }
   };
 
-  const handleFileSelect = (file: File) => {
-    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      showNotification({
-        type: 'error',
-        title: 'Invalid file',
-        message: 'Please upload a PDF, JPEG, PNG, or WEBP file',
-      });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showNotification({
-        type: 'error',
-        title: 'File too large',
-        message: 'File size must be less than 5MB',
-      });
-      return;
-    }
-
-    setSelectedFile(file);
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setPreview(null);
-    }
-  };
-
-  const clearFile = () => {
-    setSelectedFile(null);
-    setPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) {
       showNotification({
         type: 'error',
         title: 'Missing image',
-        message: 'Choose a receipt image or PDF to upload',
+        message: 'Take a photo or choose a receipt image / PDF',
+      });
+      return;
+    }
+
+    if (!referenceNumber.trim()) {
+      showNotification({
+        type: 'error',
+        title: 'Reference required',
+        message: 'Enter the transaction / reference number from your receipt',
       });
       return;
     }
@@ -147,6 +130,7 @@ export function ReceiptUploadPanel({
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('referenceNumber', referenceNumber.trim());
       if (selected?.kind === 'payment' && selected.paymentId) {
         formData.append('paymentId', selected.paymentId);
       } else if (selected?.kind === 'invoice' && selected.invoiceId) {
@@ -177,10 +161,12 @@ export function ReceiptUploadPanel({
       showNotification({
         type: 'success',
         title: 'Receipt uploaded',
-        message: 'Your receipt was linked to the selected payment date',
+        message:
+          'Submitted for verification. Balance updates after the office confirms the transaction ID.',
       });
-      clearFile();
+      setSelectedFile(null);
       setNotes('');
+      setReferenceNumber('');
       onUploadComplete?.();
     } catch (error) {
       console.error('Receipt upload error:', error);
@@ -196,21 +182,11 @@ export function ReceiptUploadPanel({
 
   return (
     <form onSubmit={handleSubmit} className={cn(theme.formPanel, 'p-4 sm:p-6', className)}>
-      <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">Upload receipt</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Attach a photo or PDF and link it to the payment date it belongs to.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          leftIcon={<ImagePlus className="h-4 w-4" />}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          Choose image
-        </Button>
+      <div className="mb-5">
+        <h3 className="text-lg font-medium text-gray-900">Upload receipt</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Take a photo or choose a file, then link it to the payment it belongs to.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -253,68 +229,50 @@ export function ReceiptUploadPanel({
         )}
 
         <FormField
-          label="Notes (optional)"
-          htmlFor="receipt-notes"
-          className={selected?.kind === 'payment' ? 'sm:col-span-2' : undefined}
+          label="Reference / transaction number"
+          htmlFor="receipt-reference"
+          required
+          hint="From your GCash, Maya, or bank transfer confirmation"
+          className="sm:col-span-2"
         >
+          <Input
+            id="receipt-reference"
+            value={referenceNumber}
+            onChange={(e) => setReferenceNumber(e.target.value)}
+            placeholder="e.g. 1234567890"
+            required
+          />
+        </FormField>
+
+        <FormField label="Notes (optional)" htmlFor="receipt-notes" className="sm:col-span-2">
           <Textarea
             id="receipt-notes"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Bank transfer reference, remittance details, etc."
+            placeholder="Additional details about this payment..."
           />
         </FormField>
       </div>
 
-      {selectedFile ? (
-        <div className="mt-5 rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-6 text-center">
-          <div className="space-y-3">
-            {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preview}
-                alt="Receipt preview"
-                className="mx-auto max-h-48 rounded-md object-contain"
-              />
-            ) : (
-              <FileText className="mx-auto h-10 w-10 text-gray-400" />
-            )}
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-700">
-              <span className="truncate max-w-xs">{selectedFile.name}</span>
-              <button
-                type="button"
-                aria-label="Remove file"
-                onClick={clearFile}
-                className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <FileDropzone
-          className="mt-5"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
-          inputRef={fileInputRef}
-          onFiles={(files) => handleFileSelect(files[0])}
-          label="Drop receipt here or click to browse"
-          hint="PDF, JPEG, PNG, WEBP · max 5MB"
-          icon={<Upload className="mx-auto mb-3 h-8 w-8 text-gray-400" />}
+      <div className="mt-5">
+        <ReceiptImageField
+          file={selectedFile}
+          onChange={setSelectedFile}
+          disabled={isUploading}
         />
-      )}
+      </div>
 
       <div className="mt-5 flex justify-end">
         <Button
           type="submit"
           variant="success"
           isLoading={isUploading}
-          disabled={isUploading || !selectedFile}
+          disabled={isUploading || !selectedFile || !referenceNumber.trim()}
           leftIcon={<Upload className="h-4 w-4" />}
           className={theme.primaryButton}
         >
-          Upload & link receipt
+          Submit for verification
         </Button>
       </div>
     </form>

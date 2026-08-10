@@ -7,6 +7,8 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Alert } from '@/components/ui/Alert';
 import { FileDropzone } from '@/components/ui/FileDropzone';
 import { Progress } from '@/components/ui/Progress';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
+import { LightboxImage } from '@/components/ui/ImageLightbox';
 
 // Supported image types
 const SUPPORTED_IMAGE_TYPES = [
@@ -465,6 +467,15 @@ export default function ImageUpload({
         }
         hint={`JPEG, PNG, GIF, WebP up to ${MAX_IMAGE_SIZE / 1024 / 1024}MB each`}
       />
+      <div className="flex flex-wrap gap-2">
+        <TakePhotoButton
+          disabled={files.length >= maxImages || isUploading}
+          onCapture={(file) => void handleFileSelect([file])}
+          title="Take property photo"
+          description="Allow camera access if prompted, then capture."
+          fileNamePrefix={`${entityType}-photo`}
+        />
+      </div>
 
       {/* Selected Images Preview */}
       {files.length > 0 && (
@@ -479,35 +490,30 @@ export default function ImageUpload({
                   file.error ? 'ring-2 ring-red-500 bg-red-50' : 'bg-white'
                 }`}>
                   {file.preview ? (
-                    <img
+                    <LightboxImage
                       src={file.preview}
                       alt={file.name}
-                      className={`w-full h-full object-cover ${file.error ? 'opacity-50' : ''}`}
-                      style={{ 
-                        display: 'block',
-                        position: 'relative',
-                        zIndex: 10,
-                        backgroundColor: 'transparent'
+                      title={file.name}
+                      gallery={files
+                        .filter((f) => f.preview)
+                        .map((f) => ({
+                          src: f.preview as string,
+                          alt: f.name,
+                          title: f.name,
+                        }))}
+                      galleryIndex={Math.max(
+                        0,
+                        files.filter((f) => f.preview).findIndex((f) => f.id === file.id)
+                      )}
+                      wrapperClassName="block h-full w-full focus:outline-none"
+                      className={`h-full w-full object-cover ${file.error ? 'opacity-50' : ''}`}
+                      onError={() => {
+                        setFiles((prev) =>
+                          prev.map((f) =>
+                            f.id === file.id ? { ...f, preview: undefined } : f
+                          )
+                        );
                       }}
-                      onLoad={(e) => {
-                        console.log('✅ Preview image loaded successfully for:', file.name);
-                        console.log('✅ Image URL:', file.preview);
-                        console.log('✅ Image dimensions:', e.currentTarget.naturalWidth, 'x', e.currentTarget.naturalHeight);
-                        console.log('✅ Image display size:', e.currentTarget.offsetWidth, 'x', e.currentTarget.offsetHeight);
-                        console.log('✅ Image computed style:', window.getComputedStyle(e.currentTarget).display);
-                      }}
-                      onError={(e) => {
-                        console.error('❌ Failed to display preview for:', file.name);
-                        console.error('❌ Preview URL:', file.preview);
-                        console.error('❌ URL type:', file.preview?.startsWith('blob:') ? 'blob URL' : 'other');
-                        console.error('❌ Error event:', e);
-                        // Set error state so placeholder shows
-                        setFiles(prev => prev.map(f => 
-                          f.id === file.id ? { ...f, preview: undefined } : f
-                        ));
-                      }}
-                      loading="eager"
-                      decoding="sync"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">

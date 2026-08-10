@@ -38,6 +38,7 @@ import { ReceiptUploadPanel, type ReceiptLinkOption } from '@/components/feature
 import PaymentForm from '@/components/features/tenant/PaymentForm';
 import DepositPaymentForm from '@/components/features/tenant/DepositPaymentForm';
 import UtilityDepositForm from '@/components/features/tenant/UtilityDepositForm';
+import { formatPaymentMethodLabel } from '@/lib/constants/payment-methods';
 import ManualPaymentForm from '@/components/features/tenant/ManualPaymentForm';
 import { TenantStatementsPanel } from '@/components/features/tenant/TenantStatementsPanel';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
@@ -50,6 +51,7 @@ import {
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 import { formatPaymentNotesLabel } from '@/lib/format-payment-notes';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 type PaymentTab = 'overview' | 'pay' | 'upload' | 'history' | 'statements';
 
@@ -228,6 +230,7 @@ export default function PaymentsPage() {
     preferPartial?: boolean;
   } | null>(null);
   const { showNotification } = useNotifications();
+  const { open: openLightbox } = useImageLightbox();
 
   useEffect(() => {
     if (gateLoading || status === 'loading') return;
@@ -354,9 +357,37 @@ export default function PaymentsPage() {
     fetchDepositData();
   };
 
-  const handleDownloadReceipt = (paymentId: string) => {
-    // Open receipt download in new tab
-    window.open(`/api/tenant/payments/${paymentId}/receipt`, '_blank');
+  const handleDownloadReceipt = async (paymentId: string, fileName?: string) => {
+    const receiptUrl = `/api/tenant/payments/${paymentId}/receipt`;
+    if (looksLikeImage({ fileName, url: receiptUrl })) {
+      openLightbox({
+        src: receiptUrl,
+        alt: fileName || 'Payment receipt',
+        title: fileName || 'Payment receipt',
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(receiptUrl);
+      if (!response.ok) {
+        window.open(receiptUrl, '_blank');
+        return;
+      }
+      const blob = await response.blob();
+      if (looksLikeImage({ mimeType: blob.type, fileName })) {
+        const objectUrl = URL.createObjectURL(blob);
+        openLightbox({
+          src: objectUrl,
+          alt: fileName || 'Payment receipt',
+          title: fileName || 'Payment receipt',
+        });
+        return;
+      }
+      window.open(receiptUrl, '_blank');
+    } catch {
+      window.open(receiptUrl, '_blank');
+    }
   };
 
   const handlePrintReceipt = (paymentId: string) => {
@@ -591,8 +622,8 @@ export default function PaymentsPage() {
                   </TableCell>
                   <TableCell>
                     {payment.method ? (
-                      <span className="capitalize">
-                        {String(payment.method).replace(/_/g, ' ')}
+                      <span>
+                        {formatPaymentMethodLabel(payment.method)}
                       </span>
                     ) : (
                       <span className="italic text-gray-400">-</span>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import AppLoader from '@/components/ui/AppLoader';
 import { Button } from '@/components/ui/Button';
+import { AddNotesButton, EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import { getImageUrl } from '@/lib/format/image-url';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 
@@ -172,6 +173,12 @@ export default function TenantProfileModal({
               <div className="flex flex-shrink-0 items-center gap-2">
                 {tenant && (
                   <>
+                    <AddNotesButton
+                      entityType="tenant"
+                      entityId={tenant.id}
+                      entityLabel={fullName}
+                      label="Add note"
+                    />
                     <Link href={`/admin/financial/payments/new?tenantId=${tenant.id}`}>
                       <Button
                         variant="outline"
@@ -365,14 +372,15 @@ export default function TenantProfileModal({
                     </section>
                   )}
 
-                  {tenant.notes && (
-                    <section className="overflow-hidden rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
-                      <h3 className="mb-3 text-sm font-bold text-gray-900">Notes</h3>
-                      <p className="whitespace-pre-wrap text-sm text-gray-700">
-                        {tenant.notes}
-                      </p>
-                    </section>
-                  )}
+                  <section className="overflow-hidden rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
+                    <EntityNotesPanel
+                      entityType="tenant"
+                      entityId={tenant.id}
+                      entityLabel={fullName}
+                      title="Notes"
+                      compact
+                    />
+                  </section>
                 </>
               )}
             </div>

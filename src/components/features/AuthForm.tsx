@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { getSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { homePathForRole } from '@/lib/auth/home-path';
 import type { UserRole } from '@/types/auth.types';
 
 interface AuthFormProps {
@@ -53,22 +53,17 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
           const signInResult = await signIn('credentials', {
             email: formData.email,
             password: formData.password,
-            role: formData.role,
             redirect: false,
           });
 
           if (signInResult?.ok) {
-            const redirectUrl = formData.role === 'admin' ? '/admin' : '/tenant';
-            router.push(redirectUrl);
+            const session = await getSession();
+            router.push(homePathForRole(session?.user?.role || formData.role));
             router.refresh();
           } else {
             setSuccess('Account created successfully! Please sign in.');
             setTimeout(() => {
-              const signInPath =
-                formData.role === 'admin'
-                  ? '/auth/admin/signin'
-                  : '/auth/tenant/signin';
-              router.push(signInPath);
+              router.push('/auth/signin');
             }, 2000);
           }
         } else {
@@ -78,15 +73,14 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
         const result = await signIn('credentials', {
           email: formData.email,
           password: formData.password,
-          role: formData.role,
           redirect: false,
         });
 
         if (result?.error) {
-          setError('Invalid credentials. Please check your email, password, and role.');
+          setError('Invalid credentials. Please check your email and password.');
         } else if (result?.ok) {
-          const redirectUrl = formData.role === 'admin' ? '/admin' : '/tenant';
-          router.push(redirectUrl);
+          const session = await getSession();
+          router.push(homePathForRole(session?.user?.role));
           router.refresh();
         }
       }
@@ -109,47 +103,34 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <FormField label="Role" htmlFor="role" required>
-          <Select
-            id="role"
-            name="role"
-            value={formData.role}
-            onChange={handleInputChange}
-            isDisabled={isLoading}
-          >
-            <option value="tenant">Tenant</option>
-            <option value="admin">Admin</option>
-          </Select>
-        </FormField>
-
         {mode === 'signup' && (
-          <FormField label="First Name" htmlFor="firstName" required>
-            <Input
-              id="firstName"
-              name="firstName"
-              type="text"
-              required
-              value={formData.firstName}
-              onChange={handleInputChange}
-              placeholder="Enter your first name"
-              isDisabled={isLoading}
-            />
-          </FormField>
-        )}
+          <>
+            <FormField label="First Name" htmlFor="firstName" required>
+              <Input
+                id="firstName"
+                name="firstName"
+                type="text"
+                required
+                value={formData.firstName}
+                onChange={handleInputChange}
+                placeholder="Enter your first name"
+                isDisabled={isLoading}
+              />
+            </FormField>
 
-        {mode === 'signup' && (
-          <FormField label="Last Name" htmlFor="lastName" required>
-            <Input
-              id="lastName"
-              name="lastName"
-              type="text"
-              required
-              value={formData.lastName}
-              onChange={handleInputChange}
-              placeholder="Enter your last name"
-              isDisabled={isLoading}
-            />
-          </FormField>
+            <FormField label="Last Name" htmlFor="lastName" required>
+              <Input
+                id="lastName"
+                name="lastName"
+                type="text"
+                required
+                value={formData.lastName}
+                onChange={handleInputChange}
+                placeholder="Enter your last name"
+                isDisabled={isLoading}
+              />
+            </FormField>
+          </>
         )}
 
         <FormField label="Email" htmlFor="email" required>
@@ -208,8 +189,8 @@ export function AuthForm({ mode, defaultRole = 'tenant' }: AuthFormProps) {
                 }
                 const signInPath =
                   formData.role === 'admin'
-                    ? '/auth/admin/signin'
-                    : '/auth/tenant/signin';
+                    ? '/auth/signin'
+                    : '/auth/signin';
                 router.push(signInPath);
               }}
               className="text-purple-600 hover:text-purple-500 font-medium"

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Copy, ImagePlus, Smartphone, Upload, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Copy, Smartphone } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -11,6 +11,8 @@ import { FormField } from '@/components/forms/FormField';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 import type { TenantPaymentInstructions } from '@/lib/tenant-payment-instructions-shared';
+import { DEFAULT_TENANT_PAYMENT_INSTRUCTIONS } from '@/lib/tenant-payment-instructions-shared';
+import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 
 interface Invoice {
   id: string;
@@ -59,7 +61,6 @@ export default function PaymentForm({
 }: PaymentFormProps) {
   const theme = useTenantTheme();
   const { showNotification } = useNotifications();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [instructions, setInstructions] = useState<
     (TenantPaymentInstructions & { configured?: boolean }) | null
@@ -74,7 +75,6 @@ export default function PaymentForm({
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [userEditedAmount, setUserEditedAmount] = useState(preferPartial);
 
@@ -131,7 +131,7 @@ export default function PaymentForm({
   const maxAmount = selectedInvoice ? selectedInvoice.balanceDue : 0;
   const acceptedMethods = (instructions?.acceptedMethods?.length
     ? instructions.acceptedMethods
-    : (['gcash', 'maya', 'bank_transfer'] as PayMethod[])) as PayMethod[];
+    : DEFAULT_TENANT_PAYMENT_INSTRUCTIONS.acceptedMethods) as PayMethod[];
 
   const handleCopy = async (value: string, label: string) => {
     try {
@@ -148,40 +148,6 @@ export default function PaymentForm({
         message: 'Could not copy to clipboard',
       });
     }
-  };
-
-  const handleFileSelect = (file: File) => {
-    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowed.includes(file.type)) {
-      showNotification({
-        type: 'error',
-        title: 'Invalid file',
-        message: 'Upload a JPEG, PNG, WEBP, or PDF screenshot of your receipt',
-      });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showNotification({
-        type: 'error',
-        title: 'File too large',
-        message: 'Receipt must be under 5MB',
-      });
-      return;
-    }
-    setSelectedFile(file);
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setPreview(null);
-    }
-  };
-
-  const clearFile = () => {
-    setSelectedFile(null);
-    setPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,7 +175,7 @@ export default function PaymentForm({
       showNotification({
         type: 'error',
         title: 'Receipt required',
-        message: 'Upload a screenshot of your payment transfer',
+        message: 'Take a photo or choose a screenshot of your payment transfer',
       });
       return;
     }
@@ -246,7 +212,7 @@ export default function PaymentForm({
         message:
           'Receipt uploaded. Your balance updates after the office verifies the transfer.',
       });
-      clearFile();
+      setSelectedFile(null);
       setReferenceNumber('');
       setNotes('');
       onPaymentComplete?.();
@@ -425,77 +391,12 @@ export default function PaymentForm({
         />
       </FormField>
 
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <label className={cn('text-sm font-medium', theme.listValue)}>
-            Receipt screenshot <span className="text-red-500">*</span>
-          </label>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={theme.outlineButton}
-            leftIcon={<ImagePlus className="h-4 w-4" />}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Choose image
-          </Button>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFileSelect(file);
-          }}
-        />
-
-        {selectedFile ? (
-          <div
-            className={cn(
-              'relative overflow-hidden rounded-xl border p-3',
-              theme.divider
-            )}
-          >
-            <button
-              type="button"
-              aria-label="Remove receipt"
-              onClick={clearFile}
-              className={cn('absolute right-2 top-2 z-10', theme.shellIconButton)}
-            >
-              <X className="h-4 w-4" />
-            </button>
-            {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preview}
-                alt="Receipt preview"
-                className="mx-auto max-h-56 rounded-lg object-contain"
-              />
-            ) : (
-              <p className={cn('py-6 text-center text-sm', theme.muted)}>
-                {selectedFile.name}
-              </p>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className={cn(
-              'flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-10 text-sm transition',
-              theme.mode === 'dark'
-                ? 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:bg-zinc-900'
-                : 'border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:bg-zinc-50'
-            )}
-          >
-            <Upload className="h-6 w-6" />
-            Upload transfer screenshot
-          </button>
-        )}
-      </div>
+      <ReceiptImageField
+        file={selectedFile}
+        onChange={setSelectedFile}
+        disabled={isProcessing}
+        className="text-gray-900"
+      />
 
       <FormField label="Notes (optional)" htmlFor="notes">
         <Textarea

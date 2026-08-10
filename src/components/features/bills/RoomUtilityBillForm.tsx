@@ -13,6 +13,10 @@ import {
   ALLOCATION_METHOD_LABELS,
   AllocationMethod,
 } from '@/lib/constants/bills-expenses';
+import {
+  formatPaymentNotesForPeople,
+  preserveLedgerTagOnSave,
+} from '@/lib/format-payment-notes';
 
 interface Building {
   id: string;
@@ -24,6 +28,14 @@ interface Room {
   roomNumber: string;
   buildingId: string;
   buildingName: string;
+  floorNumber?: number | null;
+}
+
+interface UtilityUnitGroupOption {
+  id: string;
+  name: string;
+  utilityType: string | null;
+  memberCount: number;
 }
 
 interface RoomUtilityBillFormData {
@@ -42,6 +54,8 @@ interface RoomUtilityBillFormData {
   usageUnit: string;
   allocationMethod: AllocationMethod;
   distributeAcrossUnits: boolean;
+  floorNumber: string;
+  utilityUnitGroupId: string;
   billStatus: 'pending' | 'paid' | 'overdue';
   notes: string;
 }
@@ -119,6 +133,7 @@ export default function RoomUtilityBillForm({
   const [activeSection, setActiveSection] = useState<FormSection>('room');
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [unitGroups, setUnitGroups] = useState<UtilityUnitGroupOption[]>([]);
 
   const [formData, setFormData] = useState<RoomUtilityBillFormData>({
     scope: initialData?.scope || 'unit',
@@ -136,10 +151,12 @@ export default function RoomUtilityBillForm({
     meterReadingPrevious: initialData?.meterReadingPrevious || '',
     meterReadingCurrent: initialData?.meterReadingCurrent || '',
     usageUnit: initialData?.usageUnit || 'kWh',
-    allocationMethod: initialData?.allocationMethod || 'per_unit_metered',
+    allocationMethod: initialData?.allocationMethod || 'SUBMETERED',
     distributeAcrossUnits: initialData?.distributeAcrossUnits ?? true,
+    floorNumber: initialData?.floorNumber || '',
+    utilityUnitGroupId: initialData?.utilityUnitGroupId || '',
     billStatus: initialData?.billStatus || 'pending',
-    notes: initialData?.notes || '',
+    notes: formatPaymentNotesForPeople(initialData?.notes || ''),
   });
 
   const [errors, setErrors] = useState<
@@ -175,14 +192,21 @@ export default function RoomUtilityBillForm({
           else if (Array.isArray(data.rooms)) list = data.rooms;
           else if (Array.isArray(data)) list = data;
           setRooms(
-            list.map((room: Record<string, unknown>) => ({
-              id: String(room.id),
-              roomNumber: String(room.roomNumber || room.room_number || ''),
-              buildingId: String(room.buildingId || room.building_id || ''),
-              buildingName: String(
-                room.buildingName || room.building_name || 'Unknown Building'
-              ),
-            }))
+            list.map((room) => {
+              const r = room as Record<string, unknown>;
+              return {
+                id: String(r.id),
+                roomNumber: String(r.roomNumber || r.room_number || ''),
+                buildingId: String(r.buildingId || r.building_id || ''),
+                buildingName: String(
+                  r.buildingName || r.building_name || 'Unknown Building'
+                ),
+                floorNumber:
+                  r.floorNumber != null || r.floor_number != null
+                    ? Number(r.floorNumber ?? r.floor_number)
+                    : null,
+              };
+            })
           );
         }
       } catch (error) {
@@ -196,6 +220,39 @@ export default function RoomUtilityBillForm({
     if (!formData.buildingId) return rooms;
     return rooms.filter((r) => r.buildingId === formData.buildingId);
   }, [rooms, formData.buildingId]);
+
+  useEffect(() => {
+    if (!formData.buildingId || formData.scope !== 'building') {
+      setUnitGroups([]);
+      return;
+    }
+    let cancelled = false;
+    const loadGroups = async () => {
+      try {
+        const res = await fetch(
+          `/api/utility-unit-groups?buildingId=${encodeURIComponent(formData.buildingId)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const list = Array.isArray(data.data) ? data.data : [];
+        setUnitGroups(
+          list.map((g: Record<string, unknown>) => ({
+            id: String(g.id),
+            name: String(g.name),
+            utilityType: g.utilityType ? String(g.utilityType) : null,
+            memberCount: Number(g.memberCount) || 0,
+          }))
+        );
+      } catch {
+        if (!cancelled) setUnitGroups([]);
+      }
+    };
+    loadGroups();
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.buildingId, formData.scope]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof RoomUtilityBillFormData, string>> = {};
@@ -274,8 +331,12 @@ export default function RoomUtilityBillForm({
               (formData.utilityType === 'electricity' ? 'kWh' : 'm³'),
             allocationMethod: formData.allocationMethod,
             distributeAcrossUnits: formData.distributeAcrossUnits,
+            floorNumber: formData.utilityUnitGroupId
+              ? undefined
+              : formData.floorNumber || undefined,
+            utilityUnitGroupId: formData.utilityUnitGroupId || undefined,
             billStatus: formData.billStatus,
-            notes: formData.notes || undefined,
+            notes: preserveLedgerTagOnSave(formData.notes || '', initialData?.notes) || undefined,
           }),
         });
 
@@ -312,12 +373,13 @@ export default function RoomUtilityBillForm({
       const next = { ...prev, [field]: value };
       if (field === 'scope') {
         if (value === 'unit') {
-          next.allocationMethod = 'per_unit_metered';
+          next.allocationMethod = 'SUBMETERED';
         } else {
           next.roomId = '';
           next.allocationMethod =
+            prev.allocationMethod === 'SUBMETERED' ||
             prev.allocationMethod === 'per_unit_metered'
-              ? 'flat'
+              ? 'SHARED_MANUAL'
               : prev.allocationMethod;
         }
       }
@@ -326,6 +388,11 @@ export default function RoomUtilityBillForm({
       }
       if (field === 'buildingId') {
         next.roomId = '';
+        next.utilityUnitGroupId = '';
+        next.floorNumber = '';
+      }
+      if (field === 'utilityUnitGroupId' && value) {
+        next.floorNumber = '';
       }
       return next;
     });
@@ -436,11 +503,19 @@ export default function RoomUtilityBillForm({
                     string,
                   ][]
                 )
-                  .filter(([key]) =>
-                    formData.scope === 'unit'
-                      ? key === 'per_unit_metered' || key === 'flat'
-                      : true
-                  )
+                  .filter(([key]) => {
+                    // Prefer canonical Phase 1 methods in the picker
+                    const canonical = [
+                      'SUBMETERED',
+                      'SHARED_MANUAL',
+                      'NOT_APPLICABLE',
+                    ];
+                    if (!canonical.includes(key)) return false;
+                    if (formData.scope === 'unit') {
+                      return key === 'SUBMETERED' || key === 'NOT_APPLICABLE';
+                    }
+                    return true;
+                  })
                   .map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
@@ -450,21 +525,87 @@ export default function RoomUtilityBillForm({
             </FormField>
 
             {formData.scope === 'building' &&
-              formData.allocationMethod === 'split_evenly' && (
-                <label className="flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={formData.distributeAcrossUnits}
-                    onChange={(e) =>
-                      handleInputChange('distributeAcrossUnits', e.target.checked)
-                    }
-                  />
-                  <span>
-                    Create equal per-unit slices (shows each room&apos;s share in
-                    lists; parent building bill keeps the full total)
-                  </span>
-                </label>
+              (formData.allocationMethod === 'SHARED_MANUAL' ||
+                formData.allocationMethod === 'split_evenly') && (
+                <div className="space-y-3">
+                  <label className="flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={formData.distributeAcrossUnits}
+                      onChange={(e) =>
+                        handleInputChange('distributeAcrossUnits', e.target.checked)
+                      }
+                    />
+                    <span>
+                      Equal-split across units (creates a per-room share; vacant
+                      rooms are owner-absorbed)
+                    </span>
+                  </label>
+                  {formData.distributeAcrossUnits && (
+                    <>
+                      <FormField
+                        label="Unit group (preferred)"
+                        htmlFor="utilityUnitGroupId"
+                        hint={
+                          unitGroups.length === 0
+                            ? 'Create named groups under Bills & Expenses → Unit groups'
+                            : 'Overrides floor filter when selected'
+                        }
+                      >
+                        <Select
+                          id="utilityUnitGroupId"
+                          value={formData.utilityUnitGroupId}
+                          onChange={(e) =>
+                            handleInputChange('utilityUnitGroupId', e.target.value)
+                          }
+                        >
+                          <option value="">None — use floor / all units</option>
+                          {unitGroups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                              {g.memberCount > 0 ? ` (${g.memberCount} units)` : ''}
+                              {g.utilityType ? ` · ${g.utilityType}` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      {!formData.utilityUnitGroupId && (
+                        <FormField
+                          label="Floor filter (optional)"
+                          htmlFor="floorNumber"
+                          hint="e.g. 3 for Balibago 3rd-floor shared water — leave blank for all units"
+                        >
+                          <Select
+                            id="floorNumber"
+                            value={formData.floorNumber}
+                            onChange={(e) =>
+                              handleInputChange('floorNumber', e.target.value)
+                            }
+                          >
+                            <option value="">All floors</option>
+                            {Array.from(
+                              new Set(
+                                filteredRooms
+                                  .map((r) => r.floorNumber)
+                                  .filter(
+                                    (f): f is number => f != null && !Number.isNaN(f)
+                                  )
+                              )
+                            )
+                              .sort((a, b) => a - b)
+                              .map((f) => (
+                                <option key={f} value={String(f)}>
+                                  Floor {f}
+                                  {f === 3 ? ' (shared water preset)' : ''}
+                                </option>
+                              ))}
+                          </Select>
+                        </FormField>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
 
             <FormField label="Provider Name" htmlFor="providerName">
@@ -573,7 +714,8 @@ export default function RoomUtilityBillForm({
               </div>
             </FormField>
 
-            {formData.allocationMethod === 'per_unit_metered' && (
+            {(formData.allocationMethod === 'SUBMETERED' ||
+              formData.allocationMethod === 'per_unit_metered') && (
               <>
                 <FormField
                   label="Previous meter reading"

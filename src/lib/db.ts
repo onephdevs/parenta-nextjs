@@ -18,6 +18,9 @@ types.setTypeParser(types.builtins.TIMESTAMP, (value: string) => {
  * Shared PostgreSQL pool (singleton).
  * All runtime modules must import this — never create a second Pool.
  * globalThis guard prevents duplicate pools under Next.js HMR.
+ *
+ * Remote Postgres (Supabase / NAT) often drops idle sockets; without keepAlive
+ * and a one-shot retry, the next query hangs until `read ETIMEDOUT`.
  */
 const connectionString = process.env.DATABASE_URL;
 const useSsl =
@@ -25,21 +28,95 @@ const useSsl =
   Boolean(connectionString?.includes('supabase')) ||
   Boolean(connectionString?.includes('vercel'));
 
-const globalForPg = globalThis as typeof globalThis & { __parentaPgPool?: Pool };
+function isTransientDbError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; message?: string; syscall?: string };
+  const code = e.code || '';
+  const message = e.message || '';
+  return (
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    code === 'EPIPE' ||
+    code === 'ENOTFOUND' ||
+    code === '57P01' || // admin_shutdown
+    code === '57P02' || // crash_shutdown
+    code === '57P03' || // cannot_connect_now
+    code === '08006' || // connection_failure
+    code === '08001' ||
+    code === '08003' ||
+    /connection terminated/i.test(message) ||
+    /Client has encountered a connection error/i.test(message) ||
+    /timeout exceeded when trying to connect/i.test(message)
+  );
+}
 
-const pool =
-  globalForPg.__parentaPgPool ??
-  new Pool({
-    connectionString,
-    ssl: useSsl ? { rejectUnauthorized: false } : false,
-    max: 10, // single PM2 process; keep conservative vs Supabase pooler limits
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000, // fail fast under exhaustion (default 0 waits forever)
+function attachPoolGuards(p: Pool): Pool {
+  p.on('error', (err) => {
+    // Idle clients can error after the remote closes the socket; swallow so
+    // the process does not crash, and let the pool discard the client.
+    console.error('[db] unexpected idle client error:', err.message);
   });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPg.__parentaPgPool = pool;
+  const originalQuery = p.query.bind(p) as Pool['query'];
+  // One automatic retry after a dead-socket failure; the bad client is removed
+  // from the pool so the retry typically opens a fresh connection.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (p as any).query = (...args: any[]) => {
+    const result = (originalQuery as (...a: unknown[]) => unknown)(...args);
+    if (result && typeof (result as Promise<unknown>).then === 'function') {
+      return (result as Promise<unknown>).catch(async (error: unknown) => {
+        if (!isTransientDbError(error)) throw error;
+        console.warn(
+          '[db] transient connection error, retrying once:',
+          (error as { code?: string; message?: string }).code ||
+            (error as Error).message
+        );
+        return (originalQuery as (...a: unknown[]) => unknown)(...args);
+      });
+    }
+    return result;
+  };
+
+  return p;
 }
+
+const POOL_GUARD_VERSION = 1;
+
+const globalForPg = globalThis as typeof globalThis & {
+  __parentaPgPool?: Pool;
+  __parentaPgPoolGuardVersion?: number;
+};
+
+function createPool(): Pool {
+  return attachPoolGuards(
+    new Pool({
+      connectionString,
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
+      max: 10, // single PM2 process; keep conservative vs Supabase pooler limits
+      // Recycle before remote idle killers; keepAlive detects half-open sockets.
+      idleTimeoutMillis: 15_000,
+      connectionTimeoutMillis: 10_000, // fail fast under exhaustion (default 0 waits forever)
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+      allowExitOnIdle: true,
+    })
+  );
+}
+
+if (
+  !globalForPg.__parentaPgPool ||
+  globalForPg.__parentaPgPoolGuardVersion !== POOL_GUARD_VERSION
+) {
+  const previous = globalForPg.__parentaPgPool;
+  if (previous) {
+    void previous.end().catch(() => undefined);
+  }
+  globalForPg.__parentaPgPool = createPool();
+  globalForPg.__parentaPgPoolGuardVersion = POOL_GUARD_VERSION;
+}
+
+const pool = globalForPg.__parentaPgPool;
 
 // Convert database user to app user format
 function mapDatabaseUserToUser(dbUser: DatabaseUser): User {
@@ -145,16 +222,18 @@ export async function findUserById(id: string): Promise<User | null> {
 
 /**
  * Verify password using email OR username as the login identifier.
+ * When role is omitted, any active account matching the identifier is accepted.
  */
 export async function verifyPassword(
   loginId: string,
-  role: UserRole,
+  role: UserRole | null | undefined,
   password: string
 ): Promise<User | null> {
   const identifier = String(loginId || '').trim();
   if (!identifier) return null;
 
-  const query = `
+  const query = role
+    ? `
     SELECT * FROM users 
     WHERE role = $2
       AND is_active = true
@@ -163,9 +242,27 @@ export async function verifyPassword(
         OR (username IS NOT NULL AND lower(username) = lower($1))
       )
     LIMIT 1
+  `
+    : `
+    SELECT * FROM users 
+    WHERE is_active = true
+      AND (
+        (email IS NOT NULL AND lower(email) = lower($1))
+        OR (username IS NOT NULL AND lower(username) = lower($1))
+      )
+    ORDER BY CASE role
+      WHEN 'admin' THEN 0
+      WHEN 'caretaker' THEN 1
+      WHEN 'staff' THEN 2
+      WHEN 'tenant' THEN 3
+      ELSE 4
+    END
+    LIMIT 1
   `;
 
-  const result = await pool.query(query, [identifier, role]);
+  const result = role
+    ? await pool.query(query, [identifier, role])
+    : await pool.query(query, [identifier]);
 
   if (result.rows.length === 0) {
     return null;

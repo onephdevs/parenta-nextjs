@@ -9,12 +9,12 @@ export default async function StaffHomePage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
-    redirect('/auth/staff/signin');
+    redirect('/auth/signin');
   }
 
   // Staff portal accepts staff role; admins can also open it for convenience
   if (session.user.role !== 'staff' && session.user.role !== 'admin') {
-    redirect('/auth/staff/signin');
+    redirect('/auth/signin');
   }
 
   const links = [

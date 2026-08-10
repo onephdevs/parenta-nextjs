@@ -294,7 +294,10 @@ export async function getRentRollReport(buildingId?: number): Promise<{
   }>;
 }> {
   try {
-    const conditions: string[] = ['r.is_active = true'];
+    const conditions: string[] = [
+      'r.is_active = true',
+      'COALESCE(r.is_revenue_unit, true) = true',
+    ];
     const values: unknown[] = [];
     let paramCount = 0;
 

@@ -10,8 +10,8 @@ export default async function AdminLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+  if (!session || !session.user || (session.user.role !== 'admin' && session.user.role !== 'caretaker')) {
+    redirect('/auth/signin');
   }
 
   // Keep sidebar mounted during navigations — page `loading.tsx` only replaces main content.

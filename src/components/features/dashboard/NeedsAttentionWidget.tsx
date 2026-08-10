@@ -7,6 +7,7 @@ import {
   Zap,
   UserPlus,
   Wrench,
+  PiggyBank,
   ArrowRight,
   Plus,
 } from 'lucide-react';
@@ -49,6 +50,18 @@ const CARD_META: Record<
     iconWrap: 'bg-gray-100 text-gray-600',
     badge: 'bg-gray-200 text-gray-700',
     empty: 'No open requests',
+  },
+  deposits: {
+    icon: PiggyBank,
+    iconWrap: 'bg-violet-50 text-violet-600',
+    badge: 'bg-violet-100 text-violet-700',
+    empty: 'No empty deposit balances',
+  },
+  deposit_funded: {
+    icon: Wallet,
+    iconWrap: 'bg-orange-50 text-orange-600',
+    badge: 'bg-orange-100 text-orange-700',
+    empty: 'No deposit-funded payments',
   },
 };
 

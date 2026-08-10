@@ -5,15 +5,15 @@ import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
 import { logActivitySafe } from '@/lib/services/activity-logger';
+import { CONSTANTS } from '@/lib/constants';
+import {
+  resolveAllowedPaymentMethod,
+  resolveAllowedPaymentType,
+} from '@/lib/constants/payment-methods';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const SUPPORTED_FILE_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-];
+const MAX_FILE_SIZE = CONSTANTS.MODULE.UPLOAD.MAX_FILE_SIZE_BYTES;
+const SUPPORTED_FILE_TYPES = CONSTANTS.MODULE.UPLOAD
+  .SUPPORTED_RECEIPT_MIME_TYPES as readonly string[];
 
 /**
  * POST /api/tenant/payments/upload-receipt
@@ -36,9 +36,12 @@ export async function POST(request: NextRequest) {
     const paymentMethodRaw = String(formData.get('paymentMethod') || 'gcash')
       .trim()
       .toLowerCase();
+    const paymentTypeRaw = String(formData.get('paymentType') || 'rent')
+      .trim()
+      .toLowerCase();
 
-    const allowedMethods = new Set(['gcash', 'maya', 'bank_transfer', 'online', 'other']);
-    const paymentMethod = allowedMethods.has(paymentMethodRaw) ? paymentMethodRaw : 'gcash';
+    const paymentMethod = resolveAllowedPaymentMethod(paymentMethodRaw);
+    const paymentType = resolveAllowedPaymentType(paymentTypeRaw);
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
@@ -57,6 +60,16 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { success: false, error: 'File size must be less than 5MB' },
+        { status: 400 }
+      );
+    }
+
+    if (!referenceNumberRaw) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Reference / transaction number is required',
+        },
         { status: 400 }
       );
     }
@@ -131,17 +144,18 @@ export async function POST(request: NextRequest) {
         `INSERT INTO payments (
            tenant_id, room_id, assignment_id, amount, payment_type, payment_method,
            payment_date, due_date, payment_status, reference_number, notes
-         ) VALUES ($1, $2, $3, $4, 'rent', $5, $6, $7, 'pending', $8, $9)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10)
          RETURNING id`,
         [
           tenant.id,
           assignment?.room_id || null,
           assignment?.assignment_id || null,
           paymentAmount,
+          paymentType,
           paymentMethod,
           paymentDateRaw || invoice.due_date,
           invoice.due_date,
-          referenceNumberRaw || null,
+          referenceNumberRaw,
           [
             `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})`,
             'Status: awaiting office verification — invoice balance not updated yet.',
@@ -166,16 +180,17 @@ export async function POST(request: NextRequest) {
         `INSERT INTO payments (
            tenant_id, room_id, assignment_id, amount, payment_type, payment_method,
            payment_date, due_date, payment_status, reference_number, notes
-         ) VALUES ($1, $2, $3, $4, 'rent', $5, $6, $6, 'pending', $7, $8)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 'pending', $8, $9)
          RETURNING id`,
         [
           tenant.id,
           assignment?.room_id || null,
           assignment?.assignment_id || null,
           paymentAmount,
+          paymentType,
           paymentMethod,
           paymentDateRaw,
-          referenceNumberRaw || null,
+          referenceNumberRaw,
           notesRaw || `Receipt uploaded for payment dated ${paymentDateRaw}`,
         ]
       );

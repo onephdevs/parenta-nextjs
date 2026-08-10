@@ -13,6 +13,13 @@ import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
 import { Home, Info, DollarSign, Shield, FileText, Star } from 'lucide-react';
+import {
+  UNIT_PURPOSE_LABELS,
+  UNIT_PURPOSES,
+  applyUnitPurpose,
+  unitPurposeFromRoom,
+  type UnitPurpose,
+} from '@/lib/constants/unit-purpose';
 
 interface AddRoomFormProps {
   buildingId: string;
@@ -84,6 +91,7 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
     depositType: 'one_month',
     depositFixedAmount: undefined,
     depositPercentage: undefined,
+    isRevenueUnit: true,
     amenities: '',
     description: ''
   });
@@ -180,6 +188,39 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
               />
             </FormField>
             
+            <FormField
+              label="Unit purpose"
+              htmlFor="unitPurpose"
+              required
+              hint="Store = same schema, commercial rate. Admin = owner space, utilities only (no rent)."
+            >
+              <Select
+                id="unitPurpose"
+                name="unitPurpose"
+                required
+                value={unitPurposeFromRoom({
+                  roomType: formData.roomType,
+                  isRevenueUnit: formData.isRevenueUnit,
+                })}
+                onChange={(e) => {
+                  const purpose = e.target.value as UnitPurpose;
+                  const applied = applyUnitPurpose(purpose, formData.roomType);
+                  setFormData((prev) => ({
+                    ...prev,
+                    roomType: applied.roomType,
+                    isRevenueUnit: applied.isRevenueUnit,
+                    monthlyRate: purpose === 'admin' ? 0 : prev.monthlyRate,
+                  }));
+                }}
+              >
+                {UNIT_PURPOSES.map((p) => (
+                  <option key={p} value={p}>
+                    {UNIT_PURPOSE_LABELS[p]}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
             <FormField label="Room Type" htmlFor="roomType" required>
               <Select
                 id="roomType"
@@ -187,6 +228,10 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
                 required
                 value={formData.roomType}
                 onChange={handleInputChange}
+                disabled={unitPurposeFromRoom({
+                  roomType: formData.roomType,
+                  isRevenueUnit: formData.isRevenueUnit,
+                }) !== 'residential'}
               >
                 <option value="studio">Studio</option>
                 <option value="one_bedroom">1 Bedroom</option>
@@ -196,6 +241,8 @@ export default function AddRoomForm({ buildingId, building }: AddRoomFormProps) 
                 <option value="shared">Shared Room</option>
                 <option value="single">Single Room</option>
                 <option value="double">Double Room</option>
+                <option value="store">Store / commercial</option>
+                <option value="admin">Admin / owner</option>
               </Select>
             </FormField>
           </div>

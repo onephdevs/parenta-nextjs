@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
   Calendar,
@@ -9,14 +9,17 @@ import {
   FileCheck2,
   FileText,
   History,
+  Plus,
   ShieldCheck,
   Tag,
   Trash2,
   User,
   Wallet,
+  Wrench,
 } from 'lucide-react';
 import SectionedFormShell, {
   type SectionedFormSection,
+  type SectionNavStatus,
 } from '@/components/ui/SectionedFormShell';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/forms/FormField';
@@ -45,6 +48,22 @@ import { OpportunityDocumentsPanel } from './OpportunityDocumentsPanel';
 import { OpportunityHistoryPanel } from './OpportunityHistoryPanel';
 import { PaymentFollowUpPanel } from './PaymentFollowUpPanel';
 import { ExpenseFollowUpPanel } from './ExpenseFollowUpPanel';
+import { MaintenanceFollowUpPanel } from './MaintenanceFollowUpPanel';
+import {
+  contactDisplayName,
+  vendorContactPersonName,
+  type Contact,
+} from '@/lib/constants/contacts';
+import {
+  formatPaymentNotesForPeople,
+  preserveLedgerTagOnSave,
+} from '@/lib/format-payment-notes';
+import {
+  formatPaymentMethodLabel,
+  PAYMENT_METHOD_SELECT_OPTIONS,
+} from '@/lib/constants/payment-methods';
+
+const CUSTOM_VENDOR_VALUE = '__custom__';
 
 interface BuildingOption {
   id: string;
@@ -67,7 +86,8 @@ interface AddOpportunityModalProps {
   card?: PipelineCard | null;
   onClose: () => void;
   onCreated: () => void;
-  onSaved?: () => void;
+  /** Called after a successful save. Pass the updated card so the board can refresh immediately. */
+  onSaved?: (updatedCard?: PipelineCard) => void;
   /** Called after moving to another board (receives that board's slug) */
   onMoved?: (boardSlug: string) => void;
 }
@@ -248,6 +268,51 @@ const expensesSections: SectionedFormSection<FormSection>[] = [
   },
 ];
 
+const maintenanceSections: SectionedFormSection<FormSection>[] = [
+  {
+    id: 'payment',
+    label: 'Request',
+    icon: <Wrench className="h-4 w-4" />,
+    title: 'Maintenance request',
+    subtitle: 'Issue details, photos, status, and priority.',
+  },
+  {
+    id: 'contact',
+    label: 'Tenant',
+    icon: <User className="h-4 w-4" />,
+    title: 'Tenant contact',
+    subtitle: 'Who reported the issue and how to reach them.',
+  },
+  {
+    id: 'property',
+    label: 'Location',
+    icon: <Building2 className="h-4 w-4" />,
+    title: 'Building & unit',
+    subtitle: 'Where the work needs to happen.',
+  },
+  {
+    id: 'schedule',
+    label: 'Schedule',
+    icon: <Calendar className="h-4 w-4" />,
+    title: 'Visit / due date',
+    subtitle: 'When this should be attended to.',
+  },
+  {
+    id: 'notes',
+    label: 'Follow-up',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Follow-up notes',
+    subtitle: 'Technician notes or next steps for this card.',
+  },
+  {
+    id: 'tags',
+    label: 'Tags',
+    icon: <Tag className="h-4 w-4" />,
+    title: 'Tags',
+    subtitle: 'e.g. Parts ordered, Vendor scheduled, Waiting on tenant.',
+  },
+];
+
 const genericSections: SectionedFormSection<FormSection>[] = [
   {
     id: 'contact',
@@ -302,6 +367,110 @@ const historySection: SectionedFormSection<FormSection> = {
   subtitle: 'What changed on this card — assignments, stage moves, and updates.',
 };
 
+type OnboardingSectionMeta = {
+  status: SectionNavStatus;
+  statusHint?: string;
+};
+
+/** Side-nav colors for onboarding win path: done / ready / blocked. */
+function computeOnboardingSectionMeta(input: {
+  firstName: string;
+  lastName: string;
+  buildingId: string;
+  roomId: string;
+  viewingAt: string;
+  documentCount?: number;
+  backgroundCheckStatus: string;
+  moveInPaymentStatus: 'unpaid' | 'paid';
+  assignmentId?: string | null;
+  leaseStartDate: string;
+  isEditing: boolean;
+}): Partial<Record<FormSection, OnboardingSectionMeta>> {
+  const hasContact = Boolean(input.firstName.trim() || input.lastName.trim());
+  const hasProperty = Boolean(input.buildingId && input.roomId);
+  const paymentDone =
+    Boolean(input.assignmentId) || input.moveInPaymentStatus === 'paid';
+  const leaseDone = Boolean(input.assignmentId);
+  const screeningDone =
+    Boolean(input.backgroundCheckStatus) &&
+    input.backgroundCheckStatus !== 'not_started';
+  const docsDone = (input.documentCount || 0) > 0;
+
+  const meta: Partial<Record<FormSection, OnboardingSectionMeta>> = {
+    contact: hasContact
+      ? { status: 'done', statusHint: 'Contact details saved' }
+      : { status: 'ready', statusHint: 'Add prospect name to continue' },
+    property: hasProperty
+      ? { status: 'done', statusHint: 'Building and room selected' }
+      : {
+          status: 'ready',
+          statusHint: 'Select building and room for deposit/lease',
+        },
+    schedule: input.viewingAt
+      ? { status: 'done', statusHint: 'Viewing scheduled' }
+      : { status: 'optional', statusHint: 'Optional viewing date' },
+    status: { status: 'optional', statusHint: 'Mark lost or move boards' },
+    tags: { status: 'optional', statusHint: 'Optional labels' },
+    history: { status: 'optional', statusHint: 'Change log' },
+  };
+
+  if (!input.isEditing) return meta;
+
+  meta.documents = docsDone
+    ? { status: 'done', statusHint: 'Documents uploaded' }
+    : {
+        status: 'ready',
+        statusHint: 'Optional — upload ID / income docs when ready',
+      };
+
+  meta.screening = screeningDone
+    ? { status: 'done', statusHint: 'Screening in progress or complete' }
+    : {
+        status: hasContact ? 'ready' : 'blocked',
+        statusHint: hasContact
+          ? 'Update background / credit check status'
+          : 'Add contact first',
+      };
+
+  if (paymentDone) {
+    meta.payment = {
+      status: 'done',
+      statusHint: 'Move-in payment received',
+    };
+  } else if (!hasProperty) {
+    meta.payment = {
+      status: 'blocked',
+      statusHint: 'Select building and room under Property first',
+    };
+  } else {
+    meta.payment = {
+      status: 'ready',
+      statusHint: 'Record deposit/advance and mark Payment received',
+    };
+  }
+
+  if (leaseDone) {
+    meta.lease = {
+      status: 'done',
+      statusHint: 'Lease generated — tenant created',
+    };
+  } else if (!paymentDone) {
+    meta.lease = {
+      status: 'blocked',
+      statusHint: 'Mark Payment received before Generate lease',
+    };
+  } else {
+    meta.lease = {
+      status: 'ready',
+      statusHint: input.leaseStartDate
+        ? 'Ready to Generate lease'
+        : 'Set lease dates, then Generate lease',
+    };
+  }
+
+  return meta;
+}
+
 function sectionsForBoard(
   board: PipelineBoard,
   isEditing: boolean
@@ -324,10 +493,16 @@ function sectionsForBoard(
       ? paymentsSections
       : board.slug === 'expenses'
         ? expensesSections
-        : genericSections;
+        : board.slug === 'maintenance'
+          ? maintenanceSections
+          : genericSections;
   if (!isEditing) {
     // Detail panels need an existing card id
-    if (board.slug === 'payments' || board.slug === 'expenses') {
+    if (
+      board.slug === 'payments' ||
+      board.slug === 'expenses' ||
+      board.slug === 'maintenance'
+    ) {
       return base.filter((s) => s.id !== 'payment');
     }
     return base;
@@ -356,13 +531,25 @@ export function AddOpportunityModal({
   const isOnboarding = board.slug === 'onboarding';
   const isPayments = board.slug === 'payments';
   const isExpenses = board.slug === 'expenses';
-  const sections = sectionsForBoard(board, isEditing);
+  const isMaintenance = board.slug === 'maintenance';
+  const baseSections = sectionsForBoard(board, isEditing);
 
   const [activeSection, setActiveSection] = useState<FormSection>('contact');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<BuildingOption[]>([]);
   const [rooms, setRooms] = useState<RoomOption[]>([]);
+  const [vendors, setVendors] = useState<Contact[]>([]);
+  const [selectedVendorId, setSelectedVendorId] = useState('');
+  const [showAddVendor, setShowAddVendor] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorContact, setNewVendorContact] = useState('');
+  const [newVendorEmail, setNewVendorEmail] = useState('');
+  const [newVendorPhone, setNewVendorPhone] = useState('');
+  const [savingVendor, setSavingVendor] = useState(false);
+  const [vendorFormError, setVendorFormError] = useState<string | null>(null);
+  /** Raw notes from DB (may include [ledger:…] tags) — preserved on save */
+  const [notesRaw, setNotesRaw] = useState('');
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -394,6 +581,12 @@ export function AddOpportunityModal({
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMonths, setDepositMonths] = useState(1);
   const [advanceMonths, setAdvanceMonths] = useState(1);
+  /** When true, admin edited Total/Deposit — don't overwrite until months recalc */
+  const [moveInAmountsManual, setMoveInAmountsManual] = useState(false);
+  const [requiredDeposit, setRequiredDeposit] = useState(0);
+  const [requiredAdvance, setRequiredAdvance] = useState(0);
+  const [requiredUtility, setRequiredUtility] = useState(0);
+  const [feeChecklistReady, setFeeChecklistReady] = useState(false);
   const [moveInPaymentType, setMoveInPaymentType] = useState('rent');
   const [moveInPaymentDate, setMoveInPaymentDate] = useState(() => todayLocalISO());
   const [moveInPaymentStatus, setMoveInPaymentStatus] = useState<'unpaid' | 'paid'>(
@@ -402,6 +595,7 @@ export function AddOpportunityModal({
   const [moveInPaymentMethod, setMoveInPaymentMethod] = useState('cash');
   const [moveInTransactionId, setMoveInTransactionId] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
+  const moveInAmountsManualRef = useRef(false);
   const [moveBoardId, setMoveBoardId] = useState('');
   const [moveStageId, setMoveStageId] = useState('');
   const [movingBoard, setMovingBoard] = useState(false);
@@ -419,7 +613,9 @@ export function AddOpportunityModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setActiveSection('contact');
+    setActiveSection(
+      board.slug === 'maintenance' && card?.id ? 'payment' : 'contact'
+    );
     setError(null);
     setMoveBoardId('');
     setMoveStageId('');
@@ -434,7 +630,8 @@ export function AddOpportunityModal({
       setRoomId(card.roomId || '');
       setSource(card.source || 'Walk-in');
       setAmount(card.amount != null ? String(card.amount) : '');
-      setNotes(card.notes || '');
+      setNotesRaw(card.notes || '');
+      setNotes(formatPaymentNotesForPeople(card.notes || ''));
       setTitle(card.title || '');
       setViewingAt(toDatetimeLocal(card.viewingAt));
       setDueAt(toDatetimeLocal(card.dueAt));
@@ -456,12 +653,15 @@ export function AddOpportunityModal({
       setCustomLeaseMonths('');
       const savedDeposit = card.depositAmount != null ? Number(card.depositAmount) : null;
       const savedAdvance = card.advanceAmount != null ? Number(card.advanceAmount) : null;
+      const hasSavedMoveIn =
+        (savedDeposit != null && savedDeposit > 0) ||
+        (savedAdvance != null && savedAdvance > 0);
       setDepositAmount(savedDeposit != null && savedDeposit > 0 ? String(savedDeposit) : '');
       setMoveInTotalPaid(
-        savedDeposit != null || savedAdvance != null
-          ? String((savedDeposit || 0) + (savedAdvance || 0) || '')
-          : ''
+        hasSavedMoveIn ? String((savedDeposit || 0) + (savedAdvance || 0)) : ''
       );
+      setMoveInAmountsManual(hasSavedMoveIn);
+      moveInAmountsManualRef.current = hasSavedMoveIn;
       {
         const rentHint =
           card.amount != null && Number(card.amount) > 0 ? Number(card.amount) : 0;
@@ -499,6 +699,7 @@ export function AddOpportunityModal({
       setRoomId('');
       setSource('Walk-in');
       setAmount('');
+      setNotesRaw('');
       setNotes('');
       setTitle('');
       setViewingAt('');
@@ -519,13 +720,24 @@ export function AddOpportunityModal({
       setDepositAmount('');
       setDepositMonths(1);
       setAdvanceMonths(1);
+      setMoveInAmountsManual(false);
+      moveInAmountsManualRef.current = false;
       setMoveInPaymentStatus('unpaid');
       setMoveInPaymentMethod('cash');
       setMoveInTransactionId('');
       setMoveInPaymentType('rent');
       setMoveInPaymentDate(todayLocalISO());
     }
-  }, [isOpen, board.id, card]);
+    setSelectedVendorId('');
+    setShowAddVendor(false);
+    setNewVendorName('');
+    setNewVendorContact('');
+    setNewVendorEmail('');
+    setNewVendorPhone('');
+    setVendorFormError(null);
+    // Re-init only when the modal opens or the card identity changes — not when
+    // the parent refreshes the same card after Payment received (that was wiping paid).
+  }, [isOpen, board.id, card?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -546,6 +758,109 @@ export function AddOpportunityModal({
       }
     })();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !isExpenses) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/contacts?role=VENDOR');
+        const json = await res.json();
+        if (!cancelled && json.success && Array.isArray(json.data)) {
+          setVendors(json.data as Contact[]);
+        }
+      } catch {
+        if (!cancelled) setVendors([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isExpenses]);
+
+  useEffect(() => {
+    if (!isExpenses || !isOpen) return;
+    const name = firstName.trim().toLowerCase();
+    if (!name) {
+      setSelectedVendorId('');
+      return;
+    }
+    const match = vendors.find((v) => v.firstName.trim().toLowerCase() === name);
+    setSelectedVendorId(match ? match.id : CUSTOM_VENDOR_VALUE);
+  }, [isExpenses, isOpen, firstName, vendors]);
+
+  function applyVendor(vendor: Contact) {
+    setSelectedVendorId(vendor.id);
+    setFirstName(vendor.firstName);
+    setLastName(vendorContactPersonName(vendor.lastName));
+    setEmail(vendor.email || '');
+    setPhone(vendor.phone || '');
+    setShowAddVendor(false);
+    setVendorFormError(null);
+  }
+
+  function handleVendorSelect(value: string) {
+    if (!value) {
+      setSelectedVendorId('');
+      setFirstName('');
+      setLastName('');
+      setEmail('');
+      setPhone('');
+      return;
+    }
+    if (value === CUSTOM_VENDOR_VALUE) {
+      setSelectedVendorId(CUSTOM_VENDOR_VALUE);
+      return;
+    }
+    const vendor = vendors.find((v) => v.id === value);
+    if (vendor) applyVendor(vendor);
+  }
+
+  async function handleCreateVendor() {
+    const name = newVendorName.trim();
+    if (!name) {
+      setVendorFormError('Vendor / provider name is required');
+      return;
+    }
+    setSavingVendor(true);
+    setVendorFormError(null);
+    try {
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: name,
+          lastName: newVendorContact.trim() || undefined,
+          email: newVendorEmail.trim() || null,
+          phone: newVendorPhone.trim() || null,
+          roles: ['VENDOR'],
+        }),
+      });
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        throw new Error(json.error || 'Failed to create vendor');
+      }
+      const created = json.data as Contact;
+      setVendors((prev) => {
+        const without = prev.filter((v) => v.id !== created.id);
+        return [...without, created].sort((a, b) =>
+          contactDisplayName(a).localeCompare(contactDisplayName(b), undefined, {
+            sensitivity: 'base',
+          })
+        );
+      });
+      applyVendor(created);
+      setNewVendorName('');
+      setNewVendorContact('');
+      setNewVendorEmail('');
+      setNewVendorPhone('');
+      setShowAddVendor(false);
+    } catch (err) {
+      setVendorFormError(err instanceof Error ? err.message : 'Failed to create vendor');
+    } finally {
+      setSavingVendor(false);
+    }
+  }
 
   useEffect(() => {
     if (!buildingId) {
@@ -627,6 +942,7 @@ export function AddOpportunityModal({
   useEffect(() => {
     if (!isOpen || !isOnboarding) return;
     if (card?.assignmentId || moveInPaymentStatus === 'paid') return;
+    if (moveInAmountsManualRef.current) return;
     fillMoveInAmountsFromRent(depositMonths, advanceMonths);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -638,8 +954,70 @@ export function AddOpportunityModal({
     depositMonths,
     advanceMonths,
     card?.assignmentId,
+    card?.amount,
     moveInPaymentStatus,
+    requiredUtility,
+    activeSection,
   ]);
+
+  // Load building deposit config → fee checklist (Balibago 2+1+util / Villasol 1+1+util)
+  useEffect(() => {
+    if (!isOpen || !isOnboarding || !buildingId) {
+      setFeeChecklistReady(false);
+      setRequiredDeposit(0);
+      setRequiredAdvance(0);
+      setRequiredUtility(0);
+      return;
+    }
+    const rent = getMonthlyRentForPayment();
+    if (rent <= 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [calcRes, cfgRes] = await Promise.all([
+          fetch(
+            `/api/building-deposit-config/${encodeURIComponent(buildingId)}?action=calculate&monthlyRate=${rent}`
+          ),
+          fetch(
+            `/api/building-deposit-config/${encodeURIComponent(buildingId)}`
+          ),
+        ]);
+        const calcJson = await calcRes.json();
+        const cfgJson = await cfgRes.json();
+        if (cancelled) return;
+
+        if (calcJson.success && calcJson.data) {
+          setRequiredDeposit(Number(calcJson.data.requiredDeposit) || 0);
+          setRequiredAdvance(Number(calcJson.data.requiredAdvance) || 0);
+          setRequiredUtility(Number(calcJson.data.utilityDeposit) || 0);
+          setFeeChecklistReady(true);
+        }
+
+        const cfg =
+          cfgJson?.data ||
+          cfgJson?.config ||
+          (cfgJson?.success ? cfgJson.data : null);
+        if (cfg && moveInPaymentStatus !== 'paid' && !card?.assignmentId) {
+          const depMo = Math.max(0, Math.round(Number(cfg.depositMonths) || 1));
+          const advMo = Math.max(0, Math.round(Number(cfg.advanceMonths) || 1));
+          setDepositMonths(depMo);
+          setAdvanceMonths(advMo);
+          if (!moveInAmountsManualRef.current) {
+            fillMoveInAmountsFromRent(depMo, advMo, rent);
+          }
+        } else if (!moveInAmountsManualRef.current) {
+          fillMoveInAmountsFromRent(depositMonths, advanceMonths, rent);
+        }
+      } catch {
+        if (!cancelled) setFeeChecklistReady(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isOnboarding, buildingId, roomId, amount, rooms]);
 
   async function handleMoveToBoard() {
     if (!card?.id || !moveBoardId) return;
@@ -699,7 +1077,9 @@ export function AddOpportunityModal({
     }
     const room = rooms.find((r) => r.id === roomId);
     const rate = room ? Number(room.monthlyRate) : 0;
-    return Number.isFinite(rate) && rate > 0 ? rate : 0;
+    if (Number.isFinite(rate) && rate > 0) return rate;
+    const cardAmount = card?.amount != null ? Number(card.amount) : 0;
+    return Number.isFinite(cardAmount) && cardAmount > 0 ? cardAmount : 0;
   }
 
   function fillMoveInAmountsFromRent(
@@ -714,7 +1094,8 @@ export function AddOpportunityModal({
     if (rent <= 0) return false;
     const deposit = Math.round(rent * nextDepositMonths * 100) / 100;
     const advance = Math.round(rent * nextAdvanceMonths * 100) / 100;
-    const total = Math.round((deposit + advance) * 100) / 100;
+    const utility = Math.max(0, requiredUtility);
+    const total = Math.round((deposit + advance + utility) * 100) / 100;
     setDepositAmount(deposit > 0 ? String(deposit) : '');
     setMoveInTotalPaid(total > 0 ? String(total) : '');
     return true;
@@ -723,6 +1104,8 @@ export function AddOpportunityModal({
   function applyMoveInMonths(nextDepositMonths: number, nextAdvanceMonths: number) {
     setDepositMonths(nextDepositMonths);
     setAdvanceMonths(nextAdvanceMonths);
+    setMoveInAmountsManual(false);
+    moveInAmountsManualRef.current = false;
     if (!fillMoveInAmountsFromRent(nextDepositMonths, nextAdvanceMonths)) {
       setError('Select a room (or enter monthly rent under Property) to calculate amounts');
       return;
@@ -748,7 +1131,20 @@ export function AddOpportunityModal({
     if (!card?.id) return;
     setError(null);
 
-    const { total, deposit, advance } = getMoveInSplit(overrides);
+    let { total, deposit, advance } = getMoveInSplit(overrides);
+    if (total <= 0) {
+      const rent = getMonthlyRentForPayment();
+      if (rent > 0) {
+        const nextDeposit = Math.round(rent * depositMonths * 100) / 100;
+        const nextAdvance = Math.round(rent * advanceMonths * 100) / 100;
+        const utility = Math.max(0, requiredUtility);
+        total = Math.round((nextDeposit + nextAdvance + utility) * 100) / 100;
+        deposit = nextDeposit;
+        advance = nextAdvance;
+        setDepositAmount(nextDeposit > 0 ? String(nextDeposit) : '');
+        setMoveInTotalPaid(total > 0 ? String(total) : '');
+      }
+    }
     if (total <= 0) {
       setError('Enter a total amount paid greater than zero');
       return;
@@ -769,7 +1165,7 @@ export function AddOpportunityModal({
 
     setMoveInTotalPaid(String(total));
     setDepositAmount(String(deposit));
-
+    setMoveInPaymentStatus('paid');
     setSavingPayment(true);
     try {
       const res = await fetch(`/api/pipeline/cards/${card.id}`, {
@@ -792,9 +1188,9 @@ export function AddOpportunityModal({
       if (!json.success) {
         throw new Error(json.error || 'Failed to mark payment as paid');
       }
-      setMoveInPaymentStatus('paid');
-      onSaved?.();
+      onSaved?.(json.data?.card as PipelineCard | undefined);
     } catch (err) {
+      setMoveInPaymentStatus('unpaid');
       setError(err instanceof Error ? err.message : 'Failed to mark payment as paid');
     } finally {
       setSavingPayment(false);
@@ -805,6 +1201,8 @@ export function AddOpportunityModal({
     if (!card?.id) return;
     setSavingPayment(true);
     setError(null);
+    const previousStatus = moveInPaymentStatus;
+    setMoveInPaymentStatus('unpaid');
     const { deposit, advance } = getMoveInSplit();
     try {
       const res = await fetch(`/api/pipeline/cards/${card.id}`, {
@@ -823,9 +1221,9 @@ export function AddOpportunityModal({
       if (!json.success) {
         throw new Error(json.error || 'Failed to update payment status');
       }
-      setMoveInPaymentStatus('unpaid');
-      onSaved?.();
+      onSaved?.(json.data?.card as PipelineCard | undefined);
     } catch (err) {
+      setMoveInPaymentStatus(previousStatus);
       setError(err instanceof Error ? err.message : 'Failed to update payment status');
     } finally {
       setSavingPayment(false);
@@ -895,7 +1293,7 @@ export function AddOpportunityModal({
           leaseStartDate,
           leaseEndDate: isOpenEndedLease ? null : leaseEndDate || null,
           moveInDate: moveInDate || leaseStartDate,
-          leaseStatus: 'signed',
+          leaseStatus: 'generated',
           generateLease: true,
         }),
       });
@@ -903,7 +1301,8 @@ export function AddOpportunityModal({
       if (!json.success) {
         throw new Error(json.error || json.details || 'Failed to generate lease');
       }
-      onSaved?.();
+      setLeaseStatus('generated');
+      onSaved?.(json.data?.card as PipelineCard | undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate lease');
@@ -952,7 +1351,7 @@ export function AddOpportunityModal({
           amount: amount ? Number(amount) : null,
           source: source || null,
           tags,
-          notes: notes.trim() || null,
+          notes: preserveLedgerTagOnSave(notes, notesRaw) || null,
           viewingAt: viewingAt ? new Date(viewingAt).toISOString() : null,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
           nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
@@ -991,7 +1390,7 @@ export function AddOpportunityModal({
         if (!json.success) {
           throw new Error(json.error || json.details || 'Failed to save opportunity');
         }
-        onSaved?.();
+        onSaved?.(json.data?.card as PipelineCard | undefined);
         onClose();
         return;
       }
@@ -1096,8 +1495,54 @@ export function AddOpportunityModal({
     }
   }
 
-  const entityLabel =
-    firstName || lastName
+  const sections = useMemo(() => {
+    if (!isOnboarding) return baseSections;
+    const meta = computeOnboardingSectionMeta({
+      firstName,
+      lastName,
+      buildingId,
+      roomId,
+      viewingAt,
+      documentCount: card?.documentCount,
+      backgroundCheckStatus,
+      moveInPaymentStatus,
+      assignmentId: card?.assignmentId,
+      leaseStartDate,
+      isEditing,
+    });
+    return baseSections.map((section) => {
+      const info = meta[section.id];
+      if (!info) return section;
+      return {
+        ...section,
+        status: info.status,
+        statusHint: info.statusHint,
+      };
+    });
+  }, [
+    baseSections,
+    isOnboarding,
+    firstName,
+    lastName,
+    buildingId,
+    roomId,
+    viewingAt,
+    card?.documentCount,
+    card?.assignmentId,
+    backgroundCheckStatus,
+    moveInPaymentStatus,
+    leaseStartDate,
+    isEditing,
+  ]);
+
+  const entityLabel = isMaintenance
+    ? title.trim() ||
+      (firstName || lastName
+        ? `${firstName} ${lastName}`.trim()
+        : isEditing
+          ? 'Maintenance request'
+          : 'New request')
+    : firstName || lastName
       ? `${firstName} ${lastName}`.trim()
       : title.trim() || (isEditing ? 'Opportunity' : 'New opportunity');
 
@@ -1113,12 +1558,16 @@ export function AddOpportunityModal({
             ? 'Payment follow-up'
             : isExpenses
               ? 'Expense follow-up'
-              : 'Edit opportunity'
+              : isMaintenance
+                ? 'Maintenance request'
+                : 'Edit opportunity'
           : isPayments
             ? 'Add payment follow-up'
             : isExpenses
               ? 'Add expense follow-up'
-              : 'Add opportunity'
+              : isMaintenance
+                ? 'Add maintenance follow-up'
+                : 'Add opportunity'
       }
       entityLabel={entityLabel}
       sections={sections}
@@ -1263,6 +1712,8 @@ export function AddOpportunityModal({
                         moveInPaymentStatus !== 'paid' &&
                         rate > 0
                       ) {
+                        setMoveInAmountsManual(false);
+                        moveInAmountsManualRef.current = false;
                         fillMoveInAmountsFromRent(depositMonths, advanceMonths, rate);
                       }
                     }}
@@ -1287,7 +1738,21 @@ export function AddOpportunityModal({
                     min={0}
                     step="0.01"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setAmount(next);
+                      if (
+                        isOnboarding &&
+                        !card?.assignmentId &&
+                        moveInPaymentStatus !== 'paid' &&
+                        !moveInAmountsManualRef.current
+                      ) {
+                        const rate = Number(next);
+                        if (Number.isFinite(rate) && rate > 0) {
+                          fillMoveInAmountsFromRent(depositMonths, advanceMonths, rate);
+                        }
+                      }
+                    }}
                   />
                 </FormField>
               </>
@@ -1416,7 +1881,9 @@ export function AddOpportunityModal({
                       {' · '}
                       To invoices ₱
                       {getMoveInSplit().advance.toLocaleString('en-PH')}
-                      {moveInPaymentMethod ? ` · ${moveInPaymentMethod.replace(/_/g, ' ')}` : ''}
+                      {moveInPaymentMethod
+                        ? ` · ${formatPaymentMethodLabel(moveInPaymentMethod)}`
+                        : ''}
                     </p>
                     {!card?.assignmentId && (
                       <button
@@ -1432,6 +1899,56 @@ export function AddOpportunityModal({
                 )}
 
                 <div className="grid grid-cols-6 gap-5">
+                  {feeChecklistReady && (
+                    <div className="col-span-6 rounded-lg border border-teal-200 bg-teal-50/60 p-4">
+                      <p className="text-sm font-medium text-gray-900">
+                        Onboarding fee checklist (from property deposit rules)
+                      </p>
+                      <ul className="mt-3 space-y-2 text-sm text-gray-800">
+                        <li className="flex justify-between gap-3">
+                          <span>
+                            Security deposit
+                            {depositMonths > 0 ? ` (${depositMonths} mo)` : ''}
+                          </span>
+                          <span className="font-semibold tabular-nums">
+                            ₱{requiredDeposit.toLocaleString('en-PH')}
+                          </span>
+                        </li>
+                        <li className="flex justify-between gap-3">
+                          <span>
+                            Advance rent
+                            {advanceMonths > 0 ? ` (${advanceMonths} mo)` : ''}
+                          </span>
+                          <span className="font-semibold tabular-nums">
+                            ₱{requiredAdvance.toLocaleString('en-PH')}
+                          </span>
+                        </li>
+                        <li className="flex justify-between gap-3">
+                          <span>Utility deposit</span>
+                          <span className="font-semibold tabular-nums">
+                            ₱{requiredUtility.toLocaleString('en-PH')}
+                          </span>
+                        </li>
+                        <li className="flex justify-between gap-3 border-t border-teal-200 pt-2 font-medium">
+                          <span>Expected total</span>
+                          <span className="tabular-nums">
+                            ₱
+                            {(
+                              requiredDeposit +
+                              requiredAdvance +
+                              requiredUtility
+                            ).toLocaleString('en-PH')}
+                          </span>
+                        </li>
+                      </ul>
+                      {moveInPaymentStatus === 'paid' && (
+                        <p className="mt-2 text-xs font-medium text-emerald-800">
+                          Marked paid on this opportunity
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {!card?.assignmentId && moveInPaymentStatus !== 'paid' && (
                     <div className="col-span-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1500,6 +2017,15 @@ export function AddOpportunityModal({
                           </Select>
                         </FormField>
                       </div>
+                      {moveInAmountsManual && getMonthlyRentForPayment() > 0 && (
+                        <button
+                          type="button"
+                          className="mt-3 text-xs font-medium text-blue-700 underline"
+                          onClick={() => applyMoveInMonths(depositMonths, advanceMonths)}
+                        >
+                          Reset to calculated amounts
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -1520,7 +2046,11 @@ export function AddOpportunityModal({
                         step="0.01"
                         value={moveInTotalPaid === '0' ? '' : moveInTotalPaid}
                         disabled={Boolean(card?.assignmentId)}
-                        onChange={(e) => setMoveInTotalPaid(e.target.value)}
+                        onChange={(e) => {
+                          setMoveInAmountsManual(true);
+                          moveInAmountsManualRef.current = true;
+                          setMoveInTotalPaid(e.target.value);
+                        }}
                         placeholder="0.00"
                         className="pl-8"
                       />
@@ -1543,7 +2073,11 @@ export function AddOpportunityModal({
                         step="0.01"
                         value={depositAmount === '0' ? '' : depositAmount}
                         disabled={Boolean(card?.assignmentId)}
-                        onChange={(e) => setDepositAmount(e.target.value)}
+                        onChange={(e) => {
+                          setMoveInAmountsManual(true);
+                          moveInAmountsManualRef.current = true;
+                          setDepositAmount(e.target.value);
+                        }}
                         placeholder="0.00"
                         className="pl-8"
                       />
@@ -1566,6 +2100,27 @@ export function AddOpportunityModal({
                           ₱{getMoveInSplit().advance.toLocaleString('en-PH')}
                         </span>
                       </div>
+                      {requiredUtility > 0 && (
+                        <div className="col-span-2 text-xs text-gray-600">
+                          Utility deposit included in total:{' '}
+                          <span className="font-semibold">
+                            ₱{requiredUtility.toLocaleString('en-PH')}
+                          </span>
+                          {getMoveInSplit().total >=
+                            getMoveInSplit().deposit + requiredUtility && (
+                            <span>
+                              {' '}
+                              · Advance share after deposit+utility ≈ ₱
+                              {Math.max(
+                                0,
+                                getMoveInSplit().total -
+                                  getMoveInSplit().deposit -
+                                  requiredUtility
+                              ).toLocaleString('en-PH')}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1620,11 +2175,11 @@ export function AddOpportunityModal({
                       disabled={Boolean(card?.assignmentId)}
                       onChange={(e) => setMoveInPaymentMethod(e.target.value)}
                     >
-                      <option value="cash">Cash</option>
-                      <option value="check">Check</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="credit_card">Credit Card</option>
-                      <option value="online">Online Payment</option>
+                      {PAYMENT_METHOD_SELECT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </Select>
                   </FormField>
 
@@ -1650,11 +2205,17 @@ export function AddOpportunityModal({
                       checked={moveInPaymentStatus === 'paid'}
                       disabled={savingPayment}
                       onChange={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         if (e.target.checked) {
                           void handleMarkMoveInPaid();
                         } else {
                           void handleMarkMoveInUnpaid();
                         }
+                      }}
+                      onClick={(e) => {
+                        // Avoid accidental form submit / label quirks inside the opportunity form.
+                        e.stopPropagation();
                       }}
                       label={
                         <span className="font-medium text-gray-900">Payment received</span>
@@ -1850,8 +2411,10 @@ export function AddOpportunityModal({
                         <p className="text-sm text-gray-600">
                           Generate lease creates the tenant, assigns the room, posts the paid
                           deposit/advance to the portal, and schedules rent invoices. Login for new
-                          contacts: their email / password{' '}
-                          <span className="font-mono text-gray-800">tenant123</span>.
+                          contacts: their email / temporary password{' '}
+                          <span className="font-mono text-gray-800">tenant123</span>. On first
+                          portal login they must change the password and confirm name, email, and
+                          phone.
                         </p>
                         <Button
                           type="button"
@@ -1869,7 +2432,7 @@ export function AddOpportunityModal({
                 <FormField
                   label="Pipeline lease status"
                   htmlFor="opp-lease-status"
-                  hint="Optional tracking before you generate. Generate lease sets this to signed."
+                  hint="Optional tracking before you generate. Generate lease sets this to Lease prepared."
                 >
                   <Select
                     id="opp-lease-status"
@@ -1880,7 +2443,7 @@ export function AddOpportunityModal({
                     <option value="not_started">Not started</option>
                     <option value="generated">Lease prepared</option>
                     <option value="awaiting_signature">Awaiting signature</option>
-                    <option value="signed">Signed / generated</option>
+                    <option value="signed">Signed</option>
                   </Select>
                 </FormField>
               </div>
@@ -2039,53 +2602,214 @@ export function AddOpportunityModal({
 
             {activeSection === 'contact' && (
               <>
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <FormField
-                    label={isExpenses ? 'Vendor / provider' : 'First name'}
-                    htmlFor="opp-first-name"
-                    required
-                  >
-                    <Input
-                      id="opp-first-name"
-                      required
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder={isExpenses ? 'Meralco / Cleaning Co.' : 'Maria'}
-                    />
-                  </FormField>
-                  <FormField
-                    label={isExpenses ? 'Contact name (optional)' : 'Last name'}
-                    htmlFor="opp-last-name"
-                    required={!isExpenses}
-                  >
-                    <Input
-                      id="opp-last-name"
-                      required={!isExpenses}
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder={isExpenses ? 'Optional' : 'Lopez'}
-                    />
-                  </FormField>
-                </div>
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <FormField label="Email" htmlFor="opp-email">
-                    <Input
-                      id="opp-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="maria@email.com"
-                    />
-                  </FormField>
-                  <FormField label="Phone" htmlFor="opp-phone">
-                    <Input
-                      id="opp-phone"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+63…"
-                    />
-                  </FormField>
-                </div>
+                {isExpenses ? (
+                  <>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                      <FormField
+                        label="Vendor / provider"
+                        htmlFor="opp-vendor-select"
+                        required
+                        className="min-w-0 flex-1"
+                      >
+                        <Select
+                          id="opp-vendor-select"
+                          required={!firstName.trim()}
+                          value={selectedVendorId}
+                          onChange={(e) => handleVendorSelect(e.target.value)}
+                        >
+                          <option value="">Select a vendor…</option>
+                          {vendors.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {contactDisplayName(v)}
+                            </option>
+                          ))}
+                          <option value={CUSTOM_VENDOR_VALUE}>Other (type manually)</option>
+                        </Select>
+                      </FormField>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        leftIcon={<Plus className="h-4 w-4" />}
+                        onClick={() => {
+                          setShowAddVendor((open) => !open);
+                          setVendorFormError(null);
+                        }}
+                      >
+                        Add vendor
+                      </Button>
+                    </div>
+
+                    {showAddVendor && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                        <p className="text-sm font-medium text-gray-900">
+                          New vendor / provider
+                        </p>
+                        <FormField
+                          label="Company / provider name"
+                          htmlFor="new-vendor-name"
+                          required
+                        >
+                          <Input
+                            id="new-vendor-name"
+                            value={newVendorName}
+                            onChange={(e) => setNewVendorName(e.target.value)}
+                            placeholder="e.g. Angeles Electric Corp."
+                          />
+                        </FormField>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <FormField
+                            label="Contact name (optional)"
+                            htmlFor="new-vendor-contact"
+                          >
+                            <Input
+                              id="new-vendor-contact"
+                              value={newVendorContact}
+                              onChange={(e) => setNewVendorContact(e.target.value)}
+                              placeholder="Optional"
+                            />
+                          </FormField>
+                          <FormField label="Phone" htmlFor="new-vendor-phone">
+                            <Input
+                              id="new-vendor-phone"
+                              value={newVendorPhone}
+                              onChange={(e) => setNewVendorPhone(e.target.value)}
+                              placeholder="+63…"
+                            />
+                          </FormField>
+                        </div>
+                        <FormField label="Email" htmlFor="new-vendor-email">
+                          <Input
+                            id="new-vendor-email"
+                            type="email"
+                            value={newVendorEmail}
+                            onChange={(e) => setNewVendorEmail(e.target.value)}
+                            placeholder="billing@provider.com"
+                          />
+                        </FormField>
+                        {vendorFormError && (
+                          <p className="text-sm text-red-600">{vendorFormError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            isLoading={savingVendor}
+                            onClick={() => void handleCreateVendor()}
+                          >
+                            Save vendor
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={savingVendor}
+                            onClick={() => {
+                              setShowAddVendor(false);
+                              setVendorFormError(null);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedVendorId === CUSTOM_VENDOR_VALUE ||
+                      (!selectedVendorId && Boolean(firstName))) && (
+                      <FormField
+                        label="Vendor / provider name"
+                        htmlFor="opp-first-name"
+                        required
+                      >
+                        <Input
+                          id="opp-first-name"
+                          required
+                          value={firstName}
+                          onChange={(e) => {
+                            setSelectedVendorId(CUSTOM_VENDOR_VALUE);
+                            setFirstName(e.target.value);
+                          }}
+                          placeholder="Meralco / Cleaning Co."
+                        />
+                      </FormField>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      <FormField
+                        label="Contact name (optional)"
+                        htmlFor="opp-last-name"
+                      >
+                        <Input
+                          id="opp-last-name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Optional"
+                        />
+                      </FormField>
+                      <FormField label="Phone" htmlFor="opp-phone">
+                        <Input
+                          id="opp-phone"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+63…"
+                        />
+                      </FormField>
+                    </div>
+                    <FormField label="Email" htmlFor="opp-email">
+                      <Input
+                        id="opp-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="maria@email.com"
+                      />
+                    </FormField>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      <FormField label="First name" htmlFor="opp-first-name" required>
+                        <Input
+                          id="opp-first-name"
+                          required
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Maria"
+                        />
+                      </FormField>
+                      <FormField label="Last name" htmlFor="opp-last-name" required>
+                        <Input
+                          id="opp-last-name"
+                          required
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Lopez"
+                        />
+                      </FormField>
+                    </div>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      <FormField label="Email" htmlFor="opp-email">
+                        <Input
+                          id="opp-email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="maria@email.com"
+                        />
+                      </FormField>
+                      <FormField label="Phone" htmlFor="opp-phone">
+                        <Input
+                          id="opp-phone"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+63…"
+                        />
+                      </FormField>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -2144,6 +2868,24 @@ export function AddOpportunityModal({
                     </Select>
                   </FormField>
                 )}
+                {isMaintenance && (
+                  <FormField label="Room / unit" htmlFor="opp-room-maintenance">
+                    <Select
+                      id="opp-room-maintenance"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      disabled={!buildingId}
+                    >
+                      <option value="">Select room</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomNumber}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                )}
+                {!isMaintenance && (
                 <FormField
                   label={isPayments ? 'Monthly rent (₱)' : isExpenses ? 'Bill amount (₱)' : 'Amount (₱)'}
                   htmlFor="opp-amount"
@@ -2164,20 +2906,31 @@ export function AddOpportunityModal({
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </FormField>
+                )}
               </>
             )}
 
             {activeSection === 'schedule' && (
               <>
                 <FormField
-                  label={isPayments ? 'Rent due' : isExpenses ? 'Bill due' : 'Due'}
+                  label={
+                    isPayments
+                      ? 'Rent due'
+                      : isExpenses
+                        ? 'Bill due'
+                        : isMaintenance
+                          ? 'Scheduled / due'
+                          : 'Due'
+                  }
                   htmlFor="opp-due"
                   hint={
                     isPayments
                       ? 'When this month’s rent should be paid. Drag the card to Due when that day arrives.'
                       : isExpenses
                         ? 'When this bill should be paid.'
-                        : undefined
+                        : isMaintenance
+                          ? 'Optional target date for the repair visit.'
+                          : undefined
                   }
                 >
                   <Input
@@ -2227,25 +2980,47 @@ export function AddOpportunityModal({
               />
             )}
 
+            {activeSection === 'payment' && isMaintenance && card?.id && (
+              <MaintenanceFollowUpPanel
+                cardId={card.id}
+                maintenanceRequestId={card.maintenanceRequestId}
+                buildingId={buildingId || undefined}
+                roomId={roomId || undefined}
+                onUpdated={onSaved}
+              />
+            )}
+
             {activeSection === 'notes' && (
               <FormField
-                label={isPayments ? 'Follow-up notes' : 'Notes'}
-                htmlFor="opp-notes-generic"
+                label={
+                  isPayments || isExpenses || isMaintenance
+                    ? 'Follow-up notes'
+                    : 'Notes'
+                }
+                htmlFor="opp-notes"
                 hint={
-                  isPayments
-                    ? 'Example: Called 8/4 — promised to pay Friday. Reminder SMS sent.'
-                    : undefined
+                  isExpenses
+                    ? 'Approval notes, payment schedule, or vendor follow-ups. Billing period is shown in plain language when available.'
+                    : isPayments
+                      ? 'Example: Called 8/4 — promised to pay Friday. Reminder SMS sent.'
+                      : isMaintenance
+                        ? 'Card-level follow-up (tenant description lives under Request).'
+                        : undefined
                 }
               >
                 <Textarea
-                  id="opp-notes-generic"
+                  id="opp-notes"
                   rows={5}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={
                     isPayments
                       ? 'Log calls, promises, partial payments…'
-                      : 'Follow-up context'
+                      : isExpenses
+                        ? 'e.g. Waiting on Angeles Electric confirmation…'
+                        : isMaintenance
+                          ? 'e.g. Vendor confirmed visit tomorrow…'
+                          : 'Follow-up context'
                   }
                 />
               </FormField>
@@ -2312,17 +3087,6 @@ export function AddOpportunityModal({
                 tags={tags}
                 onChange={setTags}
               />
-            )}
-
-            {activeSection === 'notes' && (
-              <FormField label="Notes" htmlFor="opp-notes">
-                <Textarea
-                  id="opp-notes"
-                  rows={5}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </FormField>
             )}
 
             {activeSection === 'history' && card?.id && (

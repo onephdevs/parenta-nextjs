@@ -1,4 +1,8 @@
+import { CONSTANTS } from '@/lib/constants';
+
 export const TENANT_PAYMENT_INSTRUCTIONS_KEY = 'tenant_payment_instructions';
+
+type TenantAcceptedMethod = 'gcash' | 'maya' | 'bank_transfer' | 'other';
 
 export interface TenantPaymentInstructions {
   /** Primary mobile number for GCash / Maya / similar */
@@ -11,7 +15,7 @@ export interface TenantPaymentInstructions {
   /** Extra notes shown on the tenant pay screen */
   notes: string;
   /** Methods the office accepts */
-  acceptedMethods: Array<'gcash' | 'maya' | 'bank_transfer' | 'other'>;
+  acceptedMethods: TenantAcceptedMethod[];
 }
 
 export const DEFAULT_TENANT_PAYMENT_INSTRUCTIONS: TenantPaymentInstructions = {
@@ -20,7 +24,9 @@ export const DEFAULT_TENANT_PAYMENT_INSTRUCTIONS: TenantPaymentInstructions = {
   bankName: '',
   bankAccountNumber: '',
   notes: 'Send payment to the number below, then upload a screenshot of your transfer receipt.',
-  acceptedMethods: ['gcash', 'maya', 'bank_transfer'],
+  acceptedMethods: [
+    ...(CONSTANTS.MODULE.PAYMENT.TENANT_ACCEPTED_METHODS_DEFAULT as TenantAcceptedMethod[]),
+  ],
 };
 
 export function parseTenantPaymentInstructions(raw: unknown): TenantPaymentInstructions {

@@ -10,7 +10,7 @@ interface PageProps {
 export default async function LeaseDetailPage({ params }: PageProps) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const { id } = await params;

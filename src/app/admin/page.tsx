@@ -69,7 +69,7 @@ export default async function AdminDashboard() {
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const stats = await getDashboardStats();

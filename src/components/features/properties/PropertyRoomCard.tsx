@@ -19,6 +19,7 @@ import {
   toDisplayRoomStatus,
 } from './property-utils';
 import { cn } from '@/lib/utils';
+import { LightboxImage } from '@/components/ui/ImageLightbox';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 const TEAL = '#39CCCC';
@@ -213,13 +214,20 @@ export default function PropertyRoomCard({
             <p className="mb-2 text-[12px] font-bold leading-none text-gray-900">Gallery</p>
             {gallery.length > 0 ? (
               <div className="flex gap-2 overflow-x-auto pb-1">
-                {gallery.map((image) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                {gallery.map((image, index) => (
+                  <LightboxImage
                     key={image.id}
                     src={getImageUrl(image.filePath)}
-                    alt=""
-                    className="h-10 w-10 flex-shrink-0 rounded object-cover"
+                    alt={`Room photo ${index + 1}`}
+                    title={`Room photo ${index + 1}`}
+                    gallery={gallery.map((img, i) => ({
+                      src: getImageUrl(img.filePath),
+                      alt: `Room photo ${i + 1}`,
+                      title: `Room photo ${i + 1}`,
+                    }))}
+                    galleryIndex={index}
+                    wrapperClassName="h-10 w-10 flex-shrink-0 overflow-hidden rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    className="h-10 w-10 object-cover"
                   />
                 ))}
               </div>

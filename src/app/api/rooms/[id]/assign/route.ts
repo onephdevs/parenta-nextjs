@@ -191,8 +191,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       `INSERT INTO tenant_room_assignments 
        (tenant_id, room_id, start_date, end_date, monthly_rate, deposit_paid, 
         advance_paid, utility_deposit_paid, deposit_valid_until, deposit_refundable, 
-        assignment_status, notes, tenant_name_snapshot, tenant_email_snapshot)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13)
+        assignment_status, notes, tenant_name_snapshot, tenant_email_snapshot,
+        billing_cycle_start_day)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13,
+         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31))
        RETURNING *`,
       [
         tenantId, 

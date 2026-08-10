@@ -54,18 +54,10 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
     const userId = session.user.id;
 
-    const countResult = await pool.query(
-      `SELECT COUNT(*)::int AS total,
-              COUNT(*) FILTER (WHERE is_read = false)::int AS unread
-       FROM notifications
-       WHERE user_id = $1`,
-      [userId]
-    );
-
-    // The stored message is a snapshot taken when the notification was created,
-    // so it goes stale when the actor renames themselves. Join back to the
-    // originating activity log to rebuild the text from current user data.
-    const selectSql = `
+    // Single round-trip: list + totals (avoids a second query on a flaky socket).
+    // The stored message is a snapshot from creation time, so join activity_log
+    // to rebuild text from current actor profile data.
+    const listSql = `
       SELECT n.id, n.category, n.notification_type, n.title, n.message AS body,
              n.link, n.related_activity_log_id, n.is_read, n.created_at, n.priority,
              al.action_type AS actor_action_type,
@@ -74,25 +66,38 @@ export async function GET(request: NextRequest) {
              al.metadata AS actor_metadata,
              u.first_name AS actor_first_name,
              u.last_name AS actor_last_name,
-             u.email AS actor_email
+             u.email AS actor_email,
+             COUNT(*) OVER()::int AS total_count,
+             (
+               SELECT COUNT(*)::int
+               FROM notifications un
+               WHERE un.user_id = $1 AND un.is_read = false
+             ) AS unread_total
       FROM notifications n
       LEFT JOIN activity_log al ON al.id = n.related_activity_log_id
-      LEFT JOIN users u ON u.id = al.actor_user_id`;
+      LEFT JOIN users u ON u.id = al.actor_user_id
+      WHERE n.user_id = $1
+        ${unreadOnly ? 'AND n.is_read = false' : ''}
+      ORDER BY ${unreadOnly ? 'n.created_at DESC' : 'n.is_read ASC, n.created_at DESC'}
+      LIMIT $2 OFFSET $3`;
 
-    const listSql = unreadOnly
-      ? `${selectSql}
-         WHERE n.user_id = $1 AND n.is_read = false
-         ORDER BY n.created_at DESC
-         LIMIT $2 OFFSET $3`
-      : `${selectSql}
-         WHERE n.user_id = $1
-         ORDER BY n.is_read ASC, n.created_at DESC
-         LIMIT $2 OFFSET $3`;
+    const result = await pool.query(listSql, [userId, limit, offset]);
+    const rows = result.rows;
+    let unreadCount = rows[0]?.unread_total ?? 0;
+    let total = rows[0]?.total_count ?? 0;
 
-    const rows = (await pool.query(listSql, [userId, limit, offset])).rows;
-    const total = unreadOnly
-      ? countResult.rows[0]?.unread || 0
-      : countResult.rows[0]?.total || 0;
+    // Empty page (no rows) still needs totals for the badge / pagination.
+    if (rows.length === 0) {
+      const counts = await pool.query(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE is_read = false)::int AS unread
+         FROM notifications
+         WHERE user_id = $1`,
+        [userId]
+      );
+      unreadCount = counts.rows[0]?.unread || 0;
+      total = unreadOnly ? unreadCount : counts.rows[0]?.total || 0;
+    }
 
     return NextResponse.json({
       success: true,
@@ -109,7 +114,7 @@ export async function GET(request: NextRequest) {
           priority: r.priority,
           createdAt: r.created_at,
         })),
-        unreadCount: countResult.rows[0]?.unread || 0,
+        unreadCount,
         pagination: { page, limit, total },
       },
     });

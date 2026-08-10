@@ -82,11 +82,11 @@ export async function allocatePaymentToInvoices(
       );
     }
 
-    // Check if admin wants to use existing deposit
+    // Check if admin wants to use existing deposit toward unpaid invoices
     let availableFromDeposit = 0;
     if (useDeposit) {
       const depositBalance = await getTenantDepositBalance(tenantId);
-      availableFromDeposit = depositBalance;
+      availableFromDeposit = Math.max(0, depositBalance);
     }
 
     // Get unpaid invoices (sorted by due date, oldest first)
@@ -95,7 +95,7 @@ export async function allocatePaymentToInvoices(
     const unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId);
 
     if (unpaidInvoices.length === 0) {
-      // No unpaid invoices - create advance for entire amount
+      // No unpaid invoices - create advance for entire cash amount (do not auto-apply deposit)
       await client.query(
         `INSERT INTO tenant_credits (
           tenant_id,
@@ -115,7 +115,9 @@ export async function allocatePaymentToInvoices(
         ]
       );
 
-      await client.query('COMMIT');
+      if (ownsClient) {
+        await client.query('COMMIT');
+      }
 
       return {
         success: true,
@@ -128,34 +130,75 @@ export async function allocatePaymentToInvoices(
       };
     }
 
-    // Allocate payment to invoices
-    let remainingAmount = paymentAmount;
+    // Allocate cash first, then deposit balance, across invoices (oldest first)
+    let remainingCash = paymentAmount;
+    let remainingDeposit = availableFromDeposit;
     const allocations: PaymentAllocationResult['allocations'] = [];
 
     for (const invoice of unpaidInvoices) {
-      if (remainingAmount <= 0) break;
+      if (remainingCash <= 0 && remainingDeposit <= 0) break;
 
-      const amountToAllocate = Math.min(remainingAmount, invoice.balanceDue);
+      let invoiceBalance = invoice.balanceDue;
+      let cashOnInvoice = 0;
+      let depositOnInvoice = 0;
 
-      // Create payment allocation record
-      await client.query(
-        `INSERT INTO payment_allocations (
-          payment_id,
-          invoice_id,
-          allocated_amount,
-          allocation_date,
-          notes
-        ) VALUES ($1, $2, $3, $4, $5)`,
-        [
-          paymentId,
-          invoice.id,
-          amountToAllocate,
-          new Date(),
-          `Auto-allocated from payment`
-        ]
-      );
+      if (remainingCash > 0 && invoiceBalance > 0) {
+        cashOnInvoice = Math.min(remainingCash, invoiceBalance);
+        remainingCash -= cashOnInvoice;
+        invoiceBalance -= cashOnInvoice;
+      }
 
-      // Update invoice amount_paid and status
+      if (remainingDeposit > 0 && invoiceBalance > 0) {
+        depositOnInvoice = Math.min(remainingDeposit, invoiceBalance);
+        remainingDeposit -= depositOnInvoice;
+        invoiceBalance -= depositOnInvoice;
+      }
+
+      const amountToAllocate = cashOnInvoice + depositOnInvoice;
+      if (amountToAllocate <= 0) continue;
+
+      if (cashOnInvoice > 0) {
+        await client.query(
+          `INSERT INTO payment_allocations (
+            payment_id,
+            invoice_id,
+            allocated_amount,
+            allocation_date,
+            notes
+          ) VALUES ($1, $2, $3, $4, $5)`,
+          [
+            paymentId,
+            invoice.id,
+            cashOnInvoice,
+            new Date(),
+            `Auto-allocated from payment`,
+          ]
+        );
+      }
+
+      if (depositOnInvoice > 0) {
+        await client.query(
+          `INSERT INTO deposit_ledger (
+            tenant_id,
+            amount,
+            transaction_type,
+            applied_to_invoice_id,
+            payment_id,
+            description,
+            transaction_date
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            tenantId,
+            depositOnInvoice,
+            'applied',
+            invoice.id,
+            paymentId,
+            `Deposit auto-applied to invoice ${invoice.invoiceNumber}`,
+            new Date(),
+          ]
+        );
+      }
+
       const newAmountPaid = invoice.amountPaid + amountToAllocate;
       const newBalanceDue = invoice.totalAmount - newAmountPaid;
       let newStatus = invoice.status;
@@ -181,15 +224,15 @@ export async function allocatePaymentToInvoices(
         amountAllocated: amountToAllocate,
         invoiceStatus: newStatus
       });
-
-      remainingAmount -= amountToAllocate;
     }
 
-    // If there's still money left after paying all invoices, create tenant credit
+    depositUsed = availableFromDeposit - remainingDeposit;
+
+    // If there's still cash left after paying all invoices, create tenant credit
     let creditCreated = false;
     let creditAmount = 0;
 
-    if (remainingAmount > 0) {
+    if (remainingCash > 0) {
       await client.query(
         `INSERT INTO tenant_credits (
           tenant_id,
@@ -201,7 +244,7 @@ export async function allocatePaymentToInvoices(
         ) VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           tenantId,
-          remainingAmount,
+          remainingCash,
           'excess_payment',
           paymentId,
           `Excess payment after allocating to ${allocations.length} invoice(s)`,
@@ -210,7 +253,7 @@ export async function allocatePaymentToInvoices(
       );
 
       creditCreated = true;
-      creditAmount = remainingAmount;
+      creditAmount = remainingCash;
     }
 
     // Update payment status to completed
@@ -233,7 +276,7 @@ export async function allocatePaymentToInvoices(
         console.error('Payment pipeline sync after allocation failed:', err)
       );
 
-    const totalAllocated = paymentAmount - remainingAmount;
+    const totalAllocated = paymentAmount - remainingCash + depositUsed;
 
     return {
       success: true,
@@ -242,7 +285,12 @@ export async function allocatePaymentToInvoices(
       creditCreated,
       creditAmount,
       depositUsed,
-      message: buildAllocationMessage(allocations, creditCreated, creditAmount)
+      message: buildAllocationMessage(
+        allocations,
+        creditCreated,
+        creditAmount,
+        depositUsed
+      )
     };
 
   } catch (error) {
@@ -579,13 +627,18 @@ export async function getTenantDepositBalance(tenantId: string): Promise<number>
 function buildAllocationMessage(
   allocations: PaymentAllocationResult['allocations'],
   creditCreated: boolean,
-  creditAmount: number
+  creditAmount: number,
+  depositUsed = 0
 ): string {
   let message = `Payment allocated to ${allocations.length} invoice(s): `;
   
   message += allocations
     .map(a => `₱${a.amountAllocated.toFixed(2)} to ${a.invoiceNumber}`)
     .join(', ');
+
+  if (depositUsed > 0) {
+    message += `. Applied ₱${depositUsed.toFixed(2)} from deposit balance.`;
+  }
 
   if (creditCreated) {
     message += `. Excess ₱${creditAmount.toFixed(2)} saved as tenant credit.`;

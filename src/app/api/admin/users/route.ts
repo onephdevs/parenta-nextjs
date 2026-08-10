@@ -43,8 +43,8 @@ export async function GET() {
       `SELECT id, email, username, role, first_name, last_name,
               is_active, email_verified, created_at, updated_at
        FROM users
-       WHERE role = 'admin'
-       ORDER BY created_at DESC`
+       WHERE role IN ('admin', 'caretaker')
+       ORDER BY role ASC, created_at DESC`
     );
 
     const users = result.rows.map(mapAdminUser);
@@ -110,11 +110,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const roleRaw = String(body.role || 'admin').toLowerCase();
+    const role = roleRaw === 'caretaker' ? 'caretaker' : 'admin';
+
     const userData: CreateUserData = {
       email,
       username,
       password,
-      role: 'admin',
+      role,
       firstName,
       lastName,
       isActive: true,

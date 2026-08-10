@@ -602,9 +602,12 @@ export async function convertReservationToAssignment(
     const assignmentQuery = `
       INSERT INTO tenant_room_assignments (
         tenant_id, room_id, start_date, end_date, monthly_rate, 
-        deposit_paid, assignment_status, notes
+        deposit_paid, assignment_status, notes, billing_cycle_start_day
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
+      VALUES (
+        $1, $2, $3, $4, $5, $6, 'active', $7,
+        LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31)
+      )
       RETURNING id
     `;
 

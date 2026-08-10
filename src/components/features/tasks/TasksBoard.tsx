@@ -113,10 +113,14 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   );
 
   const loadBoard = useCallback(
-    async (slug: PipelineBoardSlug, options?: { quiet?: boolean }) => {
+    async (
+      slug: PipelineBoardSlug,
+      options?: { quiet?: boolean; preferCard?: PipelineCard }
+    ): Promise<PipelineCard[] | undefined> => {
       const seq = ++loadSeqRef.current;
       lastRequestedSlugRef.current = slug;
       const quiet = Boolean(options?.quiet);
+      const preferCard = options?.preferCard;
 
       // Optimistic UI: clear search/filters and update label/URL immediately so
       // a leftover search term can't hide the new board or look like a failed switch.
@@ -135,15 +139,23 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       try {
         // sync=0: board UI must not wait on lease/maintenance sync (can take 30–60s+)
         const res = await fetch(
-          `/api/pipeline/boards?slug=${encodeURIComponent(slug)}&sync=0`
+          `/api/pipeline/boards?slug=${encodeURIComponent(slug)}&sync=0&_=${Date.now()}`,
+          { cache: 'no-store' }
         );
         const json = await res.json();
-        if (seq !== loadSeqRef.current) return;
+        if (seq !== loadSeqRef.current) return undefined;
         if (!json.success) {
           throw new Error(json.error || 'Failed to load board');
         }
+        let nextCards = (json.data.cards || []) as PipelineCard[];
+        // Keep a just-saved PATCH card if the follow-up GET is briefly stale.
+        if (preferCard?.id) {
+          nextCards = nextCards.map((c) =>
+            c.id === preferCard.id ? { ...c, ...preferCard } : c
+          );
+        }
         setBoards(json.data.boards);
-        setCards(json.data.cards || []);
+        setCards(nextCards);
         if (Array.isArray(json.data.archivedBoards)) {
           setArchivedBoards(json.data.archivedBoards);
         } else {
@@ -165,7 +177,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
               await fetch('/api/pipeline/sync', { method: 'POST' });
               if (seq !== loadSeqRef.current) return;
               const refresh = await fetch(
-                `/api/pipeline/boards?slug=${encodeURIComponent(slug)}&sync=0`
+                `/api/pipeline/boards?slug=${encodeURIComponent(slug)}&sync=0&_=${Date.now()}`,
+                { cache: 'no-store' }
               );
               const refreshJson = await refresh.json();
               if (seq !== loadSeqRef.current || !refreshJson.success) return;
@@ -176,9 +189,11 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             }
           })();
         }
+        return nextCards;
       } catch (err) {
-        if (seq !== loadSeqRef.current) return;
+        if (seq !== loadSeqRef.current) return undefined;
         setError(err instanceof Error ? err.message : 'Failed to load board');
+        return undefined;
       } finally {
         if (seq === loadSeqRef.current) setLoading(false);
       }
@@ -1303,8 +1318,32 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             setSelectedCard(null);
             void loadBoard(activeSlug);
           }}
-          onSaved={() => {
-            void loadBoard(activeSlug);
+          onSaved={(updatedCard) => {
+            // Apply PATCH response immediately so screening/stage/etc. show
+            // without waiting on a follow-up GET (can lag on pooled/cached reads).
+            if (updatedCard?.id) {
+              setCards((prev) => {
+                const idx = prev.findIndex((c) => c.id === updatedCard.id);
+                if (idx < 0) return [...prev, updatedCard];
+                const next = prev.slice();
+                next[idx] = { ...prev[idx], ...updatedCard };
+                return next;
+              });
+              setSelectedCard((prev) =>
+                prev?.id === updatedCard.id ? { ...prev, ...updatedCard } : prev
+              );
+            }
+            void loadBoard(activeSlug, {
+              quiet: true,
+              preferCard: updatedCard,
+            }).then((freshCards) => {
+              if (!freshCards || !updatedCard?.id) return;
+              setSelectedCard((prev) => {
+                if (!prev || prev.id !== updatedCard.id) return prev;
+                const fromBoard = freshCards.find((c) => c.id === prev.id);
+                return fromBoard ? { ...fromBoard, ...updatedCard } : prev;
+              });
+            });
           }}
           onMoved={(slug) => {
             setShowOpportunity(false);

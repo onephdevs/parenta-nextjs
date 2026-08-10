@@ -31,6 +31,13 @@ export async function GET() {
     const attachmentMap = await listAttachmentsForRequests(
       result.rows.map((row: { id: string }) => String(row.id))
     );
+    const { listMaintenanceUpdatesForRequests } = await import(
+      '@/lib/api/maintenance-updates'
+    );
+    const updatesMap = await listMaintenanceUpdatesForRequests(
+      result.rows.map((row: { id: string }) => String(row.id)),
+      access.userId
+    );
 
     const requests = result.rows.map((row: Record<string, unknown>) => ({
       id: row.id,
@@ -48,6 +55,7 @@ export async function GET() {
       buildingName: row.building_name,
       attachments: attachmentMap.get(String(row.id)) || [],
       attachmentCount: (attachmentMap.get(String(row.id)) || []).length,
+      updates: updatesMap.get(String(row.id)) || [],
     }));
 
     return NextResponse.json({
@@ -56,7 +64,10 @@ export async function GET() {
         requests,
         total: requests.length,
         active: requests.filter(
-          (r) => r.status !== 'completed' && r.status !== 'cancelled'
+          (r) =>
+            r.status !== 'completed' &&
+            r.status !== 'cancelled' &&
+            r.status !== 'closed'
         ).length,
       },
     });

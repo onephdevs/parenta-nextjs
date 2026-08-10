@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { Home, User, Calendar, DollarSign, FileText } from 'lucide-react';
-import Link from 'next/link';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 
 interface CreateReservationModalProps {
   isOpen: boolean;
@@ -552,13 +552,25 @@ export default function CreateReservationModal({
                   </option>
                 )}
               </Select>
-              <Link
-                href="/admin/tenants/new"
-                target="_blank"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 hover:bg-gray-50"
-              >
-                New Tenant
-              </Link>
+              <AddTenantButton
+                label="New Tenant"
+                variant="outline"
+                redirectAfterCreate={false}
+                refreshOnCreated={false}
+                onCreated={(tenantId) => {
+                  void fetchTenants();
+                  setFormData((prev) => ({ ...prev, tenantId }));
+                }}
+                renderTrigger={(open) => (
+                  <button
+                    type="button"
+                    onClick={open}
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                  >
+                    New Tenant
+                  </button>
+                )}
+              />
             </div>
           </FormField>
         );

@@ -10,7 +10,9 @@ import {
   Users, 
   Home,
   Package,
-  Zap
+  Zap,
+  Calculator,
+  Layers
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -19,7 +21,7 @@ export default async function ReportsPage() {
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const reportCategories = [
@@ -30,10 +32,31 @@ export default async function ReportsPage() {
       color: 'blue',
       reports: [
         {
+          name: 'Unit × Month Collections',
+          description:
+            'Spreadsheet desk: paid / partial / unpaid per unit and month (excludes ADMIN units)',
+          href: '/admin/reports/unit-month',
+          icon: Layers
+        },
+        {
           name: 'Collected Amount Report',
           description: 'Received/Collected amount per month, quarter, six months, annual',
           href: '/admin/reports/collected-amount',
           icon: DollarSign
+        },
+        {
+          name: 'Disbursement / Cash-flow',
+          description:
+            'Total Collection − Expenses = Cash Allowance + Deposit cash + Cheques = Grand Total',
+          href: '/admin/reports/disbursement',
+          icon: Calculator
+        },
+        {
+          name: 'Portfolio Rollup',
+          description:
+            'Unit → property → portfolio-wide occupancy, collections, vacancy & owner-absorbed utilities',
+          href: '/admin/reports/portfolio',
+          icon: Layers
         },
         {
           name: 'Deposit Report',
@@ -60,7 +83,7 @@ export default async function ReportsPage() {
           icon: TrendingUp
         },
         {
-          name: 'Expense Report',
+          name: 'Expense Analysis',
           description: 'Expense analysis and categorization',
           href: '/admin/financial/reports?type=expenses',
           icon: BarChart3
@@ -336,7 +359,7 @@ export default async function ReportsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {category.reports.map((report) => (
                     <Link
-                      key={report.name}
+                      key={report.href}
                       href={report.href}
                       className="group block p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:shadow-md transition-all"
                     >

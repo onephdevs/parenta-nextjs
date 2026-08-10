@@ -23,7 +23,9 @@ import {
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import { TenantStatusBadge } from '@/components/domain/StatusBadges';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import { cn } from '@/lib/utils';
+import { compareByRoomThenName, compareNatural } from '@/lib/utils/natural-sort';
 import {
   ArrowDownAZ,
   ArrowUpAZ,
@@ -31,7 +33,6 @@ import {
   Eye,
   LayoutGrid,
   List,
-  Plus,
 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -65,11 +66,16 @@ function groupTenantsByProperty(tenants: Tenant[]) {
     }
   }
 
-  return Array.from(groups.values()).sort((a, b) => {
-    if (a.key === UNASSIGNED_KEY) return 1;
-    if (b.key === UNASSIGNED_KEY) return -1;
-    return a.title.localeCompare(b.title);
-  });
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      tenants: [...group.tenants].sort(compareByRoomThenName),
+    }))
+    .sort((a, b) => {
+      if (a.key === UNASSIGNED_KEY) return 1;
+      if (b.key === UNASSIGNED_KEY) return -1;
+      return a.title.localeCompare(b.title);
+    });
 }
 
 export default function TenantsList({ tenants, buildings }: TenantsListProps) {
@@ -143,8 +149,8 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
           bValue = b.moveInDate ? new Date(b.moveInDate).getTime() : 0;
           break;
         case 'property':
-          aValue = (a.currentBuildingName || 'zzz').toLowerCase();
-          bValue = (b.currentBuildingName || 'zzz').toLowerCase();
+          aValue = `${a.currentBuildingName || 'zzz'} ${a.currentRoomNumber || ''}`.toLowerCase();
+          bValue = `${b.currentBuildingName || 'zzz'} ${b.currentRoomNumber || ''}`.toLowerCase();
           break;
         default:
           aValue = a.lastName.toLowerCase();
@@ -152,7 +158,21 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
       }
 
       if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortOrder === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+        // Prefer room-aware order for name sorts that embed unit numbers
+        // (e.g. "Tenant Unit 1" vs "Tenant Unit 10")
+        if (sortBy === 'firstName' || sortBy === 'lastName' || sortBy === 'property') {
+          const byNatural =
+            sortOrder === 'asc'
+              ? compareNatural(String(aValue), String(bValue))
+              : compareNatural(String(bValue), String(aValue));
+          if (byNatural !== 0) return byNatural;
+          return sortOrder === 'asc'
+            ? compareByRoomThenName(a, b)
+            : compareByRoomThenName(b, a);
+        }
+        return sortOrder === 'asc'
+          ? compareNatural(aValue, bValue)
+          : compareNatural(bValue, aValue);
       }
 
       return sortOrder === 'asc'
@@ -300,11 +320,7 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
                 : 'Get started by adding your first tenant.'
             }
             action={
-              !hasActiveFilters ? (
-                <Link href="/admin/tenants/new">
-                  <Button leftIcon={<Plus className="h-4 w-4" />}>Add Tenant</Button>
-                </Link>
-              ) : undefined
+              !hasActiveFilters ? <AddTenantButton /> : undefined
             }
           />
         ) : viewMode === 'grid' ? (

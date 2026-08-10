@@ -35,7 +35,7 @@ export default function VacantRoomsReportPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated' || (session && session.user.role !== 'admin')) {
-      redirect('/auth/admin/signin');
+      redirect('/auth/signin');
     }
     
     fetchBuildings();
@@ -265,10 +265,19 @@ export default function VacantRoomsReportPage() {
               />
               <MetricTile
                 tone="green"
-                label="Potential Revenue"
-                value={formatCurrency(reportData.summary.totalPotentialRevenue)}
+                label="Est. Lost Rent"
+                value={formatCurrency(
+                  reportData.summary.totalEstimatedLostRent ||
+                    reportData.summary.totalPotentialRevenue
+                )}
               />
             </div>
+            {reportData.summary.totalOwnerAbsorbedUtility != null && (
+              <p className="mt-3 text-sm text-gray-500">
+                Owner-absorbed vacant utilities:{' '}
+                {formatCurrency(reportData.summary.totalOwnerAbsorbedUtility)}
+              </p>
+            )}
           </div>
         )}
 
@@ -301,6 +310,12 @@ export default function VacantRoomsReportPage() {
                       Days Vacant
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Est. Lost Rent
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Owner Utilities
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Last Tenant
                     </th>
                   </tr>
@@ -329,7 +344,15 @@ export default function VacantRoomsReportPage() {
                         {formatCurrency(room.monthlyRate)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {room.daysVacant ? `${room.daysVacant} days` : 'N/A'}
+                        {room.daysVacant != null ? `${room.daysVacant} days` : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-700">
+                        {room.estimatedLostRent != null
+                          ? formatCurrency(room.estimatedLostRent)
+                          : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(room.ownerAbsorbedUtility || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {room.lastTenantName || 'N/A'}

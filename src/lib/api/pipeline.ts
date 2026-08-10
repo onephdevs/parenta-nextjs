@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { ensureTenantForLease, DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
+import { buildMaintenancePipelineTags } from '@/lib/constants/maintenance';
 import type {
   CreatePipelineCardData,
   PipelineBackgroundCheckStatus,
@@ -545,8 +546,12 @@ export async function convertOnboardingCardToLeaseSigned(
     leaseStartDate?: string | null;
     leaseEndDate?: string | null;
     moveInDate?: string | null;
+    /** Pipeline lease status after conversion — generate → prepared (`generated`) */
+    leaseStatus?: PipelineLeaseStatus;
   }
 ): Promise<PipelineCard> {
+  const nextLeaseStatus: PipelineLeaseStatus =
+    options?.leaseStatus || 'generated';
   const card = await getPipelineCardById(cardId);
   if (!card) throw new Error('Card not found');
   if (card.boardSlug && card.boardSlug !== 'onboarding') {
@@ -567,11 +572,19 @@ export async function convertOnboardingCardToLeaseSigned(
         `UPDATE pipeline_cards SET
            stage_id = $1,
            card_status = 'won',
-           lease_status = 'signed',
+           lease_status = $2,
            won_at = COALESCE(won_at, CURRENT_TIMESTAMP),
            updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [stageId, nextLeaseStatus, cardId]
+      );
+    } else {
+      await pool.query(
+        `UPDATE pipeline_cards SET
+           lease_status = $1,
+           updated_at = CURRENT_TIMESTAMP
          WHERE id = $2`,
-        [stageId, cardId]
+        [nextLeaseStatus, cardId]
       );
     }
     return (await getPipelineCardById(cardId))!;
@@ -649,6 +662,9 @@ export async function convertOnboardingCardToLeaseSigned(
     );
   }
 
+  const { getUtilityDeposit } = await import('@/lib/api/building-deposit-config');
+  const utilityDepositPaid = await getUtilityDeposit(room.building_id);
+
   const endDate =
     (options?.leaseEndDate !== undefined
       ? options.leaseEndDate
@@ -680,6 +696,7 @@ export async function convertOnboardingCardToLeaseSigned(
       email,
       password: DEFAULT_TENANT_PASSWORD,
       sendInvitation: false,
+      profileCompleted: false,
       firstName,
       lastName,
       phone: card.contactPhone || undefined,
@@ -717,9 +734,11 @@ export async function convertOnboardingCardToLeaseSigned(
     const assignmentResult = await client.query(
       `INSERT INTO tenant_room_assignments
          (tenant_id, room_id, start_date, end_date, monthly_rate,
-          deposit_paid, advance_paid, assignment_status,
-          notes, tenant_name_snapshot, tenant_email_snapshot)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10)
+          deposit_paid, advance_paid, utility_deposit_paid, assignment_status,
+          notes, tenant_name_snapshot, tenant_email_snapshot,
+          billing_cycle_start_day)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10, $11,
+         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31))
        RETURNING id`,
       [
         tenantId,
@@ -729,6 +748,7 @@ export async function convertOnboardingCardToLeaseSigned(
         monthlyRate,
         depositPaid > 0 ? depositPaid : null,
         advancePaid > 0 ? advancePaid : null,
+        utilityDepositPaid > 0 ? utilityDepositPaid : 0,
         notes,
         tenantNameSnapshot,
         snap?.email || email || null,
@@ -830,22 +850,23 @@ export async function convertOnboardingCardToLeaseSigned(
          stage_id = $3,
          position = $4,
          card_status = 'won',
-         lease_status = 'signed',
-         lease_start_date = $5,
-         lease_end_date = $6,
-         move_in_date = $7,
+         lease_status = $5,
+         lease_start_date = $6,
+         lease_end_date = $7,
+         move_in_date = $8,
          background_check_status = CASE
            WHEN background_check_status = 'not_started' THEN 'approved'
            ELSE background_check_status
          END,
          won_at = COALESCE(won_at, CURRENT_TIMESTAMP),
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = $8`,
+       WHERE id = $9`,
       [
         tenantId,
         assignmentId,
         wonStageId,
         position,
+        nextLeaseStatus,
         startDate,
         endDate,
         moveInDate,
@@ -1022,8 +1043,10 @@ interface LeaseSyncRow {
 interface TenantInvoiceFocus {
   id: string;
   due_date: string;
+  negotiated_due_date?: string | null;
   balance_due: string | number | null;
   invoice_status: string | null;
+  bill_status?: string | null;
   total_amount: string | number | null;
 }
 
@@ -1058,17 +1081,27 @@ export function resolvePaymentStageFromInvoice(input: {
   const invoice = input.invoice;
   const balance = invoice ? Number(invoice.balance_due || 0) : 0;
   const status = (invoice?.invoice_status || '').toLowerCase();
+  const billStatus = String(invoice?.bill_status || '').toUpperCase();
 
   // Manual refund stays put (e.g. after a paid collection)
   if (current === 'refund') return 'refund';
 
-  if (!invoice || balance <= 0 || status === 'paid' || status === 'cancelled') {
+  if (
+    !invoice ||
+    balance <= 0 ||
+    status === 'paid' ||
+    status === 'cancelled' ||
+    billStatus === 'PAID'
+  ) {
     return 'paid';
   }
 
   if (current === 'escalation') return 'escalation';
 
-  const daysUntilDue = calendarDaysUntil(String(invoice.due_date));
+  const effectiveDue = String(
+    invoice.negotiated_due_date || invoice.due_date || ''
+  ).slice(0, 10);
+  const daysUntilDue = calendarDaysUntil(effectiveDue);
   const isOverdue = daysUntilDue < 0 || status === 'overdue';
 
   if (isOverdue) return 'overdue';
@@ -1081,23 +1114,36 @@ async function getFocusInvoiceForTenant(
   tenantId: string
 ): Promise<TenantInvoiceFocus | null> {
   const unpaid = await pool.query<TenantInvoiceFocus>(
-    `SELECT id, due_date::text AS due_date, balance_due, invoice_status, total_amount
+    `SELECT id,
+            due_date::text AS due_date,
+            negotiated_due_date::text AS negotiated_due_date,
+            balance_due,
+            invoice_status,
+            bill_status,
+            total_amount
      FROM invoices
      WHERE tenant_id = $1
        AND invoice_status IN ('sent', 'partial', 'overdue')
        AND COALESCE(balance_due, 0) > 0
-     ORDER BY due_date ASC NULLS LAST, created_at ASC
+       AND COALESCE(bill_status, 'UNPAID') <> 'PAID'
+     ORDER BY COALESCE(negotiated_due_date, due_date) ASC NULLS LAST, created_at ASC
      LIMIT 1`,
     [tenantId]
   );
   if (unpaid.rows[0]) return unpaid.rows[0];
 
   const latest = await pool.query<TenantInvoiceFocus>(
-    `SELECT id, due_date::text AS due_date, balance_due, invoice_status, total_amount
+    `SELECT id,
+            due_date::text AS due_date,
+            negotiated_due_date::text AS negotiated_due_date,
+            balance_due,
+            invoice_status,
+            bill_status,
+            total_amount
      FROM invoices
      WHERE tenant_id = $1
        AND invoice_status IS DISTINCT FROM 'cancelled'
-     ORDER BY due_date DESC NULLS LAST, created_at DESC
+     ORDER BY COALESCE(negotiated_due_date, due_date) DESC NULLS LAST, created_at DESC
      LIMIT 1`,
     [tenantId]
   );
@@ -1219,10 +1265,12 @@ export async function ensurePaymentFollowUpCard(input: {
       : invoice
         ? Number(invoice.total_amount || input.amount)
         : input.amount;
-  const dueAt =
-    invoice?.due_date != null
-      ? `${String(invoice.due_date).slice(0, 10)}T12:00:00.000Z`
-      : null;
+  const effectiveDueIso = String(
+    invoice?.negotiated_due_date || invoice?.due_date || ''
+  ).slice(0, 10);
+  const dueAt = effectiveDueIso
+    ? `${effectiveDueIso}T12:00:00.000Z`
+    : null;
 
   if (existing.rows[0]) {
     const { card: updated } = await updatePipelineCard(existing.rows[0].id, {
@@ -1387,7 +1435,7 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
      FROM pipeline_boards b
      JOIN (
        VALUES
-         ('maintenance', 'submitted', 'Submitted', '#7c3aed', 1, false, false, false),
+         ('maintenance', 'submitted', 'Open', '#7c3aed', 1, false, false, false),
          ('maintenance', 'in_progress', 'In progress', '#3b82f6', 2, false, false, false),
          ('maintenance', 'resolved', 'Resolved', '#22c55e', 3, true, false, true)
      ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
@@ -1396,6 +1444,16 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
        SELECT 1 FROM pipeline_stages ps
        WHERE ps.board_id = b.id AND ps.slug = s.slug
      )`
+  );
+
+  await pool.query(
+    `UPDATE pipeline_stages ps
+     SET name = 'Open'
+     FROM pipeline_boards pb
+     WHERE ps.board_id = pb.id
+       AND pb.slug = 'maintenance'
+       AND ps.slug = 'submitted'
+       AND ps.name IS DISTINCT FROM 'Open'`
   );
 
   // Payments Paid stage must stay open so cards can cycle with the billing period
@@ -1427,6 +1485,7 @@ export function maintenanceStatusToStageSlug(status: string | null | undefined):
       return 'in_progress';
     case 'completed':
     case 'cancelled':
+    case 'closed':
       return 'resolved';
     case 'open':
     case 'submitted':
@@ -1467,14 +1526,16 @@ export async function ensureMaintenancePipelineCard(input: {
   contactLastName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  /** Admin/staff user id — same as board card assignee */
+  assignedTo?: string | null;
 }): Promise<{ card: PipelineCard; created: boolean }> {
   await ensureMaintenanceBoardExists();
 
   const stageSlug = maintenanceStatusToStageSlug(input.status);
-  const tags = [
-    input.priority ? `Priority: ${input.priority}` : null,
-    input.category || null,
-  ].filter(Boolean) as string[];
+  const tags = buildMaintenancePipelineTags({
+    priority: input.priority,
+    category: input.category,
+  });
 
   const existing = await pool.query<{ id: string }>(
     `SELECT c.id
@@ -1488,6 +1549,18 @@ export async function ensureMaintenancePipelineCard(input: {
   );
 
   if (existing.rows[0]) {
+    // Keep board assignee aligned with the request (or explicit override).
+    let resolvedAssignee: string | null | undefined = input.assignedTo;
+    if (resolvedAssignee === undefined) {
+      const assigneeRow = await pool.query<{ assigned_to: string | null }>(
+        `SELECT assigned_to FROM maintenance_requests WHERE id = $1`,
+        [input.requestId]
+      );
+      resolvedAssignee = assigneeRow.rows[0]?.assigned_to || null;
+    } else {
+      resolvedAssignee = resolvedAssignee || null;
+    }
+
     await updatePipelineCard(existing.rows[0].id, {
       title: input.title,
       notes: input.description || null,
@@ -1499,6 +1572,7 @@ export async function ensureMaintenancePipelineCard(input: {
       contactPhone: input.contactPhone || null,
       tags,
       source: 'Maintenance request',
+      assignedTo: resolvedAssignee,
     });
 
     const board = await getBoardBySlug('maintenance');
@@ -1582,6 +1656,13 @@ export async function ensureMaintenancePipelineCard(input: {
     tags,
     notes: input.description || undefined,
   });
+
+  if (input.assignedTo) {
+    const assigned = await updatePipelineCard(card.id, {
+      assignedTo: input.assignedTo,
+    });
+    return { card: assigned, created: true };
+  }
 
   return { card, created: true };
 }
@@ -2393,6 +2474,80 @@ function formatTagsList(tags: string[]): string {
   return tags.join(', ');
 }
 
+function normalizeTagKey(tag: string): string {
+  return tag.trim().toLowerCase();
+}
+
+function diffTagLists(
+  previous: string[],
+  next: string[]
+): { added: string[]; removed: string[] } {
+  const prevKeys = new Set(previous.map(normalizeTagKey));
+  const nextKeys = new Set(next.map(normalizeTagKey));
+  const added = next.filter((t) => !prevKeys.has(normalizeTagKey(t)));
+  const removed = previous.filter((t) => !nextKeys.has(normalizeTagKey(t)));
+  return { added, removed };
+}
+
+/** Structured field-level history for opportunity timeline UI. */
+export interface PipelineHistoryFieldChange {
+  field: string;
+  label: string;
+  from: string | string[] | null;
+  to: string | string[] | null;
+  added?: string[];
+  removed?: string[];
+  summary: string;
+}
+
+function buildTagHistoryChange(
+  previous: string[],
+  next: string[]
+): PipelineHistoryFieldChange | null {
+  const { added, removed } = diffTagLists(previous, next);
+  if (added.length === 0 && removed.length === 0) return null;
+
+  const parts: string[] = [];
+  if (added.length) parts.push(`added ${added.join(', ')}`);
+  if (removed.length) parts.push(`removed ${removed.join(', ')}`);
+
+  return {
+    field: 'tags',
+    label: 'Tags',
+    from: [...previous],
+    to: [...next],
+    added,
+    removed,
+    summary: `Tags: ${parts.join('; ')} (was ${formatTagsList(previous)} → now ${formatTagsList(next)})`,
+  };
+}
+
+function buildFieldHistoryChange(input: {
+  field: string;
+  label: string;
+  from: string | null;
+  to: string | null;
+  /** When true, treat empty as cleared vs set */
+  setVerb?: string;
+}): PipelineHistoryFieldChange | null {
+  const from = input.from?.trim() || null;
+  const to = input.to?.trim() || null;
+  if (from === to) return null;
+  const verb = input.setVerb || 'set to';
+  let summary: string;
+  if (!from && to) summary = `${input.label} ${verb} ${to}`;
+  else if (from && !to) summary = `${input.label} cleared (was ${from})`;
+  else summary = `${input.label}: ${from} → ${to}`;
+  return {
+    field: input.field,
+    label: input.label,
+    from,
+    to,
+    summary,
+  };
+}
+
+
 export async function getPipelineCardEvents(
   cardId: string,
   limit = 50
@@ -2680,15 +2835,27 @@ export async function updatePipelineCard(
   }
 
   const changeNotes: string[] = [];
+  const fieldChanges: PipelineHistoryFieldChange[] = [];
+
+  const recordChange = (change: PipelineHistoryFieldChange | null | undefined) => {
+    if (!change) return;
+    fieldChanges.push(change);
+    changeNotes.push(change.summary);
+  };
+
   const nextAssignedTo =
     data.assignedTo !== undefined ? data.assignedTo : existing.assignedTo || null;
   if (data.assignedTo !== undefined && nextAssignedTo !== (existing.assignedTo || null)) {
     if (!nextAssignedTo) {
-      changeNotes.push(
-        existing.assignedToName
+      recordChange({
+        field: 'assignedTo',
+        label: 'Assignee',
+        from: existing.assignedToName || existing.assignedTo || null,
+        to: null,
+        summary: existing.assignedToName
           ? `Unassigned from ${existing.assignedToName}`
-          : 'Unassigned admin'
-      );
+          : 'Unassigned admin',
+      });
     } else {
       const assigneeRow = await pool.query<{ first_name: string; last_name: string }>(
         `SELECT first_name, last_name FROM users WHERE id = $1`,
@@ -2697,40 +2864,59 @@ export async function updatePipelineCard(
       const name = assigneeRow.rows[0]
         ? `${assigneeRow.rows[0].first_name} ${assigneeRow.rows[0].last_name}`.trim()
         : 'admin';
-      changeNotes.push(`Assigned to ${name}`);
+      recordChange({
+        field: 'assignedTo',
+        label: 'Assignee',
+        from: existing.assignedToName || null,
+        to: name,
+        summary: `Assigned to ${name}`,
+      });
     }
   }
   if (data.title !== undefined && data.title.trim() !== existing.title) {
-    changeNotes.push(`Title set to "${data.title.trim()}"`);
+    recordChange(
+      buildFieldHistoryChange({
+        field: 'title',
+        label: 'Title',
+        from: existing.title,
+        to: data.title.trim(),
+      })
+    );
   }
   if (data.contactFirstName !== undefined || data.contactLastName !== undefined) {
     const prev = [existing.contactFirstName, existing.contactLastName].filter(Boolean).join(' ');
     const next = [firstName, lastName].filter(Boolean).join(' ');
     if (prev !== next) {
-      changeNotes.push(
-        prev
+      recordChange({
+        field: 'contactName',
+        label: 'Contact',
+        from: prev || null,
+        to: next || null,
+        summary: prev
           ? `Contact renamed ${prev} → ${next || '(cleared)'}`
-          : `Contact set to ${next || '(cleared)'}`
-      );
+          : `Contact set to ${next || '(cleared)'}`,
+      });
     }
   }
   if (data.contactEmail !== undefined) {
-    const next = data.contactEmail?.trim() || null;
-    const prev = existing.contactEmail || null;
-    if (next !== prev) {
-      changeNotes.push(
-        prev ? `Email ${prev} → ${next || '(cleared)'}` : `Email set to ${next || '(cleared)'}`
-      );
-    }
+    recordChange(
+      buildFieldHistoryChange({
+        field: 'contactEmail',
+        label: 'Email',
+        from: existing.contactEmail || null,
+        to: data.contactEmail?.trim() || null,
+      })
+    );
   }
   if (data.contactPhone !== undefined) {
-    const next = data.contactPhone?.trim() || null;
-    const prev = existing.contactPhone || null;
-    if (next !== prev) {
-      changeNotes.push(
-        prev ? `Phone ${prev} → ${next || '(cleared)'}` : `Phone set to ${next || '(cleared)'}`
-      );
-    }
+    recordChange(
+      buildFieldHistoryChange({
+        field: 'contactPhone',
+        label: 'Phone',
+        from: existing.contactPhone || null,
+        to: data.contactPhone?.trim() || null,
+      })
+    );
   }
   if (data.buildingId !== undefined && data.buildingId !== (existing.buildingId || null)) {
     if (data.buildingId) {
@@ -2738,17 +2924,26 @@ export async function updatePipelineCard(
         `SELECT name FROM buildings WHERE id = $1`,
         [data.buildingId]
       );
-      changeNotes.push(
-        existing.buildingName
-          ? `Building ${existing.buildingName} → ${b.rows[0]?.name || 'selected'}`
-          : `Building set to ${b.rows[0]?.name || 'selected'}`
-      );
+      const nextName = b.rows[0]?.name || 'selected';
+      recordChange({
+        field: 'buildingId',
+        label: 'Building',
+        from: existing.buildingName || null,
+        to: nextName,
+        summary: existing.buildingName
+          ? `Building ${existing.buildingName} → ${nextName}`
+          : `Building set to ${nextName}`,
+      });
     } else {
-      changeNotes.push(
-        existing.buildingName
+      recordChange({
+        field: 'buildingId',
+        label: 'Building',
+        from: existing.buildingName || null,
+        to: null,
+        summary: existing.buildingName
           ? `Building cleared (was ${existing.buildingName})`
-          : 'Building cleared'
-      );
+          : 'Building cleared',
+      });
     }
   }
   if (data.roomId !== undefined && data.roomId !== (existing.roomId || null)) {
@@ -2758,181 +2953,303 @@ export async function updatePipelineCard(
         [data.roomId]
       );
       const nextRoom = r.rows[0]?.room_number || 'selected';
-      changeNotes.push(
-        existing.roomNumber
+      recordChange({
+        field: 'roomId',
+        label: 'Room',
+        from: existing.roomNumber || null,
+        to: nextRoom,
+        summary: existing.roomNumber
           ? `Room ${existing.roomNumber} → ${nextRoom}`
-          : `Room set to ${nextRoom}`
-      );
+          : `Room set to ${nextRoom}`,
+      });
     } else {
-      changeNotes.push(
-        existing.roomNumber ? `Room cleared (was ${existing.roomNumber})` : 'Room cleared'
-      );
+      recordChange({
+        field: 'roomId',
+        label: 'Room',
+        from: existing.roomNumber || null,
+        to: null,
+        summary: existing.roomNumber
+          ? `Room cleared (was ${existing.roomNumber})`
+          : 'Room cleared',
+      });
     }
   }
   if (data.amount !== undefined && !sameNumber(data.amount, existing.amount ?? null)) {
-    changeNotes.push(
-      `Amount ${formatHistoryMoney(existing.amount)} → ${formatHistoryMoney(data.amount)}`
-    );
+    recordChange({
+      field: 'amount',
+      label: 'Amount',
+      from: formatHistoryMoney(existing.amount),
+      to: formatHistoryMoney(data.amount),
+      summary: `Amount ${formatHistoryMoney(existing.amount)} → ${formatHistoryMoney(data.amount)}`,
+    });
   } else if (
     data.amount === undefined &&
     data.roomId &&
     data.roomId !== existing.roomId &&
     !sameNumber(amount, existing.amount ?? null)
   ) {
-    changeNotes.push(
-      `Amount ${formatHistoryMoney(existing.amount)} → ${formatHistoryMoney(amount)} (from room rate)`
-    );
+    recordChange({
+      field: 'amount',
+      label: 'Amount',
+      from: formatHistoryMoney(existing.amount),
+      to: formatHistoryMoney(amount),
+      summary: `Amount ${formatHistoryMoney(existing.amount)} → ${formatHistoryMoney(amount)} (from room rate)`,
+    });
   }
   if (data.source !== undefined) {
-    const next = data.source?.trim() || null;
-    const prev = existing.source || null;
-    if (next !== prev) {
-      changeNotes.push(
-        prev ? `Source ${prev} → ${next || '(cleared)'}` : `Source set to ${next || '(cleared)'}`
-      );
-    }
+    recordChange(
+      buildFieldHistoryChange({
+        field: 'source',
+        label: 'Source',
+        from: existing.source || null,
+        to: data.source?.trim() || null,
+      })
+    );
   }
   if (data.tags !== undefined) {
-    const prev = [...(existing.tags || [])].map(String).sort().join('\0');
-    const next = [...tags].map(String).sort().join('\0');
-    if (prev !== next) {
-      changeNotes.push(
-        `Tags ${formatTagsList(existing.tags || [])} → ${formatTagsList(tags)}`
-      );
-    }
+    recordChange(buildTagHistoryChange(existing.tags || [], tags));
   } else if (
-    (data.viewingAt !== undefined) &&
+    data.viewingAt !== undefined &&
     formatTagsList(existing.tags || []) !== formatTagsList(tags)
   ) {
-    changeNotes.push(
-      `Tags ${formatTagsList(existing.tags || [])} → ${formatTagsList(tags)}`
-    );
+    recordChange(buildTagHistoryChange(existing.tags || [], tags));
   }
   if (data.dueAt !== undefined && !sameInstant(data.dueAt, existing.dueAt || null)) {
-    changeNotes.push(
-      `Due date ${formatHistoryDate(existing.dueAt)} → ${formatHistoryDate(data.dueAt)}`
-    );
+    recordChange({
+      field: 'dueAt',
+      label: 'Due date',
+      from: formatHistoryDate(existing.dueAt),
+      to: formatHistoryDate(data.dueAt),
+      summary: `Due date ${formatHistoryDate(existing.dueAt)} → ${formatHistoryDate(data.dueAt)}`,
+    });
   }
   if (
     data.nextActionAt !== undefined &&
     !sameInstant(data.nextActionAt, existing.nextActionAt || null)
   ) {
-    changeNotes.push(
-      `Next follow-up ${formatHistoryDate(existing.nextActionAt)} → ${formatHistoryDate(data.nextActionAt)}`
-    );
+    recordChange({
+      field: 'nextActionAt',
+      label: 'Next follow-up',
+      from: formatHistoryDate(existing.nextActionAt),
+      to: formatHistoryDate(data.nextActionAt),
+      summary: `Next follow-up ${formatHistoryDate(existing.nextActionAt)} → ${formatHistoryDate(data.nextActionAt)}`,
+    });
   }
   if (data.viewingAt !== undefined && !sameInstant(data.viewingAt, existing.viewingAt || null)) {
-    changeNotes.push(
-      `Viewing ${formatHistoryDate(existing.viewingAt)} → ${formatHistoryDate(data.viewingAt)}`
-    );
+    recordChange({
+      field: 'viewingAt',
+      label: 'Viewing',
+      from: formatHistoryDate(existing.viewingAt),
+      to: formatHistoryDate(data.viewingAt),
+      summary: `Viewing ${formatHistoryDate(existing.viewingAt)} → ${formatHistoryDate(data.viewingAt)}`,
+    });
   }
   if (data.notes !== undefined && (data.notes?.trim() || null) !== (existing.notes || null)) {
+    const prevNotes = (existing.notes || '').trim();
     const nextNotes = data.notes?.trim() || '';
+    const clip = (s: string) => (s.length > 120 ? `${s.slice(0, 117)}…` : s);
     if (!nextNotes) {
-      changeNotes.push('Follow-up notes cleared');
-    } else if (!(existing.notes || '').trim()) {
-      changeNotes.push(
-        `Follow-up notes added: ${nextNotes.length > 120 ? `${nextNotes.slice(0, 117)}…` : nextNotes}`
-      );
+      recordChange({
+        field: 'notes',
+        label: 'Follow-up notes',
+        from: clip(prevNotes) || null,
+        to: null,
+        summary: 'Follow-up notes cleared',
+      });
+    } else if (!prevNotes) {
+      recordChange({
+        field: 'notes',
+        label: 'Follow-up notes',
+        from: null,
+        to: clip(nextNotes),
+        summary: `Follow-up notes added: ${clip(nextNotes)}`,
+      });
     } else {
-      changeNotes.push('Follow-up notes updated');
+      recordChange({
+        field: 'notes',
+        label: 'Follow-up notes',
+        from: clip(prevNotes),
+        to: clip(nextNotes),
+        summary: `Follow-up notes: ${clip(prevNotes)} → ${clip(nextNotes)}`,
+      });
     }
   }
   if (markAsLost) {
-    changeNotes.push(lostReason ? `Marked lost: ${lostReason}` : 'Marked as lost');
+    recordChange({
+      field: 'lost',
+      label: 'Status',
+      from: 'open',
+      to: 'lost',
+      summary: lostReason ? `Marked lost: ${lostReason}` : 'Marked as lost',
+    });
   } else if (
     data.lostReason !== undefined &&
     (data.lostReason?.trim() || null) !== (existing.lostReason || null)
   ) {
-    changeNotes.push(
-      data.lostReason?.trim()
-        ? `Lost reason set to ${data.lostReason.trim()}`
-        : 'Lost reason cleared'
+    recordChange(
+      buildFieldHistoryChange({
+        field: 'lostReason',
+        label: 'Lost reason',
+        from: existing.lostReason || null,
+        to: data.lostReason?.trim() || null,
+      })
     );
   }
   if (
     data.backgroundCheckStatus !== undefined &&
     data.backgroundCheckStatus !== (existing.backgroundCheckStatus || 'not_started')
   ) {
-    changeNotes.push(
-      `Screening ${(existing.backgroundCheckStatus || 'not_started').replace(/_/g, ' ')} → ${data.backgroundCheckStatus.replace(/_/g, ' ')}`
-    );
+    const from = (existing.backgroundCheckStatus || 'not_started').replace(/_/g, ' ');
+    const to = data.backgroundCheckStatus.replace(/_/g, ' ');
+    recordChange({
+      field: 'backgroundCheckStatus',
+      label: 'Screening',
+      from,
+      to,
+      summary: `Screening ${from} → ${to}`,
+    });
   }
   if (
     data.backgroundCheckNotes !== undefined &&
     (data.backgroundCheckNotes?.trim() || null) !== (existing.backgroundCheckNotes || null)
   ) {
-    changeNotes.push('Screening notes updated');
+    const prev = (existing.backgroundCheckNotes || '').trim();
+    const next = (data.backgroundCheckNotes || '').trim();
+    const clip = (s: string) => (s.length > 100 ? `${s.slice(0, 97)}…` : s);
+    recordChange({
+      field: 'backgroundCheckNotes',
+      label: 'Screening notes',
+      from: prev ? clip(prev) : null,
+      to: next ? clip(next) : null,
+      summary:
+        !prev && next
+          ? `Screening notes added: ${clip(next)}`
+          : prev && !next
+            ? 'Screening notes cleared'
+            : `Screening notes: ${clip(prev)} → ${clip(next)}`,
+    });
   }
   if (
     data.leaseStatus !== undefined &&
     data.leaseStatus !== (existing.leaseStatus || 'not_started')
   ) {
-    changeNotes.push(
-      `Lease status ${(existing.leaseStatus || 'not_started').replace(/_/g, ' ')} → ${data.leaseStatus.replace(/_/g, ' ')}`
-    );
+    const from = (existing.leaseStatus || 'not_started').replace(/_/g, ' ');
+    const to = data.leaseStatus.replace(/_/g, ' ');
+    recordChange({
+      field: 'leaseStatus',
+      label: 'Lease status',
+      from,
+      to,
+      summary: `Lease status ${from} → ${to}`,
+    });
   }
   if (
     data.leaseStartDate !== undefined &&
     !sameInstant(data.leaseStartDate, existing.leaseStartDate || null)
   ) {
-    changeNotes.push(
-      `Lease start ${formatHistoryDate(existing.leaseStartDate)} → ${formatHistoryDate(data.leaseStartDate)}`
-    );
+    recordChange({
+      field: 'leaseStartDate',
+      label: 'Lease start',
+      from: formatHistoryDate(existing.leaseStartDate),
+      to: formatHistoryDate(data.leaseStartDate),
+      summary: `Lease start ${formatHistoryDate(existing.leaseStartDate)} → ${formatHistoryDate(data.leaseStartDate)}`,
+    });
   }
   if (
     data.leaseEndDate !== undefined &&
     !sameInstant(data.leaseEndDate, existing.leaseEndDate || null)
   ) {
-    changeNotes.push(
-      `Lease end ${formatHistoryDate(existing.leaseEndDate)} → ${formatHistoryDate(data.leaseEndDate)}`
-    );
+    recordChange({
+      field: 'leaseEndDate',
+      label: 'Lease end',
+      from: formatHistoryDate(existing.leaseEndDate),
+      to: formatHistoryDate(data.leaseEndDate),
+      summary: `Lease end ${formatHistoryDate(existing.leaseEndDate)} → ${formatHistoryDate(data.leaseEndDate)}`,
+    });
   }
   if (
     data.moveInDate !== undefined &&
     !sameInstant(data.moveInDate, existing.moveInDate || null)
   ) {
-    changeNotes.push(
-      `Move-in date ${formatHistoryDate(existing.moveInDate)} → ${formatHistoryDate(data.moveInDate)}`
-    );
+    recordChange({
+      field: 'moveInDate',
+      label: 'Move-in date',
+      from: formatHistoryDate(existing.moveInDate),
+      to: formatHistoryDate(data.moveInDate),
+      summary: `Move-in date ${formatHistoryDate(existing.moveInDate)} → ${formatHistoryDate(data.moveInDate)}`,
+    });
   }
   if (
     data.depositAmount !== undefined &&
     !sameNumber(data.depositAmount, existing.depositAmount ?? null)
   ) {
-    changeNotes.push(
-      `Deposit ${formatHistoryMoney(existing.depositAmount)} → ${formatHistoryMoney(data.depositAmount)}`
-    );
+    recordChange({
+      field: 'depositAmount',
+      label: 'Deposit',
+      from: formatHistoryMoney(existing.depositAmount),
+      to: formatHistoryMoney(data.depositAmount),
+      summary: `Deposit ${formatHistoryMoney(existing.depositAmount)} → ${formatHistoryMoney(data.depositAmount)}`,
+    });
   }
   if (
     data.advanceAmount !== undefined &&
     !sameNumber(data.advanceAmount, existing.advanceAmount ?? null)
   ) {
-    changeNotes.push(
-      `Advance ${formatHistoryMoney(existing.advanceAmount)} → ${formatHistoryMoney(data.advanceAmount)}`
-    );
+    recordChange({
+      field: 'advanceAmount',
+      label: 'Advance',
+      from: formatHistoryMoney(existing.advanceAmount),
+      to: formatHistoryMoney(data.advanceAmount),
+      summary: `Advance ${formatHistoryMoney(existing.advanceAmount)} → ${formatHistoryMoney(data.advanceAmount)}`,
+    });
   }
   if (
     data.moveInPaymentStatus !== undefined &&
     data.moveInPaymentStatus !== (existing.moveInPaymentStatus || 'unpaid')
   ) {
-    changeNotes.push(
-      `Move-in payment ${(existing.moveInPaymentStatus || 'unpaid')} → ${data.moveInPaymentStatus}`
-    );
+    const from = existing.moveInPaymentStatus || 'unpaid';
+    const to = data.moveInPaymentStatus;
+    recordChange({
+      field: 'moveInPaymentStatus',
+      label: 'Move-in payment',
+      from,
+      to,
+      summary: `Move-in payment ${from} → ${to}`,
+    });
   }
   if (
     data.moveInPaymentMethod !== undefined &&
     (data.moveInPaymentMethod?.trim() || null) !== (existing.moveInPaymentMethod || null)
   ) {
-    const next = data.moveInPaymentMethod?.trim() || '(cleared)';
-    const prev = existing.moveInPaymentMethod || '(none)';
-    changeNotes.push(`Payment method ${prev.replace(/_/g, ' ')} → ${next.replace(/_/g, ' ')}`);
+    const next = data.moveInPaymentMethod?.trim() || null;
+    const prev = existing.moveInPaymentMethod || null;
+    recordChange({
+      field: 'moveInPaymentMethod',
+      label: 'Payment method',
+      from: prev ? prev.replace(/_/g, ' ') : null,
+      to: next ? next.replace(/_/g, ' ') : null,
+      summary: `Payment method ${(prev || '(none)').replace(/_/g, ' ')} → ${(next || '(cleared)').replace(/_/g, ' ')}`,
+    });
   }
   if (
     data.moveInPaymentNotes !== undefined &&
     (data.moveInPaymentNotes?.trim() || null) !== (existing.moveInPaymentNotes || null)
   ) {
-    changeNotes.push('Payment notes updated');
+    const prev = (existing.moveInPaymentNotes || '').trim();
+    const next = (data.moveInPaymentNotes || '').trim();
+    const clip = (s: string) => (s.length > 100 ? `${s.slice(0, 97)}…` : s);
+    recordChange({
+      field: 'moveInPaymentNotes',
+      label: 'Payment notes',
+      from: prev ? clip(prev) : null,
+      to: next ? clip(next) : null,
+      summary:
+        !prev && next
+          ? `Payment notes added: ${clip(next)}`
+          : prev && !next
+            ? 'Payment notes cleared'
+            : `Payment notes: ${clip(prev)} → ${clip(next)}`,
+    });
   }
 
   await pool.query(
@@ -3023,7 +3340,7 @@ export async function updatePipelineCard(
         eventType,
         existing.boardId,
         changeNotes.join('; '),
-        JSON.stringify({ changes: changeNotes }),
+        JSON.stringify({ changes: changeNotes, fields: fieldChanges }),
         userId || null,
       ]
     );
@@ -3034,6 +3351,21 @@ export async function updatePipelineCard(
     [existing.boardId]
   );
   const boardSlug = boardRow.rows[0]?.slug;
+
+  // Keep maintenance request assignee in sync with board card assignee
+  if (
+    boardSlug === 'maintenance' &&
+    data.assignedTo !== undefined &&
+    nextAssignedTo !== (existing.assignedTo || null) &&
+    existing.maintenanceRequestId
+  ) {
+    await pool.query(
+      `UPDATE maintenance_requests
+       SET assigned_to = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [nextAssignedTo, existing.maintenanceRequestId]
+    );
+  }
 
   if (boardSlug === 'onboarding') {
     const nextRoomId =
@@ -3132,6 +3464,13 @@ export async function updatePipelineCard(
       leaseStartDate,
       leaseEndDate,
       moveInDate,
+      leaseStatus: data.generateLease
+        ? data.leaseStatus === 'awaiting_signature' ||
+          data.leaseStatus === 'signed' ||
+          data.leaseStatus === 'generated'
+          ? data.leaseStatus
+          : 'generated'
+        : 'signed',
     });
     return {
       card,

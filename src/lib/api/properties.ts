@@ -7,6 +7,11 @@ import {
   getRoomFinancialSummary,
   getRoomOccupancyMetrics,
 } from '@/lib/api/rooms';
+import {
+  assertOccupancyReconciles,
+  buildOccupancyReconciliation,
+  estimateLostRent,
+} from '@/lib/occupancy/reconcile';
 
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
@@ -916,6 +921,16 @@ export interface PropertyMaintenanceCategoryCount {
   count: number;
 }
 
+export interface PropertyVacantUnitMetrics {
+  roomId: string;
+  roomNumber: string;
+  monthlyRate: number;
+  daysVacant: number;
+  estimatedLostRent: number;
+  lastMoveOutDate: string | null;
+  ownerAbsorbedUtility: number;
+}
+
 export interface PropertyBuildingReport {
   buildingId: string;
   month: string; // YYYY-MM
@@ -937,12 +952,14 @@ export interface PropertyBuildingReport {
     totalUnits: number;
     occupied: number;
     vacant: number;
-    /** Units that are neither occupied nor vacant (reserved, maintenance, etc.) */
+    /** Derived: totalUnits − occupied − vacant (never independently tallied) */
     unassigned: number;
     occupiedPercent: number;
     vacantPercent: number;
     unassignedPercent: number;
+    reconciles: boolean;
   };
+  vacantUnits: PropertyVacantUnitMetrics[];
   unsignedUnits: PropertyUnsignedUnit[];
   maintenance: {
     newRequests: number;
@@ -985,7 +1002,7 @@ export async function getPropertyBuildingReport(
     year: 'numeric',
   });
 
-  const [rentResult, availabilityResult, unsignedResult, awaitingResult, maintenanceResult, categoryResult] =
+  const [rentResult, availabilityResult, vacantMetricsResult, unsignedResult, awaitingResult, maintenanceResult, categoryResult] =
     await Promise.all([
       pool.query(
         `
@@ -1080,23 +1097,58 @@ export async function getPropertyBuildingReport(
         `,
         [buildingId, monthStart]
       ),
+      // Occupied + vacant only; unassigned is derived in JS (never independent COUNT)
       pool.query(
         `
         SELECT
           COUNT(*)::int AS total_units,
           SUM(CASE WHEN room_status = 'occupied' THEN 1 ELSE 0 END)::int AS occupied,
-          SUM(CASE WHEN room_status = 'vacant' THEN 1 ELSE 0 END)::int AS vacant,
-          SUM(
-            CASE
-              WHEN room_status IS DISTINCT FROM 'occupied'
-               AND room_status IS DISTINCT FROM 'vacant'
-              THEN 1 ELSE 0
-            END
-          )::int AS unassigned
+          SUM(CASE WHEN room_status = 'vacant' THEN 1 ELSE 0 END)::int AS vacant
         FROM rooms
         WHERE building_id = $1 AND is_active = true
         `,
         [buildingId]
+      ),
+      pool.query(
+        `
+        SELECT
+          r.id AS room_id,
+          r.room_number,
+          r.monthly_rate,
+          (
+            SELECT MAX(tra.end_date)
+            FROM tenant_room_assignments tra
+            WHERE tra.room_id = r.id AND tra.end_date IS NOT NULL
+          ) AS last_move_out_date,
+          GREATEST(
+            0,
+            (
+              CURRENT_DATE - COALESCE(
+                (
+                  SELECT MAX(tra.end_date)
+                  FROM tenant_room_assignments tra
+                  WHERE tra.room_id = r.id AND tra.end_date IS NOT NULL
+                ),
+                r.updated_at::date
+              )
+            )
+          )::int AS days_vacant,
+          COALESCE((
+            SELECT SUM(ub.amount)
+            FROM utility_bills ub
+            WHERE ub.room_id = r.id
+              AND COALESCE(ub.cost_bearer, 'TENANT') = 'OWNER'
+              AND COALESCE(ub.bill_status, 'pending') IS DISTINCT FROM 'cancelled'
+              AND ub.billing_period_start < ($2::date + INTERVAL '1 month')
+              AND ub.billing_period_end >= $2::date
+          ), 0)::float AS owner_absorbed_utility
+        FROM rooms r
+        WHERE r.building_id = $1
+          AND r.is_active = true
+          AND r.room_status = 'vacant'
+        ORDER BY days_vacant DESC NULLS LAST, r.room_number
+        `,
+        [buildingId, monthStart]
       ),
       pool.query(
         `
@@ -1207,12 +1259,29 @@ export async function getPropertyBuildingReport(
   };
 
   const avail = availabilityResult.rows[0] || {};
-  const totalUnits = Number(avail.total_units) || 0;
-  const occupied = Number(avail.occupied) || 0;
-  const vacant = Number(avail.vacant) || 0;
-  const unassigned = Math.max(
-    0,
-    Number(avail.unassigned) || totalUnits - occupied - vacant
+  const occupancy = buildOccupancyReconciliation({
+    totalUnits: Number(avail.total_units) || 0,
+    occupied: Number(avail.occupied) || 0,
+    vacant: Number(avail.vacant) || 0,
+  });
+  assertOccupancyReconciles(occupancy, `building ${buildingId}`);
+
+  const vacantUnits: PropertyVacantUnitMetrics[] = vacantMetricsResult.rows.map(
+    (r) => {
+      const daysVacant = Number(r.days_vacant) || 0;
+      const monthlyRate = Number(r.monthly_rate) || 0;
+      return {
+        roomId: String(r.room_id),
+        roomNumber: String(r.room_number),
+        monthlyRate,
+        daysVacant,
+        estimatedLostRent: estimateLostRent(daysVacant, monthlyRate),
+        lastMoveOutDate: r.last_move_out_date
+          ? String(r.last_move_out_date).slice(0, 10)
+          : null,
+        ownerAbsorbedUtility: Number(r.owner_absorbed_utility) || 0,
+      };
+    }
   );
 
   const unsignedVacant: PropertyUnsignedUnit[] = unsignedResult.rows.map((r) => {
@@ -1264,14 +1333,16 @@ export async function getPropertyBuildingReport(
       paidUnitThumbs: parseThumbs(rentRow.paid_thumbs).slice(0, 6),
     },
     availability: {
-      totalUnits,
-      occupied,
-      vacant,
-      unassigned,
-      occupiedPercent: totalUnits > 0 ? Math.round((occupied / totalUnits) * 100) : 0,
-      vacantPercent: totalUnits > 0 ? Math.round((vacant / totalUnits) * 100) : 0,
-      unassignedPercent: totalUnits > 0 ? Math.round((unassigned / totalUnits) * 100) : 0,
+      totalUnits: occupancy.totalUnits,
+      occupied: occupancy.occupied,
+      vacant: occupancy.vacant,
+      unassigned: occupancy.unassigned,
+      occupiedPercent: occupancy.occupiedPercent,
+      vacantPercent: occupancy.vacantPercent,
+      unassignedPercent: occupancy.unassignedPercent,
+      reconciles: occupancy.reconciles,
     },
+    vacantUnits,
     unsignedUnits,
     maintenance: {
       newRequests: Number(maint.new_requests) || 0,

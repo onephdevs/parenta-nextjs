@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
 import { FileText, Tag, Shield, Calendar, Trash2, Download } from 'lucide-react';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface EditDocumentFormProps {
   document: Document;
@@ -57,6 +58,7 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
+  const { open: openLightbox } = useImageLightbox();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState<FormSection>('basic');
@@ -345,10 +347,31 @@ export default function EditDocumentForm({ document, categories }: EditDocumentF
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={() => window.open(`/uploads/documents/${document.fileName}`, '_blank')}
+          onClick={() => {
+            const href = `/uploads/documents/${document.fileName}`;
+            if (
+              looksLikeImage({
+                mimeType: document.mimeType,
+                fileName: document.fileName,
+              })
+            ) {
+              openLightbox({
+                src: href,
+                alt: document.documentName || document.fileName,
+                title: document.documentName || document.fileName,
+              });
+              return;
+            }
+            window.open(href, '_blank');
+          }}
           leftIcon={<Download className="h-4 w-4" />}
         >
-          Download File
+          {looksLikeImage({
+            mimeType: document.mimeType,
+            fileName: document.fileName,
+          })
+            ? 'View file'
+            : 'Download File'}
         </Button>
       </div>
     </Card>

@@ -1,4 +1,6 @@
 import type { PipelineBoardSlug, PipelineCard } from '@/types/database';
+import { formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
+import { formatMaintenanceTag } from '@/lib/constants/maintenance';
 
 export type CardFieldKey =
   | 'source'
@@ -34,13 +36,13 @@ export const CARD_FIELD_DEFS: CardFieldDef[] = [
 
 export type CardFieldPair = [CardFieldKey, CardFieldKey];
 
-const STORAGE_PREFIX = 'parenta.pipeline.cardFields.';
+const STORAGE_PREFIX = 'parenta.pipeline.cardFields.v2.';
 
 const BOARD_DEFAULTS: Record<string, CardFieldPair> = {
   onboarding: ['source', 'unit'],
   payments: ['balance', 'dueAt'],
   expenses: ['amount', 'dueAt'],
-  maintenance: ['unit', 'nextActionAt'],
+  maintenance: ['tags', 'notes'],
 };
 
 export function defaultFieldsForBoard(slug: PipelineBoardSlug): CardFieldPair {
@@ -130,9 +132,14 @@ export function formatCardFieldValue(
     case 'phone':
       return card.contactPhone?.trim() || '—';
     case 'tags':
-      return card.tags?.length ? card.tags.join(', ') : '—';
-    case 'notes':
-      return card.notes?.trim() || '—';
+      return card.tags?.length
+        ? card.tags.map(formatMaintenanceTag).join(' · ')
+        : '—';
+    case 'notes': {
+      const notes = formatPaymentNotesForPeople(card.notes) || '';
+      if (!notes) return '—';
+      return notes.length > 80 ? `${notes.slice(0, 77)}…` : notes;
+    }
     default:
       return '—';
   }

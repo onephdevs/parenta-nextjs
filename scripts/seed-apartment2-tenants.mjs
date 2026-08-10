@@ -154,14 +154,9 @@ try {
            user_id, first_name, last_name, email, phone,
            tenant_status, is_active, notes
          )
-         VALUES ($1, $2, $3, NULL, NULL, 'active', true, $4)
+         VALUES ($1, $2, $3, NULL, NULL, 'active', true, NULL)
          RETURNING id`,
-        [
-          userId,
-          'Tenant',
-          roomNumber,
-          `Seeded for APRTMENT-2 VILLASOL; portal login ${username}`,
-        ]
+        [userId, 'Tenant', roomNumber]
       );
       const tenantId = tenantRes.rows[0].id;
 
@@ -170,14 +165,8 @@ try {
            tenant_id, room_id, start_date, monthly_rate, deposit_paid, notes,
            assignment_status, tenant_name_snapshot
          )
-         VALUES ($1, $2, CURRENT_DATE, $3, 0, $4, 'active', $5)`,
-        [
-          tenantId,
-          room.id,
-          rent,
-          'Seeded Apartment 2 tenant portal account',
-          `Tenant ${roomNumber}`,
-        ]
+         VALUES ($1, $2, CURRENT_DATE, $3, 0, NULL, 'active', $4)`,
+        [tenantId, room.id, rent, `Tenant ${roomNumber}`]
       );
 
       await client.query(

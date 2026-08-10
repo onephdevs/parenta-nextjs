@@ -130,6 +130,11 @@ const ACTION_TITLES: Record<string, string> = {
   'maintenance.status_changed': 'Maintenance status changed',
   'maintenance.completed': 'Maintenance completed',
   'maintenance.deleted': 'Maintenance deleted',
+  'maintenance.progress': 'Maintenance progress update',
+  'maintenance.reply': 'Maintenance reply',
+  'maintenance.acknowledged': 'Maintenance acknowledged',
+  'maintenance.feedback': 'Maintenance feedback',
+  'maintenance.closed': 'Maintenance closed',
   'reservation.created': 'Reservation created',
   'reservation.updated': 'Reservation updated',
   'reservation.cancelled': 'Reservation cancelled',
@@ -287,6 +292,20 @@ export function formatActivityDescription(params: {
       return `${actor} deleted document${quoted ? ` ${quoted}` : ''}`;
     case 'maintenance.requested':
       return `${actor} submitted maintenance request${quoted ? `: ${label}` : ''}`;
+    case 'maintenance.progress':
+      return changeSummary
+        ? `${actor} posted a maintenance update${quoted ? ` on ${quoted}` : ''}: ${changeSummary}`
+        : `${actor} posted a maintenance update${quoted ? ` on ${quoted}` : ''}`;
+    case 'maintenance.reply':
+      return changeSummary
+        ? `${actor} replied on maintenance${quoted ? ` ${quoted}` : ''}: ${changeSummary}`
+        : `${actor} replied on maintenance${quoted ? ` ${quoted}` : ''}`;
+    case 'maintenance.acknowledged':
+      return `${actor} acknowledged maintenance service${quoted ? ` for ${quoted}` : ''}`;
+    case 'maintenance.feedback':
+      return `${actor} left maintenance feedback${quoted ? ` on ${quoted}` : ''}`;
+    case 'maintenance.closed':
+      return `${actor} closed maintenance request${quoted ? ` ${quoted}` : ''}`;
     case 'maintenance.updated':
     case 'maintenance.status_changed':
       return changeSummary

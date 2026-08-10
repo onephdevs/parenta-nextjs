@@ -7,6 +7,12 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { IconButton } from '@/components/ui/IconButton';
 import { Card } from '@/components/ui/Card';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
+import {
+  LightboxImage,
+  looksLikeImage,
+  useImageLightbox,
+} from '@/components/ui/ImageLightbox';
 
 interface ReceiptUploadProps {
   paymentId: string;
@@ -28,6 +34,7 @@ export default function ReceiptUpload({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showNotification } = useNotifications();
+  const { open: openLightbox } = useImageLightbox();
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -146,7 +153,21 @@ export default function ReceiptUpload({
   };
 
   const handleDownload = () => {
-    window.open(`/api/tenant/payments/${paymentId}/receipt`, '_blank');
+    const receiptUrl = `/api/tenant/payments/${paymentId}/receipt`;
+    if (
+      looksLikeImage({
+        fileName: currentReceipt?.fileName,
+        url: receiptUrl,
+      })
+    ) {
+      openLightbox({
+        src: receiptUrl,
+        alt: currentReceipt?.fileName || 'Receipt',
+        title: currentReceipt?.fileName || 'Receipt',
+      });
+      return;
+    }
+    window.open(receiptUrl, '_blank');
   };
 
   return (
@@ -158,7 +179,7 @@ export default function ReceiptUpload({
               {currentReceipt.fileName} • {new Date(currentReceipt.uploadedAt).toLocaleDateString()}
             </p>
             <Button variant="ghost" size="sm" onClick={handleDownload} className="text-green-700 hover:text-green-900">
-              Download
+              {looksLikeImage({ fileName: currentReceipt.fileName }) ? 'View' : 'Download'}
             </Button>
           </div>
         </Alert>
@@ -190,14 +211,22 @@ export default function ReceiptUpload({
               <p className="text-xs text-gray-500 mb-4">
                 PDF, JPEG, or PNG (Max 5MB)
               </p>
-              <Button
-                variant="success"
-                size="sm"
-                leftIcon={<Upload className="h-4 w-4" />}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Choose File
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="success"
+                  size="sm"
+                  leftIcon={<Upload className="h-4 w-4" />}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Choose File
+                </Button>
+                <TakePhotoButton
+                  onCapture={handleFileSelect}
+                  title="Take receipt photo"
+                  description="Allow camera access if prompted, then capture your receipt."
+                  fileNamePrefix="receipt"
+                />
+              </div>
             </div>
           ) : (
             <Card padding="sm">
@@ -218,10 +247,12 @@ export default function ReceiptUpload({
 
               {preview && (
                 <div className="mb-3">
-                  <img
+                  <LightboxImage
                     src={preview}
                     alt="Receipt preview"
-                    className="max-w-full h-48 object-contain rounded border border-gray-200"
+                    title={selectedFile?.name || 'Receipt'}
+                    wrapperClassName="block w-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 rounded"
+                    className="max-h-48 max-w-full rounded border border-gray-200 object-contain"
                   />
                 </div>
               )}

@@ -13,7 +13,7 @@ export interface CreateTenantWithUserData {
   // User account fields
   email?: string | null;
   username?: string | null;
-  password?: string; // Optional: if not provided, generates a random password
+  password?: string; // Optional: defaults to DEFAULT_TENANT_PASSWORD (tenant123)
   sendInvitation?: boolean; // If true, sends invitation email to set password
   profileCompleted?: boolean;
   tenantStatus?: string;
@@ -49,8 +49,15 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
   try {
     await client.query('BEGIN');
     
-    // Generate password if not provided
-    const password = data.password || generateRandomPassword();
+    // Default portal password (same as lease/pipeline flow) unless admin sets one
+    const password = data.password || DEFAULT_TENANT_PASSWORD;
+    const isDefaultPassword =
+      !data.password || data.password === DEFAULT_TENANT_PASSWORD;
+    // Board/lease accounts with the default password must complete profile + change password
+    const profileCompleted =
+      data.profileCompleted !== undefined
+        ? data.profileCompleted
+        : !isDefaultPassword;
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const email = data.email ? data.email.toLowerCase().trim() : null;
@@ -75,7 +82,7 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
           passwordHash,
           data.firstName.trim(),
           data.lastName.trim(),
-          data.profileCompleted !== false,
+          profileCompleted,
         ]
       );
       userId = String(userResult.rows[0].id);
@@ -147,7 +154,8 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     return {
       userId,
       tenantId,
-      temporaryPassword: data.password ? undefined : password,
+      // Show once in admin UI when we assigned the default password
+      temporaryPassword: isDefaultPassword ? password : undefined,
     };
     
   } catch (error) {
@@ -251,6 +259,8 @@ export async function ensureTenantForLease(
     email,
     firstName,
     lastName,
+    // New portal logins from lease generation must change password + confirm profile
+    profileCompleted: data.profileCompleted ?? false,
   });
   return {
     tenantId: created.tenantId,
@@ -474,19 +484,6 @@ export async function getTenantCompleteDataByTenantId(tenantId: string) {
       `Failed to fetch tenant data: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
-}
-
-/**
- * Generates a random secure password
- */
-function generateRandomPassword(): string {
-  const length = 12;
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
 }
 
 /**

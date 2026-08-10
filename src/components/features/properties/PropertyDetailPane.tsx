@@ -40,6 +40,14 @@ export default function PropertyDetailPane({
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
 
+  // Close action modals when the loaded property changes (avoids creating into wrong building)
+  useEffect(() => {
+    setAddRoomOpen(false);
+    setAddTenantOpen(false);
+    setRecordPaymentOpen(false);
+    setMaintenanceOpen(false);
+  }, [detail?.building.id]);
+
   useEffect(() => {
     if (!scrollToRoomId || loading || !detail) return;
 
@@ -90,6 +98,7 @@ export default function PropertyDetailPane({
               onAddTenant={() => setAddTenantOpen(true)}
               onRecordPayment={() => setRecordPaymentOpen(true)}
               onMaintenance={() => setMaintenanceOpen(true)}
+              onTenantCreated={onBuildingUpdated}
             />
 
             <div>

@@ -339,6 +339,31 @@ export async function generateTenantUtilityBills(
       throw new Error('Utility bill not found');
     }
 
+    // Owner-absorbed (vacant-unit) bills must not become tenant balances
+    if (
+      String((utilityBill as { costBearer?: string }).costBearer || '').toUpperCase() ===
+        'OWNER' ||
+      String((utilityBill as { cost_bearer?: string }).cost_bearer || '').toUpperCase() ===
+        'OWNER'
+    ) {
+      throw new Error(
+        'Cannot allocate owner-absorbed utility bill to tenants (vacant unit cost)'
+      );
+    }
+
+    // Also check DB column in case mapper lacks costBearer
+    const bearerCheck = await client.query(
+      `SELECT cost_bearer FROM utility_bills WHERE id = $1`,
+      [utilityBillId]
+    );
+    if (
+      String(bearerCheck.rows[0]?.cost_bearer || 'TENANT').toUpperCase() === 'OWNER'
+    ) {
+      throw new Error(
+        'Cannot allocate owner-absorbed utility bill to tenants (vacant unit cost)'
+      );
+    }
+
     const billDueDate = dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
     const generatedBills: TenantUtilityBill[] = [];

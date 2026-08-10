@@ -31,6 +31,7 @@ import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantDocuments } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface Document {
   id: string;
@@ -79,6 +80,7 @@ export default function DocumentsPage() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const { showNotification } = useNotifications();
+  const { open: openLightbox } = useImageLightbox();
 
   const fetchDocuments = async () => {
     try {
@@ -132,23 +134,35 @@ export default function DocumentsPage() {
   };
 
   const handlePreview = (document: Document) => {
-    if (document.fileType?.includes('pdf')) {
-      // Open PDF in new tab for preview
+    if (
+      looksLikeImage({
+        mimeType: document.fileType,
+        fileName: document.name,
+        url: document.url,
+      })
+    ) {
       if (document.url) {
-        window.open(document.url, '_blank');
+        openLightbox({
+          src: document.url,
+          alt: document.name,
+          title: document.name,
+        });
       }
-    } else if (document.fileType?.startsWith('image/')) {
-      // Open image in new tab for preview
-      if (document.url) {
-        window.open(document.url, '_blank');
-      }
-    } else {
-      showNotification({
-        type: 'info',
-        title: 'Preview',
-        message: `Preview not available for this file type. Please download to view.`
-      });
+      return;
     }
+
+    if (document.fileType?.includes('pdf')) {
+      if (document.url) {
+        window.open(document.url, '_blank');
+      }
+      return;
+    }
+
+    showNotification({
+      type: 'info',
+      title: 'Preview',
+      message: `Preview not available for this file type. Please download to view.`,
+    });
   };
 
   const getFileIcon = (fileType: string) => {

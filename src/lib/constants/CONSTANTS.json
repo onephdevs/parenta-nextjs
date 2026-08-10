@@ -1,0 +1,127 @@
+{
+  "MODULE": {
+    "PAYMENT": {
+      "ALLOWED_METHODS": [
+        "gcash",
+        "maya",
+        "bank_transfer",
+        "cash",
+        "cheque",
+        "check",
+        "online",
+        "other",
+        "credit_card"
+      ],
+      "CANONICAL_METHODS": [
+        "cash",
+        "cheque",
+        "bank_transfer",
+        "gcash",
+        "maya",
+        "other"
+      ],
+      "DEFAULT_METHOD": "gcash",
+      "METHOD_LABELS": {
+        "cash": "Cash",
+        "cheque": "Cheque",
+        "check": "Cheque",
+        "bank_transfer": "Bank transfer",
+        "gcash": "GCash",
+        "maya": "Maya",
+        "other": "Other",
+        "credit_card": "Credit card",
+        "online": "Online"
+      },
+      "METHOD_ALIASES": {
+        "check": "cheque",
+        "g_cash": "gcash",
+        "paymaya": "maya",
+        "bank": "bank_transfer",
+        "transfer": "bank_transfer",
+        "credit_card": "other",
+        "online": "other"
+      },
+      "ALLOWED_TYPES": [
+        "rent",
+        "deposit",
+        "advance",
+        "late_fee",
+        "utility",
+        "asset_rental",
+        "other"
+      ],
+      "DEFAULT_TYPE": "rent",
+      "TYPE_LABELS": {
+        "rent": "Rent",
+        "deposit": "Deposit",
+        "advance": "Advance",
+        "late_fee": "Late fee",
+        "utility": "Utility",
+        "asset_rental": "Asset rental",
+        "other": "Other"
+      },
+      "TENANT_ACCEPTED_METHODS_DEFAULT": [
+        "gcash",
+        "maya",
+        "bank_transfer"
+      ]
+    },
+    "MAINTENANCE": {
+      "CATEGORIES": [
+        "plumbing",
+        "electrical",
+        "hvac",
+        "appliance",
+        "flooring",
+        "painting",
+        "locks_security",
+        "windows_doors",
+        "pest_control",
+        "other"
+      ],
+      "CATEGORY_LABELS": {
+        "plumbing": "Plumbing",
+        "electrical": "Electrical",
+        "hvac": "Heating & cooling",
+        "appliance": "Appliance",
+        "flooring": "Flooring",
+        "painting": "Painting",
+        "locks_security": "Locks & security",
+        "windows_doors": "Windows & doors",
+        "pest_control": "Pest control",
+        "other": "Other"
+      },
+      "PRIORITY_LABELS": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "urgent": "Urgent",
+        "emergency": "Emergency"
+      },
+      "STATUS_LABELS": {
+        "open": "Open",
+        "pending": "Pending",
+        "submitted": "Open",
+        "scheduled": "Scheduled",
+        "in_progress": "In progress",
+        "completed": "Resolved",
+        "resolved": "Resolved",
+        "closed": "Closed",
+        "cancelled": "Cancelled",
+        "canceled": "Cancelled"
+      },
+      "DEFAULT_PRIORITY": "medium",
+      "DEFAULT_STATUS": "open"
+    },
+    "UPLOAD": {
+      "MAX_FILE_SIZE_BYTES": 5242880,
+      "SUPPORTED_RECEIPT_MIME_TYPES": [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp"
+      ]
+    }
+  }
+}

@@ -29,11 +29,12 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
+  const isCaretaker = session?.user?.role === 'caretaker';
 
   const displayName =
     [session?.user?.firstName, session?.user?.lastName].filter(Boolean).join(' ') ||
     session?.user?.email ||
-    'Admin';
+    (isCaretaker ? 'Caretaker' : 'Admin');
 
   const isActive = (href: string) => {
     // Exact match for dashboard root so /admin does not light up on every admin page
@@ -43,7 +44,51 @@ export default function AdminSidebar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const menuItems: NavEntry[] = [
+  const caretakerBlockedHref = (href?: string) => {
+    if (!href || !isCaretaker) return false;
+    const blockedPrefixes = [
+      '/admin/reports',
+      '/admin/financial/reports',
+      '/admin/financial/expenses',
+      '/admin/financial/dashboard',
+      '/admin/financial/advanced-analytics',
+      '/admin/financial/late-fees',
+      '/admin/bills-expenses/reports',
+      '/admin/analytics',
+      '/admin/export',
+      '/admin/users',
+      '/admin/tools',
+    ];
+    return blockedPrefixes.some(
+      (p) => href === p || href.startsWith(`${p}/`) || href.startsWith(`${p}?`)
+    );
+  };
+
+  const filterMenuForRole = (entries: NavEntry[]): NavEntry[] => {
+    if (!isCaretaker) return entries;
+    const filtered: NavEntry[] = [];
+    for (const entry of entries) {
+      if (isDivider(entry)) {
+        filtered.push(entry);
+        continue;
+      }
+      if (entry.name === 'Reports' || entry.name === 'Bills & Expenses' || entry.name === 'Users') {
+        continue;
+      }
+      if (caretakerBlockedHref(entry.href)) continue;
+      const children = entry.children?.filter((c) => !caretakerBlockedHref(c.href));
+      filtered.push({ ...entry, ...(children ? { children } : {}) });
+    }
+    return filtered.filter((e, i, arr) => {
+      if (!isDivider(e)) return true;
+      const prev = arr[i - 1];
+      const next = arr[i + 1];
+      if (!prev || !next) return false;
+      return !isDivider(prev) && !isDivider(next);
+    });
+  };
+
+  const menuItems: NavEntry[] = filterMenuForRole([
     {
       name: 'Dashboard',
       href: '/admin',
@@ -147,29 +192,11 @@ export default function AdminSidebar() {
           ),
         },
         {
-          name: 'Late Fee Settings',
-          href: '/admin/financial/late-fees/settings',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
-        },
-        {
           name: 'Tenant pay details',
           href: '/admin/settings?tab=payments',
           icon: (
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-          ),
-        },
-        {
-          name: 'Apply Late Fees',
-          href: '/admin/financial/late-fees/apply',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           ),
         },
@@ -197,6 +224,11 @@ export default function AdminSidebar() {
         {
           name: 'Utility Bills',
           href: '/admin/bills-expenses/utility-bills',
+          icon: chevronIcon,
+        },
+        {
+          name: 'Unit groups',
+          href: '/admin/bills-expenses/unit-groups',
           icon: chevronIcon,
         },
         {
@@ -240,6 +272,20 @@ export default function AdminSidebar() {
         </svg>
       ),
     },
+    {
+      name: 'Reports',
+      href: '/admin/reports',
+      icon: (
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      ),
+    },
     { type: 'divider', id: 'after-ops' },
     {
       name: 'Maintenance',
@@ -275,8 +321,21 @@ export default function AdminSidebar() {
         </svg>
       ),
     },
-    // Hidden for now: Bulk Operations, Recent Activity, Email Reminders
-  ];
+    {
+      name: 'Activity',
+      href: '/admin/activity',
+      icon: (
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      ),
+    },
+  ]);
 
   // Expand only the section that owns the current route; everything else stays collapsed
   useEffect(() => {
@@ -291,7 +350,7 @@ export default function AdminSidebar() {
     setExpandedSections(activeParents);
     // menuItems / isActive are driven by pathname
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, isCaretaker]);
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections((prev) => (prev.includes(sectionName) ? [] : [sectionName]));
@@ -452,7 +511,7 @@ export default function AdminSidebar() {
             <p className="truncate text-xs text-gray-600">{session?.user?.email || ''}</p>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/auth/admin/signin' })}
+            onClick={() => signOut({ callbackUrl: '/auth/signin' })}
             className="p-1 text-gray-400 transition-colors hover:text-gray-900"
             title="Sign out"
           >

@@ -129,6 +129,12 @@ model buildings {
   total_units              Int?                       @default(0)
   amenities                String[]
   is_active                Boolean?                   @default(true)
+  /// When false, skip automatic late-fee penalties; use negotiated due-date workflow.
+  auto_late_fee            Boolean                    @default(true)
+  /// WGS84 coords for maps / nearby amenities (Nominatim); null until geocoded.
+  latitude                 Float?
+  longitude                Float?
+  geocoded_at              DateTime?                  @db.Timestamptz(6)
   created_at               DateTime?                  @default(now()) @db.Timestamp(6)
   updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
   assets                   assets[]
@@ -141,9 +147,48 @@ model buildings {
   utility_allocation_rules utility_allocation_rules[]
   utility_bills            utility_bills[]
   utility_meter_readings   utility_meter_readings[]
+  utility_unit_groups      utility_unit_groups[]
+  collection_lifetime_totals collection_lifetime_totals[]
+  collection_lifetime_period_commits collection_lifetime_period_commits[]
 
   @@index([is_active], map: "idx_buildings_active")
   @@index([building_type], map: "idx_buildings_type")
+}
+
+/// People directory parallel to tenants (TENANT | STAFF | VENDOR roles).
+model contacts {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  first_name           String                 @db.VarChar(100)
+  last_name            String                 @db.VarChar(100)
+  email                String?                @db.VarChar(255)
+  phone                String?                @db.VarChar(20)
+  notes                String?
+  tenant_id            String?                @db.Uuid
+  user_id              String?                @db.Uuid
+  is_active            Boolean?               @default(true)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  tenants              tenants?               @relation(fields: [tenant_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  users                users?                 @relation(fields: [user_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  contact_roles        contact_roles[]
+  deposit_transactions deposit_transactions[]
+
+  @@index([tenant_id], map: "idx_contacts_tenant_id")
+  @@index([user_id], map: "idx_contacts_user_id")
+  @@index([email], map: "idx_contacts_email")
+  @@index([is_active], map: "idx_contacts_active")
+}
+
+model contact_roles {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contact_id String    @db.Uuid
+  role       String    @db.VarChar(20)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  contacts   contacts  @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([contact_id, role])
+  @@index([contact_id], map: "idx_contact_roles_contact_id")
+  @@index([role], map: "idx_contact_roles_role")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -186,6 +231,7 @@ model cost_allocation_history {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Legacy flat deposit txn log — kept for existing payment/invoice code paths.
 model deposit_ledger {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id             String    @db.Uuid
@@ -206,6 +252,50 @@ model deposit_ledger {
   @@index([tenant_id], map: "idx_deposit_ledger_tenant_id")
   @@index([transaction_date], map: "idx_deposit_ledger_transaction_date")
   @@index([transaction_type], map: "idx_deposit_ledger_transaction_type")
+}
+
+/// Per-lease deposit account (SECURITY | UTILITY) with running balance.
+model deposit_ledgers {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignment_id        String                 @db.Uuid
+  tenant_id            String                 @db.Uuid
+  deposit_type         String                 @db.VarChar(20)
+  initial_amount       Decimal                @default(0) @db.Decimal(10, 2)
+  running_balance      Decimal                @default(0) @db.Decimal(10, 2)
+  is_active            Boolean?               @default(true)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  tenant_room_assignments tenant_room_assignments @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants              tenants                @relation("TenantDepositLedgers", fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deposit_transactions deposit_transactions[]
+
+  @@unique([assignment_id, deposit_type])
+  @@index([assignment_id], map: "idx_deposit_ledgers_assignment_id")
+  @@index([tenant_id], map: "idx_deposit_ledgers_tenant_id")
+  @@index([deposit_type], map: "idx_deposit_ledgers_type")
+}
+
+model deposit_transactions {
+  id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deposit_ledger_id     String          @db.Uuid
+  amount                Decimal         @db.Decimal(10, 2)
+  reason                String
+  transaction_date      DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_by_contact_id String?         @db.Uuid
+  created_by_user_id    String?         @db.Uuid
+  applied_to_invoice_id String?         @db.Uuid
+  payment_id            String?         @db.Uuid
+  created_at            DateTime?       @default(now()) @db.Timestamp(6)
+  deposit_ledgers       deposit_ledgers @relation(fields: [deposit_ledger_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  contacts              contacts?       @relation(fields: [created_by_contact_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  users                 users?          @relation("DepositTxnCreator", fields: [created_by_user_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  invoices              invoices?       @relation(fields: [applied_to_invoice_id], references: [id], onUpdate: NoAction)
+  payments              payments?       @relation("DepositTxnPayment", fields: [payment_id], references: [id], onUpdate: NoAction)
+
+  @@index([deposit_ledger_id], map: "idx_deposit_transactions_ledger_id")
+  @@index([transaction_date], map: "idx_deposit_transactions_date")
+  @@index([created_by_contact_id], map: "idx_deposit_transactions_created_by_contact")
+  @@index([applied_to_invoice_id], map: "idx_deposit_transactions_invoice")
 }
 
 model document_categories {
@@ -270,6 +360,9 @@ model expenses {
   id                  String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   building_id         String?    @db.Uuid
   room_id             String?    @db.Uuid
+  tenant_id           String?    @db.Uuid
+  related_moveout_id  String?    @db.Uuid
+  related_assignment_id String?  @db.Uuid
   category            String     @db.VarChar(100)
   description         String     @db.VarChar(255)
   amount              Decimal    @db.Decimal(10, 2)
@@ -286,10 +379,14 @@ model expenses {
   updated_at          DateTime?  @default(now()) @db.Timestamp(6)
   buildings           buildings?       @relation(fields: [building_id], references: [id], onUpdate: NoAction)
   rooms               rooms?           @relation(fields: [room_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  tenants             tenants?         @relation(fields: [tenant_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  tenant_room_assignments tenant_room_assignments? @relation(fields: [related_assignment_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
   pipeline_cards      pipeline_cards[]
 
   @@index([building_id], map: "idx_expenses_building")
   @@index([room_id], map: "idx_expenses_room_id")
+  @@index([tenant_id], map: "idx_expenses_tenant_id")
+  @@index([related_moveout_id], map: "idx_expenses_related_moveout")
   @@index([category], map: "idx_expenses_category")
   @@index([expense_date], map: "idx_expenses_date")
   @@index([expense_status], map: "idx_expenses_status")
@@ -337,19 +434,26 @@ model invoices {
   invoice_number       String                @unique @db.VarChar(100)
   issue_date           DateTime              @db.Date
   due_date             DateTime              @db.Date
+  negotiated_due_date  DateTime?             @db.Date
+  negotiated_due_reason String?
   billing_period_start DateTime?             @db.Date
   billing_period_end   DateTime?             @db.Date
   subtotal             Decimal               @default(0) @db.Decimal(10, 2)
   tax_amount           Decimal               @default(0) @db.Decimal(10, 2)
   discount_amount      Decimal               @default(0) @db.Decimal(10, 2)
+  adjustment_amount    Decimal               @default(0) @db.Decimal(10, 2)
+  adjustment_reason    String?
   total_amount         Decimal               @db.Decimal(10, 2)
   amount_paid          Decimal               @default(0) @db.Decimal(10, 2)
   balance_due          Decimal?              @default(dbgenerated("(total_amount - amount_paid)")) @db.Decimal(10, 2)
   invoice_status       String?               @default("draft") @db.VarChar(20)
+  /// Formal collection status: PAID | UNPAID | PARTIAL
+  bill_status          String                @default("UNPAID") @db.VarChar(20)
   notes                String?
   created_at           DateTime?             @default(now()) @db.Timestamp(6)
   updated_at           DateTime?             @default(now()) @db.Timestamp(6)
   deposit_ledger       deposit_ledger[]
+  deposit_transactions deposit_transactions[]
   invoice_line_items   invoice_line_items[]
   tenants              tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   payment_allocations  payment_allocations[]
@@ -358,7 +462,9 @@ model invoices {
   @@index([due_date], map: "idx_invoices_due_date")
   @@index([invoice_number], map: "idx_invoices_number")
   @@index([invoice_status], map: "idx_invoices_status")
+  @@index([bill_status], map: "idx_invoices_bill_status")
   @@index([tenant_id], map: "idx_invoices_tenant")
+  @@index([negotiated_due_date], map: "idx_invoices_negotiated_due_date")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -420,6 +526,7 @@ model payments {
   updated_at              DateTime?                @default(now()) @db.Timestamp(6)
   asset_billing           asset_billing[]
   deposit_ledger          deposit_ledger[]
+  deposit_transactions    deposit_transactions[] @relation("DepositTxnPayment")
   payment_allocations     payment_allocations[]
   tenant_room_assignments tenant_room_assignments? @relation(fields: [assignment_id], references: [id], onUpdate: NoAction)
   rooms                   rooms?                   @relation(fields: [room_id], references: [id], onUpdate: NoAction)
@@ -447,6 +554,7 @@ model rooms {
   description             String?
   amenities               String[]
   is_active               Boolean?                  @default(true)
+  is_revenue_unit         Boolean                   @default(true)
   created_at              DateTime?                 @default(now()) @db.Timestamp(6)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(6)
   asset_assignments       asset_assignments[]
@@ -459,11 +567,14 @@ model rooms {
   utility_meter_readings  utility_meter_readings[]
   utility_bills           utility_bills[]
   expenses                expenses[]
+  utility_unit_group_members utility_unit_group_members[]
+  utility_bill_unit_splits   utility_bill_unit_splits[]
 
   @@unique([building_id, room_number])
   @@index([is_active], map: "idx_rooms_active")
   @@index([building_id], map: "idx_rooms_building")
   @@index([room_status], map: "idx_rooms_status")
+  @@index([is_revenue_unit], map: "idx_rooms_is_revenue_unit")
 }
 
 model schema_migrations {
@@ -494,21 +605,25 @@ model tenant_credits {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model tenant_room_assignments {
-  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id         String     @db.Uuid
-  room_id           String     @db.Uuid
-  start_date        DateTime   @db.Date
-  end_date          DateTime?  @db.Date
-  monthly_rate      Decimal    @db.Decimal(10, 2)
-  deposit_paid      Decimal?   @db.Decimal(10, 2)
-  assignment_status String?    @default("active") @db.VarChar(20)
-  notes             String?
-  created_at        DateTime?  @default(now()) @db.Timestamp(6)
-  updated_at        DateTime?  @default(now()) @db.Timestamp(6)
-  payments          payments[]
-  pipeline_cards    pipeline_cards[]
-  rooms             rooms      @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  tenants           tenants    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                      String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id               String           @db.Uuid
+  room_id                 String           @db.Uuid
+  start_date              DateTime         @db.Date
+  end_date                DateTime?        @db.Date
+  monthly_rate            Decimal          @db.Decimal(10, 2)
+  deposit_paid            Decimal?         @db.Decimal(10, 2)
+  /// Day of month rent billing cycle starts (from move-in / lease start).
+  billing_cycle_start_day Int?             @db.SmallInt
+  assignment_status       String?          @default("active") @db.VarChar(20)
+  notes                   String?
+  created_at              DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?        @default(now()) @db.Timestamp(6)
+  payments                payments[]
+  pipeline_cards          pipeline_cards[]
+  rooms                   rooms            @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants                 tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deposit_ledgers         deposit_ledgers[]
+  expenses                expenses[]
 
   @@index([start_date, end_date], map: "idx_assignments_dates")
   @@index([room_id], map: "idx_assignments_room")
@@ -540,6 +655,7 @@ model tenant_utility_bills {
   paid_date               DateTime?      @db.Date
   notes                   String?
   allocation_details      Json?
+  applicability_status    String         @default("APPLICABLE") @db.VarChar(20)
   created_at              DateTime?      @default(now()) @db.Timestamp(6)
   updated_at              DateTime?      @default(now()) @db.Timestamp(6)
   buildings               buildings      @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -578,7 +694,9 @@ model tenants {
   asset_billing                  asset_billing[]
   communications                 communications[]
   deposit_ledger                 deposit_ledger[]
+  deposit_ledgers                deposit_ledgers[] @relation("TenantDepositLedgers")
   documents                      documents[]
+  expenses                       expenses[]
   invoices                       invoices[]
   notifications                  notifications[]
   payments                       payments[]
@@ -587,6 +705,7 @@ model tenants {
   tenant_room_assignments        tenant_room_assignments[]
   tenant_utility_bills           tenant_utility_bills[]
   users                          users?                    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  contacts                       contacts[]
 
   @@index([is_active], map: "idx_tenants_active")
   @@index([email], map: "idx_tenants_email")
@@ -611,12 +730,14 @@ model users {
   audit_logs            audit_logs[]
   communications        communications[]
   deposit_ledger        deposit_ledger[]
+  deposit_transactions  deposit_transactions[] @relation("DepositTxnCreator")
   documents             documents[]
   notifications         notifications[]
   pipeline_cards_created pipeline_cards[] @relation("PipelineCardCreator")
   pipeline_cards_assigned pipeline_cards[] @relation("PipelineCardAssignee")
   pipeline_card_events  pipeline_card_events[]
   tenants               tenants[]
+  contacts              contacts[]
 
   @@index([is_active], map: "idx_users_active")
   @@index([email], map: "idx_users_email")
@@ -655,11 +776,15 @@ model utility_bills {
   usage_unit              String?                   @db.VarChar(20)
   meter_reading_previous  Decimal?                  @db.Decimal(12, 2)
   meter_reading_current   Decimal?                  @db.Decimal(12, 2)
-  allocation_method       String?                   @default("per_unit_metered") @db.VarChar(30)
+  /// Canonical: SUBMETERED | SHARED_MANUAL | NOT_APPLICABLE (legacy aliases still present in DB)
+  allocation_method       String?                   @default("SUBMETERED") @db.VarChar(30)
   parent_bill_id          String?                   @db.Uuid
+  utility_unit_group_id   String?                   @db.Uuid
   bill_status             String?                   @default("pending") @db.VarChar(20)
   bill_url                String?                   @db.VarChar(500)
   notes                   String?
+  /// TENANT = billable to occupant; OWNER = vacant/owner-absorbed
+  cost_bearer             String                    @default("TENANT") @db.VarChar(20)
   created_at              DateTime?                 @default(now()) @db.Timestamp(6)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(6)
   cost_allocation_history cost_allocation_history[]
@@ -668,6 +793,8 @@ model utility_bills {
   rooms                   rooms?                    @relation(fields: [room_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
   parent_bill             utility_bills?            @relation("UtilityBillAllocations", fields: [parent_bill_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
   child_bills             utility_bills[]           @relation("UtilityBillAllocations")
+  utility_unit_groups     utility_unit_groups?      @relation(fields: [utility_unit_group_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  utility_bill_unit_splits utility_bill_unit_splits[]
 
   @@index([building_id], map: "idx_utility_bills_building")
   @@index([room_id], map: "idx_utility_bills_room_id")
@@ -676,6 +803,56 @@ model utility_bills {
   @@index([utility_type], map: "idx_utility_bills_type")
   @@index([allocation_method], map: "idx_utility_bills_allocation_method")
   @@index([parent_bill_id], map: "idx_utility_bills_parent_bill")
+  @@index([utility_unit_group_id], map: "idx_utility_bills_unit_group")
+  @@index([cost_bearer], map: "idx_utility_bills_cost_bearer")
+}
+
+model utility_unit_groups {
+  id          String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  building_id String                       @db.Uuid
+  name        String                       @db.VarChar(100)
+  utility_type String?                     @db.VarChar(50)
+  description String?
+  is_active   Boolean?                     @default(true)
+  created_at  DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at  DateTime?                    @default(now()) @db.Timestamp(6)
+  buildings   buildings                    @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  members     utility_unit_group_members[]
+  utility_bills utility_bills[]
+
+  @@index([building_id], map: "idx_utility_unit_groups_building")
+  @@index([utility_type], map: "idx_utility_unit_groups_type")
+}
+
+model utility_unit_group_members {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id   String              @db.Uuid
+  room_id    String              @db.Uuid
+  created_at DateTime?           @default(now()) @db.Timestamp(6)
+  group      utility_unit_groups @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms      rooms               @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([group_id, room_id])
+  @@index([group_id], map: "idx_utility_unit_group_members_group")
+  @@index([room_id], map: "idx_utility_unit_group_members_room")
+}
+
+model utility_bill_unit_splits {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  utility_bill_id      String        @db.Uuid
+  room_id              String        @db.Uuid
+  amount               Decimal?      @db.Decimal(10, 2)
+  applicability_status String        @default("APPLICABLE") @db.VarChar(20)
+  notes                String?
+  created_at           DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?     @default(now()) @db.Timestamp(6)
+  utility_bills        utility_bills @relation(fields: [utility_bill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rooms                rooms         @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([utility_bill_id, room_id])
+  @@index([utility_bill_id], map: "idx_utility_bill_unit_splits_bill")
+  @@index([room_id], map: "idx_utility_bill_unit_splits_room")
+  @@index([applicability_status], map: "idx_utility_bill_unit_splits_applicability")
 }
 
 model utility_meter_readings {
@@ -813,4 +990,35 @@ model pipeline_card_events {
   creator       users?           @relation(fields: [created_by], references: [id], onUpdate: NoAction)
 
   @@index([card_id, created_at(sort: Desc)], map: "idx_pipeline_card_events_card")
+}
+
+/// Running Overall Collection (Previous + Period commits)
+model collection_lifetime_totals {
+  id                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope_key                   String    @unique
+  building_id                 String?   @db.Uuid
+  overall_collection          Decimal   @default(0) @db.Decimal(14, 2)
+  as_of_date                  DateTime? @db.Date
+  last_committed_period_start DateTime? @db.Date
+  last_committed_period_end   DateTime? @db.Date
+  updated_at                  DateTime  @default(now()) @db.Timestamptz(6)
+  buildings                   buildings? @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([building_id], map: "idx_collection_lifetime_totals_building")
+}
+
+model collection_lifetime_period_commits {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope_key           String
+  building_id         String?   @db.Uuid
+  period_start        DateTime  @db.Date
+  period_end          DateTime  @db.Date
+  previous_total      Decimal   @db.Decimal(14, 2)
+  period_collection   Decimal   @db.Decimal(14, 2)
+  overall_collection  Decimal   @db.Decimal(14, 2)
+  committed_at        DateTime  @default(now()) @db.Timestamptz(6)
+  buildings           buildings? @relation(fields: [building_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([scope_key, period_start, period_end], map: "uq_collection_lifetime_period")
+  @@index([scope_key, period_end(sort: Desc)], map: "idx_collection_lifetime_commits_scope")
 }

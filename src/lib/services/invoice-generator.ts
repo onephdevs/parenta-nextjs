@@ -6,6 +6,8 @@
 import pool from '@/lib/db';
 import { InvoiceGenerationRequest, InvoiceGenerationResult } from '@/types/financial';
 import { initialInvoiceStatusForIssueDate } from '@/lib/services/invoice-issue-timing';
+import { dueDateForBillingMonth } from '@/lib/billing/invoice-due';
+import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
 
 /** Open-ended leases get a rolling year of scheduled (mostly draft) invoices. */
 const OPEN_ENDED_INVOICE_MONTHS = 12;
@@ -119,6 +121,26 @@ export async function generateInvoicesForTenant(
 
     const room = roomResult.rows[0];
 
+    // Lease billing cycle day (Phase 1) — fall back to start date / legacy day 5
+    const cycleResult = await client.query(
+      `SELECT billing_cycle_start_day, start_date
+       FROM tenant_room_assignments
+       WHERE tenant_id = $1 AND room_id = $2
+         AND assignment_status = 'active'
+       ORDER BY start_date DESC
+       LIMIT 1`,
+      [tenantId, roomId]
+    );
+    const cycleRow = cycleResult.rows[0];
+    const rentDueDay = resolveRentDueDay({
+      billingCycleStartDay:
+        cycleRow?.billing_cycle_start_day != null
+          ? Number(cycleRow.billing_cycle_start_day)
+          : null,
+      startDate: cycleRow?.start_date ?? leaseStartDate,
+      fallbackDay: 5,
+    });
+
     const startDate = new Date(leaseStartDate);
     const endDate = new Date(leaseEndDate);
     
@@ -187,8 +209,11 @@ export async function generateInvoicesForTenant(
         continue;
       }
 
-      const dueDate = new Date(invoiceMonth);
-      dueDate.setDate(5); // Due on the 5th of each month
+      const dueDate = dueDateForBillingMonth(
+        invoiceMonth.getFullYear(),
+        invoiceMonth.getMonth(),
+        rentDueDay
+      );
 
       // Always bill full monthly rent (no day-based proration).
       // Move-in mid-month still charges one full month; advance covers that month.
@@ -448,9 +473,10 @@ export async function updateOverdueInvoices(): Promise<number> {
 
     const result = await pool.query(
       `UPDATE invoices 
-       SET invoice_status = 'overdue' 
+       SET invoice_status = 'overdue',
+           updated_at = CURRENT_TIMESTAMP
        WHERE invoice_status IN ('sent', 'partial') 
-       AND due_date < CURRENT_DATE 
+       AND COALESCE(negotiated_due_date, due_date) < CURRENT_DATE 
        AND balance_due > 0
        RETURNING id`
     );

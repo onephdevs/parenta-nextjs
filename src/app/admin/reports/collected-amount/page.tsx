@@ -34,11 +34,12 @@ export default function CollectedAmountReportPage() {
   const [periodType, setPeriodType] = useState<'monthly' | 'quarterly' | 'semi-annual' | 'annual'>('monthly');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isCommittingLifetime, setIsCommittingLifetime] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated' || (session && session.user.role !== 'admin')) {
-      redirect('/auth/admin/signin');
+      redirect('/auth/signin');
     }
     
     // Set default date range (last month)
@@ -100,6 +101,57 @@ export default function CollectedAmountReportPage() {
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleCommitLifetime = async () => {
+    if (!startDate || !endDate) return;
+    setIsCommittingLifetime(true);
+    try {
+      const response = await fetch(
+        '/api/reports/collected-amount/commit-lifetime',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate }),
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        setReportData((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                lifetime: {
+                  previousTotal: data.data.previousTotal,
+                  currentPeriodCollection: data.data.currentPeriodCollection,
+                  overallCollection: data.data.overallCollection,
+                  alreadyCommitted: true,
+                  asOfDate: data.data.asOfDate,
+                },
+              }
+            : prev
+        );
+        showNotification({
+          type: 'success',
+          title: 'Lifetime Updated',
+          message: data.message || 'Period committed to running total',
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to commit lifetime total',
+        });
+      }
+    } catch {
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to commit lifetime total',
+      });
+    } finally {
+      setIsCommittingLifetime(false);
     }
   };
 
@@ -392,6 +444,50 @@ export default function CollectedAmountReportPage() {
                   value={`${reportData.summary.growth >= 0 ? '+' : ''}${reportData.summary.growth.toFixed(2)}%`}
                 />
               )}
+            </div>
+          </div>
+        )}
+
+        {reportData && reportData.lifetime && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Lifetime collection (running total)
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Previous Total + Current Period = Overall Collection (persisted,
+                  not recalculated from scratch)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reportData.lifetime.alreadyCommitted || isCommittingLifetime}
+                onClick={handleCommitLifetime}
+              >
+                {isCommittingLifetime
+                  ? 'Committing…'
+                  : reportData.lifetime.alreadyCommitted
+                    ? 'Period already committed'
+                    : 'Commit period to lifetime'}
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <MetricTile
+                label="Previous Total Collection"
+                value={formatCurrency(reportData.lifetime.previousTotal)}
+              />
+              <MetricTile
+                tone="blue"
+                label="Current Period"
+                value={formatCurrency(reportData.lifetime.currentPeriodCollection)}
+              />
+              <MetricTile
+                tone="green"
+                label="Overall Collection"
+                value={formatCurrency(reportData.lifetime.overallCollection)}
+              />
             </div>
           </div>
         )}

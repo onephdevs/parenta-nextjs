@@ -30,7 +30,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
 
   // Redirect if not authenticated or not admin
   if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   let buildingWithStats: (Building & { roomStats: any }) | null = null;
@@ -136,8 +136,8 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
                         tone="green"
                       />
                       <MetricTile
-                        label="Maintenance"
-                        value={roomStats.maintenanceRooms}
+                        label="Unassigned"
+                        value={roomStats.unassignedRooms ?? 0}
                         tone="yellow"
                       />
                       <MetricTile
@@ -146,6 +146,12 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
                         tone="blue"
                       />
                     </div>
+                    <p className="mb-4 text-center text-xs text-gray-500">
+                      {roomStats.totalRooms} total = {roomStats.occupiedRooms} occupied +{' '}
+                      {roomStats.vacantRooms} vacant +{' '}
+                      {roomStats.unassignedRooms ?? 0} unassigned
+                      {roomStats.reconciles === false ? ' ⚠ does not reconcile' : ''}
+                    </p>
 
                     <div className="text-center">
                       <Link

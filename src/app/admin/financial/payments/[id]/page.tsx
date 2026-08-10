@@ -17,6 +17,8 @@ import {
   PaymentStatusBadge,
   PaymentTypeBadge,
 } from '@/components/domain/StatusBadges';
+import { formatPaymentMethodLabel } from '@/lib/constants/payment-methods';
+import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 
 interface PaymentDetailPageProps {
   params: Promise<{
@@ -50,22 +52,15 @@ function formatDateOnly(date: Date) {
 }
 
 function getPaymentMethodDisplay(method: string) {
-  switch (method) {
-    case 'bank_transfer':
-      return 'Bank Transfer';
-    case 'credit_card':
-      return 'Credit Card';
-    default:
-      return method ? method.charAt(0).toUpperCase() + method.slice(1) : 'N/A';
-  }
+  return formatPaymentMethodLabel(method);
 }
 
 export default async function PaymentDetailPage({ params }: PaymentDetailPageProps) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+  if (!session || !['admin','caretaker'].includes(session.user.role)) {
+    redirect('/auth/signin');
   }
 
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -235,6 +230,13 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
           A late fee of {formatCurrency(lateFeeAmount)} was applied to this payment.
         </Alert>
       )}
+
+      <EntityNotesPanel
+        entityType="payment"
+        entityId={String(payment.id)}
+        entityLabel={`Payment ${formatCurrency(Number(payment.amount) || 0)}`}
+        title="Payment notes"
+      />
     </div>
   );
 }

@@ -9,6 +9,11 @@
 
 import pool from '@/lib/db';
 import type { PoolClient } from 'pg';
+import {
+  deriveBillStatusFromAmounts,
+  getEffectiveDueDate,
+  toDateOnly,
+} from '@/lib/billing/invoice-due';
 
 export interface RecalculationResult {
   invoiceId: string;
@@ -18,6 +23,7 @@ export interface RecalculationResult {
   amountPaid: number;
   balanceDue: number;
   updated: boolean;
+  billStatus?: 'PAID' | 'UNPAID' | 'PARTIAL';
 }
 
 export interface TenantRecalculationResult {
@@ -35,14 +41,11 @@ interface InvoicePaymentTotalsRow {
   balance_due: string | number;
   invoice_status: string;
   due_date: Date | string | null;
+  negotiated_due_date?: Date | string | null;
   issue_date: Date | string | null;
   total_allocated: string | number;
   total_advance: string | number;
   total_deposit: string | number;
-}
-
-function startOfLocalDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 /** Pure status derivation — shared by single + batch paths for identical outcomes. */
@@ -50,33 +53,41 @@ export function deriveInvoiceStatus(params: {
   totalAmount: number;
   totalPaid: number;
   dueDate: Date | string | null;
+  negotiatedDueDate?: Date | string | null;
   issueDate?: Date | string | null;
   currentStatus?: string;
   now?: Date;
-}): { newStatus: string; balanceDue: number } {
+}): { newStatus: string; balanceDue: number; billStatus: 'PAID' | 'UNPAID' | 'PARTIAL' } {
   const {
     totalAmount,
     totalPaid,
     dueDate,
+    negotiatedDueDate = null,
     issueDate = null,
     currentStatus,
     now = new Date(),
   } = params;
   const balanceDue = totalAmount - totalPaid;
-  const due = dueDate ? new Date(dueDate) : null;
-  const isOverdue = Boolean(due && due < now && balanceDue > 0);
+  const effectiveDue = getEffectiveDueDate({
+    due_date: dueDate,
+    negotiated_due_date: negotiatedDueDate,
+  });
+  const today = toDateOnly(now)!;
+  const isOverdue = Boolean(
+    effectiveDue && effectiveDue.getTime() < today.getTime() && balanceDue > 0
+  );
+  const billStatus = deriveBillStatusFromAmounts(totalAmount, totalPaid);
 
   // Preserve cancelled
   if (currentStatus === 'cancelled') {
-    return { newStatus: 'cancelled', balanceDue };
+    return { newStatus: 'cancelled', balanceDue, billStatus };
   }
 
   // Keep future-dated drafts hidden until issue_date
-  const issue = issueDate ? new Date(issueDate) : null;
-  const issueInFuture =
-    Boolean(issue) && startOfLocalDay(issue!).getTime() > startOfLocalDay(now).getTime();
+  const issue = issueDate ? toDateOnly(issueDate) : null;
+  const issueInFuture = Boolean(issue) && issue!.getTime() > today.getTime();
   if ((currentStatus === 'draft' || issueInFuture) && totalPaid <= 0 && issueInFuture) {
-    return { newStatus: 'draft', balanceDue };
+    return { newStatus: 'draft', balanceDue, billStatus };
   }
 
   let newStatus: string;
@@ -88,7 +99,7 @@ export function deriveInvoiceStatus(params: {
     newStatus = isOverdue ? 'overdue' : 'sent';
   }
 
-  return { newStatus, balanceDue };
+  return { newStatus, balanceDue, billStatus };
 }
 
 function rowToResult(row: InvoicePaymentTotalsRow, now: Date): RecalculationResult {
@@ -98,10 +109,11 @@ function rowToResult(row: InvoicePaymentTotalsRow, now: Date): RecalculationResu
     parseFloat(String(row.total_deposit || 0));
   const totalAmount = parseFloat(String(row.total_amount));
   const oldStatus = row.invoice_status;
-  const { newStatus, balanceDue } = deriveInvoiceStatus({
+  const { newStatus, balanceDue, billStatus } = deriveInvoiceStatus({
     totalAmount,
     totalPaid,
     dueDate: row.due_date,
+    negotiatedDueDate: row.negotiated_due_date ?? null,
     issueDate: row.issue_date,
     currentStatus: oldStatus,
     now,
@@ -118,6 +130,7 @@ function rowToResult(row: InvoicePaymentTotalsRow, now: Date): RecalculationResu
     amountPaid: totalPaid,
     balanceDue,
     updated,
+    billStatus,
   };
 }
 
@@ -165,6 +178,7 @@ async function fetchInvoicePaymentTotals(
       i.balance_due,
       i.invoice_status,
       i.due_date,
+      i.negotiated_due_date,
       i.issue_date,
       COALESCE(pa.total_allocated, 0) AS total_allocated,
       COALESCE(tc.total_advance, 0) AS total_advance,
@@ -214,15 +228,21 @@ async function applyRecalculationUpdates(
     SET
       amount_paid = v.amount_paid,
       invoice_status = v.invoice_status,
+      bill_status = v.bill_status,
       updated_at = CURRENT_TIMESTAMP
     FROM (
       SELECT *
-      FROM UNNEST($1::uuid[], $2::numeric[], $3::text[])
-        AS t(id, amount_paid, invoice_status)
+      FROM UNNEST($1::uuid[], $2::numeric[], $3::text[], $4::text[])
+        AS t(id, amount_paid, invoice_status, bill_status)
     ) AS v
     WHERE i.id = v.id
     `,
-    [ids, amounts, statuses]
+    [
+      ids,
+      amounts,
+      statuses,
+      toUpdate.map((r) => r.billStatus || 'UNPAID'),
+    ]
   );
 }
 

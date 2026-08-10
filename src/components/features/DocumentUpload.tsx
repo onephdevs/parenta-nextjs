@@ -8,6 +8,7 @@ import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FileText, Download, X, Upload, FilePlus2 } from 'lucide-react';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface DocumentUploadProps {
   tenantId: string;
@@ -35,6 +36,7 @@ export default function DocumentUpload({
 }: DocumentUploadProps) {
   const { showNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
+  const { open: openLightbox } = useImageLightbox();
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isUploading, setIsUploading] = useState(false);
@@ -348,9 +350,21 @@ export default function DocumentUpload({
   };
 
   const handleDownload = () => {
-    if (viewUrl) {
-      window.open(viewUrl, '_blank');
+    if (!viewUrl) return;
+    if (
+      looksLikeImage({
+        fileName: currentDocumentName,
+        url: viewUrl,
+      })
+    ) {
+      openLightbox({
+        src: viewUrl,
+        alt: currentDocumentName || 'Document',
+        title: currentDocumentName || 'Document',
+      });
+      return;
     }
+    window.open(viewUrl, '_blank');
   };
 
   return (

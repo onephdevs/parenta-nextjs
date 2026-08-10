@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth';
 
-export type AppRole = 'admin' | 'staff' | 'tenant';
+export type AppRole = 'admin' | 'staff' | 'tenant' | 'caretaker';
 
 /**
  * Require an authenticated session with one of the allowed roles.
@@ -31,4 +31,9 @@ export async function requireAdmin() {
 
 export async function requireAdminOrStaff() {
   return requireRole(['admin', 'staff']);
+}
+
+/** Owner/admin or caretaker — payments entry without full finance visibility. */
+export async function requireAdminOrCaretaker() {
+  return requireRole(['admin', 'caretaker']);
 }

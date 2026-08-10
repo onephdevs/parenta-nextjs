@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Eye,
   FileText,
-  Plus,
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -21,6 +20,7 @@ import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import Pagination from '@/components/ui/Pagination';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { LeaseStatusBadge } from '@/components/domain/StatusBadges';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import {
   formatLeaseTermShort,
   type LeaseListItem,
@@ -213,9 +213,7 @@ export default function LeaseManagement() {
                 Generate Alerts
               </Button>
             )}
-            <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
-              <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
-            </Link>
+            <AddTenantButton label="New lease" />
           </div>
         }
       />
@@ -323,11 +321,7 @@ export default function LeaseManagement() {
               <EmptyState
                 title="No leases found"
                 description="Create a tenant with a room assignment to start a lease."
-                action={
-                  <Link href="/admin/tenants/new?returnTo=/admin/lease-management">
-                    <Button leftIcon={<Plus className="h-4 w-4" />}>New lease</Button>
-                  </Link>
-                }
+                action={<AddTenantButton label="New lease" />}
               />
             </div>
           ) : (
@@ -572,6 +566,9 @@ export default function LeaseManagement() {
                           <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                             Status
                           </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
@@ -595,6 +592,14 @@ export default function LeaseManagement() {
                               <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium capitalize text-blue-800">
                                 {moveout.status}
                               </span>
+                            </td>
+                            <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                              <Link
+                                href={`/admin/lease-management/moveouts/${moveout.id}`}
+                                className="font-medium text-blue-600 hover:text-blue-800"
+                              >
+                                Inspection &amp; refund
+                              </Link>
                             </td>
                           </tr>
                         ))}

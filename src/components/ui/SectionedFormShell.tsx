@@ -10,12 +10,24 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 
+export type SectionNavStatus = 'done' | 'ready' | 'blocked' | 'optional';
+
 export interface SectionedFormSection<T extends string = string> {
   id: T;
   label: string;
   icon?: ReactNode;
   title?: string;
   subtitle?: string;
+  /**
+   * Flow progress (onboarding):
+   * - done: step complete
+   * - ready: can / should be done now toward winning
+   * - blocked: waiting on an earlier dependency
+   * - optional: no required action
+   */
+  status?: SectionNavStatus;
+  /** Tooltip explaining status / dependency */
+  statusHint?: string;
 }
 
 interface SectionedFormShellBaseProps<T extends string> {
@@ -71,6 +83,73 @@ export type SectionedFormShellProps<T extends string> =
   | SectionedFormModalProps<T>
   | SectionedFormDialogProps<T>
   | SectionedFormPageProps<T>;
+
+function sectionNavClasses(
+  status: SectionNavStatus | undefined,
+  active: boolean,
+  compactChip?: boolean
+) {
+  if (compactChip) {
+    if (active) return 'bg-blue-600 text-white';
+    switch (status) {
+      case 'done':
+        return 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200';
+      case 'ready':
+        return 'bg-white text-gray-900 ring-1 ring-emerald-300';
+      case 'blocked':
+        return 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
+      default:
+        return 'bg-white text-gray-700 ring-1 ring-gray-200';
+    }
+  }
+
+  if (active) {
+    return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
+  }
+
+  switch (status) {
+    case 'done':
+      return 'bg-emerald-50/80 text-emerald-900 hover:bg-emerald-50';
+    case 'ready':
+      return 'bg-white text-gray-900 shadow-sm ring-1 ring-emerald-200/80 hover:bg-emerald-50/40';
+    case 'blocked':
+      return 'bg-slate-100/80 text-slate-500 hover:bg-slate-100';
+    default:
+      return 'text-gray-700 hover:bg-white hover:text-gray-900';
+  }
+}
+
+function sectionIconClasses(
+  status: SectionNavStatus | undefined,
+  active: boolean
+) {
+  if (active) return 'text-blue-600';
+  switch (status) {
+    case 'done':
+      return 'text-emerald-600';
+    case 'ready':
+      return 'text-emerald-500';
+    case 'blocked':
+      return 'text-slate-400';
+    default:
+      return 'text-gray-400';
+  }
+}
+
+function SectionStatusDot({ status }: { status?: SectionNavStatus }) {
+  if (!status || status === 'optional') return null;
+  return (
+    <span
+      className={cn(
+        'ml-auto h-2 w-2 shrink-0 rounded-full',
+        status === 'done' && 'bg-emerald-500',
+        status === 'ready' && 'bg-emerald-400 ring-2 ring-emerald-100',
+        status === 'blocked' && 'bg-slate-400'
+      )}
+      aria-hidden
+    />
+  );
+}
 
 function SectionedFormLayout<T extends string>({
   eyebrow,
@@ -134,24 +213,43 @@ function SectionedFormLayout<T extends string>({
               <button
                 key={item.id}
                 type="button"
+                title={item.statusHint || item.label}
                 onClick={() => onSectionChange(item.id)}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-white hover:text-gray-900'
+                  sectionNavClasses(item.status, active)
                 )}
               >
                 {item.icon && (
-                  <span className={active ? 'text-blue-600' : 'text-gray-400'}>
+                  <span className={sectionIconClasses(item.status, active)}>
                     {item.icon}
                   </span>
                 )}
-                {item.label}
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                <SectionStatusDot status={item.status} />
               </button>
             );
           })}
         </nav>
+
+        {sections.some((s) => s.status && s.status !== 'optional') && (
+          <div className="border-t border-gray-200 px-3 py-2">
+            <ul className="space-y-1 text-[10px] leading-tight text-gray-500">
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Done
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 ring-1 ring-emerald-100" />
+                Ready / next step
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                Waiting on earlier step
+              </li>
+            </ul>
+          </div>
+        )}
 
         {navFooter && <div className="border-t border-gray-200 p-3">{navFooter}</div>}
       </aside>
@@ -216,15 +314,15 @@ function SectionedFormLayout<T extends string>({
               <button
                 key={item.id}
                 type="button"
+                title={item.statusHint || item.label}
                 onClick={() => onSectionChange(item.id)}
                 className={cn(
-                  'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium',
-                  active
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 ring-1 ring-gray-200'
+                  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium',
+                  sectionNavClasses(item.status, active, true)
                 )}
               >
                 {item.label}
+                <SectionStatusDot status={item.status} />
               </button>
             );
           })}

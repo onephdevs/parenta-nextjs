@@ -115,6 +115,7 @@ export async function generateBillsExpensesReport(
         ub.bill_status,
         ub.provider_name,
         ub.notes,
+        COALESCE(ub.cost_bearer, 'TENANT') AS cost_bearer,
         b.name as building_name,
         r.room_number
       FROM utility_bills ub
@@ -158,6 +159,8 @@ export async function generateBillsExpensesReport(
       const utilType = normalizeUtilityType(row.utility_type) || 'electricity';
       const category = utilType as ReportCategory;
       const periodStart = new Date(row.billing_period_start);
+      const isOwnerAbsorbed =
+        String(row.cost_bearer || 'TENANT').toUpperCase() === 'OWNER';
       const loc = row.room_number
         ? locationLabel(row.building_name, row.room_number)
         : row.building_name
@@ -170,12 +173,12 @@ export async function generateBillsExpensesReport(
         categoryLabel: REPORT_CATEGORY_LABELS[category] || category,
         description: `${REPORT_CATEGORY_LABELS[category] || category} bill${
           row.provider_name ? ` — ${row.provider_name}` : ''
-        }`,
+        }${isOwnerAbsorbed ? ' (owner-absorbed / vacant)' : ''}`,
         date: periodStart.toISOString().split('T')[0],
         amount: parseFloat(row.amount),
         buildingName: row.building_name || undefined,
         roomNumber: row.room_number || undefined,
-        locationLabel: loc,
+        locationLabel: isOwnerAbsorbed ? `${loc} · owner cost` : loc,
         vendor: row.provider_name || undefined,
         status: row.bill_status || undefined,
       });

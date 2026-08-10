@@ -49,7 +49,7 @@ export async function GET() {
     const outstandingAmount = parseFloat(outstandingResult.rows[0].outstanding_amount || 0);
     const outstandingCount = parseInt(outstandingResult.rows[0].outstanding_count || 0);
 
-    // Past due = only invoices whose due date has already passed
+    // Past due = only invoices whose effective due date has already passed
     const pastDueQuery = `
       SELECT 
         COALESCE(SUM(balance_due), 0) as past_due_amount,
@@ -58,25 +58,27 @@ export async function GET() {
       WHERE tenant_id = $1
         AND invoice_status IN ('sent', 'partial', 'overdue')
         AND balance_due > 0
-        AND due_date < CURRENT_DATE
+        AND COALESCE(negotiated_due_date, due_date) < CURRENT_DATE
     `;
     const pastDueResult = await pool.query(pastDueQuery, [tenant.id]);
     const pastDueAmount = parseFloat(pastDueResult.rows[0].past_due_amount || 0);
     const pastDueCount = parseInt(pastDueResult.rows[0].past_due_count || 0);
     const upcomingAmount = Math.max(0, outstandingAmount - pastDueAmount);
     
-    // Get next due date and amount (soonest unpaid invoice that is not past due first;
-    // if all are past due, still return the oldest overdue as next actionable)
+    // Get next due date and amount (effective due = negotiated ?? scheduled)
     const nextDueQuery = `
       SELECT 
-        due_date,
+        COALESCE(negotiated_due_date, due_date) AS due_date,
+        due_date AS scheduled_due_date,
+        negotiated_due_date,
         balance_due,
-        total_amount
+        total_amount,
+        bill_status
       FROM invoices
       WHERE tenant_id = $1
         AND invoice_status IN ('sent', 'partial', 'overdue')
         AND balance_due > 0
-      ORDER BY due_date ASC
+      ORDER BY COALESCE(negotiated_due_date, due_date) ASC
       LIMIT 1
     `;
     

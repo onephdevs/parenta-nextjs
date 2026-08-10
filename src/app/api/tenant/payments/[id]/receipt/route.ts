@@ -7,15 +7,11 @@ import { contentDispositionHeader, sanitizeDownloadFileName } from '@/lib/format
 import pool from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
+import { CONSTANTS } from '@/lib/constants';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const SUPPORTED_FILE_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-];
+const MAX_FILE_SIZE = CONSTANTS.MODULE.UPLOAD.MAX_FILE_SIZE_BYTES;
+const SUPPORTED_FILE_TYPES = CONSTANTS.MODULE.UPLOAD
+  .SUPPORTED_RECEIPT_MIME_TYPES as readonly string[];
 
 /**
  * POST /api/tenant/payments/[id]/receipt

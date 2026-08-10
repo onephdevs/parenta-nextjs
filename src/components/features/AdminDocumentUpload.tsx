@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DocumentCategory, DOCUMENT_TYPES, MAX_FILE_SIZE, SUPPORTED_FILE_TYPES } from '@/types/document';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 
 interface AdminDocumentUploadProps {
   categories: DocumentCategory[];
@@ -51,6 +52,10 @@ export default function AdminDocumentUpload({
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0] || null;
+    applySelectedFile(selected);
+  };
+
+  const applySelectedFile = (selected: File | null) => {
     setFile(selected);
     if (selected && !documentName.trim()) {
       setDocumentName(selected.name);
@@ -158,13 +163,27 @@ export default function AdminDocumentUpload({
       >
         <div className="space-y-4 px-6 py-4">
           <FormField label="File" htmlFor="doc-upload-file" required>
-            <input
-              id="doc-upload-file"
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-purple-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-purple-700 hover:file:bg-purple-100"
-            />
+            <div className="space-y-2">
+              <input
+                id="doc-upload-file"
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-purple-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-purple-700 hover:file:bg-purple-100"
+              />
+              <TakePhotoButton
+                disabled={isUploading}
+                onCapture={(captured) => applySelectedFile(captured)}
+                title="Take document photo"
+                description="Allow camera access if prompted, then capture the document or receipt."
+                fileNamePrefix="document"
+              />
+              {file ? (
+                <p className="text-xs text-gray-500">
+                  Selected: {file.name} ({(file.size / 1024).toFixed(0)} KB)
+                </p>
+              ) : null}
+            </div>
           </FormField>
 
           <FormField label="Document name" htmlFor="doc-upload-name" required>

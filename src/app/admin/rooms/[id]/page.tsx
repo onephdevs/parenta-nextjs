@@ -13,7 +13,7 @@ export default async function RoomDetailPage({ params }: RoomDetailPageProps) {
   const { id } = await params;
 
   if (!session || !session.user || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const detail = await getRoomPageDetail(id);

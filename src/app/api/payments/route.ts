@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getPayments, createPayment, PaymentFilters } from '@/lib/api/payments';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdminOrCaretaker } from '@/lib/api-auth';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 import pool from '@/lib/db';
 import { invalidateDashboardCache } from '@/lib/cache/memory-cache';
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireAdmin();
+    const { error } = await requireAdminOrCaretaker();
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { session, error } = await requireAdmin();
+    const { session, error } = await requireAdminOrCaretaker();
     if (error) return error;
 
     const paymentData = await request.json();
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
             tenantId: paymentData.tenantId,
             paymentAmount: payment.amount,
             depositAmount: paymentData.depositAmount || 0,
-            useDeposit: paymentData.useDeposit || false,
+            useDeposit: paymentData.useDeposit !== false,
           },
           client
         );

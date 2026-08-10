@@ -1,6 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import {
+  formatPaymentNotesForPeople,
+  formatPaymentNotesLabel,
+  preserveLedgerTagOnSave,
+} from '@/lib/format-payment-notes';
 import ExpenseForm from '@/components/features/ExpenseForm';
 
 interface ExpenseLike {
@@ -31,10 +36,10 @@ export default function EditExpenseForm({ expense }: { expense: ExpenseLike }) {
         roomId: expense.roomId != null ? String(expense.roomId) : '',
         amount: String(expense.amount ?? ''),
         category: expense.category || 'maintenance',
-        description: expense.description || '',
+        description: formatPaymentNotesLabel(expense.description, expense.description || ''),
         vendor: expense.vendorName || expense.vendor || '',
         expenseDate,
-        notes: expense.notes || '',
+        notes: formatPaymentNotesForPeople(expense.notes || ''),
       }}
       onSubmit={async (data) => {
         const res = await fetch(`/api/expenses/${expense.id}`, {
@@ -45,10 +50,10 @@ export default function EditExpenseForm({ expense }: { expense: ExpenseLike }) {
             roomId: data.roomId || null,
             amount: parseFloat(data.amount),
             category: data.category,
-            description: data.description,
+            description: preserveLedgerTagOnSave(data.description, expense.description),
             vendorName: data.vendor,
             expenseDate: data.expenseDate,
-            notes: data.notes,
+            notes: preserveLedgerTagOnSave(data.notes || '', expense.notes),
           }),
         });
         const result = await res.json();

@@ -9,6 +9,8 @@ import TenantCreditsManager from '@/components/features/TenantCreditsManager';
 import DepositLedgerManager from '@/components/features/DepositLedgerManager';
 import TenantDetailClient from '@/components/features/TenantDetailClient';
 import { PreviewTenantPortalButton } from '@/components/features/tenant/PreviewTenantPortalButton';
+import TenantNotesAction from '@/components/features/tenants/TenantNotesAction';
+import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 
@@ -20,7 +22,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
   const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const { id } = await params;
@@ -90,6 +92,10 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                   {tenant.tenantStatus}
                 </span>
                 <PreviewTenantPortalButton
+                  tenantId={String(tenant.id)}
+                  tenantName={fullName}
+                />
+                <TenantNotesAction
                   tenantId={String(tenant.id)}
                   tenantName={fullName}
                 />
@@ -221,6 +227,13 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
               </section>
             )}
 
+            <EntityNotesPanel
+              entityType="tenant"
+              entityId={String(tenant.id)}
+              entityLabel={fullName}
+              title="Notes"
+            />
+
             <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
                 <h3 className="text-sm font-semibold text-gray-900">Room assignment history</h3>
@@ -258,6 +271,15 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
                               {assignment.assignmentStatus}
                             </span>
                           </div>
+                        </div>
+                        <div className="mt-3 border-t border-gray-100 pt-3">
+                          <EntityNotesPanel
+                            entityType="lease"
+                            entityId={String(assignment.id)}
+                            entityLabel={`Room ${assignment.roomNumber} lease`}
+                            title="Lease notes"
+                            compact
+                          />
                         </div>
                       </div>
                     ))}

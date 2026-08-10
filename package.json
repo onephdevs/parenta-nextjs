@@ -13,7 +13,8 @@
     "seed:apartment1-tenants": "node scripts/seed-apartment1-tenants.mjs",
     "seed:apartment2-tenants": "node scripts/seed-apartment2-tenants.mjs",
     "seed:apartment-ledgers": "node scripts/seed-apartment-ledgers.mjs",
-    "seed:apartment-expenses": "node scripts/seed-apartment-expenses.mjs"
+    "seed:apartment-expenses": "node scripts/seed-apartment-expenses.mjs",
+    "test:occupancy": "node scripts/test-occupancy-reconcile.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
@@ -32,6 +33,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.513.0",
     "next": "^15.3.6",
     "next-auth": "^4.24.11",
@@ -41,12 +43,14 @@
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
     "recharts": "^2.15.4",
     "tailwind-merge": "^3.3.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

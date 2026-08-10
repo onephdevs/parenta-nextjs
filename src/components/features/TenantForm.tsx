@@ -80,6 +80,11 @@ export interface TenantFormProps {
   lockHousing?: boolean;
   returnTo?: string;
   onCreated?: (tenantId: string) => void;
+  /**
+   * When true (default), navigate to the created tenant (or returnTo) after create.
+   * Set false when the caller handles post-create UX (e.g. reservation picker).
+   */
+  redirectAfterCreate?: boolean;
 }
 
 const SECTIONS: SectionedFormSection<SectionId>[] = [
@@ -292,6 +297,7 @@ export default function TenantForm({
   lockHousing = false,
   returnTo,
   onCreated,
+  redirectAfterCreate = true,
 }: TenantFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -773,7 +779,9 @@ export default function TenantForm({
         }
 
         const invoiceDetails = assignResult.invoiceDetails;
-        let detailMessage = `${formData.firstName} ${formData.lastName} has been added successfully.`;
+        const tenantName = `${formData.firstName} ${formData.lastName}`.trim();
+        let detailMessage = `${tenantName} has been added successfully.`;
+        let duration = 6000;
 
         if (invoiceDetails && invoiceDetails.totalInvoices > 0) {
           const formatCurrency = (amount: number) =>
@@ -782,32 +790,36 @@ export default function TenantForm({
               currency: 'PHP',
             }).format(amount || 0);
 
+          const count = Number(invoiceDetails.totalInvoices) || 0;
           const firstNo = invoiceDetails.firstInvoiceNumber;
           const lastNo = invoiceDetails.lastInvoiceNumber;
-          const rangeLabel =
-            firstNo && lastNo
-              ? firstNo === lastNo
-                ? firstNo
-                : `${firstNo} → ${lastNo}`
-              : null;
-
-          detailMessage += `\n\n✅ Auto-Invoicing Complete:`;
-          detailMessage += `\n📄 ${invoiceDetails.totalInvoices} monthly rent invoice${invoiceDetails.totalInvoices === 1 ? '' : 's'} (one per lease month)`;
-          detailMessage += `\n💰 Total amount: ${formatCurrency(Number(invoiceDetails.totalAmount) || 0)}`;
-          if (rangeLabel) {
-            detailMessage += `\n📊 Invoice range: ${rangeLabel}`;
+          const invoiceLines = [
+            '',
+            'Auto-invoicing complete',
+            `• ${count} monthly rent invoice${count === 1 ? '' : 's'} (one per lease month)`,
+            `• Total: ${formatCurrency(Number(invoiceDetails.totalAmount) || 0)}`,
+          ];
+          if (firstNo && lastNo) {
+            invoiceLines.push(
+              firstNo === lastNo
+                ? `• Invoice: ${firstNo}`
+                : `• Invoices: ${firstNo} → ${lastNo}`
+            );
           }
+          detailMessage = `${tenantName} has been added successfully.${invoiceLines.join('\n')}`;
+          duration = 10000;
         }
 
         updateNotification(loadingNotificationId, {
           type: 'success',
-          title: 'Tenant Created & Room Assigned!',
+          title: 'Tenant created & room assigned',
           message: detailMessage,
+          duration,
         });
       } else {
         updateNotification(loadingNotificationId, {
           type: 'success',
-          title: 'Tenant created successfully!',
+          title: 'Tenant created',
           message: `${formData.firstName} ${formData.lastName} has been added. You can assign a room later.`,
         });
       }
@@ -948,17 +960,17 @@ export default function TenantForm({
   const finishAfterCreate = useCallback(
     (tenantId: string) => {
       onCreated?.(tenantId);
-      if (onClose) {
-        onClose();
-        return;
-      }
+      onClose?.();
+
+      if (!redirectAfterCreate) return;
+
       if (resolvedReturnTo) {
         router.push(resolvedReturnTo);
         return;
       }
       router.push(`/admin/tenants/${tenantId}`);
     },
-    [onClose, onCreated, resolvedReturnTo, router]
+    [onClose, onCreated, redirectAfterCreate, resolvedReturnTo, router]
   );
 
   const handleCredentialsModalContinue = () => {

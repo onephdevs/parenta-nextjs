@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
@@ -230,6 +231,17 @@ export default function BulkOperations() {
     <div className="p-6">
       {dialog}
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Bulk Operations</h2>
+
+      <Alert variant="info" title="Historical spreadsheet migration" className="mb-6">
+        For past months/years of Alfonso spreadsheet data, use the dedicated importer
+        (preview + commit):{' '}
+        <Link
+          href="/admin/tools/history-import"
+          className="font-semibold text-blue-700 underline"
+        >
+          History import
+        </Link>
+      </Alert>
 
       <div className="border-b border-gray-300 mb-6">
         <div className="flex gap-4">

@@ -230,6 +230,23 @@ export async function applyLateFees(
   applications: LateFeeApplication[];
   errors: { invoice_id: string; error: string }[];
 }> {
+  const { isLateFeesEnabled } = await import('@/lib/ops-policy-settings');
+  if (!(await isLateFeesEnabled())) {
+    return {
+      success: false,
+      fees_applied: 0,
+      total_fee_amount: 0,
+      applications: [],
+      errors: [
+        {
+          invoice_id: '',
+          error:
+            'Late fees are disabled. Renegotiate invoice due dates instead of applying penalties.',
+        },
+      ],
+    };
+  }
+
   const applications: LateFeeApplication[] = [];
   const errors: { invoice_id: string; error: string }[] = [];
   let totalFeeAmount = 0;
@@ -320,6 +337,17 @@ export async function applyAutoLateFees(options?: {
   applications: LateFeeApplication[];
   errors: { invoice_id: string; error: string }[];
 }> {
+  const { isLateFeesEnabled } = await import('@/lib/ops-policy-settings');
+  if (!(await isLateFeesEnabled())) {
+    return {
+      success: true,
+      fees_applied: 0,
+      total_fee_amount: 0,
+      applications: [],
+      errors: [],
+    };
+  }
+
   const dbPool = options?.dbPool ?? pool;
   const dryRun = options?.dryRun ?? false;
 
@@ -328,6 +356,27 @@ export async function applyAutoLateFees(options?: {
   if (options?.tenantId) {
     invoicesToProcess = invoicesToProcess.filter(
       (inv) => String(inv.tenant_id) === String(options.tenantId)
+    );
+  }
+
+  // Per-building toggle: skip properties with auto_late_fee = false
+  if (invoicesToProcess.length > 0) {
+    const feeGate = await dbPool.query<{ invoice_id: string; auto_late_fee: boolean }>(
+      `SELECT i.id AS invoice_id, COALESCE(b.auto_late_fee, true) AS auto_late_fee
+       FROM invoices i
+       JOIN tenants t ON t.id = i.tenant_id
+       LEFT JOIN tenant_room_assignments tra
+         ON tra.tenant_id = t.id AND tra.assignment_status = 'active'
+       LEFT JOIN rooms r ON r.id = tra.room_id
+       LEFT JOIN buildings b ON b.id = r.building_id
+       WHERE i.id = ANY($1::uuid[])`,
+      [invoicesToProcess.map((i) => String(i.invoice_id))]
+    );
+    const allowed = new Set(
+      feeGate.rows.filter((r) => r.auto_late_fee !== false).map((r) => String(r.invoice_id))
+    );
+    invoicesToProcess = invoicesToProcess.filter((inv) =>
+      allowed.has(String(inv.invoice_id))
     );
   }
 

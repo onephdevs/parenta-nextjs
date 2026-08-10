@@ -5,6 +5,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 
 interface ProfilePictureUploadProps {
   tenantId: string;
@@ -37,7 +38,11 @@ export default function ProfilePictureUpload({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    void processSelectedFile(file);
+    e.target.value = '';
+  };
 
+  const processSelectedFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       showNotification({
         type: 'error',
@@ -62,7 +67,7 @@ export default function ProfilePictureUpload({
     };
     reader.readAsDataURL(file);
 
-    handleUpload(file);
+    void handleUpload(file);
   };
 
   const handleUpload = async (file: File) => {
@@ -197,6 +202,15 @@ export default function ProfilePictureUpload({
         >
           {preview ? 'Change' : 'Upload'}
         </Button>
+        <TakePhotoButton
+          size="sm"
+          disabled={isUploading || isDeleting}
+          onCapture={processSelectedFile}
+          title="Take profile photo"
+          description="Allow camera access if prompted, then capture."
+          fileNamePrefix="profile"
+          preferUserCamera
+        />
         {preview && (
           <Button
             type="button"

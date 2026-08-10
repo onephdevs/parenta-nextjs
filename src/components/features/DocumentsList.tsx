@@ -40,6 +40,7 @@ import {
   getDocumentUiStatus,
   type DocumentUiStatus,
 } from '@/lib/documents-shared';
+import { useImageLightbox } from '@/components/ui/ImageLightbox';
 
 const PAGE_SIZE = 20;
 
@@ -98,6 +99,7 @@ function DocumentTypeIcon({ doc }: { doc: Document }) {
 
 function DocumentThumb({ doc }: { doc: Document }) {
   const [failed, setFailed] = useState(false);
+  const { open: openLightbox } = useImageLightbox();
 
   if (!isImageDocument(doc) || failed) {
     return (
@@ -107,14 +109,27 @@ function DocumentThumb({ doc }: { doc: Document }) {
     );
   }
 
+  const src = documentPreviewSrc(doc);
+  const title = (doc.documentName || doc.fileName || 'Untitled').trim();
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- document thumbs from blob/local paths
-    <img
-      src={documentPreviewSrc(doc)}
-      alt=""
-      className="h-10 w-10 flex-shrink-0 rounded-md object-cover ring-1 ring-gray-200"
-      onError={() => setFailed(true)}
-    />
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        openLightbox({ src, alt: title, title });
+      }}
+      className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-md ring-1 ring-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+      aria-label={`View ${title}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- document thumbs from blob/local paths */}
+      <img
+        src={src}
+        alt=""
+        className="h-full w-full object-cover"
+        onError={() => setFailed(true)}
+      />
+    </button>
   );
 }
 

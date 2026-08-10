@@ -102,15 +102,17 @@ function MaintenanceStatusBadge({ status }: { status: string }) {
     in_progress: 'info',
     completed: 'success',
     resolved: 'success',
+    closed: 'neutral',
     cancelled: 'neutral',
   };
-  // Align labels with Maintenance pipeline stages (Submitted / In Progress / Resolved)
+  // Align labels with Maintenance pipeline stages (Open / In Progress / Resolved)
   const labelMap: Record<string, string> = {
-    open: 'Submitted',
-    submitted: 'Submitted',
+    open: 'Open',
+    submitted: 'Open',
     in_progress: 'In Progress',
     completed: 'Resolved',
     resolved: 'Resolved',
+    closed: 'Closed',
     cancelled: 'Cancelled',
   };
   const key = status.toLowerCase();
@@ -212,10 +214,17 @@ function MaintenancePriorityBadge({ priority }: { priority: string }) {
     medium: 'warning',
     low: 'success',
   };
+  const labels: Record<string, string> = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    urgent: 'Urgent',
+    emergency: 'Emergency',
+  };
   const key = priority.toLowerCase();
   return (
     <Badge tone={map[key] ?? 'neutral'}>
-      {formatLabel(priority)}
+      {labels[key] ?? formatLabel(priority)}
     </Badge>
   );
 }

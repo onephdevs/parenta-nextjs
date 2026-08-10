@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -43,8 +44,13 @@ function isBenignFetchError(error: unknown): boolean {
 const PANEL_WIDTH = 384; // w-96
 const POLL_MS = 30000;
 
-export function NotificationBell() {
+export function NotificationBell({
+  variant = 'admin',
+}: {
+  variant?: 'admin' | 'tenant';
+}) {
   const router = useRouter();
+  const { status: sessionStatus } = useSession();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -56,11 +62,14 @@ export function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inFlightRef = useRef(false);
+  const isTenant = variant === 'tenant';
 
   const fetchInbox = useCallback(async (opts?: { showLoading?: boolean }) => {
+    if (sessionStatus !== 'authenticated') return;
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       return;
     }
+    if (inFlightRef.current) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -82,8 +91,9 @@ export function NotificationBell() {
         setUnreadCount(data.data.unreadCount || 0);
       }
     } catch (error) {
-      if (!isBenignFetchError(error)) {
-        console.error('Failed to load notifications', error);
+      // Never surface transient network/HMR/abort noise to the console overlay.
+      if (!isBenignFetchError(error) && process.env.NODE_ENV === 'development') {
+        console.warn('Notifications inbox unavailable', error);
       }
     } finally {
       if (abortRef.current === controller) {
@@ -93,13 +103,15 @@ export function NotificationBell() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [sessionStatus]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    if (sessionStatus !== 'authenticated') return;
+
     void fetchInbox({ showLoading: true });
 
     const id = window.setInterval(() => {
@@ -118,7 +130,7 @@ export function NotificationBell() {
       document.removeEventListener('visibilitychange', onVisibility);
       abortRef.current?.abort();
     };
-  }, [fetchInbox]);
+  }, [fetchInbox, sessionStatus]);
 
   const updatePanelPosition = useCallback(() => {
     const btn = buttonRef.current;
@@ -230,7 +242,10 @@ export function NotificationBell() {
               <button
                 type="button"
                 onClick={markAllRead}
-                className="text-xs font-medium text-purple-700 hover:underline"
+                className={cn(
+                  'text-xs font-medium hover:underline',
+                  isTenant ? 'text-emerald-700' : 'text-purple-700'
+                )}
               >
                 Mark all read
               </button>
@@ -248,7 +263,11 @@ export function NotificationBell() {
               <div className="p-4">
                 <EmptyState
                   title="No notifications"
-                  description="Activity you care about will show up here."
+                  description={
+                    isTenant
+                      ? 'Maintenance updates and office messages will show up here.'
+                      : 'Activity you care about will show up here.'
+                  }
                 />
               </div>
             ) : (
@@ -260,7 +279,7 @@ export function NotificationBell() {
                       onClick={() => openItem(item)}
                       className={cn(
                         'w-full border-b border-gray-50 px-4 py-3 text-left hover:bg-gray-50',
-                        !item.isRead && 'bg-purple-50/60'
+                        !item.isRead && (isTenant ? 'bg-emerald-50/70' : 'bg-purple-50/60')
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -283,24 +302,38 @@ export function NotificationBell() {
           </div>
 
           <div className="flex gap-2 border-t border-gray-100 px-3 py-2">
-            <Link
-              href="/admin/activity"
-              className="flex-1"
-              onClick={() => setOpen(false)}
-            >
-              <Button type="button" variant="outline" size="sm" className="w-full">
-                Recent activity
-              </Button>
-            </Link>
-            <Link
-              href="/admin/settings?tab=notifications"
-              className="flex-1"
-              onClick={() => setOpen(false)}
-            >
-              <Button type="button" variant="ghost" size="sm" className="w-full">
-                Preferences
-              </Button>
-            </Link>
+            {isTenant ? (
+              <Link
+                href="/tenant/maintenance"
+                className="flex-1"
+                onClick={() => setOpen(false)}
+              >
+                <Button type="button" variant="outline" size="sm" className="w-full">
+                  Maintenance
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/admin/activity"
+                  className="flex-1"
+                  onClick={() => setOpen(false)}
+                >
+                  <Button type="button" variant="outline" size="sm" className="w-full">
+                    Recent activity
+                  </Button>
+                </Link>
+                <Link
+                  href="/admin/settings?tab=notifications"
+                  className="flex-1"
+                  onClick={() => setOpen(false)}
+                >
+                  <Button type="button" variant="ghost" size="sm" className="w-full">
+                    Preferences
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>,
         document.body

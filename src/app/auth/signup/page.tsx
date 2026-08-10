@@ -202,7 +202,7 @@ function SignUpForm() {
           <p className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{' '}
             <Link
-              href="/auth/tenant/signin"
+              href="/auth/signin"
               className="font-semibold text-[#3B82F6] hover:text-blue-600"
             >
               Login here
@@ -214,7 +214,7 @@ function SignUpForm() {
       <RegistrationSuccessModal
         isOpen={showSuccess}
         onClose={() => setShowSuccess(false)}
-        loginHref="/auth/tenant/signin"
+        loginHref="/auth/signin"
       />
     </>
   );

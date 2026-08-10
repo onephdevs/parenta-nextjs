@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Camera, Lock, Mail, User, Shield } from 'lucide-react';
+import { Camera, Lock, Mail, User, Shield, ImagePlus } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/forms/FormField';
 import { getImageUrl } from '@/lib/format/image-url';
 import { cn } from '@/lib/utils';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 
 interface TenantAccountPanelProps {
   email?: string;
@@ -66,10 +67,13 @@ export function TenantAccountPanel({
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadAvatarFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
+  const uploadAvatarFile = async (file: File) => {
     if (isPreview) {
       showError('Photo upload is disabled in preview mode');
-      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -91,7 +95,6 @@ export function TenantAccountPanel({
       showError(error instanceof Error ? error.message : 'Failed to upload photo');
     } finally {
       setIsUploadingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -179,20 +182,46 @@ export function TenantAccountPanel({
               className="hidden"
               onChange={handlePhotoChange}
             />
-            <button
-              type="button"
-              aria-label="Upload profile photo"
-              disabled={isUploadingPhoto || isPreview}
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                'absolute bottom-0 right-0 rounded-full border p-2 shadow-sm transition disabled:opacity-50',
-                theme.mode === 'dark'
-                  ? 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800'
-                  : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
-              )}
-            >
-              <Camera className="h-4 w-4" />
-            </button>
+            <div className="absolute bottom-0 right-0 flex gap-1">
+              <TakePhotoButton
+                disabled={isUploadingPhoto || isPreview}
+                onCapture={(file) => void uploadAvatarFile(file)}
+                title="Take profile photo"
+                description="Allow camera access if prompted, then capture."
+                fileNamePrefix="profile"
+                preferUserCamera
+                renderTrigger={(open) => (
+                  <button
+                    type="button"
+                    aria-label="Take profile photo"
+                    disabled={isUploadingPhoto || isPreview}
+                    onClick={open}
+                    className={cn(
+                      'rounded-full border p-2 shadow-sm transition disabled:opacity-50',
+                      theme.mode === 'dark'
+                        ? 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800'
+                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                    )}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                )}
+              />
+              <button
+                type="button"
+                aria-label="Choose profile photo from gallery"
+                disabled={isUploadingPhoto || isPreview}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  'rounded-full border p-2 shadow-sm transition disabled:opacity-50',
+                  theme.mode === 'dark'
+                    ? 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800'
+                    : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                )}
+              >
+                <ImagePlus className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div>
             <p className={cn('text-lg font-semibold', theme.shellHeader)}>{displayName}</p>

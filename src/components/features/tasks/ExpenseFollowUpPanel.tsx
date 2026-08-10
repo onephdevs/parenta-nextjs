@@ -6,6 +6,10 @@ import { Badge } from '@/components/ui/Badge';
 import { ExpenseCategoryBadge } from '@/components/domain/StatusBadges';
 import { Button } from '@/components/ui/Button';
 import {
+  formatPaymentNotesForPeople,
+  formatPaymentNotesLabel,
+} from '@/lib/format-payment-notes';
+import {
   formatReportCategoryLabel,
   UTILITY_TYPE_LABELS,
 } from '@/lib/constants/bills-expenses';
@@ -13,6 +17,7 @@ import {
   OpportunityDocumentsPanel,
   PAYMENT_DOC_TYPE_OPTIONS,
 } from './OpportunityDocumentsPanel';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 const EXPENSE_DOC_TYPE_OPTIONS = [
   { value: 'receipt', label: 'Receipt / proof of payment' },
@@ -125,6 +130,7 @@ export function ExpenseFollowUpPanel({
   const [loading, setLoading] = useState(Boolean(utilityBillId || expenseId));
   const [error, setError] = useState<string | null>(null);
   const [savingStatus, setSavingStatus] = useState(false);
+  const { open: openLightbox } = useImageLightbox();
 
   const load = useCallback(async () => {
     if (!utilityBillId && !expenseId) {
@@ -213,6 +219,19 @@ export function ExpenseFollowUpPanel({
       : '/admin/financial/expenses';
 
   const receiptHref = bill?.billUrl || expense?.receiptUrl;
+
+  function openReceiptFile() {
+    if (!receiptHref) return;
+    if (looksLikeImage({ url: receiptHref })) {
+      openLightbox({
+        src: receiptHref,
+        alt: 'Receipt',
+        title: 'Receipt',
+      });
+      return;
+    }
+    window.open(receiptHref, '_blank', 'noopener,noreferrer');
+  }
 
   return (
     <div className="space-y-6">
@@ -304,7 +323,7 @@ export function ExpenseFollowUpPanel({
 
             {bill.notes && (
               <p className="mt-3 border-t border-gray-200 pt-3 text-sm text-gray-700">
-                {bill.notes}
+                {formatPaymentNotesForPeople(bill.notes)}
               </p>
             )}
 
@@ -321,15 +340,14 @@ export function ExpenseFollowUpPanel({
                 </Button>
               )}
               {receiptHref && (
-                <a
-                  href={receiptHref}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={openReceiptFile}
                   className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
                 >
                   <Paperclip className="h-3.5 w-3.5" />
-                  Open bill file
-                </a>
+                  {looksLikeImage({ url: receiptHref }) ? 'View bill file' : 'Open bill file'}
+                </button>
               )}
             </div>
           </div>
@@ -338,9 +356,10 @@ export function ExpenseFollowUpPanel({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-base font-semibold text-gray-900">
-                  {expense.description ||
-                    formatReportCategoryLabel(expense.category) ||
-                    'Expense'}
+                  {formatPaymentNotesLabel(
+                    expense.description,
+                    formatReportCategoryLabel(expense.category) || 'Expense'
+                  )}
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
                   {[
@@ -389,7 +408,7 @@ export function ExpenseFollowUpPanel({
 
             {expense.notes && (
               <p className="mt-3 border-t border-gray-200 pt-3 text-sm text-gray-700">
-                {expense.notes}
+                {formatPaymentNotesForPeople(expense.notes)}
               </p>
             )}
 
@@ -406,15 +425,14 @@ export function ExpenseFollowUpPanel({
                 </Button>
               )}
               {receiptHref && (
-                <a
-                  href={receiptHref}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={openReceiptFile}
                   className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  Open receipt
-                </a>
+                  {looksLikeImage({ url: receiptHref }) ? 'View receipt' : 'Open receipt'}
+                </button>
               )}
             </div>
           </div>

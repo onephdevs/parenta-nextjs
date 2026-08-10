@@ -114,7 +114,7 @@ function ProfilePageInner() {
     if (canAccess) {
       void fetchProfile();
     } else if (status === 'unauthenticated') {
-      router.push('/auth/tenant/signin');
+      router.push('/auth/signin');
     }
   }, [status, session, router, canAccess, gateIsLoading]);
 

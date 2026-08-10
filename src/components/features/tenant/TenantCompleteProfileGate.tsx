@@ -13,10 +13,14 @@ interface ProfileDraft {
   email: string;
   username: string;
   phone: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 /**
- * Blocking modal shown until the tenant finishes first-login profile setup.
+ * Blocking modal shown until the tenant finishes first-login setup:
+ * change temporary password + confirm name, email, phone.
  */
 export default function TenantCompleteProfileGate() {
   const { data: session, update } = useSession();
@@ -30,6 +34,9 @@ export default function TenantCompleteProfileGate() {
     email: '',
     username: '',
     phone: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
 
   useEffect(() => {
@@ -51,13 +58,14 @@ export default function TenantCompleteProfileGate() {
           return;
         }
         const data = json.data;
-        setForm({
+        setForm((prev) => ({
+          ...prev,
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           email: data.email || '',
           username: data.username || '',
           phone: data.phone || '',
-        });
+        }));
         setNeeded(data.profileCompleted === false);
       } catch {
         if (!cancelled) setNeeded(session.user.profileCompleted === false);
@@ -81,6 +89,13 @@ export default function TenantCompleteProfileGate() {
     setSaving(true);
     setError(null);
     try {
+      if (form.newPassword !== form.confirmPassword) {
+        throw new Error('New passwords do not match');
+      }
+      if (form.newPassword.length < 8) {
+        throw new Error('New password must be at least 8 characters');
+      }
+
       const res = await fetch('/api/tenant/complete-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,14 +130,14 @@ export default function TenantCompleteProfileGate() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="complete-profile-title"
-        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
       >
         <h2 id="complete-profile-title" className="text-xl font-semibold text-gray-900">
-          Complete your account
+          Set up your account
         </h2>
         <p className="mt-1 text-sm text-gray-600">
-          Before you continue, please add your email and update your name, username, and phone
-          number.
+          Your temporary login must be updated before you can use the portal. Change your
+          password and confirm your name, email, and phone number.
         </p>
 
         {error && <FormErrorBanner message={error} className="mt-4" />}
@@ -151,7 +166,12 @@ export default function TenantCompleteProfileGate() {
             </FormField>
           </div>
 
-          <FormField label="Email" htmlFor="email" required hint="Used for notices and account recovery.">
+          <FormField
+            label="Email"
+            htmlFor="email"
+            required
+            hint="Used for notices and account recovery."
+          >
             <Input
               id="email"
               name="email"
@@ -192,6 +212,50 @@ export default function TenantCompleteProfileGate() {
               placeholder="09XXXXXXXXX"
             />
           </FormField>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-4">
+            <p className="text-sm font-medium text-amber-950">Change temporary password</p>
+            <FormField
+              label="Current password"
+              htmlFor="currentPassword"
+              required
+              hint="The temporary password you just used to sign in."
+            >
+              <Input
+                id="currentPassword"
+                name="currentPassword"
+                type="password"
+                required
+                value={form.currentPassword}
+                onChange={handleChange}
+                autoComplete="current-password"
+              />
+            </FormField>
+            <FormField label="New password" htmlFor="newPassword" required>
+              <Input
+                id="newPassword"
+                name="newPassword"
+                type="password"
+                required
+                minLength={8}
+                value={form.newPassword}
+                onChange={handleChange}
+                autoComplete="new-password"
+              />
+            </FormField>
+            <FormField label="Confirm new password" htmlFor="confirmPassword" required>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                minLength={8}
+                value={form.confirmPassword}
+                onChange={handleChange}
+                autoComplete="new-password"
+              />
+            </FormField>
+          </div>
 
           <Button type="submit" variant="primary" className="w-full" isLoading={saving}>
             Save and continue

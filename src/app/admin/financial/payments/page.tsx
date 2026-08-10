@@ -35,8 +35,8 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const resolvedSearchParams = await searchParams;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+  if (!session || !['admin','caretaker'].includes(session.user.role)) {
+    redirect('/auth/signin');
   }
 
   const page = parseInt(resolvedSearchParams.page || '1', 10);

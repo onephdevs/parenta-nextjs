@@ -119,14 +119,50 @@ export default function TenantAssignmentManager({
 
   const fetchAvailableTenants = async () => {
     try {
-      const response = await fetch('/api/tenants?status=available');
+      // Unassigned tenants for the picker — not tenant_status=available
+      const response = await fetch('/api/tenants?limit=1000');
       const result = await response.json();
 
-      if (result.success) {
-        setAvailableTenants(result.data);
+      if (!result.success) {
+        setAvailableTenants([]);
+        return;
       }
+
+      const raw = result.data;
+      const list: unknown[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.tenants)
+          ? raw.tenants
+          : [];
+
+      const unassigned: Tenant[] = [];
+      for (const item of list) {
+        const t = item as Record<string, unknown>;
+        const currentRoomId = t.current_room_id ?? t.currentRoomId ?? null;
+        if (currentRoomId) continue;
+
+        unassigned.push({
+          id: String(t.id),
+          first_name: String(t.first_name ?? t.firstName ?? ''),
+          last_name: String(t.last_name ?? t.lastName ?? ''),
+          email: String(t.email ?? ''),
+          phone: t.phone != null ? String(t.phone) : undefined,
+          tenant_status: String(t.tenant_status ?? t.tenantStatus ?? ''),
+          monthly_income:
+            t.monthly_income != null || t.monthlyIncome != null
+              ? Number(t.monthly_income ?? t.monthlyIncome)
+              : undefined,
+          employment_status:
+            t.employment_status != null || t.employmentStatus != null
+              ? String(t.employment_status ?? t.employmentStatus)
+              : undefined,
+        });
+      }
+
+      setAvailableTenants(unassigned);
     } catch (error) {
       console.error('Error fetching available tenants:', error);
+      setAvailableTenants([]);
       showError('Failed to load available tenants');
     }
   };
@@ -624,12 +660,18 @@ export default function TenantAssignmentManager({
               required
             >
               <option value="">Choose a tenant...</option>
-              {availableTenants.map((tenant) => (
+              {(Array.isArray(availableTenants) ? availableTenants : []).map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
-                  {tenant.first_name} {tenant.last_name} ({tenant.email})
+                  {tenant.first_name} {tenant.last_name}
+                  {tenant.email ? ` (${tenant.email})` : ''}
                 </option>
               ))}
             </Select>
+            {Array.isArray(availableTenants) && availableTenants.length === 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                No unassigned tenants. Create a tenant first, then assign them here.
+              </p>
+            )}
           </FormField>
 
           <FormField htmlFor="startDate" label="Start Date" required>

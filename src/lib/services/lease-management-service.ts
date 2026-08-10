@@ -306,6 +306,8 @@ export async function completeMoveOut(
            deposit_return_amount = $3,
            deposit_deduction_amount = $4,
            deduction_reason = $5,
+           advance_return_amount = $6,
+           utility_deposit_return_amount = $7,
            settlement_completed = true,
            settlement_date = CURRENT_DATE,
            status = 'completed',
@@ -317,20 +319,38 @@ export async function completeMoveOut(
         data.deposit_return_amount,
         data.deposit_deduction_amount || 0,
         data.deduction_reason || null,
+        data.advance_return_amount || 0,
+        data.utility_deposit_return_amount || 0,
       ]
     );
     
     // Update tenant status to inactive
     await client.query(
-      `UPDATE tenants SET status = 'inactive' WHERE id = $1`,
-      [moveout.tenant_id]
+      `UPDATE tenants
+       SET tenant_status = 'inactive',
+           is_active = false,
+           move_out_date = COALESCE(move_out_date, $2::date),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [moveout.tenant_id, data.actual_moveout_date]
     );
     
     // Update room assignment status to past
     await client.query(
       `UPDATE tenant_room_assignments
-       SET status = 'past', updated_at = CURRENT_TIMESTAMP
+       SET assignment_status = 'past',
+           end_date = COALESCE(end_date, $2::date),
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
+      [moveout.room_assignment_id, data.actual_moveout_date]
+    );
+
+    // Free the unit
+    await client.query(
+      `UPDATE rooms r
+       SET room_status = 'vacant', updated_at = CURRENT_TIMESTAMP
+       FROM tenant_room_assignments tra
+       WHERE tra.id = $1 AND r.id = tra.room_id`,
       [moveout.room_assignment_id]
     );
     
@@ -426,6 +446,69 @@ export async function completeMoveOut(
       await client.query(
         `UPDATE moveout_processing SET notes = COALESCE(notes, '') || $1 WHERE id = $2`,
         [`\n${allocationNote.join(', ')}`, moveoutId]
+      );
+    }
+
+    // Phase 3: auto-link move-out cash refunds to expense log (category = refund)
+    const totalRefundOut =
+      Number(data.deposit_return_amount || 0) +
+      Number(data.advance_return_amount || 0) +
+      Number(data.utility_deposit_return_amount || 0);
+
+    if (totalRefundOut > 0) {
+      const loc = await client.query(
+        `SELECT tra.id AS assignment_id, tra.room_id, r.building_id,
+                t.first_name, t.last_name, r.room_number
+         FROM tenant_room_assignments tra
+         JOIN rooms r ON r.id = tra.room_id
+         JOIN tenants t ON t.id = tra.tenant_id
+         WHERE tra.id = $1`,
+        [moveout.room_assignment_id]
+      );
+      const place = loc.rows[0];
+      const tenantLabel = place
+        ? `${place.first_name} ${place.last_name}`.trim()
+        : 'Tenant';
+      const unitLabel = place?.room_number ? `Unit ${place.room_number}` : 'unit';
+      const moveDate =
+        data.actual_moveout_date instanceof Date
+          ? data.actual_moveout_date.toISOString().slice(0, 10)
+          : String(data.actual_moveout_date).slice(0, 10);
+
+      await client.query(
+        `INSERT INTO expenses (
+           building_id, room_id, category, description, amount,
+           expense_date, payment_method, expense_status, notes,
+           tenant_id, related_moveout_id, related_assignment_id
+         )
+         SELECT $1, $2, 'refund', $3, $4, $5::date, 'cash', 'paid', $6, $7, $8, $9
+         WHERE NOT EXISTS (
+           SELECT 1 FROM expenses
+           WHERE related_moveout_id = $8 AND category = 'refund'
+         )`,
+        [
+          place?.building_id || null,
+          place?.room_id || null,
+          `Move-out refund — ${tenantLabel} (${unitLabel})`,
+          totalRefundOut,
+          moveDate,
+          [
+            data.deposit_return_amount
+              ? `Security deposit return: ${data.deposit_return_amount}`
+              : null,
+            data.advance_return_amount
+              ? `Advance return: ${data.advance_return_amount}`
+              : null,
+            data.utility_deposit_return_amount
+              ? `Utility deposit return: ${data.utility_deposit_return_amount}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join('; '),
+          moveout.tenant_id,
+          moveoutId,
+          moveout.room_assignment_id,
+        ]
       );
     }
     

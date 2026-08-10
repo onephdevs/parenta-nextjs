@@ -18,7 +18,7 @@ export interface NeedsAttentionItem {
 }
 
 export interface NeedsAttentionCard {
-  key: 'payments' | 'utilities' | 'inquiries' | 'maintenance';
+  key: 'payments' | 'utilities' | 'inquiries' | 'maintenance' | 'deposits' | 'deposit_funded';
   title: string;
   count: number;
   items: NeedsAttentionItem[];
@@ -73,7 +73,9 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
       COALESCE(
         SUM(
           CASE
-            WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid'
+            WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE
+              AND i.invoice_status != 'paid'
+              AND i.bill_status != 'PAID'
             THEN i.balance_due
             ELSE 0
           END
@@ -83,8 +85,10 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
       COALESCE(
         MAX(
           CASE
-            WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid'
-            THEN (CURRENT_DATE - i.due_date)
+            WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE
+              AND i.invoice_status != 'paid'
+              AND i.bill_status != 'PAID'
+            THEN (CURRENT_DATE - COALESCE(i.negotiated_due_date, i.due_date))
             ELSE 0
           END
         ),
@@ -92,8 +96,10 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
       ) AS days_past_due,
       MIN(
         CASE
-          WHEN i.due_date >= CURRENT_DATE AND i.invoice_status != 'paid'
-          THEN (i.due_date - CURRENT_DATE)
+          WHEN COALESCE(i.negotiated_due_date, i.due_date) >= CURRENT_DATE
+            AND i.invoice_status != 'paid'
+            AND i.bill_status != 'PAID'
+          THEN (COALESCE(i.negotiated_due_date, i.due_date) - CURRENT_DATE)
           ELSE NULL
         END
       ) AS days_until_due
@@ -327,6 +333,134 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
   };
 }
 
+async function getDepositFundedAlerts(): Promise<NeedsAttentionCard> {
+  try {
+    // Bills recently paid (or partially covered) via deposit ledger apply — not cash
+    const result = await pool.query(`
+      SELECT DISTINCT ON (i.id)
+        i.id,
+        i.invoice_number,
+        i.balance_due,
+        i.bill_status,
+        t.id AS tenant_id,
+        t.first_name,
+        t.last_name,
+        r.room_number,
+        dt.amount AS deposit_amount,
+        dt.transaction_date,
+        dt.reason
+      FROM deposit_transactions dt
+      JOIN deposit_ledgers dl ON dl.id = dt.deposit_ledger_id
+      JOIN invoices i ON i.id = dt.applied_to_invoice_id
+      JOIN tenants t ON t.id = i.tenant_id
+      LEFT JOIN tenant_room_assignments tra
+        ON tra.tenant_id = t.id AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON r.id = tra.room_id
+      WHERE dt.amount < 0
+        AND dt.applied_to_invoice_id IS NOT NULL
+        AND dt.transaction_date >= CURRENT_DATE - INTERVAL '60 days'
+      ORDER BY i.id, dt.transaction_date DESC
+      LIMIT 50
+    `);
+
+    const items: NeedsAttentionItem[] = result.rows.map((row) => {
+      const name = `${row.first_name} ${row.last_name}`.trim();
+      const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
+      const applied = Math.abs(Number(row.deposit_amount || 0));
+      return {
+        id: String(row.id),
+        title: name,
+        subtitle: `${room} • ${row.invoice_number} paid ₱${applied.toLocaleString('en-PH')} from deposit`,
+        meta: row.reason ? String(row.reason) : undefined,
+        urgency: 'soon' as const,
+        href: `/admin/tenants/${row.tenant_id}`,
+      };
+    });
+
+    return {
+      key: 'deposit_funded',
+      title: 'Deposit-funded rent',
+      count: items.length,
+      items: items.slice(0, PREVIEW_LIMIT),
+      viewAllHref: '/admin/reports/deposits',
+      viewAllLabel: 'View deposits',
+    };
+  } catch (error) {
+    console.warn(
+      'deposit-funded alerts skipped:',
+      error instanceof Error ? error.message : error
+    );
+    return {
+      key: 'deposit_funded',
+      title: 'Deposit-funded rent',
+      count: 0,
+      items: [],
+      viewAllHref: '/admin/reports/deposits',
+      viewAllLabel: 'View deposits',
+    };
+  }
+}
+
+async function getDepositAlerts(): Promise<NeedsAttentionCard> {
+  try {
+    const result = await pool.query(`
+      SELECT
+        dl.id,
+        dl.deposit_type,
+        dl.running_balance,
+        t.id AS tenant_id,
+        t.first_name,
+        t.last_name,
+        r.room_number
+      FROM deposit_ledgers dl
+      JOIN tenants t ON t.id = dl.tenant_id
+      JOIN tenant_room_assignments tra ON tra.id = dl.assignment_id
+      LEFT JOIN rooms r ON r.id = tra.room_id
+      WHERE dl.is_active = true
+        AND dl.running_balance = 0
+        AND tra.assignment_status = 'active'
+      ORDER BY t.last_name, t.first_name
+      LIMIT 50
+    `);
+
+    const items: NeedsAttentionItem[] = result.rows.map((row) => {
+      const name = `${row.first_name} ${row.last_name}`.trim();
+      const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
+      const type = String(row.deposit_type || 'SECURITY');
+      return {
+        id: String(row.id),
+        title: name,
+        subtitle: `${room} • ${type} deposit balance ₱0`,
+        urgency: 'soon' as const,
+        href: `/admin/tenants/${row.tenant_id}`,
+      };
+    });
+
+    return {
+      key: 'deposits',
+      title: 'Deposit balance zero',
+      count: items.length,
+      items: items.slice(0, PREVIEW_LIMIT),
+      viewAllHref: '/admin/reports/deposits',
+      viewAllLabel: 'View deposits report',
+    };
+  } catch (error) {
+    // Table may not exist until Phase 1 migration is applied
+    console.warn(
+      'deposit alerts skipped:',
+      error instanceof Error ? error.message : error
+    );
+    return {
+      key: 'deposits',
+      title: 'Deposit balance zero',
+      count: 0,
+      items: [],
+      viewAllHref: '/admin/reports/deposits',
+      viewAllLabel: 'View deposits report',
+    };
+  }
+}
+
 export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
   const empty = (
     key: NeedsAttentionCard['key'],
@@ -347,6 +481,8 @@ export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
     getPaymentsDue(),
     getUtilitiesDue(),
     getMaintenanceOpen(),
+    getDepositAlerts(),
+    getDepositFundedAlerts(),
   ]);
 
   const fallbacks: NeedsAttentionCard[] = [
@@ -354,6 +490,8 @@ export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
     empty('payments', 'Payments due', '/admin/tasks?board=payments', 'View payments pipeline'),
     empty('utilities', 'Utilities due', '/admin/tasks?board=expenses', 'View expenses pipeline'),
     empty('maintenance', 'Maintenance', '/admin/tasks?board=maintenance', 'View maintenance pipeline'),
+    empty('deposits', 'Deposit balance zero', '/admin/reports/deposits', 'View deposits report'),
+    empty('deposit_funded', 'Deposit-funded rent', '/admin/reports/deposits', 'View deposits'),
   ];
 
   const cards = settled.map((result, i) => {

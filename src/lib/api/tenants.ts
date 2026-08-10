@@ -124,6 +124,7 @@ export async function getAllTenants(options?: {
       SELECT 
         t.*,
         tra.monthly_rate as current_monthly_rent,
+        r.id as current_room_id,
         r.room_number as current_room_number,
         b.id as current_building_id,
         b.name as current_building_name
@@ -134,7 +135,13 @@ export async function getAllTenants(options?: {
       LEFT JOIN rooms r ON tra.room_id = r.id
       LEFT JOIN buildings b ON r.building_id = b.id
       ${whereClause}
-      ORDER BY COALESCE(t.last_name, ''), COALESCE(t.first_name, ''), t.created_at DESC
+      ORDER BY
+        COALESCE(b.name, ''),
+        NULLIF(regexp_replace(COALESCE(r.room_number, ''), '[^0-9]', '', 'g'), '')::bigint NULLS LAST,
+        COALESCE(r.room_number, ''),
+        COALESCE(t.last_name, ''),
+        COALESCE(t.first_name, ''),
+        t.created_at DESC
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
     
@@ -329,6 +336,7 @@ export async function createTenant(tenantData: Partial<Tenant>): Promise<Tenant>
 function mapRowToTenant(row: Record<string, unknown>): Tenant & { 
   profilePictureUrl?: string | null;
   currentMonthlyRent?: number;
+  currentRoomId?: string;
   currentRoomNumber?: string;
   currentBuildingName?: string;
 } {
@@ -358,6 +366,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
     updatedAt: new Date(row.updated_at as string),
     // Add current monthly rent from active assignment
     currentMonthlyRent: row.current_monthly_rent ? parseFloat(row.current_monthly_rent as string) : undefined,
+    currentRoomId: row.current_room_id ? String(row.current_room_id) : undefined,
     currentRoomNumber: row.current_room_number as string | undefined,
     currentBuildingId: row.current_building_id as string | undefined,
     currentBuildingName: row.current_building_name as string | undefined,
@@ -392,7 +401,7 @@ export async function updateTenant(id: string, updates: Partial<{
   phone: string;
   tenantStatus: string;
   notes: string;
-}>): Promise<boolean> {
+}>): Promise<Tenant | boolean> {
   const setClause: string[] = [];
   const values: unknown[] = [];
   let paramIndex = 1;
@@ -451,7 +460,11 @@ export async function updateTenant(id: string, updates: Partial<{
 
   try {
     const result = await pool.query(query, values);
-    return result.rowCount > 0;
+    if ((result.rowCount ?? 0) === 0) {
+      throw new Error('Tenant not found');
+    }
+    const updated = await getTenantById(id);
+    return updated || true;
   } catch (error) {
     console.error('Error updating tenant:', error);
     throw new Error(`Failed to update tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);

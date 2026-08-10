@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui';
+import { formatPaymentNotesLabel } from '@/lib/format-payment-notes';
 
 interface Building {
   id: string;
@@ -372,7 +373,9 @@ export default function ExpenseReportsPage() {
                           {row.categoryLabel}
                         </span>
                       </TableCell>
-                      <TableCell className="whitespace-normal">{row.description}</TableCell>
+                      <TableCell className="whitespace-normal">
+                        {formatPaymentNotesLabel(row.description, '—')}
+                      </TableCell>
                       <TableCell className="text-gray-600">{row.locationLabel}</TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {formatCurrency(row.amount)}

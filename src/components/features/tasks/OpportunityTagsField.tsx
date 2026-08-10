@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { FormField } from '@/components/forms/FormField';
 import { Input } from '@/components/ui/Input';
+import { formatMaintenanceTag } from '@/lib/constants/maintenance';
 import type { BuiltInPipelineBoardSlug, PipelineBoardSlug } from '@/types/database';
 
 const SUGGESTED_TAGS: Record<BuiltInPipelineBoardSlug, string[]> = {
@@ -43,6 +44,11 @@ export function OpportunityTagsField({ boardSlug, tags, onChange }: OpportunityT
   const [draft, setDraft] = useState('');
   const suggested =
     SUGGESTED_TAGS[boardSlug as BuiltInPipelineBoardSlug] || DEFAULT_SUGGESTED;
+  const isMaintenance = boardSlug === 'maintenance';
+
+  function displayTag(tag: string): string {
+    return isMaintenance ? formatMaintenanceTag(tag) : tag;
+  }
 
   function normalize(value: string): string {
     return value.trim().replace(/\s+/g, ' ');
@@ -111,12 +117,12 @@ export function OpportunityTagsField({ boardSlug, tags, onChange }: OpportunityT
               key={tag}
               className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-800"
             >
-              {tag}
+              {displayTag(tag)}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
                 className="rounded-full p-0.5 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-800"
-                aria-label={`Remove ${tag}`}
+                aria-label={`Remove ${displayTag(tag)}`}
               >
                 <X className="h-3 w-3" />
               </button>

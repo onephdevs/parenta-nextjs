@@ -10,7 +10,11 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/forms/FormField';
-import { ACTIVITY_CATEGORIES, CATEGORY_DEFAULTS } from '@/lib/services/activity-taxonomy';
+import {
+  ACTIVITY_CATEGORIES,
+  CATEGORY_DEFAULTS,
+  getActionTitle,
+} from '@/lib/services/activity-taxonomy';
 
 interface ActivityItem {
   id: string;
@@ -70,6 +74,8 @@ function entityHref(item: { entityType: string; entityId: string | null; link?: 
       return `/admin/financial/payments/${item.entityId}`;
     case 'invoice':
       return `/admin/financial/invoices/${item.entityId}`;
+    case 'maintenance_request':
+      return `/admin/tasks?board=maintenance`;
     default:
       return null;
   }
@@ -277,7 +283,9 @@ export default function ActivityFeedClient() {
                               {CATEGORY_DEFAULTS[item.category as keyof typeof CATEGORY_DEFAULTS]
                                 ?.label || item.category}
                             </Badge>
-                            <span className="text-xs text-gray-500">{item.actionType}</span>
+                            <span className="text-xs text-gray-500">
+                              {getActionTitle(item.actionType)}
+                            </span>
                           </div>
                         </div>
                         <span className="shrink-0 text-xs text-gray-500">
@@ -329,7 +337,8 @@ export default function ActivityFeedClient() {
                 <div>
                   <p className="text-sm font-medium text-gray-900">{detail.description}</p>
                   <p className="mt-1 text-xs text-gray-500">
-                    {detail.actorName} · {new Date(detail.createdAt).toLocaleString()}
+                    {detail.actorName} · {getActionTitle(detail.actionType)} ·{' '}
+                    {new Date(detail.createdAt).toLocaleString()}
                   </p>
                 </div>
                 {(detail.link || entityHref(detail)) && (
@@ -342,10 +351,12 @@ export default function ActivityFeedClient() {
                 )}
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Changes
+                    Request details
                   </h3>
                   {detail.diffs.length === 0 ? (
-                    <p className="mt-2 text-sm text-gray-500">No field-level diff available.</p>
+                    <p className="mt-2 text-sm text-gray-500">
+                      No extra details were recorded for this event.
+                    </p>
                   ) : (
                     <ul className="mt-2 space-y-2">
                       {detail.diffs

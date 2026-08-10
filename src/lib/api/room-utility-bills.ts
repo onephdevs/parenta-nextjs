@@ -35,6 +35,8 @@ export interface UtilityBillRecord {
   meterReadingPrevious?: number;
   meterReadingCurrent?: number;
   allocationMethod: AllocationMethod;
+  /** TENANT = billable; OWNER = vacant/owner-absorbed (not tenant balance) */
+  costBearer: 'TENANT' | 'OWNER';
   parentBillId?: string;
   billUrl?: string;
   notes?: string;
@@ -74,6 +76,10 @@ function mapRow(row: Record<string, unknown>): UtilityBillRecord {
       row.allocation_method ? String(row.allocation_method) : undefined,
       Boolean(roomId)
     ),
+    costBearer:
+      String(row.cost_bearer || 'TENANT').toUpperCase() === 'OWNER'
+        ? 'OWNER'
+        : 'TENANT',
     parentBillId: row.parent_bill_id ? String(row.parent_bill_id) : undefined,
     billUrl: row.bill_url ? String(row.bill_url) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
@@ -247,8 +253,12 @@ export interface CreateUtilityBillInput {
   billStatus?: 'pending' | 'paid' | 'overdue' | 'disputed';
   billUrl?: string;
   notes?: string;
-  /** When true and allocation is split_evenly + building-wide, create per-unit child rows */
+  /** When true and SHARED_MANUAL / split_evenly + building-wide, create per-unit child rows */
   distributeAcrossUnits?: boolean;
+  /** Optional floor filter for equal-split (e.g. 3rd-floor shared water) */
+  floorNumber?: number | string | null;
+  /** Named unit group — preferred over floor filter when set */
+  utilityUnitGroupId?: string | null;
 }
 
 /**
@@ -262,20 +272,43 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
 
     let buildingId = billData.buildingId || null;
     const roomId = billData.roomId || null;
+    let roomStatus: string | null = null;
 
     if (roomId) {
       const roomQuery = await client.query(
-        'SELECT building_id FROM rooms WHERE id = $1',
+        'SELECT building_id, room_status FROM rooms WHERE id = $1',
         [roomId]
       );
       if (roomQuery.rows.length === 0) {
         throw new Error('Room not found');
       }
       buildingId = roomQuery.rows[0].building_id;
+      roomStatus = roomQuery.rows[0].room_status
+        ? String(roomQuery.rows[0].room_status)
+        : null;
     }
 
     if (!buildingId) {
       throw new Error('Building is required for utility bills');
+    }
+
+    // Vacant units: provider minimums still apply, but cost is owner-absorbed
+    let costBearer: 'TENANT' | 'OWNER' = 'TENANT';
+    if (roomId) {
+      const activeTenant = await client.query(
+        `SELECT 1 FROM tenant_room_assignments
+         WHERE room_id = $1
+           AND assignment_status = 'active'
+           AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+         LIMIT 1`,
+        [roomId]
+      );
+      if (
+        activeTenant.rows.length === 0 ||
+        String(roomStatus || '').toLowerCase() === 'vacant'
+      ) {
+        costBearer = 'OWNER';
+      }
     }
 
     const allocationMethod = normalizeAllocationMethod(
@@ -296,14 +329,31 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
       billData.providerName?.trim() ||
       (billData.utilityType === 'electricity' ? 'Electric utility' : 'Water utility');
 
+    const utilityUnitGroupId =
+      billData.utilityUnitGroupId && String(billData.utilityUnitGroupId).trim()
+        ? String(billData.utilityUnitGroupId).trim()
+        : null;
+
+    if (utilityUnitGroupId) {
+      const groupCheck = await client.query(
+        `SELECT id FROM utility_unit_groups
+         WHERE id = $1 AND building_id = $2 AND COALESCE(is_active, true) = true`,
+        [utilityUnitGroupId, buildingId]
+      );
+      if (groupCheck.rows.length === 0) {
+        throw new Error('Utility unit group not found for this building');
+      }
+    }
+
     const insertQuery = `
       INSERT INTO utility_bills (
         building_id, room_id, utility_type, provider_name, provider_account_number,
         billing_period_start, billing_period_end, due_date, amount,
         usage_amount, usage_unit, meter_reading_previous, meter_reading_current,
-        allocation_method, bill_status, bill_url, notes
+        allocation_method, bill_status, bill_url, notes, cost_bearer,
+        utility_unit_group_id
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
       RETURNING *
     `;
 
@@ -326,24 +376,78 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
       billData.billStatus || 'pending',
       billData.billUrl || null,
       billData.notes || null,
+      costBearer,
+      utilityUnitGroupId,
     ];
 
     const result = await client.query(insertQuery, values);
     const parent = mapRow(result.rows[0]);
     parentId = parent.id;
 
-    // Equal-split: create one child bill per active room (displayable per unit)
-    if (
+    // Equal-split: create one child bill per room (group → floor → all)
+    const shouldDistribute =
       !roomId &&
-      allocationMethod === 'split_evenly' &&
-      billData.distributeAcrossUnits !== false
-    ) {
-      const roomsResult = await client.query(
-        `SELECT id, room_number FROM rooms
-         WHERE building_id = $1 AND COALESCE(is_active, true) = true
-         ORDER BY room_number`,
-        [buildingId]
-      );
+      billData.distributeAcrossUnits !== false &&
+      (allocationMethod === 'split_evenly' ||
+        allocationMethod === 'SHARED_MANUAL');
+
+    if (shouldDistribute) {
+      let roomsResult;
+      let splitLabel = '';
+
+      if (utilityUnitGroupId) {
+        roomsResult = await client.query(
+          `SELECT r.id, r.room_number, r.room_status,
+                  EXISTS (
+                    SELECT 1 FROM tenant_room_assignments tra
+                    WHERE tra.room_id = r.id
+                      AND tra.assignment_status = 'active'
+                      AND (tra.end_date IS NULL OR tra.end_date >= CURRENT_DATE)
+                  ) AS has_tenant
+           FROM utility_unit_group_members m
+           JOIN rooms r ON r.id = m.room_id
+           WHERE m.group_id = $1
+             AND COALESCE(r.is_active, true) = true
+             AND COALESCE(r.is_revenue_unit, true) = true
+           ORDER BY r.room_number`,
+          [utilityUnitGroupId]
+        );
+        const groupName = await client.query(
+          `SELECT name FROM utility_unit_groups WHERE id = $1`,
+          [utilityUnitGroupId]
+        );
+        splitLabel = `, group ${groupName.rows[0]?.name || utilityUnitGroupId}`;
+      } else {
+        const floorFilter =
+          billData.floorNumber != null &&
+          String(billData.floorNumber).trim() !== ''
+            ? `AND r.floor_number = $2`
+            : '';
+        const roomParams: unknown[] =
+          floorFilter !== ''
+            ? [buildingId, Number(billData.floorNumber)]
+            : [buildingId];
+
+        roomsResult = await client.query(
+          `SELECT r.id, r.room_number, r.room_status,
+                  EXISTS (
+                    SELECT 1 FROM tenant_room_assignments tra
+                    WHERE tra.room_id = r.id
+                      AND tra.assignment_status = 'active'
+                      AND (tra.end_date IS NULL OR tra.end_date >= CURRENT_DATE)
+                  ) AS has_tenant
+           FROM rooms r
+           WHERE r.building_id = $1 AND COALESCE(r.is_active, true) = true
+             AND COALESCE(r.is_revenue_unit, true) = true
+             ${floorFilter}
+           ORDER BY r.room_number`,
+          roomParams
+        );
+        if (floorFilter) {
+          splitLabel = `, floor ${billData.floorNumber}`;
+        }
+      }
+
       const rooms = roomsResult.rows;
       if (rooms.length > 0) {
         const share = Math.round((billData.amount / rooms.length) * 100) / 100;
@@ -354,13 +458,19 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
             ? Math.round((billData.amount - allocated) * 100) / 100
             : share;
           allocated += amount;
+          const childBearer =
+            !rooms[i].has_tenant ||
+            String(rooms[i].room_status || '').toLowerCase() === 'vacant'
+              ? 'OWNER'
+              : 'TENANT';
 
           await client.query(
             `INSERT INTO utility_bills (
               building_id, room_id, utility_type, provider_name, provider_account_number,
               billing_period_start, billing_period_end, due_date, amount,
-              usage_unit, allocation_method, parent_bill_id, bill_status, notes
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'per_unit_metered',$11,$12,$13)`,
+              usage_unit, allocation_method, parent_bill_id, bill_status, notes, cost_bearer,
+              utility_unit_group_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
             [
               buildingId,
               rooms[i].id,
@@ -373,15 +483,19 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
               amount,
               billData.usageUnit ||
                 (billData.utilityType === 'electricity' ? 'kWh' : 'm³'),
+              'SHARED_MANUAL',
               parent.id,
               billData.billStatus || 'pending',
-              `Equal split of building bill (${rooms.length} units)`,
+              `Equal split of building bill (${rooms.length} units${splitLabel})${
+                childBearer === 'OWNER' ? ' — owner-absorbed (vacant)' : ''
+              }`,
+              childBearer,
+              utilityUnitGroupId,
             ]
           );
         }
       }
     }
-
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

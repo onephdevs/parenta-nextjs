@@ -19,8 +19,8 @@ function todayISO(): string {
 export default async function NewPaymentPage({ searchParams }: NewPaymentPageProps) {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+  if (!session || !['admin','caretaker'].includes(session.user.role)) {
+    redirect('/auth/signin');
   }
 
   const params = await searchParams;

@@ -7,11 +7,12 @@ import {
   PaymentStatusBadge,
   PaymentTypeBadge,
 } from '@/components/domain/StatusBadges';
-import { formatPaymentNotesDisplay } from '@/lib/format-payment-notes';
+import { formatPaymentNotesDisplay, formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
 import {
   OpportunityDocumentsPanel,
   PAYMENT_DOC_TYPE_OPTIONS,
 } from './OpportunityDocumentsPanel';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface InvoiceSummary {
   id: string;
@@ -91,11 +92,13 @@ export function PaymentFollowUpPanel({
   balanceAmount,
 }: PaymentFollowUpPanelProps) {
   const [invoice, setInvoice] = useState<InvoiceSummary | null>(null);
+  const { open: openLightbox } = useImageLightbox();
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loadingInvoice, setLoadingInvoice] = useState(Boolean(invoiceId));
   const [loadingPayments, setLoadingPayments] = useState(Boolean(tenantId));
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [depositBalance, setDepositBalance] = useState<number | null>(null);
 
   const loadInvoice = useCallback(async () => {
     if (!invoiceId) {
@@ -149,7 +152,34 @@ export function PaymentFollowUpPanel({
     void loadPayments();
   }, [loadInvoice, loadPayments]);
 
-  async function downloadReceipt(paymentId: string) {
+  useEffect(() => {
+    if (!tenantId) {
+      setDepositBalance(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/deposit-ledger/${encodeURIComponent(tenantId)}?type=balance`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const bal =
+          typeof data?.data === 'number'
+            ? data.data
+            : data?.data?.balance ?? data?.balance ?? null;
+        if (!cancelled && bal != null) setDepositBalance(Number(bal));
+      } catch {
+        if (!cancelled) setDepositBalance(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantId]);
+
+  async function downloadReceipt(paymentId: string, fileNameHint?: string) {
     setDownloadingId(paymentId);
     try {
       const response = await fetch(`/api/payments/${paymentId}/receipt`);
@@ -160,8 +190,19 @@ export function PaymentFollowUpPanel({
       const blob = await response.blob();
       const disposition = response.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename="([^"]+)"/);
-      const fileName = match?.[1] || `receipt-${paymentId}.pdf`;
+      const fileName = match?.[1] || fileNameHint || `receipt-${paymentId}.pdf`;
       const url = URL.createObjectURL(blob);
+
+      if (
+        looksLikeImage({
+          mimeType: blob.type,
+          fileName,
+        })
+      ) {
+        openLightbox({ src: url, alt: fileName, title: fileName });
+        return;
+      }
+
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
@@ -291,7 +332,16 @@ export function PaymentFollowUpPanel({
 
             {!invoice.items?.length && (invoice.description || invoice.notes) && (
               <p className="mt-3 border-t border-gray-200 pt-3 text-sm text-gray-700">
-                {invoice.description || invoice.notes}
+                {formatPaymentNotesForPeople(invoice.description || invoice.notes)}
+              </p>
+            )}
+
+            {depositBalance != null &&
+              depositBalance > 0 &&
+              (balanceDue == null || balanceDue > 0) && (
+              <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                Using deposit: ₱{depositBalance.toLocaleString()} available. Recording a
+                payment will apply deposit to unpaid invoices by default (cash first).
               </p>
             )}
 
@@ -408,14 +458,18 @@ export function PaymentFollowUpPanel({
                     {payment.receiptFilePath ? (
                       <button
                         type="button"
-                        onClick={() => void downloadReceipt(payment.id)}
+                        onClick={() =>
+                          void downloadReceipt(payment.id, payment.receiptFileName)
+                        }
                         disabled={downloadingId === payment.id}
                         className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:underline disabled:opacity-50"
                       >
                         <Paperclip className="h-3 w-3" />
                         {downloadingId === payment.id
-                          ? 'Downloading…'
-                          : payment.receiptFileName || 'Download receipt'}
+                          ? 'Opening…'
+                          : looksLikeImage({ fileName: payment.receiptFileName })
+                            ? payment.receiptFileName || 'View receipt'
+                            : payment.receiptFileName || 'Download receipt'}
                       </button>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs text-gray-400">

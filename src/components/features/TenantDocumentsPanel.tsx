@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface TenantDocument {
   id: string;
@@ -10,6 +11,7 @@ interface TenantDocument {
   documentType?: string;
   fileName?: string;
   fileSize?: number;
+  mimeType?: string;
   createdAt?: string | Date;
 }
 
@@ -30,6 +32,7 @@ export function TenantDocumentsPanel({ tenantId }: TenantDocumentsPanelProps) {
   const [docs, setDocs] = useState<TenantDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { open: openLightbox } = useImageLightbox();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +54,21 @@ export function TenantDocumentsPanel({ tenantId }: TenantDocumentsPanelProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  function openDocument(doc: TenantDocument) {
+    const href = `/api/documents/${doc.id}/download`;
+    const name = doc.documentName || doc.fileName || 'Document';
+    if (
+      looksLikeImage({
+        mimeType: doc.mimeType,
+        fileName: doc.fileName || doc.documentName,
+      })
+    ) {
+      openLightbox({ src: href, alt: name, title: name });
+      return;
+    }
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }
 
   async function handleDelete(id: string) {
     if (!confirm('Remove this document from the tenant?')) return;
@@ -85,15 +103,14 @@ export function TenantDocumentsPanel({ tenantId }: TenantDocumentsPanelProps) {
               <div className="flex min-w-0 items-center gap-2">
                 <FileText className="h-4 w-4 shrink-0 text-gray-400" />
                 <div className="min-w-0">
-                  <a
-                    href={`/api/documents/${doc.id}/download`}
-                    className="block truncate text-sm font-medium text-indigo-600 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openDocument(doc)}
+                    className="block truncate text-left text-sm font-medium text-indigo-600 hover:underline"
                     title={doc.documentName || doc.fileName}
                   >
                     {doc.documentName || doc.fileName || 'Document'}
-                  </a>
+                  </button>
                   <p className="truncate text-xs text-gray-500">
                     {DOC_TYPE_LABELS[doc.documentType || ''] ||
                       doc.documentType ||

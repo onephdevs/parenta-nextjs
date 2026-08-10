@@ -2,6 +2,9 @@ import type { NextAuthOptions, Session } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { verifyPassword, findUserById } from './db';
 import type { LoginCredentials, UserRole } from '@/types/auth.types';
+import { homePathForRole } from '@/lib/auth/home-path';
+
+export { homePathForRole };
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -24,26 +27,29 @@ export const authOptions: NextAuthOptions = {
         }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password || !credentials?.role) {
+        if (!credentials?.email || !credentials?.password) {
           throw new Error('Missing credentials');
         }
 
         const { email, password, role } = credentials as LoginCredentials;
-
-        // Validate role
-        if (role !== 'admin' && role !== 'tenant') {
-          throw new Error('Invalid role specified');
-        }
+        const roleHint =
+          role && role !== 'auto' && ['admin', 'tenant', 'staff', 'caretaker'].includes(role)
+            ? (role as UserRole)
+            : null;
 
         try {
-          // Verify user credentials (email OR username)
-          const user = await verifyPassword(email, role as UserRole, password);
-          
+          // Prefer role hint when provided (legacy portals); otherwise detect from account.
+          let user = await verifyPassword(email, roleHint, password);
+
+          // Admin portal historically also accepted caretaker when role=admin
+          if (!user && roleHint === 'admin') {
+            user = await verifyPassword(email, 'caretaker', password);
+          }
+
           if (!user) {
             throw new Error('Invalid credentials or user not found');
           }
 
-          // Return user object that will be stored in JWT
           return {
             id: user.id,
             email: user.email,

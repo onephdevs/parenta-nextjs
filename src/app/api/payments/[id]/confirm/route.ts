@@ -32,6 +32,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = await request.json().catch(() => ({}));
     const action = body.action === 'reject' ? 'reject' : 'confirm';
     const adminNote = typeof body.note === 'string' ? body.note.trim() : '';
+    const confirmedReference =
+      typeof body.confirmedReference === 'string'
+        ? body.confirmedReference.trim()
+        : '';
 
     const payment = await getPaymentById(id);
     if (!payment) {
@@ -43,6 +47,45 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { error: 'Only pending payment claims can be confirmed or rejected' },
         { status: 400 }
       );
+    }
+
+    if (action === 'confirm') {
+      const expected = String(payment.referenceNumber || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '');
+      const entered = confirmedReference
+        .toLowerCase()
+        .replace(/\s+/g, '');
+
+      if (!expected) {
+        return NextResponse.json(
+          {
+            error:
+              'Payment has no transaction / reference number. Ask the tenant to resubmit with one.',
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!entered || entered !== expected) {
+        return NextResponse.json(
+          {
+            error:
+              'Transaction ID does not match. Re-check the receipt reference number.',
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!payment.receiptFilePath) {
+        return NextResponse.json(
+          {
+            error: 'Payment has no receipt attached. Cannot confirm without proof.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     if (action === 'reject') {
@@ -93,6 +136,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       paymentStatus: 'completed',
       notes: confirmNotes,
     });
+
+    // Apply deposit / advance side-effects only after confirmation
+    try {
+      if (payment.paymentType === 'deposit') {
+        const { createDepositTransaction } = await import(
+          '@/lib/api/deposit-ledger'
+        );
+        await createDepositTransaction({
+          tenantId: payment.tenantId,
+          amount: payment.amount,
+          transactionType: 'deposit',
+          description: `Confirmed deposit (txn ${payment.referenceNumber || 'n/a'})`,
+          paymentId: id,
+        });
+      } else if (payment.paymentType === 'advance') {
+        const { createTenantCredit } = await import('@/lib/api/tenant-credits');
+        await createTenantCredit({
+          tenantId: payment.tenantId,
+          amount: payment.amount,
+          source: 'manual',
+          description: `Confirmed advance (txn ${payment.referenceNumber || 'n/a'})`,
+        });
+      }
+    } catch (sideEffectError) {
+      console.error('Post-confirm deposit/advance side effect failed:', sideEffectError);
+    }
 
     const invoiceId = extractInvoiceIdFromNotes(payment.notes);
     let allocationMessage = 'Payment confirmed';

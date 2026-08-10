@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
+import { formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
 
 interface TenantUtilityBillsProps {
   buildingId?: string;
@@ -575,7 +576,9 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
               {selectedBill.notes && (
                 <div>
                   <label className="block text-sm font-medium text-gray-900">Notes</label>
-                  <div className="text-sm">{selectedBill.notes}</div>
+                  <div className="text-sm">
+                    {formatPaymentNotesForPeople(selectedBill.notes)}
+                  </div>
                 </div>
               )}
 

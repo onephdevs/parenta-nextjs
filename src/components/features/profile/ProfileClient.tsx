@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Session } from 'next-auth';
 import { useSession } from 'next-auth/react';
-import { User, Lock, Camera } from 'lucide-react';
+import { User, Lock, Camera, ImagePlus } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,6 +13,7 @@ import { Alert } from '@/components/ui/Alert';
 import { IconButton } from '@/components/ui/IconButton';
 import { FormField } from '@/components/forms/FormField';
 import { getImageUrl } from '@/lib/format/image-url';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 
 interface ProfileClientProps {
   session: Session;
@@ -149,7 +150,11 @@ export default function ProfileClient({ session }: ProfileClientProps) {
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadAvatarFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
+  const uploadAvatarFile = async (file: File) => {
     setIsUploadingPhoto(true);
     try {
       const body = new FormData();
@@ -168,7 +173,6 @@ export default function ProfileClient({ session }: ProfileClientProps) {
       showError(error instanceof Error ? error.message : 'Failed to upload photo');
     } finally {
       setIsUploadingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -216,16 +220,38 @@ export default function ProfileClient({ session }: ProfileClientProps) {
                       className="hidden"
                       onChange={handlePhotoChange}
                     />
-                    <IconButton
-                      label="Change profile photo"
-                      variant="outline"
-                      size="sm"
-                      className="absolute bottom-0 right-0 bg-white shadow-lg"
-                      isLoading={isUploadingPhoto}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Camera className="w-5 h-5" />
-                    </IconButton>
+                    <div className="absolute bottom-0 right-0 flex gap-1">
+                      <TakePhotoButton
+                        disabled={isUploadingPhoto}
+                        onCapture={(file) => void uploadAvatarFile(file)}
+                        title="Take profile photo"
+                        description="Allow camera access if prompted, then capture."
+                        fileNamePrefix="profile"
+                        preferUserCamera
+                        renderTrigger={(open) => (
+                          <IconButton
+                            label="Take profile photo"
+                            variant="outline"
+                            size="sm"
+                            className="bg-white shadow-lg"
+                            isLoading={isUploadingPhoto}
+                            onClick={open}
+                          >
+                            <Camera className="w-5 h-5" />
+                          </IconButton>
+                        )}
+                      />
+                      <IconButton
+                        label="Choose profile photo from gallery"
+                        variant="outline"
+                        size="sm"
+                        className="bg-white shadow-lg"
+                        isLoading={isUploadingPhoto}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImagePlus className="w-5 h-5" />
+                      </IconButton>
+                    </div>
                   </div>
 
                   <h2 className="mt-4 text-2xl font-bold text-gray-900">

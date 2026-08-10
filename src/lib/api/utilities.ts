@@ -192,13 +192,36 @@ export async function getUtilityBillById(id: string): Promise<UtilityBill | null
  */
 export async function createUtilityBill(billData: Partial<UtilityBill>): Promise<UtilityBill> {
   try {
+    // Vacant / unoccupied rooms: owner absorbs (matches createRoomUtilityBill)
+    let costBearer: 'TENANT' | 'OWNER' = 'TENANT';
+    if (billData.roomId) {
+      const roomCheck = await pool.query(
+        `SELECT room_status,
+                EXISTS (
+                  SELECT 1 FROM tenant_room_assignments tra
+                  WHERE tra.room_id = rooms.id
+                    AND tra.assignment_status = 'active'
+                    AND (tra.end_date IS NULL OR tra.end_date >= CURRENT_DATE)
+                ) AS has_active_tenant
+         FROM rooms
+         WHERE id = $1`,
+        [billData.roomId]
+      );
+      if (roomCheck.rows[0]) {
+        const vacant =
+          String(roomCheck.rows[0].room_status || '').toLowerCase() === 'vacant' ||
+          !roomCheck.rows[0].has_active_tenant;
+        if (vacant) costBearer = 'OWNER';
+      }
+    }
+
     const query = `
       INSERT INTO utility_bills (
         building_id, room_id, utility_type, amount, billing_period_start,
         billing_period_end, due_date, bill_status, provider_name, provider_account_number,
-        usage_amount, notes
+        usage_amount, notes, cost_bearer
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
     
@@ -220,6 +243,7 @@ export async function createUtilityBill(billData: Partial<UtilityBill>): Promise
       billData.accountNumber || null,
       billData.meterReading || null,
       billData.notes || null,
+      costBearer,
     ];
     
     const result = await pool.query(query, values);

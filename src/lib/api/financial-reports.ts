@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { FinancialReport } from '@/types/financial';
+import { formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
 
 export interface RevenueByCategory {
   category: string;
@@ -77,18 +78,18 @@ export async function generateFinancialReport(
       SELECT 
         SUM(i.total_amount - COALESCE(i.amount_paid, 0)) as total_outstanding,
         SUM(CASE 
-          WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
+          WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' 
           THEN (i.total_amount - COALESCE(i.amount_paid, 0)) 
           ELSE 0 
         END) as overdue_outstanding,
         SUM(CASE 
-          WHEN i.due_date >= CURRENT_DATE AND i.invoice_status != 'paid' 
+          WHEN COALESCE(i.negotiated_due_date, i.due_date) >= CURRENT_DATE AND i.invoice_status != 'paid' 
           THEN (i.total_amount - COALESCE(i.amount_paid, 0)) 
           ELSE 0 
         END) as current_outstanding,
         AVG(CASE 
-          WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
-          THEN (CURRENT_DATE - i.due_date) 
+          WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' 
+          THEN (CURRENT_DATE - COALESCE(i.negotiated_due_date, i.due_date)) 
           ELSE NULL 
         END) as average_days_overdue
       FROM invoices i
@@ -246,13 +247,13 @@ export async function getOutstandingBalances(): Promise<OutstandingBalance[]> {
       CONCAT(t.first_name, ' ', t.last_name) as tenant_name,
       SUM(i.total_amount - COALESCE(i.amount_paid, 0)) as total_amount,
       SUM(CASE 
-        WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
+        WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' 
         THEN (i.total_amount - COALESCE(i.amount_paid, 0)) 
         ELSE 0 
       END) as overdue_amount,
       MAX(CASE 
-        WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' 
-        THEN (CURRENT_DATE - i.due_date) 
+        WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' 
+        THEN (CURRENT_DATE - COALESCE(i.negotiated_due_date, i.due_date)) 
         ELSE 0 
       END) as days_past_due
     FROM invoices i
@@ -449,8 +450,19 @@ export async function exportFinancialData(
   
   let csvContent = headers;
   
-  result.rows.forEach(row => {
-    const values = Object.values(row).map(value => {
+  result.rows.forEach((row) => {
+    const cleaned: Record<string, unknown> = { ...row };
+    if ('description' in cleaned) {
+      cleaned.description = formatPaymentNotesForPeople(
+        cleaned.description != null ? String(cleaned.description) : ''
+      );
+    }
+    if ('notes' in cleaned) {
+      cleaned.notes = formatPaymentNotesForPeople(
+        cleaned.notes != null ? String(cleaned.notes) : ''
+      );
+    }
+    const values = Object.values(cleaned).map((value) => {
       if (value === null || value === undefined) return '';
       const stringValue = String(value);
       // Escape quotes and wrap in quotes if contains comma or quote

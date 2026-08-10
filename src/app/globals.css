@@ -54,9 +54,19 @@ body {
   animation: auth-hero-fade 450ms ease-out both;
 }
 
+.landing-hero-fade {
+  animation: auth-hero-fade 500ms ease-out both;
+}
+
+.landing-hero-float {
+  animation: auth-float 5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-hero-float,
-  .auth-hero-fade {
+  .auth-hero-fade,
+  .landing-hero-float,
+  .landing-hero-fade {
     animation: none;
   }
 }

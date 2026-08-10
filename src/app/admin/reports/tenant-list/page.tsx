@@ -37,7 +37,7 @@ export default function TenantListReportPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated' || (session && session.user.role !== 'admin')) {
-      redirect('/auth/admin/signin');
+      redirect('/auth/signin');
     }
   }, [session, status]);
 

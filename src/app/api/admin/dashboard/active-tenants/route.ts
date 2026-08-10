@@ -45,10 +45,10 @@ export async function GET(request: Request) {
         b.name as building_name,
         b.id as building_id,
         COALESCE(SUM(i.balance_due), 0) as balance,
-        COALESCE(SUM(CASE WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' THEN i.balance_due ELSE 0 END), 0) as past_due_amount,
-        COUNT(CASE WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' THEN 1 END) as overdue_count,
-        COALESCE(MAX(CASE WHEN i.due_date < CURRENT_DATE AND i.invoice_status != 'paid' THEN (CURRENT_DATE - i.due_date) ELSE 0 END), 0) as days_past_due,
-        MIN(CASE WHEN i.due_date >= CURRENT_DATE AND i.invoice_status != 'paid' THEN (i.due_date - CURRENT_DATE) ELSE NULL END) as days_until_due,
+        COALESCE(SUM(CASE WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' THEN i.balance_due ELSE 0 END), 0) as past_due_amount,
+        COUNT(CASE WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' THEN 1 END) as overdue_count,
+        COALESCE(MAX(CASE WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE AND i.invoice_status != 'paid' THEN (CURRENT_DATE - COALESCE(i.negotiated_due_date, i.due_date)) ELSE 0 END), 0) as days_past_due,
+        MIN(CASE WHEN COALESCE(i.negotiated_due_date, i.due_date) >= CURRENT_DATE AND i.invoice_status != 'paid' THEN (COALESCE(i.negotiated_due_date, i.due_date) - CURRENT_DATE) ELSE NULL END) as days_until_due,
         tra.start_date as lease_start,
         tra.end_date as lease_end
       FROM tenants t

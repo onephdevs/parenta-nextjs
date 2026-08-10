@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type {
   PropertyBuildingDetail,
@@ -22,6 +22,7 @@ export default function PropertiesMasterDetail({
 }: PropertiesMasterDetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const detailLoadGen = useRef(0);
 
   const [buildings, setBuildings] = useState(initialBuildings);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
@@ -57,6 +58,7 @@ export default function PropertiesMasterDetail({
   );
 
   const loadDetail = useCallback(async (buildingId: string) => {
+    const gen = ++detailLoadGen.current;
     setDetailLoading(true);
     setDetailError(null);
     setRoomsLoadingId(buildingId);
@@ -66,6 +68,8 @@ export default function PropertiesMasterDetail({
         credentials: 'include',
       });
       const json = await response.json();
+
+      if (gen !== detailLoadGen.current) return;
 
       if (!response.ok || !json.success) {
         throw new Error(json.error || 'Failed to load property');
@@ -78,11 +82,14 @@ export default function PropertiesMasterDetail({
         [buildingId]: data.rooms,
       }));
     } catch (err) {
+      if (gen !== detailLoadGen.current) return;
       setDetail(null);
       setDetailError(err instanceof Error ? err.message : 'Failed to load property');
     } finally {
-      setDetailLoading(false);
-      setRoomsLoadingId(null);
+      if (gen === detailLoadGen.current) {
+        setDetailLoading(false);
+        setRoomsLoadingId(null);
+      }
     }
   }, []);
 
@@ -107,17 +114,15 @@ export default function PropertiesMasterDetail({
     return buildings;
   }, [buildings]);
 
-  // Keep selection in sync when URL buildingId changes (e.g. after add)
+  // Sync selection FROM the URL only when the URL changes (not when selection changes).
+  // Depending on selectedBuildingId caused clicks to revert while router.replace lagged.
   useEffect(() => {
     const fromUrl = searchParams.get('buildingId');
-    if (fromUrl && fromUrl !== selectedBuildingId) {
-      const exists = buildings.some((b) => b.id === fromUrl);
-      if (exists) {
-        setSelectedBuildingId(fromUrl);
-        setExpandedBuildingId(fromUrl);
-      }
-    }
-  }, [searchParams, buildings, selectedBuildingId]);
+    if (!fromUrl) return;
+    if (!buildings.some((b) => b.id === fromUrl)) return;
+    setSelectedBuildingId((prev) => (prev === fromUrl ? prev : fromUrl));
+    setExpandedBuildingId((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, [searchParams, buildings]);
 
   useEffect(() => {
     if (!selectedBuildingId) {
@@ -131,6 +136,7 @@ export default function PropertiesMasterDetail({
   useEffect(() => {
     const roomIdFromUrl = searchParams.get('roomId');
     if (!roomIdFromUrl || detailLoading || !detail) return;
+    if (selectedBuildingId && detail.building.id !== selectedBuildingId) return;
     const exists = detail.rooms.some((room) => room.id === roomIdFromUrl);
     if (!exists) return;
 
@@ -142,9 +148,16 @@ export default function PropertiesMasterDetail({
     params.delete('roomId');
     const query = params.toString();
     router.replace(query ? `/admin/properties?${query}` : '/admin/properties', { scroll: false });
-  }, [searchParams, detail, detailLoading, router]);
+  }, [searchParams, detail, detailLoading, router, selectedBuildingId]);
+
   const handleSelectBuilding = (id: string) => {
+    if (id === selectedBuildingId) return;
+    // Invalidate in-flight detail fetches and clear stale pane immediately
+    detailLoadGen.current += 1;
     setSelectedBuildingId(id);
+    setDetail(null);
+    setDetailLoading(true);
+    setDetailError(null);
     setActiveRoomId(null);
     setScrollRequest(null);
     syncUrl(id);
@@ -246,8 +259,20 @@ export default function PropertiesMasterDetail({
       </div>
 
       <PropertyDetailPane
-        detail={detail}
-        loading={detailLoading}
+        // Never show / act on a building that is not the current selection
+        detail={
+          detail && selectedBuildingId && detail.building.id === selectedBuildingId
+            ? detail
+            : null
+        }
+        loading={
+          detailLoading ||
+          Boolean(
+            selectedBuildingId &&
+              detail &&
+              detail.building.id !== selectedBuildingId
+          )
+        }
         error={detailError}
         activeRoomId={activeRoomId}
         scrollToRoomId={scrollRequest?.roomId ?? null}

@@ -15,6 +15,7 @@ import { getImageUrl } from '@/lib/format/image-url';
 import { useNotifications } from '@/hooks/useNotifications';
 import EditBuildingModal from '@/components/features/EditBuildingModal';
 import DeleteBuildingModal from '@/components/features/DeleteBuildingModal';
+import { AddNotesButton, EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import {
   formatBuildingAddress,
   googleMapsUrl,
@@ -169,6 +170,24 @@ export default function MainPropertyCard({
                       >
                         Edit property
                       </button>
+                      <AddNotesButton
+                        entityType="building"
+                        entityId={building.id}
+                        entityLabel={building.name}
+                        onSaved={() => onBuildingUpdated()}
+                        renderTrigger={(open) => (
+                          <button
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              open();
+                            }}
+                          >
+                            Add note
+                          </button>
+                        )}
+                      />
                       <Link
                         href={`/admin/buildings/${building.id}/rooms`}
                         className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -244,7 +263,7 @@ export default function MainPropertyCard({
                 Open on Google Maps
               </a>
 
-              <div className="mt-auto flex flex-wrap items-center gap-5 pt-1 text-[12px] font-normal leading-none text-gray-600">
+              <div className="mt-auto flex flex-wrap items-center gap-3 pt-1 text-[12px] font-normal leading-none text-gray-600">
                 <span className="inline-flex items-center gap-1.5">
                   <Home className="h-4 w-4" style={{ color: TEAL }} />
                   {roomCount} Rooms
@@ -253,9 +272,26 @@ export default function MainPropertyCard({
                   <Users className="h-4 w-4" style={{ color: TEAL }} />
                   {detail.tenantCount || 0} Tenants
                 </span>
+                <AddNotesButton
+                  entityType="building"
+                  entityId={building.id}
+                  entityLabel={building.name}
+                  label="Add note"
+                  onSaved={() => onBuildingUpdated()}
+                />
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="border-t border-gray-100 p-5">
+          <EntityNotesPanel
+            entityType="building"
+            entityId={building.id}
+            entityLabel={building.name}
+            title="Property notes"
+            compact
+          />
         </div>
       </div>
 

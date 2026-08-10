@@ -9,6 +9,8 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
+import { PAYMENT_METHOD_SELECT_OPTIONS } from '@/lib/constants/payment-methods';
+import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 import { cn } from '@/lib/utils';
 
 interface DepositPaymentFormProps {
@@ -22,9 +24,10 @@ export default function DepositPaymentForm({
 }: DepositPaymentFormProps) {
   const [paymentType, setPaymentType] = useState<'deposit' | 'advance'>('deposit');
   const [amount, setAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('online');
+  const [paymentMethod, setPaymentMethod] = useState<string>('gcash');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { showNotification } = useNotifications();
 
@@ -41,22 +44,42 @@ export default function DepositPaymentForm({
       return;
     }
 
+    if (!referenceNumber.trim()) {
+      showNotification({
+        type: 'error',
+        title: 'Reference required',
+        message: 'Enter the transaction / reference number from your receipt',
+      });
+      return;
+    }
+
+    if (!selectedFile) {
+      showNotification({
+        type: 'error',
+        title: 'Receipt required',
+        message: 'Take a photo or choose a screenshot of your payment receipt',
+      });
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
-      const response = await fetch('/api/tenant/deposits', {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('amount', String(amountValue));
+      formData.append('paymentType', paymentType);
+      formData.append('paymentMethod', paymentMethod);
+      formData.append('referenceNumber', referenceNumber.trim());
+      formData.append(
+        'notes',
+        description.trim() ||
+          `${paymentType === 'deposit' ? 'Deposit' : 'Advance'} payment`
+      );
+
+      const response = await fetch('/api/tenant/payments/manual', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: amountValue,
-          paymentType,
-          paymentMethod,
-          referenceNumber: referenceNumber || undefined,
-          description:
-            description || `${paymentType === 'deposit' ? 'Deposit' : 'Advance'} payment`,
-        }),
+        body: formData,
       });
 
       const data = await response.json();
@@ -64,10 +87,15 @@ export default function DepositPaymentForm({
       if (data.success) {
         showNotification({
           type: 'success',
-          title: paymentType === 'deposit' ? 'Deposit Recorded' : 'Advance Recorded',
-          message: data.message || `Your ${paymentType} payment has been recorded successfully`,
+          title: 'Payment submitted',
+          message:
+            data.message ||
+            'Receipt uploaded. Balance updates after the office verifies the transaction ID.',
         });
-
+        setSelectedFile(null);
+        setReferenceNumber('');
+        setDescription('');
+        setAmount('');
         onPaymentComplete?.();
       } else {
         showNotification({
@@ -98,8 +126,8 @@ export default function DepositPaymentForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <Alert variant="info">
-        <strong>Note:</strong> Deposits are held for security and refunded at move-out. Advances
-        are applied to future rent payments.
+        <strong>Note:</strong> Attach your receipt and transaction ID. The office confirms
+        before deposit/advance balances update.
       </Alert>
 
       <FormField label="Payment Type" htmlFor="paymentType-deposit" required>
@@ -172,23 +200,34 @@ export default function DepositPaymentForm({
           onChange={(e) => setPaymentMethod(e.target.value)}
           required
         >
-          <option value="online">Online Payment</option>
-          <option value="credit_card">Credit Card</option>
-          <option value="bank_transfer">Bank Transfer</option>
-          <option value="cash">Cash</option>
-          <option value="check">Check</option>
+          {PAYMENT_METHOD_SELECT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
         </Select>
       </FormField>
 
-      <FormField label="Reference Number (Optional)" htmlFor="referenceNumber">
+      <FormField
+        label="Reference / transaction number"
+        htmlFor="referenceNumber"
+        required
+      >
         <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
-          placeholder="Transaction reference, receipt number, etc."
+          placeholder="e.g. 1234567890"
+          required
         />
       </FormField>
+
+      <ReceiptImageField
+        file={selectedFile}
+        onChange={setSelectedFile}
+        disabled={isProcessing}
+      />
 
       <FormField label="Description (Optional)" htmlFor="description">
         <Textarea
@@ -200,28 +239,6 @@ export default function DepositPaymentForm({
         />
       </FormField>
 
-      {amount && parseFloat(amount) > 0 && (
-        <Alert
-          variant={paymentType === 'deposit' ? 'success' : 'info'}
-          title={`${paymentType === 'deposit' ? 'Deposit' : 'Advance'} Summary`}
-        >
-          <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>Payment Type:</span>
-              <span className="font-medium capitalize">{paymentType}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Amount:</span>
-              <span className="font-medium">{formatCurrency(parseFloat(amount))}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Payment Method:</span>
-              <span className="font-medium capitalize">{paymentMethod.replace('_', ' ')}</span>
-            </div>
-          </div>
-        </Alert>
-      )}
-
       <div className="flex items-center justify-end space-x-3">
         {onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel}>
@@ -232,10 +249,15 @@ export default function DepositPaymentForm({
           type="submit"
           variant="success"
           isLoading={isProcessing}
-          isDisabled={!amount || parseFloat(amount) <= 0}
+          isDisabled={
+            !amount ||
+            parseFloat(amount) <= 0 ||
+            !selectedFile ||
+            !referenceNumber.trim()
+          }
           leftIcon={<DollarSign className="h-5 w-5" />}
         >
-          Record {paymentType === 'deposit' ? 'Deposit' : 'Advance'}
+          Submit {paymentType === 'deposit' ? 'Deposit' : 'Advance'}
         </Button>
       </div>
     </form>

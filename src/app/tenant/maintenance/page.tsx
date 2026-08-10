@@ -1,23 +1,23 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Wrench, 
-  Plus, 
+import {
+  Wrench,
+  Plus,
   ArrowLeft,
-  Calendar,
   Clock,
   CheckCircle2,
   AlertCircle,
-  MessageSquare,
   X,
-  Camera,
   ImagePlus,
+  ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 import {
   Button,
   EmptyState,
@@ -35,20 +35,17 @@ import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
-import { Card } from '@/components/ui/Card';
-import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantMaintenance } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
-
-interface MaintenancePhoto {
-  id: string;
-  fileName?: string;
-  url: string;
-  mimeType?: string;
-}
+import { LightboxImage } from '@/components/ui/ImageLightbox';
+import {
+  MAINTENANCE_CATEGORIES,
+  MAINTENANCE_CATEGORY_LABELS,
+  formatMaintenanceCategory,
+} from '@/lib/constants/maintenance';
 
 interface MaintenanceRequest {
   id: string;
@@ -59,11 +56,8 @@ interface MaintenanceRequest {
   status: string;
   createdAt: string;
   updatedAt: string;
-  scheduledDate?: string;
-  completedDate?: string;
-  notes?: string;
-  attachments?: MaintenancePhoto[];
   attachmentCount?: number;
+  updates?: unknown[];
 }
 
 interface MaintenanceData {
@@ -89,10 +83,29 @@ function mapMaintenance(raw: { requests: unknown[] } | Record<string, unknown>):
     (r) => !['completed', 'cancelled', 'closed'].includes(String(r.status).toLowerCase())
   ).length;
   return {
-    active: typeof (raw as MaintenanceData).active === 'number' ? (raw as MaintenanceData).active : active,
-    total: typeof (raw as MaintenanceData).total === 'number' ? (raw as MaintenanceData).total : requests.length,
+    active:
+      typeof (raw as MaintenanceData).active === 'number'
+        ? (raw as MaintenanceData).active
+        : active,
+    total:
+      typeof (raw as MaintenanceData).total === 'number'
+        ? (raw as MaintenanceData).total
+        : requests.length,
     requests,
   };
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 export default function MaintenancePage() {
@@ -101,26 +114,40 @@ export default function MaintenancePage() {
   const { load, getCached, isLoading: cacheLoading, invalidate } = useTenantData();
   const theme = useTenantTheme();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams?.get('highlight') || null;
   const { showNotification } = useNotifications();
   const [maintenanceData, setMaintenanceData] = useState<MaintenanceData | null>(() => {
     const cached = getCached<{ requests: unknown[] }>('maintenance');
     return cached ? mapMaintenance(cached) : null;
   });
   const [showNewRequestForm, setShowNewRequestForm] = useState(false);
+  const [requestPanelIn, setRequestPanelIn] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  // Form state
   const [newRequest, setNewRequest] = useState({
     title: '',
     description: '',
     category: '',
-    priority: 'medium'
+    priority: 'medium',
   });
+
+  useEffect(() => {
+    if (!highlightId) return;
+    router.replace(`/tenant/maintenance/${highlightId}`);
+  }, [highlightId, router]);
+
+  useEffect(() => {
+    if (!showNewRequestForm) {
+      setRequestPanelIn(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setRequestPanelIn(true));
+    return () => cancelAnimationFrame(frame);
+  }, [showNewRequestForm]);
 
   const clearPhotos = () => {
     setPhotos((prev) => {
@@ -157,7 +184,6 @@ export default function MaintenancePage() {
     if (next.length === 0) return;
     setPhotos((prev) => {
       const combined = [...prev, ...next].slice(0, MAX_PHOTOS);
-      // revoke previews that didn't make the cut
       next.forEach((p) => {
         if (!combined.includes(p)) URL.revokeObjectURL(p.preview);
       });
@@ -190,7 +216,10 @@ export default function MaintenancePage() {
         showNotification({
           type: 'error',
           title: 'Error',
-          message: error instanceof Error ? error.message : 'Failed to load maintenance requests',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Failed to load maintenance requests',
         });
       }
     }
@@ -209,18 +238,20 @@ export default function MaintenancePage() {
     return <TenantPageSkeleton variant="list" />;
   }
 
-  if (!canAccess) {
-    return null;
+  if (!canAccess) return null;
+
+  if (highlightId) {
+    return <TenantPageSkeleton variant="list" />;
   }
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newRequest.title || !newRequest.description || !newRequest.category) {
       showNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please fill in all required fields'
+        message: 'Please fill in all required fields',
       });
       return;
     }
@@ -245,23 +276,30 @@ export default function MaintenancePage() {
         showNotification({
           type: data.warning ? 'warning' : 'success',
           title: 'Request Submitted',
-          message: data.message || 'Your maintenance request has been submitted successfully!'
+          message:
+            data.message ||
+            'Your maintenance request has been submitted successfully!',
         });
         setNewRequest({
           title: '',
           description: '',
           category: '',
-          priority: 'medium'
+          priority: 'medium',
         });
         clearPhotos();
         setShowNewRequestForm(false);
         invalidate('maintenance');
-        void fetchMaintenanceData(true);
+        const createdId = data.data?.id;
+        if (createdId) {
+          router.push(`/tenant/maintenance/${createdId}`);
+        } else {
+          void fetchMaintenanceData(true);
+        }
       } else {
         showNotification({
           type: 'error',
           title: 'Submission Failed',
-          message: data.error || data.details || 'Failed to submit maintenance request'
+          message: data.error || data.details || 'Failed to submit maintenance request',
         });
       }
     } catch (error) {
@@ -269,246 +307,271 @@ export default function MaintenancePage() {
       showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to submit maintenance request'
+        message:
+          error instanceof Error ? error.message : 'Failed to submit request',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const filteredRequests = (maintenanceData?.requests || []).filter(request => {
-    const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
-    const matchesPriority = filterPriority === 'all' || request.priority === filterPriority;
-    const matchesSearch = request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.category.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesPriority && matchesSearch;
+  const categories = MAINTENANCE_CATEGORIES;
+  const filteredRequests = (maintenanceData?.requests || []).filter((request) => {
+    const matchesSearch =
+      request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      filterStatus === 'all' || request.status === filterStatus;
+    const matchesPriority =
+      filterPriority === 'all' || request.priority === filterPriority;
+    return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const categories = [
-    'plumbing',
-    'electrical',
-    'hvac',
-    'appliance',
-    'flooring',
-    'painting',
-    'locks_security',
-    'windows_doors',
-    'pest_control',
-    'other'
-  ];
-
   return (
-    <div className={theme.pagePad}>
-      <Link
-        href="/tenant"
-        className="inline-flex items-center text-sm text-emerald-400 hover:text-emerald-300"
-      >
-        <ArrowLeft className="mr-1 h-4 w-4" />
-        Back to Home
-      </Link>
-      <div>
-        <h1 className={theme.title}>Maintenance</h1>
-        <p className={cn('mt-1', theme.muted)}>
-          Submit and track maintenance requests
-        </p>
-      </div>
-      <div className={cn(theme.formPanel, 'overflow-hidden')}>
-      <div className="p-4 sm:p-6">
-      <PageHeader
-        title="Maintenance Requests"
-        description="Manage your maintenance requests and submit new ones"
-        actions={
-          isPreview ? undefined : (
-            <Button
-              variant="success"
-              leftIcon={<Plus className="h-4 w-4" />}
-              onClick={() => setShowNewRequestForm(true)}
-              className={theme.primaryButton}
-            >
-              New Request
-            </Button>
-          )
-        }
-      />
-          {maintenanceData && (
-            <div className="space-y-6">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-4">
-                <StatCard
-                  title="Active Requests"
-                  value={maintenanceData?.active || 0}
-                  icon={<Clock className="h-5 w-5" />}
-                />
-                <StatCard
-                  title="In Progress"
-                  value={filteredRequests.filter((r) => r.status === 'in_progress').length}
-                  tone="blue"
-                  icon={<Wrench className="h-5 w-5" />}
-                />
-                <StatCard
-                  title="Completed"
-                  value={filteredRequests.filter((r) => r.status === 'completed').length}
-                  tone="green"
-                  icon={<CheckCircle2 className="h-5 w-5" />}
-                />
-                <StatCard
-                  title="High Priority"
-                  value={filteredRequests.filter((r) => r.priority === 'high').length}
-                  tone="red"
-                  icon={<AlertCircle className="h-5 w-5" />}
-                />
-              </div>
+    <div className={theme.page}>
+      <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6">
+        <Link
+          href="/tenant"
+          className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-500"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to home
+        </Link>
+        <div>
+          <h1 className={theme.title}>Maintenance</h1>
+          <p className={cn('mt-1', theme.muted)}>
+            Browse your requests, then open one to view updates and reply
+          </p>
+        </div>
+        <div className={cn(theme.formPanel, 'overflow-hidden')}>
+          <div className="p-4 sm:p-6">
+            <PageHeader
+              title="Maintenance Requests"
+              description="Select a request to view details and conversation"
+              actions={
+                isPreview ? undefined : (
+                  <Button
+                    variant="success"
+                    leftIcon={<Plus className="h-4 w-4" />}
+                    onClick={() => setShowNewRequestForm(true)}
+                    className={theme.primaryButton}
+                  >
+                    New Request
+                  </Button>
+                )
+              }
+            />
+            {maintenanceData && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-4">
+                  <StatCard
+                    title="Active Requests"
+                    value={maintenanceData?.active || 0}
+                    icon={<Clock className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    title="In Progress"
+                    value={
+                      filteredRequests.filter((r) => r.status === 'in_progress')
+                        .length
+                    }
+                    tone="blue"
+                    icon={<Wrench className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    title="Completed"
+                    value={
+                      filteredRequests.filter((r) => r.status === 'completed')
+                        .length
+                    }
+                    tone="green"
+                    icon={<CheckCircle2 className="h-5 w-5" />}
+                  />
+                  <StatCard
+                    title="High Priority"
+                    value={
+                      filteredRequests.filter((r) => r.priority === 'high').length
+                    }
+                    tone="red"
+                    icon={<AlertCircle className="h-5 w-5" />}
+                  />
+                </div>
 
-              {/* Maintenance Requests List */}
-              <div className="bg-white shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Your Maintenance Requests ({maintenanceData?.requests?.length || 0} total)
-                    </h3>
-                    
-                    {/* Filters */}
-                    <div className="flex flex-wrap items-center gap-3">
-                      <SearchInput
-                        placeholder="Search requests..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        aria-label="Search requests"
-                        className="w-56"
-                      />
-                      <Select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        aria-label="Filter by status"
-                      >
-                        <option value="all">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="scheduled">Scheduled</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </Select>
-                      <Select
-                        value={filterPriority}
-                        onChange={(e) => setFilterPriority(e.target.value)}
-                        aria-label="Filter by priority"
-                      >
-                        <option value="all">All Priority</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                      </Select>
+                <div className="rounded-lg bg-white shadow">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-lg font-medium leading-6 text-gray-900">
+                        Your requests ({maintenanceData?.requests?.length || 0})
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <SearchInput
+                          placeholder="Search requests..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          aria-label="Search requests"
+                          className="w-56"
+                        />
+                        <Select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                          aria-label="Filter by status"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="open">Open</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Resolved</option>
+                          <option value="closed">Closed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </Select>
+                        <Select
+                          value={filterPriority}
+                          onChange={(e) => setFilterPriority(e.target.value)}
+                          aria-label="Filter by priority"
+                        >
+                          <option value="all">All Priority</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
 
-                  {filteredRequests.length > 0 ? (
-                    <div className="space-y-4">
-                      {filteredRequests.map((request) => (
-                        <div key={request.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <h4 className="text-lg font-medium text-gray-900">{request.title}</h4>
-                                <MaintenanceStatusBadge status={request.status} />
-                                <MaintenancePriorityBadge priority={request.priority} />
-                              </div>
-                              <p className="text-gray-900 mb-3">{request.description}</p>
-                              {(request.attachments?.length || 0) > 0 && (
-                                <MaintenancePhotoGallery
-                                  photos={request.attachments || []}
-                                  className="mb-3"
-                                />
-                              )}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-900">
-                                <div>
-                                  <span className="font-medium">Category:</span> {request.category.replace('_', ' ')}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Created:</span> {formatDate(request.createdAt)}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Last updated:</span> {formatDate(request.updatedAt)}
-                                </div>
-                              </div>
-                              {request.scheduledDate && (
-                                <div className="mt-2 text-sm text-blue-600">
-                                  <Calendar className="h-4 w-4 inline mr-1" />
-                                  <span className="font-medium">Scheduled:</span> {formatDate(request.scheduledDate)}
-                                </div>
-                              )}
-                              {request.completedDate && (
-                                <div className="mt-2 text-sm text-green-600">
-                                  <CheckCircle2 className="h-4 w-4 inline mr-1" />
-                                  <span className="font-medium">Completed:</span> {formatDate(request.completedDate)}
-                                </div>
-                              )}
-                              {request.notes && (
-                                <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                                  <p className="text-sm text-gray-900">
-                                    <MessageSquare className="h-4 w-4 inline mr-1" />
-                                    <span className="font-medium">Notes:</span> {request.notes}
+                    {filteredRequests.length > 0 ? (
+                      <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                        {filteredRequests.map((request) => {
+                          const updateCount = request.updates?.length || 0;
+                          return (
+                            <li key={request.id}>
+                              <Link
+                                href={`/tenant/maintenance/${request.id}`}
+                                className="flex items-start gap-3 px-4 py-4 transition hover:bg-gray-50"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <h4 className="truncate text-base font-medium text-gray-900">
+                                      {request.title}
+                                    </h4>
+                                    <MaintenanceStatusBadge status={request.status} />
+                                    <MaintenancePriorityBadge
+                                      priority={request.priority}
+                                    />
+                                  </div>
+                                  <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                                    {request.description}
                                   </p>
+                                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                    <span>
+                                      {formatMaintenanceCategory(request.category)}
+                                    </span>
+                                    <span>Updated {formatDate(request.updatedAt)}</span>
+                                    {updateCount > 0 && (
+                                      <span className="inline-flex items-center gap-1">
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                        {updateCount} update
+                                        {updateCount === 1 ? '' : 's'}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon={<Wrench className="h-12 w-12" />}
-                      title={
-                        searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
-                          ? 'No matching requests'
-                          : 'No maintenance requests yet'
-                      }
-                      description={
-                        searchTerm || filterStatus !== 'all' || filterPriority !== 'all'
-                          ? 'No maintenance requests found matching your criteria.'
-                          : 'Submit a new request if you need assistance.'
-                      }
-                      action={
-                        searchTerm || filterStatus !== 'all' || filterPriority !== 'all' ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                              setSearchTerm('');
-                              setFilterStatus('all');
-                              setFilterPriority('all');
-                            }}
-                          >
-                            Clear filters
-                          </Button>
-                        ) : undefined
-                      }
-                    />
-                  )}
+                                <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-gray-400" />
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <EmptyState
+                        icon={<Wrench className="h-12 w-12" />}
+                        title={
+                          searchTerm ||
+                          filterStatus !== 'all' ||
+                          filterPriority !== 'all'
+                            ? 'No matching requests'
+                            : 'No maintenance requests yet'
+                        }
+                        description={
+                          searchTerm ||
+                          filterStatus !== 'all' ||
+                          filterPriority !== 'all'
+                            ? 'No maintenance requests found matching your criteria.'
+                            : 'Submit a new request if you need assistance.'
+                        }
+                        action={
+                          searchTerm ||
+                          filterStatus !== 'all' ||
+                          filterPriority !== 'all' ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => {
+                                setSearchTerm('');
+                                setFilterStatus('all');
+                                setFilterPriority('all');
+                              }}
+                            >
+                              Clear filters
+                            </Button>
+                          ) : undefined
+                        }
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+      </div>
 
       {showNewRequestForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto" padding="lg">
-            <form onSubmit={handleSubmitRequest}>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-medium text-gray-900">Submit Maintenance Request</h3>
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            className={cn(
+              'absolute inset-0 bg-gray-900/50 transition-opacity duration-300 md:left-64',
+              requestPanelIn ? 'opacity-100' : 'opacity-0'
+            )}
+            onClick={() => {
+              if (isSubmitting) return;
+              clearPhotos();
+              setShowNewRequestForm(false);
+            }}
+            aria-hidden="true"
+          />
+
+          <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex justify-end md:left-64">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tenant-maintenance-request-title"
+              className={cn(
+                'pointer-events-auto flex h-full w-full max-w-lg flex-col shadow-2xl transition-transform duration-300 ease-out',
+                theme.mode === 'dark'
+                  ? 'bg-zinc-950 text-zinc-100'
+                  : 'bg-white text-gray-900',
+                requestPanelIn ? 'translate-x-0' : 'translate-x-full'
+              )}
+            >
+              <div
+                className={cn(
+                  'flex flex-shrink-0 items-start justify-between gap-3 border-b px-4 py-4 sm:px-5',
+                  theme.mode === 'dark' ? 'border-zinc-800' : 'border-gray-200'
+                )}
+              >
+                <div className="min-w-0">
+                  <h3
+                    id="tenant-maintenance-request-title"
+                    className={cn('text-lg font-semibold', theme.shellHeader)}
+                  >
+                    Submit maintenance request
+                  </h3>
+                  <p className={cn('mt-1 text-sm', theme.muted)}>
+                    Describe the issue and attach photos if helpful.
+                  </p>
+                </div>
                 <IconButton
                   label="Close"
                   onClick={() => {
+                    if (isSubmitting) return;
                     clearPhotos();
                     setShowNewRequestForm(false);
                   }}
@@ -517,148 +580,161 @@ export default function MaintenancePage() {
                 </IconButton>
               </div>
 
-              <div className="space-y-4">
-                <FormField label="Title" htmlFor="title" required>
-                  <Input
-                    type="text"
-                    id="title"
-                    required
-                    value={newRequest.title}
-                    onChange={(e) => setNewRequest({ ...newRequest, title: e.target.value })}
-                    placeholder="Brief description of the issue"
-                  />
-                </FormField>
-
-                <FormField label="Category" htmlFor="category" required>
-                  <Select
-                    id="category"
-                    required
-                    value={newRequest.category}
-                    onChange={(e) => setNewRequest({ ...newRequest, category: e.target.value })}
-                  >
-                    <option value="">Select a category</option>
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-
-                <FormField label="Priority" htmlFor="priority">
-                  <Select
-                    id="priority"
-                    value={newRequest.priority}
-                    onChange={(e) => setNewRequest({ ...newRequest, priority: e.target.value })}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </Select>
-                </FormField>
-
-                <FormField label="Description" htmlFor="description" required>
-                  <Textarea
-                    id="description"
-                    required
-                    rows={4}
-                    value={newRequest.description}
-                    onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
-                    placeholder="Please provide detailed information about the issue, location, and any relevant details"
-                  />
-                </FormField>
-
-                <FormField
-                  label="Photos of the issue"
-                  htmlFor="maintenance-photos"
-                  hint={`Optional — up to ${MAX_PHOTOS} photos so the office can assess what needs fixing.`}
-                >
-                  <div className="space-y-3">
-                    <FileDropzone
-                      accept="image/jpeg,image/png,image/webp,image/*"
-                      multiple
-                      disabled={isSubmitting || photos.length >= MAX_PHOTOS}
-                      onFiles={addPhotoFiles}
-                      icon={<ImagePlus className="mx-auto mb-3 h-10 w-10 text-gray-400" />}
-                      label="Drag photos here, or click to choose from gallery"
-                      hint="JPEG, PNG, or WEBP · max 5MB each"
+              <form
+                onSubmit={handleSubmitRequest}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+                  <FormField label="Title" htmlFor="title" required>
+                    <Input
+                      type="text"
+                      id="title"
+                      required
+                      value={newRequest.title}
+                      onChange={(e) =>
+                        setNewRequest({ ...newRequest, title: e.target.value })
+                      }
+                      placeholder="Brief description of the issue"
                     />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        leftIcon={<Camera className="h-4 w-4" />}
-                        disabled={isSubmitting || photos.length >= MAX_PHOTOS}
-                        onClick={() => cameraInputRef.current?.click()}
-                      >
-                        Take photo
-                      </Button>
-                      <input
-                        ref={cameraInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          const list = e.target.files;
-                          if (list?.length) addPhotoFiles(Array.from(list));
-                          e.target.value = '';
-                        }}
-                      />
-                    </div>
-                    {photos.length > 0 && (
-                      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                        {photos.map((photo) => (
-                          <li key={photo.id} className="relative">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={photo.preview}
-                              alt="Issue preview"
-                              className="h-20 w-full rounded-md object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removePhoto(photo.id)}
-                              className="absolute -right-1.5 -top-1.5 rounded-full bg-gray-900 p-0.5 text-white shadow"
-                              aria-label="Remove photo"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </FormField>
-              </div>
+                  </FormField>
 
-              <div className="mt-6 flex items-center justify-end space-x-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    clearPhotos();
-                    setShowNewRequestForm(false);
-                  }}
+                  <FormField label="Category" htmlFor="category" required>
+                    <Select
+                      id="category"
+                      required
+                      value={newRequest.category}
+                      onChange={(e) =>
+                        setNewRequest({ ...newRequest, category: e.target.value })
+                      }
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {MAINTENANCE_CATEGORY_LABELS[category] || category}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+
+                  <FormField label="Priority" htmlFor="priority">
+                    <Select
+                      id="priority"
+                      value={newRequest.priority}
+                      onChange={(e) =>
+                        setNewRequest({ ...newRequest, priority: e.target.value })
+                      }
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </Select>
+                  </FormField>
+
+                  <FormField label="Description" htmlFor="description" required>
+                    <Textarea
+                      id="description"
+                      required
+                      rows={4}
+                      value={newRequest.description}
+                      onChange={(e) =>
+                        setNewRequest({
+                          ...newRequest,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Please provide detailed information about the issue, location, and any relevant details"
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Photos of the issue"
+                    htmlFor="maintenance-photos"
+                    hint={`Optional — up to ${MAX_PHOTOS} photos so the office can assess what needs fixing.`}
+                  >
+                    <div className="space-y-3">
+                      <FileDropzone
+                        accept="image/jpeg,image/png,image/webp,image/*"
+                        multiple
+                        disabled={isSubmitting || photos.length >= MAX_PHOTOS}
+                        onFiles={addPhotoFiles}
+                        icon={
+                          <ImagePlus className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+                        }
+                        label="Drag photos here, or click to choose from gallery"
+                        hint="JPEG, PNG, or WEBP · max 5MB each"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <TakePhotoButton
+                          disabled={isSubmitting || photos.length >= MAX_PHOTOS}
+                          onCapture={(file) => addPhotoFiles([file])}
+                          title="Take maintenance photo"
+                          description="Allow camera access if prompted, then capture the issue."
+                          fileNamePrefix="maintenance"
+                        />
+                      </div>
+                      {photos.length > 0 && (
+                        <ul className="grid grid-cols-3 gap-2">
+                          {photos.map((photo, index) => (
+                            <li key={photo.id} className="relative">
+                              <LightboxImage
+                                src={photo.preview}
+                                alt="Issue preview"
+                                title={photo.file.name || 'Issue photo'}
+                                gallery={photos.map((p) => ({
+                                  src: p.preview,
+                                  alt: 'Issue preview',
+                                  title: p.file.name || 'Issue photo',
+                                }))}
+                                galleryIndex={index}
+                                wrapperClassName="block w-full overflow-hidden rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                                className="h-20 w-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(photo.id)}
+                                className="absolute -right-1.5 -top-1.5 rounded-full bg-gray-900 p-0.5 text-white shadow"
+                                aria-label="Remove photo"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </FormField>
+                </div>
+
+                <div
+                  className={cn(
+                    'flex flex-shrink-0 items-center justify-end gap-3 border-t px-4 py-4 sm:px-5',
+                    theme.mode === 'dark' ? 'border-zinc-800' : 'border-gray-200'
+                  )}
                 >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="success"
-                  isLoading={isSubmitting}
-                  disabled={isSubmitting}
-                  className={theme.primaryButton}
-                >
-                  Submit request
-                </Button>
-              </div>
-            </form>
-          </Card>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    isDisabled={isSubmitting}
+                    onClick={() => {
+                      clearPhotos();
+                      setShowNewRequestForm(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={isSubmitting}
+                    className={theme.primaryButton}
+                  >
+                    Submit request
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
-      </div>
-      </div>
     </div>
   );
-} 
+}

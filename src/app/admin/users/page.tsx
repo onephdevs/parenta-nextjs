@@ -63,6 +63,7 @@ const emptyCreateForm = {
   username: '',
   password: '',
   confirmPassword: '',
+  role: 'admin' as 'admin' | 'caretaker',
 };
 
 const emptyEditForm = {
@@ -154,7 +155,7 @@ export default function AdminUsersPage() {
   }
 
   if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+    redirect('/auth/signin');
   }
 
   const formatDate = (value: string) =>
@@ -204,6 +205,7 @@ export default function AdminUsersPage() {
           email: createForm.email,
           username: createForm.username || undefined,
           password: createForm.password,
+          role: createForm.role,
         }),
       });
       const data = await response.json();
@@ -212,7 +214,10 @@ export default function AdminUsersPage() {
         showNotification({
           type: 'success',
           title: 'Success',
-          message: 'Admin account created successfully',
+          message:
+            createForm.role === 'caretaker'
+              ? 'Caretaker account created — they can enter payments via admin sign-in'
+              : 'Admin account created successfully',
         });
         setShowCreateModal(false);
         setCreateForm(emptyCreateForm);
@@ -421,6 +426,7 @@ export default function AdminUsersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Username</TableHead>
                   <TableHead>Status</TableHead>
@@ -440,6 +446,17 @@ export default function AdminUsersPage() {
                             <span className="ml-2 text-xs font-normal text-gray-500">(you)</span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            user.role === 'caretaker'
+                              ? 'bg-amber-100 text-amber-900'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {user.role === 'caretaker' ? 'Caretaker' : 'Admin'}
+                        </span>
                       </TableCell>
                       <TableCell>{user.email || '—'}</TableCell>
                       <TableCell>{user.username || '—'}</TableCell>
@@ -491,8 +508,8 @@ export default function AdminUsersPage() {
       <Dialog
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title="Create Admin Account"
-        description="Create a new user who can sign in to the admin portal."
+        title="Create portal account"
+        description="Admin has full access. Caretaker can enter payments but cannot see cash-flow or expense reports."
         size="md"
         footer={
           <div className="flex justify-end gap-2">
@@ -506,6 +523,21 @@ export default function AdminUsersPage() {
         }
       >
         <div className="space-y-4">
+          <FormField label="Role" htmlFor="create-role" required>
+            <Select
+              id="create-role"
+              value={createForm.role}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  role: e.target.value === 'caretaker' ? 'caretaker' : 'admin',
+                }))
+              }
+            >
+              <option value="admin">Admin (full access)</option>
+              <option value="caretaker">Caretaker (payments only)</option>
+            </Select>
+          </FormField>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="First name" htmlFor="create-first-name" required>
               <Input

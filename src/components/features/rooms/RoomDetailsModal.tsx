@@ -177,6 +177,10 @@ export default function RoomDetailsModal({
                     void loadDetail(detail.room.id);
                     onRoomUpdated?.();
                   }}
+                  onTenantCreated={() => {
+                    void loadDetail(detail.room.id);
+                    onRoomUpdated?.();
+                  }}
                 />
               )}
             </div>

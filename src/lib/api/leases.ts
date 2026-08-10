@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import type { LeaseDetail, LeaseListItem, LeaseStats, LeaseUiStatus } from '@/lib/leases-shared';
+import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
 
 export type { LeaseDetail, LeaseListItem, LeaseStats, LeaseUiStatus };
 export {
@@ -256,6 +257,7 @@ export async function getLeaseById(id: string): Promise<LeaseDetail | null> {
       tra.deposit_paid,
       tra.advance_paid,
       tra.utility_deposit_paid,
+      tra.billing_cycle_start_day,
       tra.assignment_status,
       tra.notes,
       tra.tenant_name_snapshot,
@@ -310,7 +312,14 @@ export async function getLeaseById(id: string): Promise<LeaseDetail | null> {
     agreementDocumentId: row.tenant_agreement_document_id || null,
     agreementDocumentUrl: row.agreement_document_url || null,
     agreementDocumentName: row.agreement_document_name || null,
-    rentDueDay: 5,
+    rentDueDay: resolveRentDueDay({
+      billingCycleStartDay:
+        row.billing_cycle_start_day != null
+          ? Number(row.billing_cycle_start_day)
+          : null,
+      startDate: row.start_date as string | Date | null,
+      fallbackDay: 5,
+    }),
   };
 }
 

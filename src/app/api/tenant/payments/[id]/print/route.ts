@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTenantByUserId } from '@/lib/api/tenant-user-link';
 import { generateReceiptPDF } from '@/lib/services/receipt-generator';
+import { formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
 import pool from '@/lib/db';
 
 /**
@@ -119,7 +120,7 @@ export async function GET(
       address: address || undefined,
       companyName: 'Alfonso Property Management System',
       companyAddress: 'Manila, Philippines',
-      notes: payment.notes,
+      notes: formatPaymentNotesForPeople(payment.notes) || undefined,
     };
     
     // Generate PDF

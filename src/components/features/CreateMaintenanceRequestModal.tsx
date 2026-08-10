@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
-  Camera,
   FileText,
   Home,
   ImagePlus,
@@ -19,6 +18,8 @@ import { FileDropzone } from '@/components/ui/FileDropzone';
 import { FormField } from '@/components/forms/FormField';
 import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
 import { useNotifications } from '@/hooks/useNotifications';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
+import { LightboxImage } from '@/components/ui/ImageLightbox';
 
 type SectionId = 'details' | 'location' | 'priority';
 
@@ -78,7 +79,6 @@ export default function CreateMaintenanceRequestModal({
   onCreated,
 }: CreateMaintenanceRequestModalProps) {
   const { showSuccess, showError, showWarning } = useNotifications();
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [section, setSection] = useState<SectionId>('details');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -270,37 +270,30 @@ export default function CreateMaintenanceRequestModal({
                   hint="JPEG, PNG, or WEBP · max 5MB each"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    leftIcon={<Camera className="h-4 w-4" />}
+                  <TakePhotoButton
                     disabled={submitting || photos.length >= MAX_PHOTOS}
-                    onClick={() => cameraInputRef.current?.click()}
-                  >
-                    Take photo
-                  </Button>
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => {
-                      const list = e.target.files;
-                      if (list?.length) addPhotoFiles(Array.from(list));
-                      e.target.value = '';
-                    }}
+                    onCapture={(file) => addPhotoFiles([file])}
+                    title="Take maintenance photo"
+                    description="Allow camera access if prompted, then capture the issue."
+                    fileNamePrefix="maintenance"
                   />
                 </div>
                 {photos.length > 0 && (
                   <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                    {photos.map((photo) => (
+                    {photos.map((photo, index) => (
                       <li key={photo.id} className="relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <LightboxImage
                           src={photo.preview}
                           alt="Issue preview"
-                          className="h-20 w-full rounded-md object-cover"
+                          title={photo.file.name || 'Issue photo'}
+                          gallery={photos.map((p) => ({
+                            src: p.preview,
+                            alt: 'Issue preview',
+                            title: p.file.name || 'Issue photo',
+                          }))}
+                          galleryIndex={index}
+                          wrapperClassName="block w-full overflow-hidden rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+                          className="h-20 w-full object-cover"
                         />
                         <button
                           type="button"

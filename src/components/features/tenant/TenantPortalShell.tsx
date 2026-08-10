@@ -16,9 +16,11 @@ import {
   Sun,
   LogOut,
   Settings,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/ui/BrandLogo';
+import { NotificationBell } from '@/components/features/notifications/NotificationBell';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import {
@@ -69,6 +71,12 @@ const NAV: NavItem[] = [
     ],
   },
   {
+    id: 'maintenance',
+    label: 'Maintenance',
+    href: '/tenant/maintenance',
+    icon: Wrench,
+  },
+  {
     id: 'documents',
     label: 'Documents',
     href: '/tenant/documents',
@@ -106,6 +114,17 @@ function childIsActive(pathname: string, search: string, href: string) {
   return true;
 }
 
+function defaultExpandedFor(activeParentId: string): Record<string, boolean> {
+  const next: Record<string, boolean> = {};
+  for (const item of NAV) {
+    if (item.children?.length) {
+      // Only the active parent with children is open
+      next[item.id] = item.id === activeParentId;
+    }
+  }
+  return next;
+}
+
 export function TenantPortalShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -127,16 +146,20 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
     if (pathname.startsWith('/tenant/payments') || pathname.startsWith('/tenant/reports')) {
       return 'payments';
     }
+    if (pathname.startsWith('/tenant/maintenance')) return 'maintenance';
     if (pathname.startsWith('/tenant/documents')) return 'documents';
     if (pathname.startsWith('/tenant/profile')) return 'profile';
-    if (pathname.startsWith('/tenant/maintenance')) return 'home';
     return 'home';
   }, [pathname]);
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    payments: true,
-    profile: true,
-  });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
+    defaultExpandedFor(activeParentId)
+  );
+
+  // Keep only the current section's submenu open when the route changes
+  useEffect(() => {
+    setExpanded(defaultExpandedFor(activeParentId));
+  }, [activeParentId]);
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -144,7 +167,7 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
 
   const handleSignOut = () => {
     void signOut({
-      callbackUrl: '/auth/tenant/signin',
+      callbackUrl: '/auth/signin',
       redirect: true,
     });
   };
@@ -227,7 +250,7 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
         {NAV.map((item) => {
           const Icon = item.icon;
           const isActive = activeParentId === item.id;
-          const isExpanded = expanded[item.id] ?? isActive;
+          const isExpanded = Boolean(expanded[item.id]);
           const hasChildren = Boolean(item.children?.length);
 
           return (
@@ -303,6 +326,7 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
       >
         <div className={cn('flex items-center gap-2 border-b px-4 py-4', theme.shellBorder)}>
           {BrandBlock}
+          <NotificationBell variant="tenant" />
         </div>
         {NavBody}
       </aside>
@@ -320,14 +344,17 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
           <BrandLogo variant="mark" height={28} className="shrink-0" />
           <span className={cn('text-sm font-semibold', theme.shellHeader)}>Alfonso</span>
         </div>
-        <button
-          type="button"
-          aria-label="Open menu"
-          onClick={() => setMobileOpen(true)}
-          className={theme.shellIconButton}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell variant="tenant" />
+          <button
+            type="button"
+            aria-label="Open menu"
+            onClick={() => setMobileOpen(true)}
+            className={theme.shellIconButton}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}

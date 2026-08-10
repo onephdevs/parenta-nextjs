@@ -5,6 +5,8 @@ import { Plus } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
 import PrintInvoiceButton from '@/components/features/PrintInvoiceButton';
+import { InvoiceNegotiationPanel } from '@/components/features/InvoiceNegotiationPanel';
+import { formatPaymentMethodLabel } from '@/lib/constants/payment-methods';
 import {
   Button,
   Card,
@@ -22,6 +24,8 @@ import {
   TableRow,
 } from '@/components/ui';
 import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
+import { getEffectiveDueDate, getDaysUntilDue } from '@/lib/billing/invoice-due';
+import { formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
 
 interface InvoiceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -46,8 +50,8 @@ function formatDate(date: Date | string | null | undefined) {
 export default async function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== 'admin') {
-    redirect('/auth/admin/signin');
+  if (!session || !['admin','caretaker'].includes(session.user.role)) {
+    redirect('/auth/signin');
   }
 
   const { id } = await params;
@@ -107,6 +111,18 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
     const balanceDue = Number(invoice.balance_due ?? totalAmount - amountPaid);
     const progressPercentage = totalAmount > 0 ? (amountPaid / totalAmount) * 100 : 0;
     const status = invoice.invoice_status || 'draft';
+    const billStatus = String(invoice.bill_status || '').toUpperCase() || null;
+    const adjustmentAmount = Number(invoice.adjustment_amount || 0);
+    const effectiveDue = getEffectiveDueDate({
+      due_date: invoice.due_date,
+      negotiated_due_date: invoice.negotiated_due_date,
+    });
+    const daysToDue = getDaysUntilDue({
+      due_date: invoice.due_date,
+      negotiated_due_date: invoice.negotiated_due_date,
+    });
+    const canNegotiate =
+      balanceDue > 0.009 && status !== 'cancelled' && status !== 'paid';
 
     return (
       <div className="space-y-8">
@@ -115,7 +131,28 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
           description={`${invoice.first_name} ${invoice.last_name}`}
           backHref="/admin/financial/invoices"
           backLabel="Back to invoices"
-          actions={<InvoiceStatusBadge status={status} />}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <InvoiceStatusBadge status={status} />
+              {billStatus && (
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    billStatus === 'PAID'
+                      ? 'bg-green-100 text-green-800'
+                      : billStatus === 'PARTIAL'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {billStatus === 'PAID'
+                    ? 'Paid'
+                    : billStatus === 'PARTIAL'
+                      ? 'Partial'
+                      : 'Unpaid'}
+                </span>
+              )}
+            </div>
+          }
         />
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -141,15 +178,30 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                 <DescriptionItem label="Issue Date">
                   {formatDate(invoice.issue_date)}
                 </DescriptionItem>
-                <DescriptionItem label="Due Date">
+                <DescriptionItem label="Scheduled due date">
                   {formatDate(invoice.due_date)}
+                </DescriptionItem>
+                <DescriptionItem label="Effective due date">
+                  <span className="font-medium">
+                    {formatDate(effectiveDue || invoice.due_date)}
+                  </span>
+                  {invoice.negotiated_due_date && (
+                    <span className="mt-0.5 block text-xs font-normal text-gray-500">
+                      Renegotiated
+                      {invoice.negotiated_due_reason
+                        ? `: ${invoice.negotiated_due_reason}`
+                        : ''}
+                    </span>
+                  )}
                 </DescriptionItem>
                 <DescriptionItem label="Period">
                   {formatDate(invoice.billing_period_start)} -{' '}
                   {formatDate(invoice.billing_period_end)}
                 </DescriptionItem>
                 {invoice.notes && (
-                  <DescriptionItem label="Notes">{invoice.notes}</DescriptionItem>
+                  <DescriptionItem label="Notes">
+                    {formatPaymentNotesForPeople(invoice.notes)}
+                  </DescriptionItem>
                 )}
               </DescriptionList>
             </DetailSection>
@@ -212,7 +264,7 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                               allocation.payment_date || allocation.allocation_date
                             )}{' '}
                             · Method:{' '}
-                            {(allocation.payment_method || 'unknown').replace(/_/g, ' ')}{' '}
+                            {formatPaymentMethodLabel(allocation.payment_method)}{' '}
                             · Total: {formatCurrency(allocation.payment_amount)}
                           </p>
                           {allocation.payment_description && (
@@ -260,6 +312,19 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                     <span>-{formatCurrency(invoice.discount_amount)}</span>
                   </div>
                 )}
+                {adjustmentAmount > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">
+                      Adjustment
+                      {invoice.adjustment_reason ? (
+                        <span className="mt-0.5 block text-xs font-normal text-gray-500">
+                          {invoice.adjustment_reason}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-amber-800">-{formatCurrency(adjustmentAmount)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
                   <span className="font-medium">Total Amount</span>
                   <span className="text-lg font-bold">{formatCurrency(totalAmount)}</span>
@@ -286,6 +351,25 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                 </div>
               </div>
             </Card>
+
+            <InvoiceNegotiationPanel
+              invoiceId={invoice.id}
+              dueDate={
+                invoice.due_date
+                  ? String(invoice.due_date).slice(0, 10)
+                  : null
+              }
+              negotiatedDueDate={
+                invoice.negotiated_due_date
+                  ? String(invoice.negotiated_due_date).slice(0, 10)
+                  : null
+              }
+              negotiatedDueReason={invoice.negotiated_due_reason || null}
+              adjustmentAmount={adjustmentAmount}
+              adjustmentReason={invoice.adjustment_reason || null}
+              balanceDue={balanceDue}
+              canEdit={canNegotiate}
+            />
 
             <Card>
               <h3 className="mb-4 text-lg font-medium text-gray-900">Quick Actions</h3>
@@ -333,16 +417,18 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                   <span className="text-gray-600">Days Until Due</span>
                   <span
                     className={`font-semibold ${
-                      new Date(invoice.due_date) < new Date()
+                      daysToDue != null && daysToDue < 0
                         ? 'text-red-600'
                         : 'text-gray-900'
                     }`}
                   >
-                    {Math.floor(
-                      (new Date(invoice.due_date).getTime() - new Date().getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    )}{' '}
-                    days
+                    {daysToDue == null
+                      ? '—'
+                      : daysToDue < 0
+                        ? `${Math.abs(daysToDue)} days overdue`
+                        : daysToDue === 0
+                          ? 'Due today'
+                          : `${daysToDue} days`}
                   </span>
                 </div>
               </div>

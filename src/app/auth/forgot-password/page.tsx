@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { FormEvent, useState } from 'react';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Alert } from '@/components/ui/Alert';
 import { AuthSplitShell, AuthHeroPanel } from '@/components/features/auth/AuthSplitShell';
@@ -11,30 +10,7 @@ import {
   AuthPrimaryButton,
 } from '@/components/features/auth/AuthFields';
 
-type Role = 'admin' | 'tenant' | 'staff';
-
-const signInPaths: Record<Role, string> = {
-  admin: '/auth/admin/signin',
-  tenant: '/auth/tenant/signin',
-  staff: '/auth/staff/signin',
-};
-
-const roleLabels: Record<Role, string> = {
-  admin: 'Admin',
-  tenant: 'Tenant',
-  staff: 'Staff',
-};
-
 function ForgotPasswordContent() {
-  const searchParams = useSearchParams();
-  const roleParam = searchParams.get('role');
-  const role: Role =
-    roleParam === 'admin' || roleParam === 'tenant' || roleParam === 'staff'
-      ? roleParam
-      : 'tenant';
-  const signInHref = signInPaths[role];
-  const label = roleLabels[role];
-
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -54,10 +30,7 @@ function ForgotPasswordContent() {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          role: role === 'staff' ? undefined : role,
-        }),
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
 
@@ -85,8 +58,7 @@ function ForgotPasswordContent() {
         <div className="mb-8 border-t border-gray-200 pt-8">
           <h2 className="text-3xl font-bold text-gray-900">Forgot password?</h2>
           <p className="mt-2 text-sm text-gray-500">
-            Enter the email for your {label.toLowerCase()} account and we&apos;ll send a reset
-            link.
+            Enter your account email and we&apos;ll send a reset link.
           </p>
         </div>
 
@@ -134,7 +106,7 @@ function ForgotPasswordContent() {
         <p className="mt-8 text-center text-sm text-gray-600">
           Remember your password?{' '}
           <Link
-            href={signInHref}
+            href="/auth/signin"
             className="font-semibold text-[#3B82F6] hover:text-blue-600"
           >
             Back to Login
@@ -147,15 +119,5 @@ function ForgotPasswordContent() {
 }
 
 export default function ForgotPasswordPage() {
-  return (
-    <Suspense
-      fallback={
-        <AuthSplitShell left={<AuthHeroPanel />}>
-          <div className="animate-pulse text-gray-500">Loading...</div>
-        </AuthSplitShell>
-      }
-    >
-      <ForgotPasswordContent />
-    </Suspense>
-  );
+  return <ForgotPasswordContent />;
 }

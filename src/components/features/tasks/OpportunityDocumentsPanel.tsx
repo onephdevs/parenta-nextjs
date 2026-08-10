@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/forms/FormField';
 import { Select } from '@/components/ui/Select';
 import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from '@/types/document';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
+import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface CardDocument {
   id: string;
@@ -13,6 +15,7 @@ interface CardDocument {
   documentType?: string;
   fileName: string;
   fileSize?: number;
+  mimeType?: string;
   createdAt?: string | Date;
 }
 
@@ -57,6 +60,7 @@ export function OpportunityDocumentsPanel({
     defaultDocType || docTypeOptions[0]?.value || 'other'
   );
   const [error, setError] = useState<string | null>(null);
+  const { open: openLightbox } = useImageLightbox();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +82,22 @@ export function OpportunityDocumentsPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function openDocument(doc: CardDocument) {
+    const href = `/api/documents/${doc.id}/download`;
+    const name = doc.documentName || doc.fileName || 'Document';
+    if (
+      looksLikeImage({
+        mimeType: doc.mimeType,
+        fileName: doc.fileName || doc.documentName,
+        url: name,
+      })
+    ) {
+      openLightbox({ src: href, alt: name, title: name });
+      return;
+    }
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -145,7 +165,7 @@ export function OpportunityDocumentsPanel({
             ))}
           </Select>
         </FormField>
-        <div>
+        <div className="flex flex-wrap gap-2">
           <input
             ref={fileRef}
             type="file"
@@ -166,6 +186,13 @@ export function OpportunityDocumentsPanel({
             <Upload className="mr-2 h-4 w-4" />
             {uploading ? 'Uploading…' : 'Upload'}
           </Button>
+          <TakePhotoButton
+            disabled={uploading}
+            onCapture={(file) => void handleUpload(file)}
+            title="Take document photo"
+            description="Allow camera access if prompted, then capture the document or receipt."
+            fileNamePrefix="document"
+          />
         </div>
       </div>
 
@@ -187,15 +214,14 @@ export function OpportunityDocumentsPanel({
               <div className="flex min-w-0 items-center gap-2">
                 <FileText className="h-4 w-4 shrink-0 text-gray-400" />
                 <div className="min-w-0">
-                  <a
-                    href={`/api/documents/${doc.id}/download`}
-                    className="block truncate text-sm font-medium text-indigo-600 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => void openDocument(doc)}
+                    className="block truncate text-left text-sm font-medium text-indigo-600 hover:underline"
                     title={doc.documentName || doc.fileName}
                   >
                     {doc.documentName || doc.fileName || 'Document'}
-                  </a>
+                  </button>
                   <p className="truncate text-xs text-gray-500">
                     {docTypeOptions.find((o) => o.value === doc.documentType)?.label ||
                       doc.documentType ||

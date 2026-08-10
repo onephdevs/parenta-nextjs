@@ -1,5 +1,9 @@
 import pool from '@/lib/db';
 import type { Building, DatabaseBuilding, CreateBuildingData } from '@/types/database';
+import {
+  assertOccupancyReconciles,
+  buildOccupancyReconciliation,
+} from '@/lib/occupancy/reconcile';
 
 // Helper function to map database building to app building
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
@@ -20,6 +24,7 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
     activeUnits: dbBuilding.active_units || 0,
     amenities: dbBuilding.amenities,
     isActive: dbBuilding.is_active,
+    autoLateFee: dbBuilding.auto_late_fee !== false,
     createdAt: dbBuilding.created_at,
     updatedAt: dbBuilding.updated_at,
   };
@@ -243,6 +248,7 @@ export async function updateBuilding(id: string, buildingData: Partial<CreateBui
                      key === 'buildingType' ? 'building_type' :
                      key === 'yearBuilt' ? 'year_built' :
                      key === 'totalFloors' ? 'total_floors' :
+                     key === 'autoLateFee' ? 'auto_late_fee' :
                      key;
         updates.push(`${dbKey} = $${paramCount}`);
         values.push(value);
@@ -325,20 +331,31 @@ export async function getBuildingWithRoomStats(id: string): Promise<(Building & 
     
     const building = mapDatabaseBuildingToBuilding(buildingResult.rows[0]);
     const roomStats = roomStatsResult.rows[0];
+    const totalRooms = parseInt(roomStats.total_rooms) || 0;
+    const occupiedRooms = parseInt(roomStats.occupied_rooms) || 0;
+    const vacantRooms = parseInt(roomStats.vacant_rooms) || 0;
+    const occupancy = buildOccupancyReconciliation({
+      totalUnits: totalRooms,
+      occupied: occupiedRooms,
+      vacant: vacantRooms,
+    });
+    assertOccupancyReconciles(occupancy, `building ${id}`);
     
     return {
       ...building,
       roomStats: {
-        totalRooms: parseInt(roomStats.total_rooms) || 0,
-        vacantRooms: parseInt(roomStats.vacant_rooms) || 0,
-        occupiedRooms: parseInt(roomStats.occupied_rooms) || 0,
+        totalRooms: occupancy.totalUnits,
+        vacantRooms: occupancy.vacant,
+        occupiedRooms: occupancy.occupied,
+        /** Derived: total − occupied − vacant (maintenance + reserved + other) */
+        unassignedRooms: occupancy.unassigned,
         maintenanceRooms: parseInt(roomStats.maintenance_rooms) || 0,
         reservedRooms: parseInt(roomStats.reserved_rooms) || 0,
         averageRent: parseFloat(roomStats.average_rent) || 0,
         minRent: parseFloat(roomStats.min_rent) || 0,
         maxRent: parseFloat(roomStats.max_rent) || 0,
-        occupancyRate: roomStats.total_rooms > 0 ? 
-          Math.round((roomStats.occupied_rooms / roomStats.total_rooms) * 100) : 0
+        occupancyRate: occupancy.occupiedPercent,
+        reconciles: occupancy.reconciles,
       }
     };
   } catch (error) {

@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Alert } from '@/components/ui/Alert';
 import { FormField } from '@/components/forms/FormField';
 import { User, Home, Calendar, Plus, FileText } from 'lucide-react';
+import { compareByRoomThenName } from '@/lib/utils/natural-sort';
 
 interface Tenant {
   id: string;
@@ -124,7 +125,8 @@ export default function CreateInvoiceForm({ roomId, tenantId }: CreateInvoiceFor
       const result = await response.json();
       if (result.success) {
         const tenantsList = result.data?.tenants || (Array.isArray(result.data) ? result.data : []);
-        setTenants(Array.isArray(tenantsList) ? tenantsList : []);
+        const list = Array.isArray(tenantsList) ? tenantsList : [];
+        setTenants([...list].sort(compareByRoomThenName));
       } else {
         setTenants([]);
       }

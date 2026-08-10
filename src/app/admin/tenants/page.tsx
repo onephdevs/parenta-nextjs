@@ -1,12 +1,11 @@
-import Link from 'next/link';
 import { getAllTenants, getTenantStats } from '@/lib/api/tenants';
 import { getAllBuildings } from '@/lib/api/buildings';
 import TenantsList from '@/components/features/TenantsList';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
-import { Button } from '@/components/ui/Button';
 import { Tenant } from '@/types/database';
-import { CheckCircle2, Clock, PhilippinePeso, Plus, Users } from 'lucide-react';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import { CheckCircle2, Clock, PhilippinePeso, Users } from 'lucide-react';
 
 export const revalidate = 60;
 
@@ -41,11 +40,7 @@ export default async function TenantsPage() {
       <PageHeader
         title="Tenants"
         description="Manage your tenant relationships"
-        actions={
-          <Link href="/admin/tenants/new">
-            <Button leftIcon={<Plus className="h-4 w-4" />}>Add Tenant</Button>
-          </Link>
-        }
+        actions={<AddTenantButton />}
       />
 
       {stats && (

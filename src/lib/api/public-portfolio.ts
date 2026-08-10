@@ -25,6 +25,8 @@ export interface PublicFeaturedProperty {
   availableUnits: number;
   startingRent: number | null;
   imageUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface PublicPortfolioPayload {
@@ -55,6 +57,8 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
       city: string | null;
       state: string | null;
       postal_code: string | null;
+      latitude: string | null;
+      longitude: string | null;
       total_units: string;
       vacant_units: string;
       starting_rent: string | null;
@@ -67,6 +71,8 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
         b.city,
         b.state,
         b.postal_code,
+        b.latitude::text,
+        b.longitude::text,
         COUNT(r.id)::text AS total_units,
         COUNT(r.id) FILTER (WHERE r.room_status = 'vacant')::text AS vacant_units,
         MIN(r.monthly_rate) FILTER (
@@ -96,6 +102,8 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
 
   const properties: PublicFeaturedProperty[] = propertiesResult.rows.map((row) => {
     const imagePath = row.primary_image_path;
+    const lat = row.latitude != null ? parseFloat(row.latitude) : NaN;
+    const lng = row.longitude != null ? parseFloat(row.longitude) : NaN;
     return {
       id: row.id,
       name: row.name,
@@ -106,6 +114,8 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
       availableUnits: parseInt(row.vacant_units, 10) || 0,
       startingRent: row.starting_rent != null ? parseFloat(row.starting_rent) : null,
       imageUrl: imagePath ? getImageUrl(imagePath) : null,
+      latitude: Number.isFinite(lat) ? lat : null,
+      longitude: Number.isFinite(lng) ? lng : null,
     };
   });
 

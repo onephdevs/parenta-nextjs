@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Trash2, Star, X } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Star } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import {
+  useImageLightbox,
+  type LightboxImageItem,
+} from '@/components/ui/ImageLightbox';
 
 interface ImageData {
   id: string;
@@ -35,7 +38,7 @@ export default function ImageGallery({
   showUpload = true,
 }: ImageGalleryProps) {
   const { showNotification } = useNotifications();
-  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
+  const { open: openLightbox } = useImageLightbox();
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
@@ -69,6 +72,12 @@ export default function ImageGallery({
     const pathParts = filePath.replace('uploads/images/', '').split('/');
     return `/api/images/serve/${pathParts.join('/')}`;
   };
+
+  const galleryItems: LightboxImageItem[] = images.map((image) => ({
+    src: getImageUrl(image.filePath),
+    alt: image.caption || image.fileName,
+    title: image.fileName,
+  }));
 
   const handleSetPrimary = async (imageId: string) => {
     setIsUpdating(imageId);
@@ -107,32 +116,6 @@ export default function ImageGallery({
     setDeleteConfirm({ isOpen: false, imageId: null, imageName: '' });
   };
 
-  const closeLightbox = () => setSelectedImage(null);
-
-  useEffect(() => {
-    if (!selectedImage) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (deleteConfirm.isOpen) {
-        closeDeleteConfirm();
-        return;
-      }
-      closeLightbox();
-    };
-
-    document.addEventListener('keydown', onKeyDown, true);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [selectedImage, deleteConfirm.isOpen]);
-
   const handleDeleteImage = async () => {
     if (!deleteConfirm.imageId) return;
     const imageId = deleteConfirm.imageId;
@@ -149,7 +132,6 @@ export default function ImageGallery({
         title: 'Image deleted',
         message: 'The image has been deleted successfully.',
       });
-      if (selectedImage?.id === imageId) setSelectedImage(null);
       closeDeleteConfirm();
       onImageUpdate?.();
     } catch (error) {
@@ -174,78 +156,11 @@ export default function ImageGallery({
     );
   }
 
-  const lightbox =
-    selectedImage && typeof document !== 'undefined'
-      ? createPortal(
-          <div
-            className="fixed inset-0 z-[120] flex flex-col bg-black/90"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Image preview"
-            onClick={closeLightbox}
-          >
-            <div
-              className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/80 px-4 py-3"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-white">{selectedImage.fileName}</p>
-                <p className="text-xs text-white/70">
-                  {formatFileSize(selectedImage.fileSize)} • {formatDate(selectedImage.createdAt)}
-                  {selectedImage.isPrimary ? ' • Primary' : ''}
-                </p>
-              </div>
-              <div className="flex flex-shrink-0 items-center gap-2">
-                {!selectedImage.isPrimary && (
-                  <button
-                    type="button"
-                    onClick={() => void handleSetPrimary(selectedImage.id)}
-                    disabled={isUpdating === selectedImage.id}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    <Star className="h-4 w-4" />
-                    Set primary
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => openDeleteConfirm(selectedImage.id, selectedImage.fileName)}
-                  disabled={isUpdating === selectedImage.id}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={closeLightbox}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
-                  aria-label="Close preview"
-                >
-                  <X className="h-4 w-4" />
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={getImageUrl(selectedImage.filePath)}
-                alt={selectedImage.caption || selectedImage.fileName}
-                className="max-h-full max-w-full object-contain"
-                onClick={(event) => event.stopPropagation()}
-              />
-            </div>
-          </div>,
-          document.body
-        )
-      : null;
-
   return (
     <>
       <div className={`space-y-4 ${className}`}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {images.map((image) => (
+          {images.map((image, index) => (
             <div
               key={image.id}
               className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
@@ -253,7 +168,7 @@ export default function ImageGallery({
               <button
                 type="button"
                 className="relative block aspect-[4/3] w-full bg-gray-100"
-                onClick={() => setSelectedImage(image)}
+                onClick={() => openLightbox(galleryItems, index)}
                 aria-label={`View ${image.fileName}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -310,8 +225,6 @@ export default function ImageGallery({
           {images.length} image{images.length !== 1 ? 's' : ''}
         </p>
       </div>
-
-      {lightbox}
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
