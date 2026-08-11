@@ -10,9 +10,11 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
 ];
 const USER_AGENT = 'Parenta nearby amenities (parenta.com.mx)';
-export const SEARCH_RADIUS_M = 1500;
+/** Widest fetch radius (sparse categories after 2x expand). Filter tighter per category in code. */
+const OVERPASS_FETCH_RADIUS_M = 6000;
 const MAX_PER_CATEGORY = 8;
-const FETCH_TIMEOUT_MS = 15_000;
+const MIN_RESULTS_BEFORE_EXPAND = 3;
+const FETCH_TIMEOUT_MS = 18_000;
 
 /** Full catalog fetched once per building into the weekly snapshot. */
 export const AMENITY_CATEGORIES = [
@@ -27,6 +29,30 @@ export const AMENITY_CATEGORIES = [
 ] as const;
 
 export type AmenityCategory = (typeof AMENITY_CATEGORIES)[number];
+
+/** Base search radius by category (meters). Expand 2x if fewer than 3 results. */
+export const CATEGORY_BASE_RADIUS_M: Record<AmenityCategory, number> = {
+  school: 1000,
+  market: 1000,
+  store: 1000,
+  park: 1000,
+  barber: 1000,
+  restaurant: 1000,
+  mall: 3000,
+  hospital: 3000,
+};
+
+/** Pin + selected-chip color per category (list, grid, and map stay in sync). */
+export const CATEGORY_COLORS: Record<AmenityCategory, string> = {
+  school: '#2563EB',
+  market: '#D97706',
+  mall: '#7C3AED',
+  park: '#059669',
+  store: '#0284C7',
+  restaurant: '#E11D48',
+  barber: '#DB2777',
+  hospital: '#DC2626',
+};
 
 export interface NearbyPlace {
   id: string;
@@ -161,11 +187,11 @@ export function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export function estimateWalkMinutes(distanceMeters: number): number {
+function estimateWalkMinutes(distanceMeters: number): number {
   return Math.max(1, Math.round(distanceMeters / 83.3));
 }
 
-export function estimateDriveMinutes(distanceMeters: number): number {
+function estimateDriveMinutes(distanceMeters: number): number {
   return Math.max(1, Math.round(distanceMeters / 416.7));
 }
 
@@ -193,7 +219,7 @@ export function parseAmenityCategories(raw: string | string[] | null): AmenityCa
 }
 
 function buildOverpassQuery(origin: LatLng, categories: AmenityCategory[]): string {
-  const around = `(around:${SEARCH_RADIUS_M},${origin.latitude},${origin.longitude})`;
+  const around = `(around:${OVERPASS_FETCH_RADIUS_M},${origin.latitude},${origin.longitude})`;
   const lines: string[] = [];
   for (const cat of categories) {
     for (const filter of CATEGORY_FILTERS[cat]) {
@@ -203,7 +229,7 @@ function buildOverpassQuery(origin: LatLng, categories: AmenityCategory[]): stri
     }
   }
   return `
-[out:json][timeout:12];
+[out:json][timeout:15];
 (
 ${lines.join('\n')}
 );
@@ -240,7 +266,8 @@ function parseOverpassElements(
     const distanceMeters = Math.round(
       haversineMeters(origin, { latitude: lat, longitude: lon })
     );
-    if (distanceMeters > SEARCH_RADIUS_M + 50) continue;
+    // Keep anything within the widest fetch; tiered radius applied below.
+    if (distanceMeters > OVERPASS_FETCH_RADIUS_M + 50) continue;
 
     const list = byCategory.get(category);
     if (!list) continue;
@@ -259,9 +286,17 @@ function parseOverpassElements(
 
   const places: NearbyPlace[] = [];
   for (const cat of categories) {
-    const list = byCategory.get(cat) ?? [];
-    list.sort((a, b) => a.distanceMeters - b.distanceMeters);
-    places.push(...list.slice(0, MAX_PER_CATEGORY));
+    const list = (byCategory.get(cat) ?? []).sort(
+      (a, b) => a.distanceMeters - b.distanceMeters
+    );
+    const base = CATEGORY_BASE_RADIUS_M[cat];
+    const expanded = base * 2;
+    const withinBase = list.filter((p) => p.distanceMeters <= base);
+    const chosen =
+      withinBase.length >= MIN_RESULTS_BEFORE_EXPAND
+        ? withinBase
+        : list.filter((p) => p.distanceMeters <= expanded);
+    places.push(...chosen.slice(0, MAX_PER_CATEGORY));
   }
   places.sort((a, b) => a.distanceMeters - b.distanceMeters);
   return places;

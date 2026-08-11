@@ -1,0 +1,41 @@
+---
+description: Landing nearby map — weekly OSM cache, no cron, tiered radii
+globs: src/lib/maps/**/*,src/app/api/public/nearby/**/*,src/app/api/public/place-route/**/*,src/app/api/public/commute/**/*,src/app/api/admin/nearby/**/*,src/components/features/nearby/**/*
+alwaysApply: false
+---
+
+# Nearby map (landing)
+
+## Cache policy (no cron)
+
+- Call Overpass **only when** `building_nearby_snapshots.fetched_at` is missing or older than `app_settings.nearby_refresh_days` (default **7**).
+- Compare **now vs `fetched_at`** on each `/api/public/nearby` request — do not schedule a cron.
+- Persist the full catalog JSON on the building; filter by category in app code.
+- Admin can force refresh via `/api/admin/nearby/refresh`. Setting lives under Admin → Settings → System.
+
+## Search radius (not 100m)
+
+100m is too tight (schools often 0.1–1.1km; mall/hospital often 2–5km). Use **tiered radii** + one expansion:
+
+| Categories | Base | If under 3 results |
+|---|---|---|
+| school, market, store, park, barber, restaurant | **1km** | expand once to **2km** |
+| mall, hospital | **3km** | expand once to **6km** |
+
+Prefer **one** Overpass query at the max needed radius (6km), then apply per-category base/expand filters in code.
+
+## Product UX
+
+- Landing `#nearby` is one comparison tool with a **Nearby | Commute** segmented toggle (not a footer commute widget).
+- Categories: fixed **4×2 icon grid**, all 8 always visible (no overflow pill row). Selected chip fill matches that category’s pin color.
+- Desktop: map column `position: sticky; top: header`. List scrolls; map stays. Selecting a list row highlights its pin (bigger, filled) and pans/centers the map. Pin color = card color = category color.
+- Keep other category pins visible (dim unselected). Street polyline only — no straight-line preview.
+- Mobile: toggle → category grid → list. Map is a **View map** overlay, not inline.
+- Commute mode: From = property address (read-only). Only workplace/school is typed. Results are walk / drive / transit rows, fastest first, **Best** highlighted. Transit minutes are a heuristic (wait + city speed), not live GTFS.
+- Routes cache in `building_nearby_routes` with the same freshness window.
+
+## Do not
+
+- Do not call Google Places.
+- Do not add a cron for weekly refresh.
+- Do not use a single flat radius (especially not 100m).

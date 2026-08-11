@@ -42,9 +42,6 @@ export const PUBLIC_PORTFOLIO_KEY = 'public:portfolio';
 /** Homepage portfolio aggregates — safe to cache a few minutes. */
 export const PUBLIC_PORTFOLIO_TTL_MS = 5 * 60_000;
 
-export const PUBLIC_NEARBY_KEY_PREFIX = 'nearby:';
-export const PUBLIC_NEARBY_TTL_MS = 30 * 60_000;
-
 export function invalidateDashboardCache(): void {
   cacheDelete(DASHBOARD_METRICS_KEY);
   cacheDelete(DASHBOARD_STATS_KEY);

@@ -1,5 +1,5 @@
 /**
- * Commute duration via public OSRM (driving + walking).
+ * Commute duration via public OSRM (driving + walking) plus a transit estimate.
  */
 
 import { cacheGet, cacheSet } from '@/lib/cache/memory-cache';
@@ -8,24 +8,48 @@ import { haversineMeters } from '@/lib/maps/nearby-amenities';
 
 const OSRM_BASE = 'https://router.project-osrm.org';
 const USER_AGENT = 'Parenta nearby amenities (parenta.com.mx)';
-const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 12_000;
 const COMMUTE_CACHE_TTL_MS = 15 * 60_000;
 
+export type CommuteMode = 'walking' | 'driving' | 'transit';
+
+export interface CommuteOption {
+  mode: CommuteMode;
+  minutes: number;
+  distanceMeters: number;
+  /** Leaflet-friendly [lat, lng][] */
+  coordinates: [number, number][];
+  /** True when minutes are heuristic (no live GTFS) */
+  estimated?: boolean;
+}
+
 export interface CommuteEstimate {
+  /** Workplace / school */
   origin: LatLng & { label: string };
+  /** Property (apartment) */
   destination: LatLng & { label: string };
   distanceMeters: number;
   drivingMinutes: number | null;
   walkingMinutes: number | null;
+  transitMinutes: number | null;
+  options: CommuteOption[];
 }
 
-async function osrmDurationSeconds(
+interface OsrmRoute {
+  durationSeconds: number;
+  distanceMeters: number;
+  coordinates: [number, number][];
+}
+
+async function osrmRoute(
   from: LatLng,
   to: LatLng,
   profile: 'driving' | 'walking'
-): Promise<{ durationSeconds: number; distanceMeters: number } | null> {
-  // OSRM expects lon,lat
-  const url = `${OSRM_BASE}/route/v1/${profile}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?overview=false`;
+): Promise<OsrmRoute | null> {
+  const url =
+    `${OSRM_BASE}/route/v1/${profile}/` +
+    `${from.longitude},${from.latitude};${to.longitude},${to.latitude}` +
+    `?overview=full&geometries=geojson`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -36,12 +60,23 @@ async function osrmDurationSeconds(
     if (!res.ok) return null;
     const data = (await res.json()) as {
       code?: string;
-      routes?: Array<{ duration: number; distance: number }>;
+      routes?: Array<{
+        duration: number;
+        distance: number;
+        geometry?: { coordinates?: [number, number][] };
+      }>;
     };
     if (data.code !== 'Ok' || !data.routes?.[0]) return null;
+    const route = data.routes[0];
+    const geo = route.geometry?.coordinates ?? [];
+    const coordinates: [number, number][] = geo.map(([lng, lat]) => [lat, lng]);
+    if (coordinates.length < 2) {
+      coordinates.push([from.latitude, from.longitude], [to.latitude, to.longitude]);
+    }
     return {
-      durationSeconds: data.routes[0].duration,
-      distanceMeters: data.routes[0].distance,
+      durationSeconds: route.duration,
+      distanceMeters: Math.round(route.distance),
+      coordinates,
     };
   } catch (err) {
     console.warn('OSRM error', profile, err);
@@ -51,34 +86,10 @@ async function osrmDurationSeconds(
   }
 }
 
-export async function estimateCommute(params: {
-  workplaceQuery: string;
-  destination: LatLng & { label: string };
-}): Promise<CommuteEstimate | null> {
-  const workplace = await geocodeAddress(params.workplaceQuery);
-  if (!workplace) return null;
-
-  const cacheKey = `commute:${workplace.latitude.toFixed(4)},${workplace.longitude.toFixed(4)}:${params.destination.latitude.toFixed(4)},${params.destination.longitude.toFixed(4)}`;
-  const cached = cacheGet<CommuteEstimate>(cacheKey);
-  if (cached) return cached;
-
-  const [driving, walking] = await Promise.all([
-    osrmDurationSeconds(workplace, params.destination, 'driving'),
-    osrmDurationSeconds(workplace, params.destination, 'walking'),
-  ]);
-
-  const distanceMeters = Math.round(
-    driving?.distanceMeters ??
-      walking?.distanceMeters ??
-      haversineMeters(workplace, params.destination)
-  );
-
-  let drivingMinutes: number | null = driving
-    ? Math.max(1, Math.round(driving.durationSeconds / 60))
-    : null;
-
-  // Public OSRM walking profile sometimes returns driving-like durations.
-  // Accept walking only when implied speed is under ~8 km/h.
+function walkingMinutesFromRoute(
+  walking: OsrmRoute | null,
+  distanceMeters: number
+): number | null {
   let walkingMinutes: number | null = null;
   if (walking && walking.distanceMeters > 0) {
     const hours = walking.durationSeconds / 3600;
@@ -89,16 +100,96 @@ export async function estimateCommute(params: {
     }
   }
   if (walkingMinutes == null && distanceMeters > 0 && distanceMeters <= 8000) {
-    // Heuristic walk @ 5 km/h for short hops when OSRM walking is unreliable
     walkingMinutes = Math.max(1, Math.round((distanceMeters / 1000 / 5) * 60));
   }
+  return walkingMinutes;
+}
+
+/** Jeepney/bus-style estimate: wait + ~16 km/h in-vehicle. Not live arrivals. */
+function estimateTransitMinutes(distanceMeters: number): number {
+  const waitMin = 5;
+  const vehicleMin = Math.max(1, Math.round((distanceMeters / 1000 / 16) * 60));
+  return waitMin + vehicleMin;
+}
+
+export async function estimateCommute(params: {
+  workplaceQuery: string;
+  destination: LatLng & { label: string };
+}): Promise<CommuteEstimate | null> {
+  const workplace = await geocodeAddress(params.workplaceQuery);
+  if (!workplace) return null;
+
+  const cacheKey = `commute:v2:${workplace.latitude.toFixed(4)},${workplace.longitude.toFixed(4)}:${params.destination.latitude.toFixed(4)},${params.destination.longitude.toFixed(4)}`;
+  const cached = cacheGet<CommuteEstimate>(cacheKey);
+  if (cached) return cached;
+
+  const home = params.destination;
+
+  const [driving, walking] = await Promise.all([
+    osrmRoute(home, workplace, 'driving'),
+    osrmRoute(home, workplace, 'walking'),
+  ]);
+
+  const distanceMeters = Math.round(
+    driving?.distanceMeters ??
+      walking?.distanceMeters ??
+      haversineMeters(home, workplace)
+  );
+
+  const drivingMinutes = driving
+    ? Math.max(1, Math.round(driving.durationSeconds / 60))
+    : null;
+  const walkingMinutes = walkingMinutesFromRoute(walking, distanceMeters);
+  const transitMinutes = distanceMeters > 0 ? estimateTransitMinutes(distanceMeters) : null;
+
+  const roadPath =
+    (driving?.coordinates && driving.coordinates.length >= 2
+      ? driving.coordinates
+      : null) ??
+    (walking?.coordinates && walking.coordinates.length >= 2
+      ? walking.coordinates
+      : []);
+  const walkPath =
+    walking?.coordinates && walking.coordinates.length >= 2
+      ? walking.coordinates
+      : roadPath;
+
+  const options: CommuteOption[] = [];
+  if (walkingMinutes != null) {
+    options.push({
+      mode: 'walking',
+      minutes: walkingMinutes,
+      distanceMeters: walking?.distanceMeters ?? distanceMeters,
+      coordinates: walkPath,
+    });
+  }
+  if (drivingMinutes != null) {
+    options.push({
+      mode: 'driving',
+      minutes: drivingMinutes,
+      distanceMeters: driving?.distanceMeters ?? distanceMeters,
+      coordinates: roadPath,
+    });
+  }
+  if (transitMinutes != null) {
+    options.push({
+      mode: 'transit',
+      minutes: transitMinutes,
+      distanceMeters: distanceMeters,
+      coordinates: roadPath,
+      estimated: true,
+    });
+  }
+  options.sort((a, b) => a.minutes - b.minutes);
 
   const result: CommuteEstimate = {
     origin: { ...workplace, label: params.workplaceQuery.trim() },
-    destination: params.destination,
+    destination: home,
     distanceMeters,
     drivingMinutes,
     walkingMinutes,
+    transitMinutes,
+    options,
   };
 
   cacheSet(cacheKey, result, COMMUTE_CACHE_TTL_MS);

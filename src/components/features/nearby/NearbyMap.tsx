@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -12,7 +12,10 @@ import {
   useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
-import type { NearbyPlace } from '@/lib/maps/nearby-amenities';
+import {
+  CATEGORY_COLORS,
+  type NearbyPlace,
+} from '@/lib/maps/nearby-amenities';
 
 import 'leaflet/dist/leaflet.css';
 
@@ -24,7 +27,7 @@ const homeIcon = L.divIcon({
       width:44px;height:44px;border-radius:12px;
       background:#fff;border:2px solid #fff;
       box-shadow:0 2px 10px rgba(17,24,39,.35);
-      overflow:hidden;display:flex;align-items:center;justify-content:center;
+      overflow:hidden;display:flex;align-items:center;justify-center;
     ">
       <img
         src="/brand/logo-mark.png"
@@ -41,78 +44,146 @@ const homeIcon = L.divIcon({
   popupAnchor: [0, -40],
 });
 
-const placeIcon = L.divIcon({
-  className: '',
-  html: `<div style="width:18px;height:18px;border-radius:50%;background:#0EA5E9;border:2px solid #fff;box-shadow:0 1px 4px rgba(17,24,39,.3);"></div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
+function makePlaceIcon(color: string, selected: boolean): L.DivIcon {
+  if (selected) {
+    return L.divIcon({
+      className: 'nearby-place-marker',
+      html: `<div style="
+        width:26px;height:26px;border-radius:50%;
+        background:${color};border:3px solid #fff;
+        box-shadow:0 2px 10px rgba(17,24,39,.4);
+      "></div>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
+    });
+  }
+  return L.divIcon({
+    className: 'nearby-place-marker',
+    html: `<div style="
+      width:16px;height:16px;border-radius:50%;
+      background:#fff;border:3px solid ${color};
+      box-shadow:0 1px 4px rgba(17,24,39,.28);
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
 
-const selectedPlaceIcon = L.divIcon({
-  className: '',
-  html: `<div style="width:24px;height:24px;border-radius:50%;background:#F59E0B;border:3px solid #fff;box-shadow:0 2px 8px rgba(17,24,39,.45);"></div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
+function makeDestinationIcon(color: string): L.DivIcon {
+  return L.divIcon({
+    className: 'nearby-dest-marker',
+    html: `<div style="
+      width:18px;height:18px;border-radius:50% 50% 50% 0;
+      background:${color};border:2px solid #fff;
+      transform:rotate(-45deg);
+      box-shadow:0 2px 8px rgba(17,24,39,.35);
+    "></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 18],
+  });
+}
 
-function FitRoute({
+const placeIcons = (() => {
+  const map: Record<string, L.DivIcon> = {};
+  for (const [cat, color] of Object.entries(CATEGORY_COLORS)) {
+    map[`${cat}-0`] = makePlaceIcon(color, false);
+    map[`${cat}-1`] = makePlaceIcon(color, true);
+  }
+  return map;
+})();
+
+function InvalidateSize({ tick }: { tick: number }) {
+  const map = useMap();
+  useEffect(() => {
+    const t1 = window.setTimeout(() => map.invalidateSize(), 60);
+    const t2 = window.setTimeout(() => map.invalidateSize(), 320);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [map, tick]);
+  return null;
+}
+
+function MapViewport({
   home,
-  visiblePlaces,
-  routeCoordinates,
+  places,
   selectedPlaceId,
+  routeCoordinates,
+  destination,
 }: {
   home: { latitude: number; longitude: number };
-  visiblePlaces: NearbyPlace[];
-  routeCoordinates: [number, number][] | null;
+  places: NearbyPlace[];
   selectedPlaceId: string | null;
+  routeCoordinates: [number, number][] | null;
+  destination: { latitude: number; longitude: number } | null;
 }) {
   const map = useMap();
+  const prevSelected = useRef<string | null>(null);
 
   useEffect(() => {
     map.invalidateSize();
 
-    let points: L.LatLngExpression[] = [];
+    const streetPath =
+      routeCoordinates && routeCoordinates.length >= 2 ? routeCoordinates : null;
 
-    if (routeCoordinates && routeCoordinates.length >= 2) {
-      points = routeCoordinates;
-    } else if (selectedPlaceId) {
-      const selected = visiblePlaces.find((p) => p.id === selectedPlaceId);
-      if (selected) {
-        points = [
-          [home.latitude, home.longitude],
-          [selected.latitude, selected.longitude],
-        ];
-      }
-    } else {
-      points = [
-        [home.latitude, home.longitude],
-        ...visiblePlaces.map((p) => [p.latitude, p.longitude] as L.LatLngExpression),
-      ];
-    }
-
-    if (points.length === 0) return;
-
-    if (points.length === 1) {
-      map.setView(points[0], 16);
+    if (streetPath) {
+      const bounds = L.latLngBounds(streetPath);
+      const diagonalM = map.distance(bounds.getSouthWest(), bounds.getNorthEast());
+      const maxZoom = diagonalM < 120 ? 19 : diagonalM < 400 ? 18 : 16;
+      map.fitBounds(bounds, { padding: [56, 56], maxZoom, animate: true });
+      prevSelected.current = selectedPlaceId;
       return;
     }
 
+    const destLat = destination?.latitude;
+    const destLng = destination?.longitude;
+    if (destLat != null && destLng != null) {
+      const bounds = L.latLngBounds(
+        [home.latitude, home.longitude],
+        [destLat, destLng]
+      );
+      map.fitBounds(bounds, { padding: [64, 64], maxZoom: 15, animate: true });
+      return;
+    }
+
+    const selected = selectedPlaceId
+      ? places.find((p) => p.id === selectedPlaceId)
+      : null;
+
+    if (selected) {
+      const justSelected = prevSelected.current !== selected.id;
+      prevSelected.current = selected.id;
+      if (justSelected) {
+        map.flyTo([selected.latitude, selected.longitude], Math.max(map.getZoom(), 16), {
+          duration: 0.55,
+        });
+      }
+      return;
+    }
+
+    prevSelected.current = null;
+    const points: L.LatLngExpression[] = [
+      [home.latitude, home.longitude],
+      ...places.map((p) => [p.latitude, p.longitude] as L.LatLngExpression),
+    ];
+    if (points.length === 1) {
+      map.setView(points[0], 15);
+      return;
+    }
     const bounds = L.latLngBounds(points);
     const diagonalM = map.distance(bounds.getSouthWest(), bounds.getNorthEast());
     const maxZoom = diagonalM < 120 ? 19 : diagonalM < 400 ? 18 : 16;
-
-    map.fitBounds(bounds, {
-      padding: [56, 56],
-      maxZoom,
-      animate: true,
-    });
+    map.fitBounds(bounds, { padding: [56, 56], maxZoom, animate: true });
   }, [
     map,
     home.latitude,
     home.longitude,
-    visiblePlaces,
+    places,
     routeCoordinates,
     selectedPlaceId,
+    destination?.latitude,
+    destination?.longitude,
   ]);
 
   return null;
@@ -124,7 +195,14 @@ export interface NearbyMapProps {
   selectedPlaceId?: string | null;
   /** Street route only — never a straight preview line */
   routeCoordinates?: [number, number][] | null;
+  routeColor?: string;
+  routeDashed?: boolean;
+  /** Commute workplace/school pin */
+  destination?: { latitude: number; longitude: number; name: string } | null;
+  destinationColor?: string;
   onSelectPlace?: (place: NearbyPlace) => void;
+  /** Bump when the container is shown (mobile overlay / resize) so Leaflet recaptures size */
+  sizeTick?: number;
   className?: string;
 }
 
@@ -133,13 +211,18 @@ export default function NearbyMap({
   places,
   selectedPlaceId = null,
   routeCoordinates = null,
+  routeColor = '#2563EB',
+  routeDashed = false,
+  destination = null,
+  destinationColor = '#111827',
   onSelectPlace,
+  sizeTick = 0,
   className,
 }: NearbyMapProps) {
-  const visiblePlaces = useMemo(() => {
-    if (!selectedPlaceId) return places;
-    return places.filter((p) => p.id === selectedPlaceId);
-  }, [places, selectedPlaceId]);
+  const destIcon = useMemo(
+    () => makeDestinationIcon(destinationColor),
+    [destinationColor]
+  );
 
   const streetPath =
     routeCoordinates && routeCoordinates.length >= 2 ? routeCoordinates : null;
@@ -152,7 +235,7 @@ export default function NearbyMap({
         scrollWheelZoom
         zoomControl={false}
         className="h-full w-full rounded-2xl [&_.leaflet-control-zoom]:border-slate-200 [&_.leaflet-control-zoom]:shadow-md [&_.leaflet-control-zoom-in]:text-lg [&_.leaflet-control-zoom-out]:text-lg"
-        style={{ minHeight: 320, zIndex: 0 }}
+        style={{ minHeight: 240, zIndex: 0 }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -160,11 +243,13 @@ export default function NearbyMap({
         />
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomleft" imperial={false} />
-        <FitRoute
+        <InvalidateSize tick={sizeTick} />
+        <MapViewport
           home={home}
-          visiblePlaces={visiblePlaces}
-          routeCoordinates={streetPath}
+          places={places}
           selectedPlaceId={selectedPlaceId}
+          routeCoordinates={streetPath}
+          destination={destination}
         />
         <Marker position={[home.latitude, home.longitude]} icon={homeIcon} zIndexOffset={800}>
           <Popup>
@@ -173,26 +258,44 @@ export default function NearbyMap({
             Your apartment
           </Popup>
         </Marker>
-        {visiblePlaces.map((place) => (
+        {destination && (
           <Marker
-            key={place.id}
-            position={[place.latitude, place.longitude]}
-            icon={place.id === selectedPlaceId ? selectedPlaceIcon : placeIcon}
-            zIndexOffset={place.id === selectedPlaceId ? 700 : 400}
-            eventHandlers={{
-              click: () => onSelectPlace?.(place),
-            }}
+            position={[destination.latitude, destination.longitude]}
+            icon={destIcon}
+            zIndexOffset={750}
           >
             <Popup>
-              <strong>{place.name}</strong>
-              <br />
-              {place.distanceMeters < 1000
-                ? `${place.distanceMeters} m`
-                : `${(place.distanceMeters / 1000).toFixed(1)} km`}{' '}
-              · ~{place.walkMinutes} min walk
+              <strong>{destination.name}</strong>
             </Popup>
           </Marker>
-        ))}
+        )}
+        {places.map((place) => {
+          const selected = place.id === selectedPlaceId;
+          const icon =
+            placeIcons[`${place.category}-${selected ? '1' : '0'}`] ??
+            placeIcons[`school-${selected ? '1' : '0'}`];
+          return (
+            <Marker
+              key={place.id}
+              position={[place.latitude, place.longitude]}
+              icon={icon}
+              zIndexOffset={selected ? 700 : 400}
+              opacity={selectedPlaceId && !selected ? 0.55 : 1}
+              eventHandlers={{
+                click: () => onSelectPlace?.(place),
+              }}
+            >
+              <Popup>
+                <strong>{place.name}</strong>
+                <br />
+                {place.distanceMeters < 1000
+                  ? `${place.distanceMeters} m`
+                  : `${(place.distanceMeters / 1000).toFixed(1)} km`}{' '}
+                · ~{place.walkMinutes} min walk
+              </Popup>
+            </Marker>
+          );
+        })}
         {streetPath && (
           <>
             <Polyline
@@ -207,14 +310,15 @@ export default function NearbyMap({
               }}
             />
             <Polyline
-              key={`path-${selectedPlaceId}-${streetPath.length}`}
+              key={`path-${selectedPlaceId}-${streetPath.length}-${routeColor}-${routeDashed}`}
               positions={streetPath}
               pathOptions={{
-                color: '#2563EB',
+                color: routeColor,
                 weight: 5,
                 opacity: 1,
                 lineCap: 'round',
                 lineJoin: 'round',
+                dashArray: routeDashed ? '10 10' : undefined,
               }}
             />
           </>
