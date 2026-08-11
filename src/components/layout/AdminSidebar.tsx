@@ -19,8 +19,8 @@ function isDivider(entry: NavEntry): entry is { type: 'divider'; id: string } {
   return 'type' in entry && entry.type === 'divider';
 }
 
-const NAV_BG = '#252A45';
-const NAV_TEAL = '#39CCCC';
+const NAV_BG = '#000000';
+const NAV_ACCENT = '#FFFFFF';
 const LATO = 'var(--font-lato), Lato, sans-serif';
 
 export default function AdminSidebar() {
@@ -343,7 +343,7 @@ export default function AdminSidebar() {
               ? 'bg-white/10 font-semibold'
               : 'font-normal text-white/55 hover:bg-white/[0.06] hover:text-white'
           }`}
-          style={childActive ? { color: NAV_TEAL } : undefined}
+          style={childActive ? { color: NAV_ACCENT } : undefined}
         >
           {child.name}
         </Link>
@@ -380,7 +380,7 @@ export default function AdminSidebar() {
               {item.icon && (
                 <span
                   className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
-                  style={{ color: sectionAccent ? NAV_TEAL : 'currentColor' }}
+                  style={{ color: sectionAccent ? NAV_ACCENT : 'currentColor' }}
                 >
                   {item.icon}
                 </span>
@@ -397,7 +397,7 @@ export default function AdminSidebar() {
               {item.icon && (
                 <span
                   className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
-                  style={{ color: sectionAccent ? NAV_TEAL : 'currentColor' }}
+                  style={{ color: sectionAccent ? NAV_ACCENT : 'currentColor' }}
                 >
                   {item.icon}
                 </span>
@@ -424,7 +424,7 @@ export default function AdminSidebar() {
         {item.icon && (
           <span
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
-            style={{ color: active ? NAV_TEAL : 'currentColor' }}
+            style={{ color: active ? NAV_ACCENT : 'currentColor' }}
           >
             {item.icon}
           </span>
@@ -468,13 +468,13 @@ export default function AdminSidebar() {
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-[#252A45]"
-              style={{ backgroundColor: NAV_TEAL }}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-black"
+              style={{ backgroundColor: NAV_ACCENT }}
             >
               {session?.user?.firstName || session?.user?.lastName ? (
                 `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
               ) : (
-                <svg className="h-6 w-6 text-[#252A45]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-6 w-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               )}

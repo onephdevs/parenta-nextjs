@@ -199,7 +199,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
             className="fixed inset-0 z-40 bg-gray-900 bg-opacity-50 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-[#252A45] shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out">
+          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-black shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out">
             <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
               <span className="text-lg font-bold text-white">Menu</span>
               <button
