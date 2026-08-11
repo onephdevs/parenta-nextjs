@@ -187,12 +187,35 @@ export function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function estimateWalkMinutes(distanceMeters: number): number {
-  return Math.max(1, Math.round(distanceMeters / 83.3));
+/** ~5 km/h pedestrian pace (858 m ≈ 10 min). */
+const WALK_METERS_PER_MIN = 83.3;
+/** ~25 km/h urban driving with lights (858 m ≈ 2 min). */
+const DRIVE_METERS_PER_MIN = 416.7;
+
+export function estimateWalkMinutes(distanceMeters: number): number {
+  return Math.max(1, Math.round(distanceMeters / WALK_METERS_PER_MIN));
 }
 
-function estimateDriveMinutes(distanceMeters: number): number {
-  return Math.max(1, Math.round(distanceMeters / 416.7));
+export function estimateDriveMinutes(distanceMeters: number): number {
+  return Math.max(1, Math.round(distanceMeters / DRIVE_METERS_PER_MIN));
+}
+
+/** Prefer a sane OSRM drive time; always use walking pace for foot travel. */
+export function estimateMinutesForProfile(
+  distanceMeters: number,
+  profile: 'walking' | 'driving',
+  osrmDurationSeconds?: number | null
+): number {
+  if (profile === 'walking') {
+    return estimateWalkMinutes(distanceMeters);
+  }
+  if (osrmDurationSeconds && osrmDurationSeconds > 0 && distanceMeters > 0) {
+    const kmh = distanceMeters / 1000 / (osrmDurationSeconds / 3600);
+    if (kmh >= 8 && kmh <= 55) {
+      return Math.max(1, Math.round(osrmDurationSeconds / 60));
+    }
+  }
+  return estimateDriveMinutes(distanceMeters);
 }
 
 export function parseAmenityCategories(raw: string | string[] | null): AmenityCategory[] {

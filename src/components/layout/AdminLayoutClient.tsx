@@ -35,6 +35,8 @@ function defaultUuidLabel(parent: string | undefined): string {
       return 'Payment';
     case 'expenses':
       return 'Expense';
+    case 'utility-bills':
+      return 'Utility bill';
     default:
       return 'Details';
   }
@@ -134,6 +136,23 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
             }
           })
           .catch(() => {});
+        return;
+      }
+
+      if (parent === 'utility-bills') {
+        fetch(`/api/utility-bills/room?id=${segment}`, { credentials: 'include' })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            const bill = data?.data;
+            if (data?.success && bill) {
+              const type = String(bill.utilityType || bill.utility_type || 'Bill');
+              const room = bill.roomNumber || bill.room_number;
+              applyLabel(
+                `${type.charAt(0).toUpperCase() + type.slice(1)}${room ? ` · Room ${room}` : ''}`
+              );
+            }
+          })
+          .catch(() => {});
       }
     });
 
@@ -180,12 +199,12 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
             className="fixed inset-0 z-40 bg-gray-900 bg-opacity-50 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out">
-            <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-              <span className="text-lg font-bold text-gray-900">Menu</span>
+          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-[#252A45] shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out">
+            <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
+              <span className="text-lg font-bold text-white">Menu</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 text-gray-900 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-md"
               >
                 <X className="w-6 h-6" />
               </button>

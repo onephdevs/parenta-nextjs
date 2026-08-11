@@ -14,6 +14,7 @@ import { formatAmenityLabel } from '@/lib/format/amenities';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { getImageUrl } from '@/lib/format/image-url';
 import {
+  displayStatusLabel,
   formatShortDate,
   getRoomTypeStats,
   toDisplayRoomStatus,
@@ -123,11 +124,11 @@ export default function PropertyRoomCard({
   const documents = room.documents || [];
   const showDocuments = isOccupied || documents.length > 0;
 
-  const balancePaid =
-    isOccupied &&
-    room.tenant &&
-    room.tenant.overdueAmount <= 0 &&
-    room.tenant.pendingAmount <= 0;
+  const amountDue = isOccupied && room.tenant
+    ? (room.tenant.overdueAmount || 0) + (room.tenant.pendingAmount || 0)
+    : 0;
+  const isSettled = amountDue <= 0;
+  const occupantCount = room.occupants.length;
 
   return (
     <div
@@ -156,7 +157,25 @@ export default function PropertyRoomCard({
         {/* Room info */}
         <div className="flex flex-1 flex-col p-4">
           <div className="flex items-start justify-between gap-2">
-            <h4 className="text-[24px] font-bold leading-none text-gray-900">{room.roomNumber}</h4>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-[24px] font-bold leading-none text-gray-900">
+                  {room.roomNumber}
+                </h4>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                    isOccupied
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : displayStatus === 'pending'
+                        ? 'bg-amber-50 text-amber-800'
+                        : 'bg-slate-100 text-slate-600'
+                  )}
+                >
+                  {displayStatusLabel(displayStatus)}
+                </span>
+              </div>
+            </div>
             {!hideEdit && onViewDetails && (
               <button
                 type="button"
@@ -189,11 +208,54 @@ export default function PropertyRoomCard({
                 {areaLabel}
               </span>
             )}
+            {room.floorNumber != null && (
+              <span className="text-gray-500">Floor {room.floorNumber}</span>
+            )}
+            {isOccupied && occupantCount > 0 && (
+              <span className="text-gray-500">
+                {occupantCount + 1} occupant{occupantCount + 1 === 1 ? '' : 's'}
+              </span>
+            )}
           </div>
 
-          <div className="mt-4 border-t border-gray-100 pt-3">
-            <p className="mb-2 text-[12px] font-bold leading-none text-gray-900">Amenities</p>
-            {amenityChips.length > 0 ? (
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-gray-100 pt-3 sm:grid-cols-3">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Listed rent
+              </p>
+              <p className="mt-1 text-[13px] font-semibold text-gray-900">
+                {formatCurrency(room.monthlyRate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Deposit
+              </p>
+              <p className="mt-1 text-[13px] font-semibold text-gray-900">
+                {room.depositAmount != null && room.depositAmount > 0
+                  ? formatCurrency(room.depositAmount)
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Photos
+              </p>
+              <p className="mt-1 text-[13px] font-semibold text-gray-900">
+                {room.images.length}
+              </p>
+            </div>
+          </div>
+
+          {room.description?.trim() && (
+            <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-gray-600">
+              {room.description.trim()}
+            </p>
+          )}
+
+          {amenityChips.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-[12px] font-bold leading-none text-gray-900">Amenities</p>
               <div className="flex flex-wrap gap-2.5">
                 {amenityChips.map((amenity) => (
                   <span
@@ -205,14 +267,12 @@ export default function PropertyRoomCard({
                   </span>
                 ))}
               </div>
-            ) : (
-              <p className="text-[12px] font-normal leading-none text-gray-400">No amenities listed</p>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div className="mt-4">
-            <p className="mb-2 text-[12px] font-bold leading-none text-gray-900">Gallery</p>
-            {gallery.length > 0 ? (
+          {gallery.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-[12px] font-bold leading-none text-gray-900">Gallery</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
                   <LightboxImage
@@ -231,10 +291,8 @@ export default function PropertyRoomCard({
                   />
                 ))}
               </div>
-            ) : (
-              <p className="text-[12px] font-normal leading-none text-gray-400">No photos yet</p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Status / occupancy + documents column */}
@@ -266,18 +324,40 @@ export default function PropertyRoomCard({
                     <dd className="text-right text-white">{formatShortDate(room.tenant.startDate)}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
+                    <dt className="text-white/60">Due date</dt>
+                    <dd className="text-right text-white">
+                      {formatShortDate(room.tenant.dueDate)}
+                    </dd>
+                  </div>
+                  {room.tenant.endDate && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-white/60">Lease end</dt>
+                      <dd className="text-right text-white">
+                        {formatShortDate(room.tenant.endDate)}
+                      </dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-2">
                     <dt className="text-white/60">Contact no.</dt>
                     <dd className="truncate text-right text-white">{room.tenant.phone || '—'}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
                     <dt className="text-white/60">Balance</dt>
                     <dd
-                      className="text-right"
-                      style={{ color: balancePaid ? '#57D163' : '#FBBF24' }}
+                      className="text-right font-semibold"
+                      style={{ color: isSettled ? '#57D163' : '#F87171' }}
                     >
-                      {balancePaid ? 'Paid' : 'Due'}
+                      {isSettled ? 'Paid' : formatCurrency(amountDue)}
                     </dd>
                   </div>
+                  {(room.tenant.depositPaid != null || room.tenant.advancePaid != null) && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-white/60">Deposit</dt>
+                      <dd className="text-right text-white">
+                        {formatCurrency(room.tenant.depositPaid || 0)}
+                      </dd>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-2">
                     <dt className="text-white/60">Monthly Rent</dt>
                     <dd className="text-right text-[16px] font-bold leading-none text-white">
@@ -321,12 +401,27 @@ export default function PropertyRoomCard({
                 )}
               </div>
             ) : (
-              <div className="relative flex min-h-[11rem] flex-col items-center justify-center gap-3 p-6 text-center">
-                <UserRoundSearch className="h-12 w-12 text-white/80" strokeWidth={1.5} />
-                <p className="text-[16px] font-bold leading-none tracking-wide">VACANT</p>
-                <div className="absolute bottom-4 left-3 right-3 rounded bg-[#C4A35A] px-3 py-2 text-[12px] font-normal leading-none text-[#3a2f12]">
-                  No pending applications
+              <div className="flex min-h-[11rem] flex-col justify-between gap-4 px-3 py-4">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <UserRoundSearch className="h-12 w-12 text-white/80" strokeWidth={1.5} />
+                  <p className="text-[16px] font-bold leading-none tracking-wide">VACANT</p>
                 </div>
+                <dl className="space-y-2 text-[12px] font-normal leading-none">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-white/60">Listed rent</dt>
+                    <dd className="text-right font-semibold text-white">
+                      {formatCurrency(room.monthlyRate)}
+                    </dd>
+                  </div>
+                  {room.depositAmount != null && room.depositAmount > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-white/60">Deposit</dt>
+                      <dd className="text-right text-white">
+                        {formatCurrency(room.depositAmount)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
               </div>
             )}
           </div>

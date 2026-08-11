@@ -124,6 +124,10 @@ async function fetchUtilityBillWithNames(id: string): Promise<UtilityBillRecord 
   return mapRow(named.rows[0]);
 }
 
+export async function getRoomUtilityBillById(id: string): Promise<UtilityBillRecord | null> {
+  return fetchUtilityBillWithNames(id);
+}
+
 /**
  * List utility bills (unit-specific and/or building-wide).
  * Electric/water per room, or common-area / split building bills.

@@ -214,6 +214,21 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
     setMapSizeTick((n) => n + 1);
   }, [showMap, mode]);
 
+  useEffect(() => {
+    const el = document.getElementById('nearby');
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setMapSizeTick((n) => n + 1);
+        }
+      },
+      { threshold: 0.2 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   const loadRoute = useCallback(
     async (place: NearbyPlace, profile: 'walking' | 'driving') => {
       if (!buildingId) return;
@@ -398,21 +413,21 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
   if (properties.length === 0) return null;
 
   const mapShellClass = showMap
-    ? 'fixed inset-x-0 top-16 bottom-0 z-40 flex flex-col bg-white p-4 lg:static lg:inset-auto lg:z-0 lg:col-span-3 lg:sticky lg:top-20 lg:block lg:bg-transparent lg:p-0'
-    : 'hidden lg:col-span-3 lg:sticky lg:top-20 lg:block';
+    ? 'fixed inset-x-0 top-16 bottom-0 z-40 flex min-h-0 flex-col bg-white p-4 lg:static lg:inset-auto lg:z-0 lg:col-span-3 lg:h-full lg:bg-transparent lg:p-0'
+    : 'hidden min-h-0 lg:col-span-3 lg:flex lg:h-full lg:flex-col';
 
   const mapFrameClass = showMap
-    ? 'relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 lg:h-[calc(100vh-6rem)] lg:min-h-[28rem] lg:flex-none'
-    : 'relative h-[calc(100vh-6rem)] min-h-[28rem] overflow-hidden rounded-2xl border border-slate-200';
+    ? 'relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200'
+    : 'relative min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-slate-200';
 
   return (
     <section
       id="nearby"
-      className="bg-white px-4 py-20 sm:px-6 lg:px-8"
+      className="scroll-mt-16 min-h-[calc(100dvh-4rem)] bg-white px-4 py-10 sm:px-6 lg:flex lg:h-[calc(100dvh-4rem)] lg:flex-col lg:overflow-hidden lg:px-8 lg:py-8"
       aria-labelledby="nearby-heading"
     >
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-8 max-w-2xl">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col min-h-0">
+        <div className="mb-6 max-w-2xl shrink-0 lg:mb-5">
           <h2
             id="nearby-heading"
             className="text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl"
@@ -424,7 +439,7 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
           </p>
         </div>
 
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-6 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between lg:mb-5">
           <label className="block min-w-0 flex-1 sm:max-w-md">
             <span className="mb-1.5 block text-sm font-medium text-[#111827]">Property</span>
             <div className="relative">
@@ -478,7 +493,7 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
           </div>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-5 lg:items-start">
+        <div className="grid min-h-0 flex-1 grid-rows-1 gap-8 lg:grid-cols-5 lg:items-stretch">
           <div className={mapShellClass}>
             <div className="mb-3 flex items-center justify-between lg:hidden">
               <p className="text-sm font-semibold text-[#111827]">Map</p>
@@ -552,7 +567,7 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
                     destinationColor={commuteRouteColor}
                     onSelectPlace={handleSelectPlace}
                     sizeTick={mapSizeTick}
-                    className="h-full min-h-[16rem] w-full"
+                    className="h-full min-h-0 w-full"
                   />
                 </>
               ) : (
@@ -563,7 +578,7 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
             </div>
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="min-h-0 lg:col-span-2 lg:h-full lg:overflow-y-auto lg:overscroll-contain">
             {!showMap && (
               <button
                 type="button"
@@ -684,7 +699,14 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
                                       className="shrink-0 text-base font-semibold tabular-nums"
                                       style={{ color: isActive ? categoryColor : '#111827' }}
                                     >
-                                      {place.walkMinutes} min
+                                      {isActive &&
+                                      route &&
+                                      route.placeId === place.id
+                                        ? route.durationMinutes
+                                        : isActive && routeProfile === 'driving'
+                                          ? place.driveMinutes
+                                          : place.walkMinutes}{' '}
+                                      min
                                     </p>
                                   </div>
                                   <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6B7280]">

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   Building2,
@@ -148,9 +149,6 @@ export default function LandingPageClient({
     name: p.name,
     availableUnits: p.availableUnits,
   }));
-  const heroImage =
-    properties.find((p) => p.imageUrl)?.imageUrl || '/brand/rectangle-15.png';
-
   const submitHeroInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     const contact = heroContact.trim();
@@ -254,25 +252,28 @@ export default function LandingPageClient({
         </div>
       </header>
 
-      {/* Hero: one composition — brand, headline, support, CTA, full-bleed home visual */}
-      <section className="landing-hero-fade relative isolate min-h-[min(88vh,52rem)] overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic portfolio / brand fallback */}
-        <img
-          src={heroImage}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-[68%_center]"
-        />
-        <div
-          className="absolute inset-0 bg-gradient-to-r from-[#F8FAFC] via-[#F8FAFC]/92 to-[#F8FAFC]/25"
-          aria-hidden
-        />
-        <div
-          className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_20%,rgba(37,99,235,0.12),transparent_50%),radial-gradient(ellipse_at_90%_10%,rgba(14,165,233,0.14),transparent_45%)]"
-          aria-hidden
-        />
+      {/* Hero: copy on the left, full room on the right, soft white blend (not property photos). */}
+      <section className="landing-hero-fade relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden bg-[#F8FAFC]">
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          <Image
+            src="/brand/hero-room.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-[68%_center]"
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(90deg, #F8FAFC 0%, rgba(248,250,252,0.92) 28%, rgba(248,250,252,0.55) 46%, rgba(248,250,252,0.18) 64%, transparent 82%)',
+            }}
+          />
+        </div>
 
-        <div className="relative mx-auto flex min-h-[min(88vh,52rem)] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8">
-          <div className="w-full max-w-xl lg:max-w-2xl">
+        <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
+          <div className="w-full max-w-xl lg:max-w-[32rem] xl:max-w-xl">
             <p className="mb-3 font-[family-name:var(--font-geist-sans)] text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl">
               Alfonso Properties
             </p>

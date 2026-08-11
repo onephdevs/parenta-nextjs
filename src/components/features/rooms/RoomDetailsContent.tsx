@@ -161,6 +161,7 @@ export default function RoomDetailsContent({
       ? (tenant?.overdueAmount || 0) + (tenant?.pendingAmount || 0)
       : financialSummary.unpaidBalance || 0;
   const isPastDue = (financialSummary.overdueAmount || 0) > 0;
+  const isSettled = amountDue <= 0;
   const leaseDoc = findLeaseDocument(documents);
   const dueDate = tenant?.dueDate || financialSummary.nextDueDate;
   const deposit =
@@ -386,12 +387,28 @@ export default function RoomDetailsContent({
                   <Field label="Due Date" value={formatShortDate(dueDate)} />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div
+                  className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${
+                    isSettled
+                      ? 'border-emerald-100 bg-emerald-50/70'
+                      : isPastDue
+                        ? 'border-rose-200 bg-rose-50'
+                        : 'border-rose-100 bg-rose-50/60'
+                  }`}
+                >
                   <div className="flex-1">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-rose-700">
-                      Amount Due
+                    <p
+                      className={`text-[11px] font-medium uppercase tracking-wide ${
+                        isSettled ? 'text-emerald-700' : 'text-rose-700'
+                      }`}
+                    >
+                      {isSettled ? 'Settled' : isPastDue ? 'Past due' : 'Amount Due'}
                     </p>
-                    <p className="mt-1 text-xl font-bold text-rose-700">
+                    <p
+                      className={`mt-1 text-xl font-bold ${
+                        isSettled ? 'text-emerald-800' : 'text-rose-700'
+                      }`}
+                    >
                       {formatCurrency(amountDue)}
                     </p>
                   </div>
@@ -401,7 +418,7 @@ export default function RoomDetailsContent({
                       variant="outline"
                       leftIcon={<Bell className="h-4 w-4" />}
                       isLoading={sendingReminder}
-                      isDisabled={sendingReminder}
+                      isDisabled={sendingReminder || isSettled}
                       onClick={() => void handleSendPaymentReminder()}
                     >
                       Payment Reminder
@@ -411,7 +428,9 @@ export default function RoomDetailsContent({
                     >
                       <Button
                         leftIcon={<Wallet className="h-4 w-4" />}
-                        className="bg-rose-600 hover:bg-rose-700"
+                        className={
+                          isSettled ? undefined : 'bg-rose-600 hover:bg-rose-700'
+                        }
                       >
                         Make Payment
                       </Button>
@@ -478,16 +497,27 @@ export default function RoomDetailsContent({
       </section>
 
       {/* Payment / Advance / Remarks */}
-      <section className={`${cardClassName()} border border-rose-100 p-5`}>
+      <section
+        className={`${cardClassName()} border p-5 ${
+          isSettled ? 'border-emerald-100' : 'border-rose-100'
+        }`}
+      >
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Payment Information */}
           <div className="space-y-3">
             <p className="text-sm font-bold text-gray-900">Payment Information</p>
-            <Field
-              label={`Total Amount Due${dueDate ? ` by ${formatShortDate(dueDate)}` : ''}`}
-              value={formatCurrency(amountDue)}
-              emphasize
-            />
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                {`Total Amount Due${dueDate ? ` by ${formatShortDate(dueDate)}` : ''}`}
+              </p>
+              <p
+                className={`mt-1 text-base font-bold ${
+                  isSettled ? 'text-emerald-800' : isPastDue ? 'text-rose-700' : 'text-gray-900'
+                }`}
+              >
+                {formatCurrency(amountDue)}
+              </p>
+            </div>
             <Field
               label="Last Payment"
               value={

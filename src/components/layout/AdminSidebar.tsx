@@ -9,7 +9,7 @@ import { BrandLogo } from '@/components/ui/BrandLogo';
 interface MenuItem {
   name: string;
   href?: string;
-  icon: React.ReactElement;
+  icon?: React.ReactElement;
   children?: MenuItem[];
 }
 
@@ -19,11 +19,9 @@ function isDivider(entry: NavEntry): entry is { type: 'divider'; id: string } {
   return 'type' in entry && entry.type === 'divider';
 }
 
-const chevronIcon = (
-  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-  </svg>
-);
+const NAV_BG = '#252A45';
+const NAV_TEAL = '#39CCCC';
+const LATO = 'var(--font-lato), Lato, sans-serif';
 
 export default function AdminSidebar() {
   const pathname = usePathname();
@@ -120,7 +118,6 @@ export default function AdminSidebar() {
         {
           name: 'All Rooms',
           href: '/admin/rooms',
-          icon: chevronIcon,
         },
       ],
     },
@@ -155,12 +152,10 @@ export default function AdminSidebar() {
         {
           name: 'Lease Designer',
           href: '/admin/documents/lease-designer',
-          icon: chevronIcon,
         },
         {
           name: 'Templates',
           href: '/admin/documents/templates',
-          icon: chevronIcon,
         },
       ],
     },
@@ -176,38 +171,18 @@ export default function AdminSidebar() {
         {
           name: 'Invoices',
           href: '/admin/financial/invoices',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          ),
         },
         {
           name: 'Financial Dashboard',
           href: '/admin/financial/dashboard',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          ),
         },
         {
           name: 'Tenant pay details',
           href: '/admin/settings?tab=payments',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-          ),
         },
         {
           name: 'Reports & Analytics',
           href: '/admin/financial/reports',
-          icon: (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          ),
         },
       ],
     },
@@ -224,22 +199,18 @@ export default function AdminSidebar() {
         {
           name: 'Utility Bills',
           href: '/admin/bills-expenses/utility-bills',
-          icon: chevronIcon,
         },
         {
           name: 'Unit groups',
           href: '/admin/bills-expenses/unit-groups',
-          icon: chevronIcon,
         },
         {
           name: 'Expenses',
           href: '/admin/financial/expenses',
-          icon: chevronIcon,
         },
         {
           name: 'Reports',
           href: '/admin/bills-expenses/reports',
-          icon: chevronIcon,
         },
       ],
     },
@@ -254,12 +225,10 @@ export default function AdminSidebar() {
         {
           name: 'Meter Readings',
           href: '/admin/utilities/readings',
-          icon: chevronIcon,
         },
         {
           name: 'Cost Allocation',
           href: '/admin/utilities/cost-allocation',
-          icon: chevronIcon,
         },
       ],
     },
@@ -359,39 +328,22 @@ export default function AdminSidebar() {
   const parentRowClass = (highlighted: boolean) =>
     `flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
       highlighted
-        ? 'bg-white font-semibold text-[#111827] shadow-sm'
-        : 'font-medium text-[#303030] hover:bg-black/[0.04]'
+        ? 'bg-white/10 font-semibold text-white'
+        : 'font-medium text-white/70 hover:bg-white/[0.06] hover:text-white'
     }`;
 
   const renderChildLink = (child: MenuItem) => {
     const childActive = child.href ? isActive(child.href) : false;
     return (
-      <li key={child.name} className="relative">
-        {/* L-connector with arrow — only for the selected sub-page */}
-        {childActive && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute left-0 top-1/2 z-10 flex -translate-x-px -translate-y-1/2 items-center"
-          >
-            <span className="block h-px w-3 bg-[#b5b5b5]" />
-            <svg
-              width="5"
-              height="8"
-              viewBox="0 0 5 8"
-              className="text-[#b5b5b5]"
-              aria-hidden
-            >
-              <path d="M0 0l5 4-5 4" fill="currentColor" />
-            </svg>
-          </span>
-        )}
+      <li key={child.name}>
         <Link
           href={child.href!}
-          className={`ml-3 block rounded-lg px-3 py-1.5 text-sm transition-colors ${
+          className={`block rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
             childActive
-              ? 'bg-white font-semibold text-[#111827] shadow-sm'
-              : 'font-normal text-[#616161] hover:bg-black/[0.04] hover:text-[#303030]'
+              ? 'bg-white/10 font-semibold'
+              : 'font-normal text-white/55 hover:bg-white/[0.06] hover:text-white'
           }`}
+          style={childActive ? { color: NAV_TEAL } : undefined}
         >
           {child.name}
         </Link>
@@ -414,6 +366,7 @@ export default function AdminSidebar() {
     const active = item.href ? isActive(item.href) : false;
     // Parent highlight only when this page is active and no distinct child owns the route
     const parentHighlight = hasChildren ? active && !childIsActive : active;
+    const sectionAccent = parentHighlight || childIsActive;
 
     if (hasChildren) {
       return (
@@ -424,9 +377,14 @@ export default function AdminSidebar() {
               className={parentRowClass(parentHighlight)}
               onClick={() => setExpandedSections([item.name])}
             >
-              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-current">
-                {item.icon}
-              </span>
+              {item.icon && (
+                <span
+                  className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+                  style={{ color: sectionAccent ? NAV_TEAL : 'currentColor' }}
+                >
+                  {item.icon}
+                </span>
+              )}
               <span>{item.name}</span>
             </Link>
           ) : (
@@ -436,14 +394,19 @@ export default function AdminSidebar() {
               className={parentRowClass(parentHighlight)}
               aria-expanded={isExpanded}
             >
-              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-current">
-                {item.icon}
-              </span>
+              {item.icon && (
+                <span
+                  className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+                  style={{ color: sectionAccent ? NAV_TEAL : 'currentColor' }}
+                >
+                  {item.icon}
+                </span>
+              )}
               <span>{item.name}</span>
             </button>
           )}
           {isExpanded && (
-            <ul className="relative ml-5 mt-0.5 space-y-0.5 border-l border-[#b5b5b5] py-0.5">
+            <ul className="mt-0.5 space-y-0.5 pl-8">
               {item.children?.map((child) => renderChildLink(child))}
             </ul>
           )}
@@ -458,20 +421,28 @@ export default function AdminSidebar() {
         className={parentRowClass(active)}
         onClick={() => setExpandedSections([])}
       >
-        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-current">
-          {item.icon}
-        </span>
+        {item.icon && (
+          <span
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+            style={{ color: active ? NAV_TEAL : 'currentColor' }}
+          >
+            {item.icon}
+          </span>
+        )}
         <span>{item.name}</span>
       </Link>
     );
   };
 
   return (
-    <div className="flex h-full flex-col border-r border-gray-200 bg-[#f1f1f1]">
+    <div
+      className="flex h-full flex-col"
+      style={{ backgroundColor: NAV_BG, fontFamily: LATO }}
+    >
       {/* Logo */}
-      <div className="flex h-16 items-center border-b border-gray-200/80 px-4">
+      <div className="flex h-16 items-center border-b border-white/10 px-4">
         <Link href="/admin" className="flex items-center" aria-label="Alfonso Properties">
-          <BrandLogo variant="full" height={36} priority />
+          <BrandLogo variant="full" height={32} priority className="brightness-0 invert" />
         </Link>
       </div>
 
@@ -483,7 +454,7 @@ export default function AdminSidebar() {
               <div
                 key={entry.id}
                 role="separator"
-                className="mx-2 my-3 border-t border-gray-300/80"
+                className="mx-2 my-3 border-t border-white/10"
               />
             ) : (
               renderMenuItem(entry)
@@ -493,26 +464,29 @@ export default function AdminSidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="border-t border-gray-200/80 p-4">
+      <div className="border-t border-white/10 p-4">
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-semibold uppercase text-[#111827] shadow-sm">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-[#252A45]"
+              style={{ backgroundColor: NAV_TEAL }}
+            >
               {session?.user?.firstName || session?.user?.lastName ? (
                 `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
               ) : (
-                <svg className="h-6 w-6 text-[#111827]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-6 w-6 text-[#252A45]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               )}
             </div>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
-            <p className="truncate text-xs text-gray-600">{session?.user?.email || ''}</p>
+            <p className="truncate text-sm font-medium text-white">{displayName}</p>
+            <p className="truncate text-xs text-white/50">{session?.user?.email || ''}</p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-            className="p-1 text-gray-400 transition-colors hover:text-gray-900"
+            className="p-1 text-white/40 transition-colors hover:text-white"
             title="Sign out"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

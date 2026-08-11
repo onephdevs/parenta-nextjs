@@ -60,6 +60,8 @@ export interface PropertyRoomTenant {
   emergencyContactPhone?: string | null;
   notes?: string | null;
   startDate: string | Date;
+  /** Lease / assignment end when set. */
+  endDate?: string | Date | null;
   /** Next rent due date when known (from open invoice or lease). */
   dueDate?: string | Date | null;
   monthlyRate: number;
@@ -251,6 +253,9 @@ export async function getPropertyBuildingDetail(
       t.email AS tenant_email,
       t.phone AS tenant_phone,
       tra.start_date AS assignment_start,
+      tra.end_date AS assignment_end,
+      tra.deposit_paid,
+      tra.advance_paid,
       COALESCE(tra.monthly_rate, r.monthly_rate) AS assignment_monthly_rate,
       COALESCE((
         SELECT SUM(p.amount)
@@ -263,7 +268,16 @@ export async function getPropertyBuildingDetail(
         FROM payments p
         WHERE p.assignment_id = tra.id
           AND p.payment_status = 'pending'
-      ), 0) AS pending_amount
+      ), 0) AS pending_amount,
+      (
+        SELECT i.due_date
+        FROM invoices i
+        WHERE i.tenant_id = t.id
+          AND i.invoice_status IS DISTINCT FROM 'cancelled'
+          AND GREATEST(i.total_amount - COALESCE(i.amount_paid, 0), 0) > 0.01
+        ORDER BY i.due_date ASC NULLS LAST
+        LIMIT 1
+      ) AS next_due_date
     FROM rooms r
     LEFT JOIN tenant_room_assignments tra
       ON tra.room_id = r.id
@@ -395,9 +409,15 @@ export async function getPropertyBuildingDetail(
             email: r.tenant_email as string | null,
             phone: r.tenant_phone as string | null,
             startDate: r.assignment_start as string | Date,
+            endDate: (r.assignment_end as string | Date | null) ?? null,
+            dueDate: (r.next_due_date as string | Date | null) ?? null,
             monthlyRate: parseFloat(r.assignment_monthly_rate) || parseFloat(r.monthly_rate) || 0,
             overdueAmount: parseFloat(r.overdue_amount) || 0,
             pendingAmount: parseFloat(r.pending_amount) || 0,
+            depositPaid:
+              r.deposit_paid != null ? parseFloat(String(r.deposit_paid)) || 0 : undefined,
+            advancePaid:
+              r.advance_paid != null ? parseFloat(String(r.advance_paid)) || 0 : undefined,
           }
         : null;
 

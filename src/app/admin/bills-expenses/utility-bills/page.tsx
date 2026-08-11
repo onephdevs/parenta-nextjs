@@ -33,6 +33,7 @@ import {
   Zap,
   Droplets,
   DollarSign,
+  Eye,
 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -475,6 +476,13 @@ export default function RoomUtilityBillsPage() {
                     <TableCell>{getStatusBadge(bill.billStatus)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
+                        <Link
+                          href={`/admin/bills-expenses/utility-bills/${bill.id}`}
+                          className="inline-flex text-gray-500 hover:text-gray-900"
+                          title="View"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </Link>
                         {bill.billStatus !== 'paid' && (
                           <button
                             onClick={() => handleMarkPaid(bill.id)}

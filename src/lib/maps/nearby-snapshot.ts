@@ -7,6 +7,8 @@ import type { BuildingLocation } from '@/lib/maps/geocode';
 import {
   AMENITY_CATEGORIES,
   buildNearbyResult,
+  estimateDriveMinutes,
+  estimateWalkMinutes,
   fetchCatalogPlacesFromOverpass,
   type AmenityCategory,
   type NearbyAmenitiesResult,
@@ -50,8 +52,8 @@ function parsePlacesJson(raw: unknown): NearbyPlace[] {
       latitude,
       longitude,
       distanceMeters,
-      walkMinutes: Math.round(Number(p.walkMinutes) || 1),
-      driveMinutes: Math.round(Number(p.driveMinutes) || 1),
+      walkMinutes: estimateWalkMinutes(distanceMeters),
+      driveMinutes: estimateDriveMinutes(distanceMeters),
     });
   }
   return out;

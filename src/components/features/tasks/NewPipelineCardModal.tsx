@@ -3112,5 +3112,3 @@ export function AddOpportunityModal({
   );
 }
 
-/** @deprecated Use AddOpportunityModal */
-export const NewPipelineCardModal = AddOpportunityModal;

@@ -91,7 +91,6 @@ export { Tab, TabList, TabPanel, Tabs, type TabPanelProps, type TabProps, type T
 export { Textarea, type TextareaProps } from './Textarea';
 
 // Default-export modules re-exported as named for one-line imports
-export { default as AdminFullScreenModal } from './AdminFullScreenModal';
 export { default as AppLoader } from './AppLoader';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogMode, ConfirmDialogVariant } from './ConfirmDialog';

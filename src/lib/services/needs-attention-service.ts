@@ -31,7 +31,7 @@ export interface NeedsAttentionPayload {
   cards: NeedsAttentionCard[];
 }
 
-const PREVIEW_LIMIT = 2;
+const PREVIEW_LIMIT = 5;
 
 function formatPhp(amount: number): string {
   return new Intl.NumberFormat('en-PH', {

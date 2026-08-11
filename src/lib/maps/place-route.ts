@@ -4,6 +4,7 @@
 
 import pool from '@/lib/db';
 import type { LatLng } from '@/lib/maps/geocode';
+import { estimateMinutesForProfile } from '@/lib/maps/nearby-amenities';
 import {
   getNearbyRefreshDays,
   isSnapshotStale,
@@ -107,14 +108,16 @@ export async function getRouteToPlace(params: {
         ? (row.geometry as [number, number][])
         : [];
       if (coords.length >= 2) {
+        const distanceMeters = row.distance_meters ?? 0;
         return {
           buildingId: params.buildingId,
           placeId: params.placeId,
           profile,
-          distanceMeters: row.distance_meters ?? 0,
-          durationMinutes: Math.max(
-            1,
-            Math.round((row.duration_seconds ?? 60) / 60)
+          distanceMeters,
+          durationMinutes: estimateMinutesForProfile(
+            distanceMeters,
+            profile,
+            row.duration_seconds
           ),
           coordinates: coords,
           fromCache: true,
@@ -136,11 +139,10 @@ export async function getRouteToPlace(params: {
     return null;
   }
 
-  const durationMinutes = Math.max(
-    1,
-    live.durationSeconds > 0
-      ? Math.round(live.durationSeconds / 60)
-      : Math.round((live.distanceMeters / 1000 / (profile === 'walking' ? 5 : 25)) * 60)
+  const durationMinutes = estimateMinutesForProfile(
+    live.distanceMeters,
+    profile,
+    live.durationSeconds
   );
 
   await pool.query(
@@ -159,7 +161,7 @@ export async function getRouteToPlace(params: {
       params.placeId,
       profile,
       Math.round(live.distanceMeters),
-      Math.round(live.durationSeconds || durationMinutes * 60),
+      Math.round(durationMinutes * 60),
       JSON.stringify(live.coordinates),
     ]
   );

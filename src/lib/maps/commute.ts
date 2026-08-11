@@ -4,7 +4,11 @@
 
 import { cacheGet, cacheSet } from '@/lib/cache/memory-cache';
 import { geocodeAddress, type LatLng } from '@/lib/maps/geocode';
-import { haversineMeters } from '@/lib/maps/nearby-amenities';
+import {
+  estimateMinutesForProfile,
+  estimateWalkMinutes,
+  haversineMeters,
+} from '@/lib/maps/nearby-amenities';
 
 const OSRM_BASE = 'https://router.project-osrm.org';
 const USER_AGENT = 'Parenta nearby amenities (parenta.com.mx)';
@@ -90,19 +94,9 @@ function walkingMinutesFromRoute(
   walking: OsrmRoute | null,
   distanceMeters: number
 ): number | null {
-  let walkingMinutes: number | null = null;
-  if (walking && walking.distanceMeters > 0) {
-    const hours = walking.durationSeconds / 3600;
-    const km = walking.distanceMeters / 1000;
-    const kmh = hours > 0 ? km / hours : Infinity;
-    if (kmh <= 8) {
-      walkingMinutes = Math.max(1, Math.round(walking.durationSeconds / 60));
-    }
-  }
-  if (walkingMinutes == null && distanceMeters > 0 && distanceMeters <= 8000) {
-    walkingMinutes = Math.max(1, Math.round((distanceMeters / 1000 / 5) * 60));
-  }
-  return walkingMinutes;
+  const meters = walking?.distanceMeters || distanceMeters;
+  if (meters <= 0 || meters > 8000) return null;
+  return estimateWalkMinutes(meters);
 }
 
 /** Jeepney/bus-style estimate: wait + ~16 km/h in-vehicle. Not live arrivals. */
@@ -119,7 +113,7 @@ export async function estimateCommute(params: {
   const workplace = await geocodeAddress(params.workplaceQuery);
   if (!workplace) return null;
 
-  const cacheKey = `commute:v2:${workplace.latitude.toFixed(4)},${workplace.longitude.toFixed(4)}:${params.destination.latitude.toFixed(4)},${params.destination.longitude.toFixed(4)}`;
+  const cacheKey = `commute:v3:${workplace.latitude.toFixed(4)},${workplace.longitude.toFixed(4)}:${params.destination.latitude.toFixed(4)},${params.destination.longitude.toFixed(4)}`;
   const cached = cacheGet<CommuteEstimate>(cacheKey);
   if (cached) return cached;
 
@@ -137,8 +131,14 @@ export async function estimateCommute(params: {
   );
 
   const drivingMinutes = driving
-    ? Math.max(1, Math.round(driving.durationSeconds / 60))
-    : null;
+    ? estimateMinutesForProfile(
+        driving.distanceMeters || distanceMeters,
+        'driving',
+        driving.durationSeconds
+      )
+    : distanceMeters > 0
+      ? estimateMinutesForProfile(distanceMeters, 'driving')
+      : null;
   const walkingMinutes = walkingMinutesFromRoute(walking, distanceMeters);
   const transitMinutes = distanceMeters > 0 ? estimateTransitMinutes(distanceMeters) : null;
 

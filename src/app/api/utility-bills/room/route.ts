@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import {
   getRoomUtilityBills,
+  getRoomUtilityBillById,
   createRoomUtilityBill,
   updateRoomUtilityBill,
   deleteRoomUtilityBill,
@@ -26,6 +27,15 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id')?.trim();
+    if (id) {
+      const bill = await getRoomUtilityBillById(id);
+      if (!bill) {
+        return NextResponse.json({ error: 'Bill not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, data: bill });
+    }
+
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const unitScopedParam = searchParams.get('unitScoped');

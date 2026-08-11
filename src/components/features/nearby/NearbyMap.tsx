@@ -95,11 +95,23 @@ const placeIcons = (() => {
 function InvalidateSize({ tick }: { tick: number }) {
   const map = useMap();
   useEffect(() => {
-    const t1 = window.setTimeout(() => map.invalidateSize(), 60);
-    const t2 = window.setTimeout(() => map.invalidateSize(), 320);
+    const invalidate = () => {
+      map.invalidateSize({ animate: false });
+    };
+    const t1 = window.setTimeout(invalidate, 60);
+    const t2 = window.setTimeout(invalidate, 320);
+    const container = map.getContainer();
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => invalidate())
+        : null;
+    ro?.observe(container);
+    window.addEventListener('resize', invalidate);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      ro?.disconnect();
+      window.removeEventListener('resize', invalidate);
     };
   }, [map, tick]);
   return null;
@@ -228,14 +240,14 @@ export default function NearbyMap({
     routeCoordinates && routeCoordinates.length >= 2 ? routeCoordinates : null;
 
   return (
-    <div className={className ?? 'h-full w-full'}>
+    <div className={className ?? 'h-full min-h-0 w-full'}>
       <MapContainer
         center={[home.latitude, home.longitude]}
         zoom={15}
         scrollWheelZoom
         zoomControl={false}
         className="h-full w-full rounded-2xl [&_.leaflet-control-zoom]:border-slate-200 [&_.leaflet-control-zoom]:shadow-md [&_.leaflet-control-zoom-in]:text-lg [&_.leaflet-control-zoom-out]:text-lg"
-        style={{ minHeight: 240, zIndex: 0 }}
+        style={{ height: '100%', width: '100%', minHeight: 0, zIndex: 0 }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
