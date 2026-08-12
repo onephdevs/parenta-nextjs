@@ -16,6 +16,8 @@ export function isContactRole(value: string | null | undefined): value is Contac
 /** Company-only vendors use this last_name sentinel (column is NOT NULL). */
 export const VENDOR_COMPANY_LAST_NAME = '-';
 
+export type VendorUtilityType = 'electricity' | 'water';
+
 export interface Contact {
   id: string;
   firstName: string;
@@ -27,6 +29,8 @@ export interface Contact {
   userId?: string;
   isActive: boolean;
   roles: ContactRole[];
+  /** Present on vendor contacts when name/notes imply electric and/or water. */
+  utilityTypes?: VendorUtilityType[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -45,4 +49,32 @@ export function vendorContactPersonName(lastName: string | null | undefined): st
   const last = (lastName || '').trim();
   if (!last || last === VENDOR_COMPANY_LAST_NAME || last === '.') return '';
   return last;
+}
+
+/**
+ * Infer which utility a vendor serves from name/notes.
+ * Used to filter providers on the new utility-bill form.
+ */
+export function inferContactUtilityTypes(
+  contact: Pick<Contact, 'firstName' | 'lastName' | 'notes'>
+): VendorUtilityType[] {
+  const hay = `${contact.firstName} ${contact.lastName || ''} ${contact.notes || ''}`.toLowerCase();
+  const types: VendorUtilityType[] = [];
+  if (
+    hay.includes('electric') ||
+    hay.includes('meralco') ||
+    /\baec\b/.test(hay) ||
+    hay.includes('power')
+  ) {
+    types.push('electricity');
+  }
+  if (
+    hay.includes('water') ||
+    hay.includes('maynilad') ||
+    hay.includes('waterworks') ||
+    hay.includes('water works')
+  ) {
+    types.push('water');
+  }
+  return types;
 }

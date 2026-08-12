@@ -1023,6 +1023,10 @@ export interface PipelineCard {
   moveInPaidAt?: string;
   moveInPaymentMethod?: string;
   moveInPaymentNotes?: string;
+  /** Parenta txn for deposit when Payment received (txn-d-…) */
+  depositParentaTxnId?: string;
+  /** Parenta txn for advance when Payment received (txn-a-…) */
+  advanceParentaTxnId?: string;
   position: number;
   wonAt?: string;
   lostAt?: string;

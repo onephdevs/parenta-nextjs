@@ -169,42 +169,27 @@ export async function POST(request: Request) {
       [newUtilityDeposit, assignment.assignment_id]
     );
     
-    // Create payment record
-    const paymentQuery = `
-      INSERT INTO payments (
-        tenant_id,
-        room_id,
-        assignment_id,
-        amount,
-        payment_type,
-        payment_method,
-        payment_date,
-        due_date,
-        payment_status,
-        reference_number,
-        notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, CURRENT_DATE, $7, $8, $9)
-      RETURNING id, amount, payment_date
-    `;
-    
-    const paymentResult = await pool.query(paymentQuery, [
-      tenant.id,
-      assignment.room_id,
-      assignment.assignment_id,
-      amount,
-      'utility',
-      paymentMethod || 'online',
-      'paid',
-      referenceNumber || null,
-      description || `${utilityType} utility deposit payment`,
-    ]);
+    // Create payment record with Parenta txn id
+    const { createPayment } = await import('@/lib/api/payments');
+    const payment = await createPayment({
+      tenantId: String(tenant.id),
+      roomAssignmentId: String(assignment.assignment_id),
+      amount: parseFloat(amount),
+      paymentType: 'deposit',
+      paymentMethod: paymentMethod || 'online',
+      paymentStatus: 'completed',
+      paymentDate: new Date(),
+      referenceNumber: referenceNumber || undefined,
+      notes: description || `${utilityType} utility deposit payment`,
+    });
     
     return NextResponse.json({
       success: true,
       data: {
-        paymentId: paymentResult.rows[0].id,
-        amount: parseFloat(paymentResult.rows[0].amount),
-        paymentDate: paymentResult.rows[0].payment_date,
+        paymentId: payment.id,
+        parentaTxnId: payment.parentaTxnId,
+        amount: payment.amount,
+        paymentDate: payment.paymentDate,
         utilityType,
         totalUtilityDeposit: newUtilityDeposit,
       },

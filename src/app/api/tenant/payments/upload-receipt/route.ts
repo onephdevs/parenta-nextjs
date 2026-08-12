@@ -10,6 +10,9 @@ import {
   resolveAllowedPaymentMethod,
   resolveAllowedPaymentType,
 } from '@/lib/constants/payment-methods';
+import { txnTypeFromPaymentType } from '@/lib/constants/transaction-ids';
+import { allocateParentaTxnId } from '@/lib/services/transaction-id-service';
+import { syncPaymentCardForTenant } from '@/lib/api/pipeline';
 
 const MAX_FILE_SIZE = CONSTANTS.MODULE.UPLOAD.MAX_FILE_SIZE_BYTES;
 const SUPPORTED_FILE_TYPES = CONSTANTS.MODULE.UPLOAD
@@ -140,12 +143,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const parentaTxnId = await allocateParentaTxnId(
+        txnTypeFromPaymentType(paymentType)
+      );
+
       const createPayment = await pool.query(
         `INSERT INTO payments (
            tenant_id, room_id, assignment_id, amount, payment_type, payment_method,
-           payment_date, due_date, payment_status, reference_number, notes
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10)
-         RETURNING id`,
+           payment_date, due_date, payment_status, reference_number, parenta_txn_id, notes
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11)
+         RETURNING id, parenta_txn_id`,
         [
           tenant.id,
           assignment?.room_id || null,
@@ -156,9 +163,12 @@ export async function POST(request: NextRequest) {
           paymentDateRaw || invoice.due_date,
           invoice.due_date,
           referenceNumberRaw,
+          parentaTxnId,
           [
+            `Parenta txn ${parentaTxnId}`,
             `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})`,
             'Status: awaiting office verification — invoice balance not updated yet.',
+            `GCash / bank reference: ${referenceNumberRaw}`,
             notesRaw ? `Tenant notes: ${notesRaw}` : null,
           ]
             .filter(Boolean)
@@ -176,12 +186,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const parentaTxnId = await allocateParentaTxnId(
+        txnTypeFromPaymentType(paymentType)
+      );
+
       const createPayment = await pool.query(
         `INSERT INTO payments (
            tenant_id, room_id, assignment_id, amount, payment_type, payment_method,
-           payment_date, due_date, payment_status, reference_number, notes
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 'pending', $8, $9)
-         RETURNING id`,
+           payment_date, due_date, payment_status, reference_number, parenta_txn_id, notes
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 'pending', $8, $9, $10)
+         RETURNING id, parenta_txn_id`,
         [
           tenant.id,
           assignment?.room_id || null,
@@ -191,7 +205,13 @@ export async function POST(request: NextRequest) {
           paymentMethod,
           paymentDateRaw,
           referenceNumberRaw,
-          notesRaw || `Receipt uploaded for payment dated ${paymentDateRaw}`,
+          parentaTxnId,
+          [
+            `Parenta txn ${parentaTxnId}`,
+            `GCash / bank reference: ${referenceNumberRaw}`,
+            notesRaw || `Receipt uploaded for payment dated ${paymentDateRaw}`,
+            'Status: awaiting office verification — balance not updated yet.',
+          ].join('\n'),
         ]
       );
       paymentId = createPayment.rows[0].id;
@@ -214,17 +234,37 @@ export async function POST(request: NextRequest) {
 
     const { fileName, filePath, fileSize } = await saveUploadedFile(file, 'uploads/receipts');
 
+    let parentaTxnId: string | null = null;
+    if (paymentIdRaw) {
+      const existingTxn = await pool.query<{ parenta_txn_id: string | null }>(
+        `SELECT parenta_txn_id FROM payments WHERE id = $1`,
+        [paymentId]
+      );
+      parentaTxnId = existingTxn.rows[0]?.parenta_txn_id || null;
+      if (!parentaTxnId) {
+        parentaTxnId = await allocateParentaTxnId(txnTypeFromPaymentType(paymentType));
+      }
+    } else {
+      const createdTxn = await pool.query<{ parenta_txn_id: string | null }>(
+        `SELECT parenta_txn_id FROM payments WHERE id = $1`,
+        [paymentId]
+      );
+      parentaTxnId = createdTxn.rows[0]?.parenta_txn_id || null;
+    }
+
     const updateResult = await pool.query(
       `UPDATE payments
        SET receipt_file_path = $1,
            receipt_file_name = $2,
            receipt_file_size = $3,
            receipt_uploaded_at = CURRENT_TIMESTAMP,
+           payment_status = 'pending',
            payment_method = COALESCE(NULLIF($5, ''), payment_method),
            reference_number = COALESCE(NULLIF($6, ''), reference_number),
+           parenta_txn_id = COALESCE(parenta_txn_id, $7),
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
-       RETURNING id, receipt_file_name, receipt_file_path, receipt_uploaded_at, payment_date, amount`,
+       RETURNING id, receipt_file_name, receipt_file_path, receipt_uploaded_at, payment_date, amount, parenta_txn_id, reference_number`,
       [
         filePath,
         fileName,
@@ -232,11 +272,18 @@ export async function POST(request: NextRequest) {
         paymentId,
         paymentIdRaw ? paymentMethod : null,
         paymentIdRaw ? referenceNumberRaw || null : null,
+        parentaTxnId,
       ]
     );
 
     const paymentRow = updateResult.rows[0];
     const amountValue = parseFloat(paymentRow.amount);
+
+    try {
+      await syncPaymentCardForTenant(tenant.id);
+    } catch (syncErr) {
+      console.error('Rent Payment board sync after claim failed:', syncErr);
+    }
 
     logActivitySafe({
       actorUserId: access.userId,
@@ -245,11 +292,12 @@ export async function POST(request: NextRequest) {
       category: 'payments',
       entityType: 'payment',
       entityId: String(paymentRow.id),
-      entityLabel: `₱${amountValue.toLocaleString()} — verify transaction ID`,
+      entityLabel: `₱${amountValue.toLocaleString()} — verify GCash reference`,
       afterData: {
         paymentId: paymentRow.id,
         amount: amountValue,
-        referenceNumber: referenceNumberRaw || null,
+        referenceNumber: paymentRow.reference_number || referenceNumberRaw || null,
+        parentaTxnId: paymentRow.parenta_txn_id || parentaTxnId,
         invoiceId: linkedInvoiceId,
       },
       link: `/admin/financial/payments/${paymentRow.id}`,
@@ -257,14 +305,15 @@ export async function POST(request: NextRequest) {
         link: `/admin/financial/payments/${paymentRow.id}`,
         invoiceId: linkedInvoiceId,
         tenantId: tenant.id,
-        referenceNumber: referenceNumberRaw || null,
+        referenceNumber: paymentRow.reference_number || referenceNumberRaw || null,
+        parentaTxnId: paymentRow.parenta_txn_id || parentaTxnId,
       },
     });
 
     return NextResponse.json({
       success: true,
       message:
-        'Payment submitted for verification. Your invoice balance updates after the office confirms the transaction ID.',
+        'Payment submitted for verification. Your invoice balance updates after the office confirms the GCash / bank reference.',
       data: {
         paymentId: paymentRow.id,
         invoiceId: linkedInvoiceId,
@@ -274,6 +323,8 @@ export async function POST(request: NextRequest) {
         paymentDate: paymentRow.payment_date,
         amount: amountValue,
         status: 'pending',
+        parentaTxnId: paymentRow.parenta_txn_id || parentaTxnId,
+        referenceNumber: paymentRow.reference_number || referenceNumberRaw,
       },
     });
   } catch (error) {

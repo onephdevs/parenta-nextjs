@@ -376,16 +376,16 @@ export default function PaymentForm({
       </FormField>
 
       <FormField
-        label="Reference number"
+        label="GCash / bank reference"
         htmlFor="referenceNumber"
         required
-        hint="From your GCash / bank transfer confirmation"
+        hint="Copy the reference number from your GCash receipt (not the Parenta txn). Attach the receipt photo below."
       >
         <Input
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
-          placeholder="e.g. 1234567890"
+          placeholder="e.g. 1234 567 890"
           className={theme.input}
           required
         />

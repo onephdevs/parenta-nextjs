@@ -169,14 +169,18 @@ export async function createReservation(
           return validityDate;
         })();
 
-    // Create payment record only when deposit > 0
+    // Create payment record only when deposit > 0 (with Parenta txn id)
     let depositPaymentId: string | undefined;
     if (depositAmount > 0) {
+      const { allocateParentaTxnId } = await import(
+        '@/lib/services/transaction-id-service'
+      );
+      const parentaTxnId = await allocateParentaTxnId('d');
       const paymentQuery = `
         INSERT INTO payments (
           tenant_id, assignment_id, amount, payment_type, payment_method,
-          payment_date, due_date, reference_number, notes, payment_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          payment_date, due_date, reference_number, parenta_txn_id, notes, payment_status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id
       `;
       const paymentResult = await client.query(paymentQuery, [
@@ -188,6 +192,7 @@ export async function createReservation(
         reservationDate.toISOString().split('T')[0],
         reservationDate.toISOString().split('T')[0],
         null, // reference_number
+        parentaTxnId,
         `Reservation deposit for room reservation`,
         'paid' // Set directly to paid for reservation deposits
       ]);

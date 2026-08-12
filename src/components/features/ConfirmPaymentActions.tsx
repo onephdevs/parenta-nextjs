@@ -11,6 +11,7 @@ interface ConfirmPaymentActionsProps {
   paymentId: string;
   referenceNumber?: string | null;
   amountLabel: string;
+  onDone?: () => void;
 }
 
 function normalizeTxn(value: string | null | undefined): string {
@@ -24,6 +25,7 @@ export default function ConfirmPaymentActions({
   paymentId,
   referenceNumber,
   amountLabel,
+  onDone,
 }: ConfirmPaymentActionsProps) {
   const router = useRouter();
   const { showNotification } = useNotifications();
@@ -85,6 +87,7 @@ export default function ConfirmPaymentActions({
       });
       setConfirmOpen(false);
       setRejectOpen(false);
+      onDone?.();
       router.refresh();
     } catch (error) {
       showNotification({

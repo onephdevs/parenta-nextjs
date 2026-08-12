@@ -135,7 +135,14 @@ export async function POST(request: Request) {
       );
     }
     
-    const paymentTypeValue = paymentType || 'deposit';
+    const paymentTypeValue = (paymentType || 'deposit') as
+      | 'deposit'
+      | 'advance'
+      | 'rent'
+      | 'late_fee'
+      | 'utility'
+      | 'asset_rental'
+      | 'other';
     const isDeposit = paymentTypeValue === 'deposit';
     const isAdvance = paymentTypeValue === 'advance';
     
@@ -166,39 +173,40 @@ export async function POST(request: Request) {
       creditId = credit.id;
     }
     
-    // Create payment record for deposit, advance, or other types
-    // DB payment_type CHECK allows: rent, deposit, late_fee, utility, asset_rental, other (no 'advance')
-    const dbPaymentType = paymentTypeValue === 'advance' ? 'other' : paymentTypeValue;
-    const paymentQuery = `
-      INSERT INTO payments (
-        tenant_id,
-        amount,
-        payment_type,
-        payment_method,
-        payment_date,
-        due_date,
-        payment_status,
-        reference_number,
-        notes
-      ) VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE, $5, $6, $7)
-      RETURNING id, payment_type
-    `;
-    
-    const paymentResult = await pool.query(paymentQuery, [
-      tenant.id,
-      amount,
-      dbPaymentType,
-      paymentMethod || 'online',
-      'paid',
-      referenceNumber || null,
-      description || `${paymentTypeValue === 'deposit' ? 'Deposit' : paymentTypeValue === 'advance' ? 'Advance' : 'Payment'} payment`,
-    ]);
-    
+    // Create payment record for deposit, advance, or other types (with Parenta txn id)
+    const { createPayment } = await import('@/lib/api/payments');
+    const payment = await createPayment({
+      tenantId: String(tenant.id),
+      amount: parseFloat(amount),
+      paymentType: paymentTypeValue,
+      paymentMethod: (paymentMethod || 'online') as
+        | 'cash'
+        | 'cheque'
+        | 'check'
+        | 'credit_card'
+        | 'bank_transfer'
+        | 'online'
+        | 'gcash'
+        | 'other',
+      paymentStatus: 'completed',
+      paymentDate: new Date(),
+      referenceNumber: referenceNumber || undefined,
+      notes:
+        description ||
+        `${
+          paymentTypeValue === 'deposit'
+            ? 'Deposit'
+            : paymentTypeValue === 'advance'
+              ? 'Advance'
+              : 'Payment'
+        } payment`,
+    });
+
     // Link credit to payment if advance payment (update credit with payment_id)
     if (isAdvance && creditId) {
       await pool.query(
         'UPDATE tenant_credits SET payment_id = $1 WHERE id = $2',
-        [paymentResult.rows[0].id, creditId]
+        [payment.id, creditId]
       );
     }
     
@@ -217,11 +225,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        paymentId: paymentResult.rows[0].id,
+        paymentId: payment.id,
+        parentaTxnId: payment.parentaTxnId,
         transactionId: transactionId,
         creditId: creditId,
         amount: parseFloat(amount),
-        paymentType: paymentTypeValue, // original type (e.g. 'advance') for display; DB stores 'other'
+        paymentType: paymentTypeValue,
         transactionDate: new Date().toISOString(),
       },
       message: `${paymentTypeValue === 'deposit' ? 'Deposit' : paymentTypeValue === 'advance' ? 'Advance' : 'Payment'} payment recorded successfully`,

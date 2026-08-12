@@ -4,6 +4,7 @@ import {
   createPipelineBoard,
   ensureExpensesBoardExists,
   ensureMaintenanceBoardExists,
+  ensurePipelineBoardLabels,
   getCardsForBoard,
   getPipelineBoards,
   reorderPipelineBoards,
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
 
     await ensureMaintenanceBoardExists();
     await ensureExpensesBoardExists();
+    await ensurePipelineBoardLabels();
 
     // Opt-in sync only (?sync=1). Never block board loads on lease/maintenance sync —
     // that can take tens of seconds with many active leases.

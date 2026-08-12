@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { getPaymentById, updatePayment } from '@/lib/api/payments';
 import { allocatePaymentToInvoices } from '@/lib/services/payment-allocator';
 import { logActivitySafe } from '@/lib/services/activity-logger';
+import { syncPaymentCardForTenant } from '@/lib/api/pipeline';
 import pool from '@/lib/db';
 
 interface RouteParams {
@@ -112,13 +113,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         metadata: {
           link: `/admin/financial/payments/${id}`,
           referenceNumber: payment.referenceNumber,
+          parentaTxnId: payment.parentaTxnId,
         },
       });
+
+      try {
+        await syncPaymentCardForTenant(payment.tenantId);
+      } catch (syncErr) {
+        console.error('Rent Payment board sync after reject failed:', syncErr);
+      }
 
       return NextResponse.json({
         success: true,
         data: updated,
-        message: 'Payment claim rejected',
+        message: 'Payment claim rejected — card returns to Due / Overdue',
       });
     }
 
@@ -237,9 +245,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       metadata: {
         link: `/admin/financial/payments/${id}`,
         referenceNumber: payment.referenceNumber,
+        parentaTxnId: payment.parentaTxnId,
         invoiceId,
       },
     });
+
+    try {
+      await syncPaymentCardForTenant(payment.tenantId);
+    } catch (syncErr) {
+      console.error('Rent Payment board sync after confirm failed:', syncErr);
+    }
 
     return NextResponse.json({
       success: true,

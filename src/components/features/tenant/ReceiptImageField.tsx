@@ -19,6 +19,7 @@ export interface ReceiptImageFieldProps {
   className?: string;
   label?: string;
   required?: boolean;
+  chooseFileLabel?: string;
 }
 
 /**
@@ -34,6 +35,7 @@ export function ReceiptImageField({
   className,
   label = 'Receipt screenshot',
   required = true,
+  chooseFileLabel = 'Choose file',
 }: ReceiptImageFieldProps) {
   const { showNotification } = useNotifications();
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +127,7 @@ export function ReceiptImageField({
             leftIcon={<ImagePlus className="h-4 w-4" />}
             onClick={() => galleryInputRef.current?.click()}
           >
-            Choose file
+            {chooseFileLabel}
           </Button>
         </div>
       </div>

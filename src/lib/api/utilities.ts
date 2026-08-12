@@ -215,13 +215,23 @@ export async function createUtilityBill(billData: Partial<UtilityBill>): Promise
       }
     }
 
+    let parentaTxnId: string | null = null;
+    try {
+      const { allocateParentaTxnId } = await import(
+        '@/lib/services/transaction-id-service'
+      );
+      parentaTxnId = await allocateParentaTxnId('b');
+    } catch (err) {
+      console.error('Parenta txn allocate failed for utility bill (non-fatal):', err);
+    }
+
     const query = `
       INSERT INTO utility_bills (
         building_id, room_id, utility_type, amount, billing_period_start,
         billing_period_end, due_date, bill_status, provider_name, provider_account_number,
-        usage_amount, notes, cost_bearer
+        usage_amount, notes, cost_bearer, parenta_txn_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `;
     
@@ -244,6 +254,7 @@ export async function createUtilityBill(billData: Partial<UtilityBill>): Promise
       billData.meterReading || null,
       billData.notes || null,
       costBearer,
+      parentaTxnId,
     ];
     
     const result = await pool.query(query, values);

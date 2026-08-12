@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
   Calendar,
+  ChevronDown,
   CircleX,
   ExternalLink,
   FileCheck2,
   FileText,
   History,
+  Info,
   Plus,
   ShieldCheck,
   Tag,
@@ -44,16 +46,22 @@ import {
   todayLocalISO,
 } from '@/lib/lease-dates';
 import { OpportunityTagsField } from './OpportunityTagsField';
+import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 import { OpportunityDocumentsPanel } from './OpportunityDocumentsPanel';
 import { OpportunityHistoryPanel } from './OpportunityHistoryPanel';
 import { PaymentFollowUpPanel } from './PaymentFollowUpPanel';
-import { ExpenseFollowUpPanel } from './ExpenseFollowUpPanel';
 import { MaintenanceFollowUpPanel } from './MaintenanceFollowUpPanel';
 import {
   contactDisplayName,
+  inferContactUtilityTypes,
   vendorContactPersonName,
   type Contact,
 } from '@/lib/constants/contacts';
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+  type ExpenseCategory,
+} from '@/lib/constants/bills-expenses';
 import {
   formatPaymentNotesForPeople,
   preserveLedgerTagOnSave,
@@ -62,8 +70,34 @@ import {
   formatPaymentMethodLabel,
   PAYMENT_METHOD_SELECT_OPTIONS,
 } from '@/lib/constants/payment-methods';
+import {
+  buildMaintenancePipelineTags,
+  MAINTENANCE_CATEGORIES,
+  MAINTENANCE_CATEGORY_LABELS,
+  MAINTENANCE_PRIORITY_LABELS,
+} from '@/lib/constants/maintenance';
 
 const CUSTOM_VENDOR_VALUE = '__custom__';
+
+const EXPENSE_BOARD_CATEGORIES = EXPENSE_CATEGORIES.filter((c) =>
+  (
+    [
+      'cleaning',
+      'maintenance',
+      'repair',
+      'upgrade',
+      'garbage_collection',
+      'other',
+    ] as ExpenseCategory[]
+  ).includes(c)
+);
+
+const EXPENSE_DOC_TYPE_OPTIONS = [
+  { value: 'receipt', label: 'Receipt / proof of payment' },
+  { value: 'utility_bill', label: 'Utility bill / invoice' },
+  { value: 'invoice', label: 'Vendor invoice' },
+  { value: 'other', label: 'Other' },
+];
 
 interface BuildingOption {
   id: string;
@@ -111,6 +145,24 @@ function toDatetimeLocal(iso?: string): string {
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function toDateInput(iso?: string | Date | null): string {
+  if (!iso) return '';
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function expenseUtilityTypeFromCard(
+  tags: string[],
+  source?: string | null
+): 'electricity' | 'water' | null {
+  const hay = `${tags.join(' ')} ${source || ''}`.toLowerCase();
+  if (hay.includes('electric')) return 'electricity';
+  if (hay.includes('water')) return 'water';
+  return null;
 }
 
 const onboardingSections: SectionedFormSection<FormSection>[] = [
@@ -180,39 +232,19 @@ const onboardingSections: SectionedFormSection<FormSection>[] = [
 
 const paymentsSections: SectionedFormSection<FormSection>[] = [
   {
-    id: 'contact',
-    label: 'Tenant',
-    icon: <User className="h-4 w-4" />,
-    title: 'Tenant contact',
-    subtitle: 'Who owes rent — confirm phone/email before you chase payment.',
-  },
-  {
-    id: 'property',
-    label: 'Lease',
-    icon: <Building2 className="h-4 w-4" />,
-    title: 'Unit & rent',
-    subtitle: 'Building, room, and monthly amount for this follow-up.',
-  },
-  {
-    id: 'schedule',
-    label: 'Due date',
-    icon: <Calendar className="h-4 w-4" />,
-    title: 'When payment is due',
-    subtitle: 'Set due / next action so you know when to remind or escalate.',
-  },
-  {
     id: 'payment',
-    label: 'Payment',
+    label: 'Rent',
     icon: <Wallet className="h-4 w-4" />,
-    title: 'Payment & invoice',
-    subtitle: 'See what the payment is for, transaction ID, receipts, and attachments.',
+    title: 'Rent payment',
+    subtitle:
+      'Tenant, unit, due date, amount, and GCash receipt verification.',
   },
   {
     id: 'notes',
-    label: 'Follow-up',
+    label: 'Notes',
     icon: <FileText className="h-4 w-4" />,
     title: 'Follow-up notes',
-    subtitle: 'What you said, promised, or need to do next (call, SMS, visit).',
+    subtitle: 'Calls, promises, partial payments, or escalation context.',
   },
   {
     id: 'tags',
@@ -225,36 +257,15 @@ const paymentsSections: SectionedFormSection<FormSection>[] = [
 
 const expensesSections: SectionedFormSection<FormSection>[] = [
   {
-    id: 'contact',
-    label: 'Vendor',
-    icon: <User className="h-4 w-4" />,
-    title: 'Vendor / provider',
-    subtitle: 'Who to pay — utility provider or expense vendor.',
-  },
-  {
-    id: 'property',
-    label: 'Property',
-    icon: <Building2 className="h-4 w-4" />,
-    title: 'Building & amount',
-    subtitle: 'Which property this bill belongs to and how much.',
-  },
-  {
-    id: 'schedule',
-    label: 'Due date',
-    icon: <Calendar className="h-4 w-4" />,
-    title: 'When payment is due',
-    subtitle: 'Bill due date and next follow-up for approval / payment.',
-  },
-  {
     id: 'payment',
-    label: 'Expense',
+    label: 'Bill',
     icon: <Wallet className="h-4 w-4" />,
-    title: 'Bill & expense details',
-    subtitle: 'See what this is for, paid status, receipts, and attachments.',
+    title: 'Bill or expense',
+    subtitle: 'Type, description, vendor, property, dates, amount, and receipt photo.',
   },
   {
     id: 'notes',
-    label: 'Follow-up',
+    label: 'Notes',
     icon: <FileText className="h-4 w-4" />,
     title: 'Follow-up notes',
     subtitle: 'Approval notes, payment schedule, or vendor follow-ups.',
@@ -414,13 +425,13 @@ function computeOnboardingSectionMeta(input: {
     history: { status: 'optional', statusHint: 'Change log' },
   };
 
-  if (!input.isEditing) return meta;
-
   meta.documents = docsDone
     ? { status: 'done', statusHint: 'Documents uploaded' }
     : {
         status: 'ready',
-        statusHint: 'Optional — upload ID / income docs when ready',
+        statusHint: input.isEditing
+          ? 'Optional — upload ID / income docs when ready'
+          : 'Optional — available after you create the card',
       };
 
   meta.screening = screeningDone
@@ -476,15 +487,7 @@ function sectionsForBoard(
   isEditing: boolean
 ): SectionedFormSection<FormSection>[] {
   if (board.slug === 'onboarding') {
-    const base = isEditing
-      ? onboardingSections
-      : onboardingSections.filter(
-          (s) =>
-            s.id !== 'documents' &&
-            s.id !== 'screening' &&
-            s.id !== 'payment' &&
-            s.id !== 'lease'
-        );
+    const base = onboardingSections;
     return isEditing ? [...base, historySection] : base;
   }
 
@@ -496,15 +499,8 @@ function sectionsForBoard(
         : board.slug === 'maintenance'
           ? maintenanceSections
           : genericSections;
+
   if (!isEditing) {
-    // Detail panels need an existing card id
-    if (
-      board.slug === 'payments' ||
-      board.slug === 'expenses' ||
-      board.slug === 'maintenance'
-    ) {
-      return base.filter((s) => s.id !== 'payment');
-    }
     return base;
   }
 
@@ -534,7 +530,13 @@ export function AddOpportunityModal({
   const isMaintenance = board.slug === 'maintenance';
   const baseSections = sectionsForBoard(board, isEditing);
 
-  const [activeSection, setActiveSection] = useState<FormSection>('contact');
+  const [activeSection, setActiveSection] = useState<FormSection>(
+    board.slug === 'expenses' ||
+      board.slug === 'payments' ||
+      board.slug === 'maintenance'
+      ? 'payment'
+      : 'contact'
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [buildings, setBuildings] = useState<BuildingOption[]>([]);
@@ -548,6 +550,16 @@ export function AddOpportunityModal({
   const [newVendorPhone, setNewVendorPhone] = useState('');
   const [savingVendor, setSavingVendor] = useState(false);
   const [vendorFormError, setVendorFormError] = useState<string | null>(null);
+  const [expenseKind, setExpenseKind] = useState<'utility' | 'expense'>('utility');
+  const [utilityType, setUtilityType] = useState<'electricity' | 'water'>('electricity');
+  const [billingPeriodStart, setBillingPeriodStart] = useState('');
+  const [billingPeriodEnd, setBillingPeriodEnd] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState('maintenance');
+  const [expenseStatus, setExpenseStatus] = useState<'pending' | 'paid'>('pending');
+  const [maintenanceDescription, setMaintenanceDescription] = useState('');
+  const [maintenanceCategory, setMaintenanceCategory] = useState<string>('plumbing');
+  const [maintenancePriority, setMaintenancePriority] = useState('medium');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   /** Raw notes from DB (may include [ledger:…] tags) — preserved on save */
   const [notesRaw, setNotesRaw] = useState('');
 
@@ -614,7 +626,11 @@ export function AddOpportunityModal({
   useEffect(() => {
     if (!isOpen) return;
     setActiveSection(
-      board.slug === 'maintenance' && card?.id ? 'payment' : 'contact'
+      board.slug === 'expenses' ||
+        board.slug === 'payments' ||
+        board.slug === 'maintenance'
+        ? 'payment'
+        : 'contact'
     );
     setError(null);
     setMoveBoardId('');
@@ -634,7 +650,11 @@ export function AddOpportunityModal({
       setNotes(formatPaymentNotesForPeople(card.notes || ''));
       setTitle(card.title || '');
       setViewingAt(toDatetimeLocal(card.viewingAt));
-      setDueAt(toDatetimeLocal(card.dueAt));
+      setDueAt(
+        board.slug === 'expenses' || board.slug === 'payments'
+          ? toDateInput(card.dueAt)
+          : toDatetimeLocal(card.dueAt)
+      );
       setNextActionAt(toDatetimeLocal(card.nextActionAt));
       setTags(card.tags || []);
       setMarkAsLost(
@@ -683,13 +703,31 @@ export function AddOpportunityModal({
       }
       setMoveInPaymentStatus(card.moveInPaymentStatus === 'paid' ? 'paid' : 'unpaid');
       setMoveInPaymentMethod(card.moveInPaymentMethod || 'cash');
-      setMoveInTransactionId(card.moveInPaymentNotes || '');
+      // Free-text field is GCash/bank reference (not Parenta txn)
+      setMoveInTransactionId(
+        (card.moveInPaymentNotes || '')
+          .split(' · ')
+          .filter((p) => p && !p.startsWith('Type:'))
+          .join(' · ')
+      );
       setMoveInPaymentType('rent');
       setMoveInPaymentDate(
         card.moveInPaidAt
           ? card.moveInPaidAt.slice(0, 10)
           : todayLocalISO()
       );
+      if (board.slug === 'expenses') {
+        const inferred = expenseUtilityTypeFromCard(
+          card.tags || [],
+          card.source
+        );
+        setExpenseKind(card.expenseId && !card.utilityBillId ? 'expense' : 'utility');
+        setUtilityType(inferred || 'electricity');
+        setBillingPeriodStart('');
+        setBillingPeriodEnd('');
+        setExpenseCategory('maintenance');
+        setExpenseStatus('pending');
+      }
     } else {
       setFirstName('');
       setLastName('');
@@ -727,7 +765,19 @@ export function AddOpportunityModal({
       setMoveInTransactionId('');
       setMoveInPaymentType('rent');
       setMoveInPaymentDate(todayLocalISO());
+      const today = todayLocalISO();
+      setExpenseKind('utility');
+      setUtilityType('electricity');
+      setBillingPeriodStart(today);
+      setBillingPeriodEnd(today);
+      setDueAt(board.slug === 'expenses' ? today : '');
+      setExpenseCategory('maintenance');
+      setExpenseStatus('pending');
+      setMaintenanceDescription('');
+      setMaintenanceCategory('plumbing');
+      setMaintenancePriority('medium');
     }
+    setReceiptFile(null);
     setSelectedVendorId('');
     setShowAddVendor(false);
     setNewVendorName('');
@@ -789,6 +839,112 @@ export function AddOpportunityModal({
     setSelectedVendorId(match ? match.id : CUSTOM_VENDOR_VALUE);
   }, [isExpenses, isOpen, firstName, vendors]);
 
+  useEffect(() => {
+    if (!isOpen || !isExpenses || !card?.id) return;
+    const utilityBillId = card.utilityBillId;
+    const expenseId = card.expenseId;
+    if (!utilityBillId && !expenseId) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (utilityBillId) {
+          const res = await fetch(
+            `/api/utilities/${encodeURIComponent(utilityBillId)}`
+          );
+          const json = await res.json();
+          if (cancelled || !json.success || !json.data) return;
+          const bill = json.data as {
+            utilityType?: string;
+            provider?: string;
+            amount?: number;
+            billStatus?: string;
+            dueDate?: string | Date;
+            billingPeriodStart?: string | Date;
+            billingPeriodEnd?: string | Date;
+            buildingId?: string;
+            roomId?: string;
+            notes?: string;
+          };
+          setExpenseKind('utility');
+          if (bill.utilityType === 'water' || bill.utilityType === 'electricity') {
+            setUtilityType(bill.utilityType);
+          }
+          setBillingPeriodStart(toDateInput(bill.billingPeriodStart));
+          setBillingPeriodEnd(toDateInput(bill.billingPeriodEnd));
+          if (bill.dueDate) setDueAt(toDateInput(bill.dueDate));
+          if (bill.amount != null) setAmount(String(bill.amount));
+          if (bill.provider) setFirstName(bill.provider);
+          if (bill.billStatus === 'paid' || bill.billStatus === 'pending') {
+            setExpenseStatus(bill.billStatus);
+          }
+          if (bill.buildingId) setBuildingId(String(bill.buildingId));
+          if (bill.roomId) setRoomId(String(bill.roomId));
+          if (bill.notes) setNotes(formatPaymentNotesForPeople(bill.notes));
+          return;
+        }
+
+        const res = await fetch(`/api/expenses/${encodeURIComponent(expenseId!)}`);
+        const json = await res.json();
+        if (cancelled || !json.success || !json.data) return;
+        const expense = json.data as {
+          category?: string;
+          vendor?: string;
+          vendorName?: string;
+          amount?: number;
+          expenseStatus?: string;
+          expenseDate?: string | Date;
+          buildingId?: string;
+          roomId?: string;
+          notes?: string;
+          description?: string;
+        };
+        setExpenseKind('expense');
+        if (
+          expense.category &&
+          EXPENSE_BOARD_CATEGORIES.includes(expense.category as ExpenseCategory)
+        ) {
+          setExpenseCategory(expense.category);
+        } else if (expense.category) {
+          setExpenseCategory('other');
+        }
+        if (expense.expenseDate) setDueAt(toDateInput(expense.expenseDate));
+        if (expense.amount != null) setAmount(String(expense.amount));
+        const vendorName = (expense.vendorName || expense.vendor || '').trim();
+        if (vendorName) setFirstName(vendorName);
+        setExpenseStatus(expense.expenseStatus === 'paid' ? 'paid' : 'pending');
+        if (expense.buildingId) setBuildingId(String(expense.buildingId));
+        if (expense.roomId) setRoomId(String(expense.roomId));
+        if (expense.notes) setNotes(formatPaymentNotesForPeople(expense.notes));
+        if (expense.description) setTitle(expense.description);
+      } catch {
+        /* keep card fields */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isExpenses, card?.id, card?.utilityBillId, card?.expenseId]);
+
+  const vendorsForType = useMemo(() => {
+    if (expenseKind !== 'utility') return vendors;
+    const matched = vendors.filter((v) => {
+      const types = v.utilityTypes?.length
+        ? v.utilityTypes
+        : inferContactUtilityTypes(v);
+      return types.includes(utilityType);
+    });
+    const selected =
+      selectedVendorId && selectedVendorId !== CUSTOM_VENDOR_VALUE
+        ? vendors.find((v) => v.id === selectedVendorId)
+        : undefined;
+    if (selected && !matched.some((v) => v.id === selected.id)) {
+      return [selected, ...matched];
+    }
+    return matched.length > 0 ? matched : vendors;
+  }, [vendors, expenseKind, utilityType, selectedVendorId]);
+
   function applyVendor(vendor: Contact) {
     setSelectedVendorId(vendor.id);
     setFirstName(vendor.firstName);
@@ -812,7 +968,7 @@ export function AddOpportunityModal({
       setSelectedVendorId(CUSTOM_VENDOR_VALUE);
       return;
     }
-    const vendor = vendors.find((v) => v.id === value);
+    const vendor = vendorsForType.find((v) => v.id === value) || vendors.find((v) => v.id === value);
     if (vendor) applyVendor(vendor);
   }
 
@@ -860,6 +1016,45 @@ export function AddOpportunityModal({
     } finally {
       setSavingVendor(false);
     }
+  }
+
+  async function uploadExpenseReceipt(cardId: string, file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('documentName', file.name || 'Receipt');
+    form.append('documentType', 'receipt');
+    form.append('pipelineCardId', cardId);
+    form.append('accessLevel', 'admin');
+    if (buildingId) form.append('buildingId', buildingId);
+    if (roomId) form.append('roomId', roomId);
+    const res = await fetch('/api/documents', { method: 'POST', body: form });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to upload receipt');
+    }
+  }
+
+  async function findExpensesBoardCard(opts: {
+    utilityBillId?: string;
+    expenseId?: string;
+  }) {
+    const res = await fetch('/api/pipeline/cards?board=expenses');
+    const json = await res.json();
+    const cards = (json.data?.cards || []) as PipelineCard[];
+    return cards.find((c) =>
+      opts.utilityBillId
+        ? c.utilityBillId === opts.utilityBillId
+        : opts.expenseId
+          ? c.expenseId === opts.expenseId
+          : false
+    );
+  }
+
+  async function findMaintenanceBoardCard(maintenanceRequestId: string) {
+    const res = await fetch('/api/pipeline/cards?board=maintenance');
+    const json = await res.json();
+    const cards = (json.data?.cards || []) as PipelineCard[];
+    return cards.find((c) => c.maintenanceRequestId === maintenanceRequestId);
   }
 
   useEffect(() => {
@@ -1319,18 +1514,34 @@ export function AddOpportunityModal({
     try {
       if (isOnboarding || board.slug === 'payments') {
         if (!firstName.trim() || !lastName.trim()) {
-          setActiveSection('contact');
+          setActiveSection(isPayments ? 'payment' : 'contact');
           throw new Error('First and last name are required');
         }
       }
 
       if (isExpenses && !firstName.trim()) {
-        setActiveSection('contact');
+        setActiveSection('payment');
         throw new Error('Vendor / provider name is required');
       }
 
+      if (isPayments && !isEditing) {
+        if (!buildingId) {
+          setActiveSection('payment');
+          throw new Error('Select a building');
+        }
+        const amountNum = Number(amount);
+        if (!Number.isFinite(amountNum) || amountNum <= 0) {
+          setActiveSection('payment');
+          throw new Error('Enter an amount greater than zero');
+        }
+        if (!dueAt) {
+          setActiveSection('payment');
+          throw new Error('Rent due date is required');
+        }
+      }
+
       if (roomId && !buildingId) {
-        setActiveSection('property');
+        setActiveSection(isExpenses || isPayments ? 'payment' : 'property');
         throw new Error('Select a building for the room');
       }
 
@@ -1339,7 +1550,157 @@ export function AddOpportunityModal({
         throw new Error('Please add remarks explaining why this opportunity is lost');
       }
 
+      if (isExpenses && !isEditing) {
+        if (!buildingId) {
+          setActiveSection('payment');
+          throw new Error('Select a building');
+        }
+        const amountNum = Number(amount);
+        if (!Number.isFinite(amountNum) || amountNum <= 0) {
+          setActiveSection('payment');
+          throw new Error('Enter an amount greater than zero');
+        }
+        if (!dueAt) {
+          setActiveSection('payment');
+          throw new Error('Due date is required');
+        }
+
+        if (expenseKind === 'utility') {
+          if (!billingPeriodStart || !billingPeriodEnd) {
+            setActiveSection('payment');
+            throw new Error('Billing period start and end are required');
+          }
+          const res = await fetch('/api/utility-bills/room', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              buildingId,
+              roomId: roomId || undefined,
+              utilityType,
+              amount: amountNum,
+              billingPeriodStart,
+              billingPeriodEnd,
+              dueDate: dueAt,
+              providerName: firstName.trim(),
+              billStatus: expenseStatus,
+              notes: notes.trim() || undefined,
+            }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            throw new Error(json.error || 'Failed to create utility bill');
+          }
+          const createdBillId = json.data?.id as string | undefined;
+          const createdCard = createdBillId
+            ? await findExpensesBoardCard({ utilityBillId: createdBillId })
+            : undefined;
+          if (createdCard?.id && title.trim()) {
+            await fetch(`/api/pipeline/cards/${createdCard.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'update', title: title.trim() }),
+            });
+          }
+          if (createdCard?.id && receiptFile) {
+            await uploadExpenseReceipt(createdCard.id, receiptFile);
+          }
+        } else {
+          const categoryLabel =
+            EXPENSE_CATEGORY_LABELS[expenseCategory as ExpenseCategory] ||
+            expenseCategory;
+          const res = await fetch('/api/expenses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              buildingId,
+              roomId: roomId || undefined,
+              amount: amountNum,
+              category: expenseCategory,
+              description:
+                title.trim() || `${categoryLabel} — ${firstName.trim()}`,
+              vendor: firstName.trim(),
+              expenseDate: dueAt,
+              notes: notes.trim() || undefined,
+            }),
+          });
+          const json = await res.json();
+          if (!res.ok || json.error) {
+            throw new Error(json.error || 'Failed to create expense');
+          }
+          const createdExpenseId = json.expense?.id || json.data?.id;
+          if (expenseStatus === 'paid' && createdExpenseId) {
+            await fetch(`/api/expenses/${encodeURIComponent(createdExpenseId)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ expenseStatus: 'paid' }),
+            });
+          }
+          const createdCard = createdExpenseId
+            ? await findExpensesBoardCard({ expenseId: createdExpenseId })
+            : undefined;
+          if (createdCard?.id && receiptFile) {
+            await uploadExpenseReceipt(createdCard.id, receiptFile);
+          }
+        }
+        onCreated();
+        onClose();
+        return;
+      }
+
       if (isEditing && card) {
+        if (isExpenses && card.utilityBillId) {
+          const billUpdates: Record<string, unknown> = {
+            provider: firstName.trim(),
+            amount: amount ? Number(amount) : undefined,
+            billStatus: expenseStatus,
+            notes: notes.trim() || undefined,
+            buildingId: buildingId || undefined,
+            roomId: roomId || null,
+            utilityType,
+            dueDate: dueAt || undefined,
+          };
+          if (billingPeriodStart) billUpdates.billingPeriodStart = billingPeriodStart;
+          if (billingPeriodEnd) billUpdates.billingPeriodEnd = billingPeriodEnd;
+          const billRes = await fetch(
+            `/api/utilities/${encodeURIComponent(card.utilityBillId)}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(billUpdates),
+            }
+          );
+          const billJson = await billRes.json();
+          if (!billRes.ok || !billJson.success) {
+            throw new Error(billJson.error || 'Failed to update utility bill');
+          }
+        } else if (isExpenses && card.expenseId) {
+          const expenseRes = await fetch(
+            `/api/expenses/${encodeURIComponent(card.expenseId)}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                vendor: firstName.trim(),
+                vendorName: firstName.trim(),
+                amount: amount ? Number(amount) : undefined,
+                category: expenseCategory,
+                expenseDate: dueAt || undefined,
+                notes: notes.trim() || undefined,
+                expenseStatus,
+                buildingId: buildingId || undefined,
+                roomId: roomId || null,
+                description:
+                  title.trim() ||
+                  `${EXPENSE_CATEGORY_LABELS[expenseCategory as ExpenseCategory] || expenseCategory} — ${firstName.trim()}`,
+              }),
+            }
+          );
+          const expenseJson = await expenseRes.json();
+          if (!expenseRes.ok || !expenseJson.success) {
+            throw new Error(expenseJson.error || 'Failed to update expense');
+          }
+        }
+
         const updateBody: Record<string, unknown> = {
           action: 'update',
           contactFirstName: firstName.trim(),
@@ -1353,7 +1714,11 @@ export function AddOpportunityModal({
           tags,
           notes: preserveLedgerTagOnSave(notes, notesRaw) || null,
           viewingAt: viewingAt ? new Date(viewingAt).toISOString() : null,
-          dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+          dueAt: dueAt
+            ? isExpenses || isPayments
+              ? new Date(`${dueAt}T12:00:00`).toISOString()
+              : new Date(dueAt).toISOString()
+            : null,
           nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
           lostReason: markAsLost ? lostReason.trim() : lostReason.trim() || null,
           markAsLost,
@@ -1391,6 +1756,78 @@ export function AddOpportunityModal({
           throw new Error(json.error || json.details || 'Failed to save opportunity');
         }
         onSaved?.(json.data?.card as PipelineCard | undefined);
+        onClose();
+        return;
+      }
+
+      if (isMaintenance && !isEditing) {
+        if (!title.trim()) {
+          setActiveSection('payment');
+          throw new Error('Issue title is required');
+        }
+        if (!maintenanceDescription.trim()) {
+          setActiveSection('payment');
+          throw new Error('Issue description is required');
+        }
+        if (!maintenanceCategory) {
+          setActiveSection('payment');
+          throw new Error('Category is required');
+        }
+
+        const maintRes = await fetch('/api/maintenance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title.trim(),
+            description: maintenanceDescription.trim(),
+            category: maintenanceCategory,
+            priority: maintenancePriority,
+            buildingId: buildingId || undefined,
+            roomId: roomId || undefined,
+            scheduledDate: dueAt || undefined,
+          }),
+        });
+        const maintJson = await maintRes.json();
+        if (!maintRes.ok || !maintJson.success) {
+          throw new Error(maintJson.error || 'Failed to create maintenance request');
+        }
+
+        const requestId = String(maintJson.data?.id || '');
+        const pipelineCard = requestId
+          ? await findMaintenanceBoardCard(requestId)
+          : undefined;
+
+        if (pipelineCard?.id) {
+          const autoTags = buildMaintenancePipelineTags({
+            priority: maintenancePriority,
+            category: maintenanceCategory,
+          });
+          const mergedTags = [...new Set([...tags, ...autoTags])];
+          const patchRes = await fetch(`/api/pipeline/cards/${pipelineCard.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              contactFirstName: firstName.trim() || null,
+              contactLastName: lastName.trim() || null,
+              contactEmail: email.trim() || null,
+              contactPhone: phone.trim() || null,
+              buildingId: buildingId || null,
+              roomId: roomId || null,
+              dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+              notes: notes.trim() || null,
+              tags: mergedTags,
+            }),
+          });
+          const patchJson = await patchRes.json();
+          if (!patchJson.success) {
+            throw new Error(
+              patchJson.error || patchJson.details || 'Failed to update maintenance card'
+            );
+          }
+        }
+
+        onCreated();
         onClose();
         return;
       }
@@ -1435,7 +1872,11 @@ export function AddOpportunityModal({
           buildingId: buildingId || undefined,
           roomId: roomId || undefined,
           amount: amount ? Number(amount) : undefined,
-          dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+          dueAt: dueAt
+            ? isPayments
+              ? new Date(`${dueAt}T12:00:00`).toISOString()
+              : new Date(dueAt).toISOString()
+            : undefined,
           nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : undefined,
           notes: notes.trim() || undefined,
           tags: tags.length > 0 ? tags : undefined,
@@ -1447,6 +1888,14 @@ export function AddOpportunityModal({
           contactLastName: lastName.trim() || undefined,
           contactEmail: email.trim() || undefined,
           contactPhone: phone.trim() || undefined,
+          buildingId: buildingId || undefined,
+          roomId: roomId || undefined,
+          amount: amount ? Number(amount) : undefined,
+          source: source || undefined,
+          dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+          nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : undefined,
+          notes: notes.trim() || undefined,
+          tags: tags.length > 0 ? tags : undefined,
         });
       }
 
@@ -1459,6 +1908,59 @@ export function AddOpportunityModal({
       if (!json.success) {
         throw new Error(json.error || json.details || 'Failed to create opportunity');
       }
+
+      if (isOnboarding && json.data?.card?.id) {
+        const createdId = json.data.card.id as string;
+        const patchRes = await fetch(`/api/pipeline/cards/${createdId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            contactFirstName: firstName.trim(),
+            contactLastName: lastName.trim(),
+            contactEmail: email.trim() || null,
+            contactPhone: phone.trim() || null,
+            buildingId: buildingId || null,
+            roomId: roomId || null,
+            amount: amount ? Number(amount) : null,
+            source: source || null,
+            tags,
+            notes: notes.trim() || null,
+            viewingAt: viewingAt ? new Date(viewingAt).toISOString() : null,
+            lostReason: markAsLost ? lostReason.trim() : lostReason.trim() || null,
+            markAsLost,
+            backgroundCheckStatus,
+            backgroundCheckNotes: backgroundCheckNotes.trim() || null,
+            leaseStatus,
+            leaseStartDate: leaseStartDate || null,
+            leaseEndDate: isOpenEndedLease ? null : leaseEndDate || null,
+            moveInDate: moveInDate || leaseStartDate || null,
+            depositAmount: depositAmount.trim() !== '' ? Number(depositAmount) : null,
+            advanceAmount: (() => {
+              const { advance } = getMoveInSplit();
+              return moveInTotalPaid.trim() !== '' ? advance : null;
+            })(),
+            moveInPaymentStatus,
+            moveInPaidAt:
+              moveInPaymentStatus === 'paid' && moveInPaymentDate
+                ? new Date(`${moveInPaymentDate}T12:00:00`).toISOString()
+                : undefined,
+            moveInPaymentMethod,
+            moveInPaymentNotes: buildMoveInPaymentNotes(),
+            title:
+              title.trim() ||
+              `${firstName.trim()} ${lastName.trim()}`.trim() ||
+              json.data.card.title,
+          }),
+        });
+        const patchJson = await patchRes.json();
+        if (!patchJson.success) {
+          throw new Error(
+            patchJson.error || patchJson.details || 'Failed to save opportunity details'
+          );
+        }
+      }
+
       onCreated();
     } catch (err) {
       setError(
@@ -1542,9 +2044,17 @@ export function AddOpportunityModal({
         : isEditing
           ? 'Maintenance request'
           : 'New request')
-    : firstName || lastName
-      ? `${firstName} ${lastName}`.trim()
-      : title.trim() || (isEditing ? 'Opportunity' : 'New opportunity');
+    : isExpenses
+      ? firstName.trim() ||
+        title.trim() ||
+        (isEditing ? 'Bill' : 'New bill')
+      : isPayments
+        ? firstName || lastName
+          ? `${firstName} ${lastName}`.trim()
+          : title.trim() || (isEditing ? 'Rent payment' : 'New rent follow-up')
+        : firstName || lastName
+          ? `${firstName} ${lastName}`.trim()
+          : title.trim() || (isEditing ? 'Opportunity' : 'New opportunity');
 
   return (
     <>
@@ -1555,16 +2065,16 @@ export function AddOpportunityModal({
       eyebrow={
         isEditing
           ? isPayments
-            ? 'Payment follow-up'
+            ? 'Rent payment'
             : isExpenses
-              ? 'Expense follow-up'
+              ? 'Building electricity, water and expense'
               : isMaintenance
                 ? 'Maintenance request'
                 : 'Edit opportunity'
           : isPayments
-            ? 'Add payment follow-up'
+            ? 'Add rent payment'
             : isExpenses
-              ? 'Add expense follow-up'
+              ? 'Add bill or expense'
               : isMaintenance
                 ? 'Add maintenance follow-up'
                 : 'Add opportunity'
@@ -1574,7 +2084,25 @@ export function AddOpportunityModal({
       activeSection={activeSection}
       onSectionChange={setActiveSection}
       formId="add-opportunity-form"
-      primaryLabel={isEditing ? 'Save changes' : 'Create opportunity'}
+      primaryLabel={
+        isExpenses
+          ? isEditing
+            ? 'Save changes'
+            : expenseKind === 'utility'
+              ? 'Create bill'
+              : 'Create expense'
+          : isPayments
+            ? isEditing
+              ? 'Save changes'
+              : 'Create rent follow-up'
+            : isMaintenance
+              ? isEditing
+                ? 'Save changes'
+                : 'Create maintenance follow-up'
+            : isEditing
+              ? 'Save changes'
+              : 'Create opportunity'
+      }
       primaryLoading={submitting}
       primaryDisabled={isDeleting}
       errorBanner={error ? <FormErrorBanner message={error} className="mb-6" /> : null}
@@ -1788,7 +2316,8 @@ export function AddOpportunityModal({
               </>
             )}
 
-            {activeSection === 'documents' && card?.id && (
+            {activeSection === 'documents' && (
+              card?.id ? (
               <OpportunityDocumentsPanel
                 cardId={card.id}
                 buildingId={buildingId || undefined}
@@ -1830,6 +2359,12 @@ export function AddOpportunityModal({
                   }
                 }}
               />
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Create the opportunity first, then reopen this card to upload ID, income
+                  proof, or lease documents.
+                </div>
+              )
             )}
 
             {activeSection === 'screening' && (
@@ -2184,9 +2719,10 @@ export function AddOpportunityModal({
                   </FormField>
 
                   <FormField
-                    label="Transaction ID"
+                    label="GCash / bank reference"
                     htmlFor="opp-txn-id"
                     className="col-span-6 sm:col-span-3"
+                    hint="Optional receipt number from GCash/bank (not the Parenta txn)"
                   >
                     <Input
                       id="opp-txn-id"
@@ -2197,6 +2733,34 @@ export function AddOpportunityModal({
                     />
                   </FormField>
                 </div>
+
+                {(card?.depositParentaTxnId ||
+                  card?.advanceParentaTxnId ||
+                  moveInPaymentStatus === 'paid') && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm">
+                    <p className="font-medium text-emerald-900">Parenta transaction IDs</p>
+                    <div className="mt-2 grid gap-1.5 font-mono text-xs text-emerald-950 sm:grid-cols-2">
+                      {card?.depositParentaTxnId ? (
+                        <div>
+                          <span className="text-emerald-700">Deposit: </span>
+                          {card.depositParentaTxnId}
+                        </div>
+                      ) : moveInPaymentStatus === 'paid' &&
+                        Number(depositAmount || 0) > 0 ? (
+                        <div className="text-emerald-700">Deposit: assigning…</div>
+                      ) : null}
+                      {card?.advanceParentaTxnId ? (
+                        <div>
+                          <span className="text-emerald-700">Advance: </span>
+                          {card.advanceParentaTxnId}
+                        </div>
+                      ) : moveInPaymentStatus === 'paid' &&
+                        Number(getMoveInSplit().advance || 0) > 0 ? (
+                        <div className="text-emerald-700">Advance: assigning…</div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
 
                 {!card?.assignmentId && (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
@@ -2555,265 +3119,51 @@ export function AddOpportunityModal({
           </>
         ) : (
           <>
-            {isPayments && isEditing && activeSection === 'contact' && (
-              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-                <p className="font-medium">How to use Payments cards</p>
-                <ol className="mt-2 list-decimal space-y-1 pl-4 text-indigo-800">
-                  <li>
-                    Drag the card across stages: Upcoming → Due → Reminder sent → Overdue → Paid
-                    → Refund (or Escalation).
-                  </li>
-                  <li>
-                    Open Payment to see the invoice, transaction IDs, receipts, and attachments.
-                  </li>
-                  <li>Set the due date, then log what you did in Follow-up notes.</li>
-                  <li>Record the actual money in Payments / Financial — this board tracks chase work.</li>
-                </ol>
-                {card?.tenantId && (
-                  <a
-                    href={`/admin/tenants/${card.tenantId}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700 underline"
-                  >
-                    Open tenant profile
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </div>
-            )}
-
-            {isExpenses && isEditing && activeSection === 'contact' && (
-              <div className="rounded-lg border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
-                <p className="font-medium">How to use Expenses cards</p>
-                <ol className="mt-2 list-decimal space-y-1 pl-4 text-violet-800">
-                  <li>
-                    Open Expense to see the utility bill or vendor expense, paid status, and
-                    attachments.
-                  </li>
-                  <li>Drag across stages as you verify, approve, schedule, and pay.</li>
-                  <li>
-                    Mark paid here or in Financial — the board syncs from utility bills and
-                    expenses.
-                  </li>
-                </ol>
-              </div>
-            )}
-
-            {activeSection === 'contact' && (
+            {activeSection === 'contact' && !isExpenses && !isPayments && (
               <>
-                {isExpenses ? (
-                  <>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                      <FormField
-                        label="Vendor / provider"
-                        htmlFor="opp-vendor-select"
-                        required
-                        className="min-w-0 flex-1"
-                      >
-                        <Select
-                          id="opp-vendor-select"
-                          required={!firstName.trim()}
-                          value={selectedVendorId}
-                          onChange={(e) => handleVendorSelect(e.target.value)}
-                        >
-                          <option value="">Select a vendor…</option>
-                          {vendors.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {contactDisplayName(v)}
-                            </option>
-                          ))}
-                          <option value={CUSTOM_VENDOR_VALUE}>Other (type manually)</option>
-                        </Select>
-                      </FormField>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="shrink-0"
-                        leftIcon={<Plus className="h-4 w-4" />}
-                        onClick={() => {
-                          setShowAddVendor((open) => !open);
-                          setVendorFormError(null);
-                        }}
-                      >
-                        Add vendor
-                      </Button>
-                    </div>
-
-                    {showAddVendor && (
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-                        <p className="text-sm font-medium text-gray-900">
-                          New vendor / provider
-                        </p>
-                        <FormField
-                          label="Company / provider name"
-                          htmlFor="new-vendor-name"
-                          required
-                        >
-                          <Input
-                            id="new-vendor-name"
-                            value={newVendorName}
-                            onChange={(e) => setNewVendorName(e.target.value)}
-                            placeholder="e.g. Angeles Electric Corp."
-                          />
-                        </FormField>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <FormField
-                            label="Contact name (optional)"
-                            htmlFor="new-vendor-contact"
-                          >
-                            <Input
-                              id="new-vendor-contact"
-                              value={newVendorContact}
-                              onChange={(e) => setNewVendorContact(e.target.value)}
-                              placeholder="Optional"
-                            />
-                          </FormField>
-                          <FormField label="Phone" htmlFor="new-vendor-phone">
-                            <Input
-                              id="new-vendor-phone"
-                              value={newVendorPhone}
-                              onChange={(e) => setNewVendorPhone(e.target.value)}
-                              placeholder="+63…"
-                            />
-                          </FormField>
-                        </div>
-                        <FormField label="Email" htmlFor="new-vendor-email">
-                          <Input
-                            id="new-vendor-email"
-                            type="email"
-                            value={newVendorEmail}
-                            onChange={(e) => setNewVendorEmail(e.target.value)}
-                            placeholder="billing@provider.com"
-                          />
-                        </FormField>
-                        {vendorFormError && (
-                          <p className="text-sm text-red-600">{vendorFormError}</p>
-                        )}
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="primary"
-                            size="sm"
-                            isLoading={savingVendor}
-                            onClick={() => void handleCreateVendor()}
-                          >
-                            Save vendor
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={savingVendor}
-                            onClick={() => {
-                              setShowAddVendor(false);
-                              setVendorFormError(null);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {(selectedVendorId === CUSTOM_VENDOR_VALUE ||
-                      (!selectedVendorId && Boolean(firstName))) && (
-                      <FormField
-                        label="Vendor / provider name"
-                        htmlFor="opp-first-name"
-                        required
-                      >
-                        <Input
-                          id="opp-first-name"
-                          required
-                          value={firstName}
-                          onChange={(e) => {
-                            setSelectedVendorId(CUSTOM_VENDOR_VALUE);
-                            setFirstName(e.target.value);
-                          }}
-                          placeholder="Meralco / Cleaning Co."
-                        />
-                      </FormField>
-                    )}
-
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <FormField
-                        label="Contact name (optional)"
-                        htmlFor="opp-last-name"
-                      >
-                        <Input
-                          id="opp-last-name"
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          placeholder="Optional"
-                        />
-                      </FormField>
-                      <FormField label="Phone" htmlFor="opp-phone">
-                        <Input
-                          id="opp-phone"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+63…"
-                        />
-                      </FormField>
-                    </div>
-                    <FormField label="Email" htmlFor="opp-email">
-                      <Input
-                        id="opp-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="maria@email.com"
-                      />
-                    </FormField>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <FormField label="First name" htmlFor="opp-first-name" required>
-                        <Input
-                          id="opp-first-name"
-                          required
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          placeholder="Maria"
-                        />
-                      </FormField>
-                      <FormField label="Last name" htmlFor="opp-last-name" required>
-                        <Input
-                          id="opp-last-name"
-                          required
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          placeholder="Lopez"
-                        />
-                      </FormField>
-                    </div>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <FormField label="Email" htmlFor="opp-email">
-                        <Input
-                          id="opp-email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="maria@email.com"
-                        />
-                      </FormField>
-                      <FormField label="Phone" htmlFor="opp-phone">
-                        <Input
-                          id="opp-phone"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+63…"
-                        />
-                      </FormField>
-                    </div>
-                  </>
-                )}
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="First name" htmlFor="opp-first-name" required>
+                    <Input
+                      id="opp-first-name"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Maria"
+                    />
+                  </FormField>
+                  <FormField label="Last name" htmlFor="opp-last-name" required>
+                    <Input
+                      id="opp-last-name"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Lopez"
+                    />
+                  </FormField>
+                </div>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="Email" htmlFor="opp-email">
+                    <Input
+                      id="opp-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="maria@email.com"
+                    />
+                  </FormField>
+                  <FormField label="Phone" htmlFor="opp-phone">
+                    <Input
+                      id="opp-phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+63…"
+                    />
+                  </FormField>
+                </div>
               </>
             )}
 
-            {activeSection === 'property' && (
+            {activeSection === 'property' && !isPayments && (
               <>
                 <FormField label="Building" htmlFor="opp-building">
                   <Select
@@ -2829,28 +3179,6 @@ export function AddOpportunityModal({
                     ))}
                   </Select>
                 </FormField>
-                {isPayments && (
-                  <FormField label="Room" htmlFor="opp-room-payments">
-                    <Select
-                      id="opp-room-payments"
-                      value={roomId}
-                      onChange={(e) => {
-                        const nextRoomId = e.target.value;
-                        setRoomId(nextRoomId);
-                        const room = rooms.find((r) => r.id === nextRoomId);
-                        if (room) setAmount(String(room.monthlyRate));
-                      }}
-                      disabled={!buildingId}
-                    >
-                      <option value="">Select room</option>
-                      {rooms.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.roomNumber} — ₱{r.monthlyRate.toLocaleString('en-PH')}/mo
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-                )}
                 {isExpenses && (
                   <FormField label="Room (optional)" htmlFor="opp-room-expenses">
                     <Select
@@ -2885,16 +3213,14 @@ export function AddOpportunityModal({
                     </Select>
                   </FormField>
                 )}
-                {!isMaintenance && (
+                {!isMaintenance && !isPayments && (
                 <FormField
-                  label={isPayments ? 'Monthly rent (₱)' : isExpenses ? 'Bill amount (₱)' : 'Amount (₱)'}
+                  label={isExpenses ? 'Bill amount (₱)' : 'Amount (₱)'}
                   htmlFor="opp-amount"
                   hint={
-                    isPayments
-                      ? 'Rent you are following up on this cycle.'
-                      : isExpenses
-                        ? 'Amount due for this utility bill or vendor expense.'
-                        : undefined
+                    isExpenses
+                      ? 'Amount due for this utility bill or vendor expense.'
+                      : undefined
                   }
                 >
                   <Input
@@ -2910,77 +3236,567 @@ export function AddOpportunityModal({
               </>
             )}
 
-            {activeSection === 'schedule' && (
+            {activeSection === 'schedule' && !isPayments && (
               <>
                 <FormField
                   label={
-                    isPayments
-                      ? 'Rent due'
-                      : isExpenses
-                        ? 'Bill due'
-                        : isMaintenance
-                          ? 'Scheduled / due'
-                          : 'Due'
+                    isExpenses
+                      ? 'Due date'
+                      : isMaintenance
+                        ? 'Scheduled / due'
+                        : 'Due'
                   }
                   htmlFor="opp-due"
+                  required={isExpenses}
                   hint={
-                    isPayments
-                      ? 'When this month’s rent should be paid. Drag the card to Due when that day arrives.'
-                      : isExpenses
-                        ? 'When this bill should be paid.'
-                        : isMaintenance
-                          ? 'Optional target date for the repair visit.'
-                          : undefined
+                    isExpenses
+                      ? 'Same due date as on the utility bill or expense.'
+                      : isMaintenance
+                        ? 'Optional target date for the repair visit.'
+                        : undefined
                   }
                 >
                   <Input
                     id="opp-due"
-                    type="datetime-local"
+                    type={isExpenses ? 'date' : 'datetime-local'}
                     value={dueAt}
                     onChange={(e) => setDueAt(e.target.value)}
+                    style={isExpenses ? { colorScheme: 'light' } : undefined}
                   />
                 </FormField>
-                {isPayments && (
+              </>
+            )}
+
+            {activeSection === 'payment' && isPayments && (
+              <>
+                {isEditing && card?.id ? (
+                  <details className="group rounded-lg border border-indigo-100 bg-indigo-50/70 text-sm text-indigo-900">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-medium [&::-webkit-details-marker]:hidden">
+                      <Info className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+                      <span>How to use Rent Payment cards</span>
+                      <ChevronDown
+                        className="ml-auto h-4 w-4 shrink-0 text-indigo-500 transition-transform group-open:rotate-180"
+                        aria-hidden
+                      />
+                    </summary>
+                    <div className="space-y-1.5 border-t border-indigo-100/80 px-3 pb-2.5 pt-2 text-xs leading-relaxed text-indigo-800">
+                      <p>
+                        Drag stages: Upcoming → Due → Reminder sent → Overdue →{' '}
+                        <strong>Pending verification</strong> → Paid → Refund (or Escalation).
+                      </p>
+                      <p>
+                        Tenant pays via GCash and uploads receipt + reference → Pending
+                        verification.
+                      </p>
+                      <p>
+                        Match GCash ref to the receipt below, then Confirm (Paid) or Reject (Due /
+                        Overdue).
+                      </p>
+                      <p>
+                        <span className="font-mono">txn-r-######-YY</span> = Parenta id; GCash ref =
+                        what you verify.
+                      </p>
+                      {card.tenantId ? (
+                        <a
+                          href={`/admin/tenants/${card.tenantId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 pt-0.5 font-medium text-indigo-700 underline"
+                        >
+                          Open tenant profile
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </details>
+                ) : null}
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="First name" htmlFor="opp-pay-first-name" required>
+                    <Input
+                      id="opp-pay-first-name"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Maria"
+                    />
+                  </FormField>
+                  <FormField label="Last name" htmlFor="opp-pay-last-name" required>
+                    <Input
+                      id="opp-pay-last-name"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Lopez"
+                    />
+                  </FormField>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="Email" htmlFor="opp-pay-email">
+                    <Input
+                      id="opp-pay-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="maria@email.com"
+                    />
+                  </FormField>
+                  <FormField label="Phone" htmlFor="opp-pay-phone">
+                    <Input
+                      id="opp-pay-phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+63…"
+                    />
+                  </FormField>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="Building" htmlFor="opp-pay-building" required>
+                    <Select
+                      id="opp-pay-building"
+                      required
+                      value={buildingId}
+                      onChange={(e) => {
+                        setBuildingId(e.target.value);
+                        setRoomId('');
+                      }}
+                    >
+                      <option value="">Select building</option>
+                      {buildings.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
                   <FormField
-                    label="Next follow-up"
-                    htmlFor="opp-next-action"
-                    hint="When you plan to call / message again."
+                    label="Unit / room"
+                    htmlFor="opp-pay-room"
+                    hint="Tenant unit for this rent cycle"
+                  >
+                    <Select
+                      id="opp-pay-room"
+                      value={roomId}
+                      onChange={(e) => {
+                        const nextRoomId = e.target.value;
+                        setRoomId(nextRoomId);
+                        const room = rooms.find((r) => r.id === nextRoomId);
+                        if (room) setAmount(String(room.monthlyRate));
+                      }}
+                      disabled={!buildingId}
+                    >
+                      <option value="">Select room</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomNumber} — ₱{r.monthlyRate.toLocaleString('en-PH')}/mo
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField
+                    label="Rent due"
+                    htmlFor="opp-pay-due"
+                    required
+                    hint="When this month's rent should be paid."
                   >
                     <Input
-                      id="opp-next-action"
+                      id="opp-pay-due"
+                      type="date"
+                      required
+                      value={dueAt}
+                      onChange={(e) => setDueAt(e.target.value)}
+                      style={{ colorScheme: 'light' }}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Next follow-up"
+                    htmlFor="opp-pay-next-action"
+                    hint="When you plan to call or message again."
+                  >
+                    <Input
+                      id="opp-pay-next-action"
                       type="datetime-local"
                       value={nextActionAt}
                       onChange={(e) => setNextActionAt(e.target.value)}
                     />
                   </FormField>
+                </div>
+
+                <FormField
+                  label="Amount (₱)"
+                  htmlFor="opp-pay-amount"
+                  required
+                  hint="Rent amount you are following up on this cycle."
+                >
+                  <Input
+                    id="opp-pay-amount"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    required
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </FormField>
+
+                {isEditing && card?.id ? (
+                  <PaymentFollowUpPanel
+                    cardId={card.id}
+                    tenantId={card.tenantId}
+                    invoiceId={card.invoiceId}
+                    buildingId={buildingId || undefined}
+                    roomId={roomId || undefined}
+                    balanceAmount={card.amount}
+                  />
+                ) : null}
+              </>
+            )}
+
+            {activeSection === 'payment' && isExpenses && (
+              <>
+                <FormField label="Type" htmlFor="opp-expense-kind" required>
+                  <Select
+                    id="opp-expense-kind"
+                    value={expenseKind}
+                    disabled={Boolean(card?.utilityBillId || card?.expenseId)}
+                    onChange={(e) =>
+                      setExpenseKind(e.target.value as 'utility' | 'expense')
+                    }
+                  >
+                    <option value="utility">Utility bill (electric / water)</option>
+                    <option value="expense">
+                      Expense (maintenance, garbage, supplies…)
+                    </option>
+                  </Select>
+                </FormField>
+
+                {expenseKind === 'utility' ? (
+                  <FormField label="Utility" htmlFor="opp-utility-type" required>
+                    <Select
+                      id="opp-utility-type"
+                      value={utilityType}
+                      onChange={(e) =>
+                        setUtilityType(e.target.value as 'electricity' | 'water')
+                      }
+                    >
+                      <option value="electricity">Electric</option>
+                      <option value="water">Water</option>
+                    </Select>
+                  </FormField>
+                ) : (
+                  <FormField label="Category" htmlFor="opp-expense-category" required>
+                    <Select
+                      id="opp-expense-category"
+                      value={expenseCategory}
+                      onChange={(e) => setExpenseCategory(e.target.value)}
+                    >
+                      {EXPENSE_BOARD_CATEGORIES.map((key) => (
+                        <option key={key} value={key}>
+                          {EXPENSE_CATEGORY_LABELS[key]}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                )}
+
+                <FormField
+                  label="Description"
+                  htmlFor="opp-expense-description"
+                  required={expenseKind === 'expense'}
+                  hint="What this bill or expense is for."
+                >
+                  <Input
+                    id="opp-expense-description"
+                    required={expenseKind === 'expense'}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. July electric bill · Unit 10"
+                  />
+                </FormField>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <FormField
+                    label="Vendor / provider"
+                    htmlFor="opp-vendor-select"
+                    required
+                    className="min-w-0 flex-1"
+                  >
+                    <Select
+                      id="opp-vendor-select"
+                      required={!firstName.trim()}
+                      value={selectedVendorId}
+                      onChange={(e) => handleVendorSelect(e.target.value)}
+                    >
+                      <option value="">Select a vendor…</option>
+                      {vendorsForType.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {contactDisplayName(v)}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_VENDOR_VALUE}>Other (type manually)</option>
+                    </Select>
+                  </FormField>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    leftIcon={<Plus className="h-4 w-4" />}
+                    onClick={() => {
+                      setShowAddVendor((open) => !open);
+                      setVendorFormError(null);
+                    }}
+                  >
+                    Add vendor
+                  </Button>
+                </div>
+
+                {showAddVendor && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                    <p className="text-sm font-medium text-gray-900">
+                      New vendor / provider
+                    </p>
+                    <FormField
+                      label="Company / provider name"
+                      htmlFor="new-vendor-name"
+                      required
+                    >
+                      <Input
+                        id="new-vendor-name"
+                        value={newVendorName}
+                        onChange={(e) => setNewVendorName(e.target.value)}
+                        placeholder="e.g. Angeles Electric Corp."
+                      />
+                    </FormField>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <FormField
+                        label="Contact name (optional)"
+                        htmlFor="new-vendor-contact"
+                      >
+                        <Input
+                          id="new-vendor-contact"
+                          value={newVendorContact}
+                          onChange={(e) => setNewVendorContact(e.target.value)}
+                          placeholder="Optional"
+                        />
+                      </FormField>
+                      <FormField label="Phone" htmlFor="new-vendor-phone">
+                        <Input
+                          id="new-vendor-phone"
+                          value={newVendorPhone}
+                          onChange={(e) => setNewVendorPhone(e.target.value)}
+                          placeholder="+63…"
+                        />
+                      </FormField>
+                    </div>
+                    <FormField label="Email" htmlFor="new-vendor-email">
+                      <Input
+                        id="new-vendor-email"
+                        type="email"
+                        value={newVendorEmail}
+                        onChange={(e) => setNewVendorEmail(e.target.value)}
+                        placeholder="billing@provider.com"
+                      />
+                    </FormField>
+                    {vendorFormError && (
+                      <p className="text-sm text-red-600">{vendorFormError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        isLoading={savingVendor}
+                        onClick={() => void handleCreateVendor()}
+                      >
+                        Save vendor
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={savingVendor}
+                        onClick={() => {
+                          setShowAddVendor(false);
+                          setVendorFormError(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {(selectedVendorId === CUSTOM_VENDOR_VALUE ||
+                  (!selectedVendorId && Boolean(firstName))) && (
+                  <FormField
+                    label="Vendor / provider name"
+                    htmlFor="opp-vendor-name"
+                    required
+                  >
+                    <Input
+                      id="opp-vendor-name"
+                      required
+                      value={firstName}
+                      onChange={(e) => {
+                        setSelectedVendorId(CUSTOM_VENDOR_VALUE);
+                        setFirstName(e.target.value);
+                      }}
+                      placeholder="Meralco / Cleaning Co."
+                    />
+                  </FormField>
+                )}
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="Building" htmlFor="opp-expense-building" required>
+                    <Select
+                      id="opp-expense-building"
+                      required
+                      value={buildingId}
+                      onChange={(e) => {
+                        setBuildingId(e.target.value);
+                        setRoomId('');
+                      }}
+                    >
+                      <option value="">Select building</option>
+                      {buildings.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  <FormField
+                    label="Unit / room"
+                    htmlFor="opp-expense-room"
+                    hint="Leave blank for building-wide"
+                  >
+                    <Select
+                      id="opp-expense-room"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      disabled={!buildingId}
+                    >
+                      <option value="">Building-wide / none</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomNumber}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                </div>
+
+                {expenseKind === 'utility' ? (
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                    <FormField
+                      label="Period start"
+                      htmlFor="opp-period-start"
+                      required
+                    >
+                      <Input
+                        id="opp-period-start"
+                        type="date"
+                        required
+                        value={billingPeriodStart}
+                        onChange={(e) => setBillingPeriodStart(e.target.value)}
+                        style={{ colorScheme: 'light' }}
+                      />
+                    </FormField>
+                    <FormField label="Period end" htmlFor="opp-period-end" required>
+                      <Input
+                        id="opp-period-end"
+                        type="date"
+                        required
+                        value={billingPeriodEnd}
+                        onChange={(e) => setBillingPeriodEnd(e.target.value)}
+                        style={{ colorScheme: 'light' }}
+                      />
+                    </FormField>
+                    <FormField label="Due date" htmlFor="opp-due" required>
+                      <Input
+                        id="opp-due"
+                        type="date"
+                        required
+                        value={dueAt}
+                        onChange={(e) => setDueAt(e.target.value)}
+                        style={{ colorScheme: 'light' }}
+                      />
+                    </FormField>
+                  </div>
+                ) : (
+                  <FormField
+                    label="Expense date"
+                    htmlFor="opp-due"
+                    required
+                    hint="Date this cost was incurred or is due."
+                  >
+                    <Input
+                      id="opp-due"
+                      type="date"
+                      required
+                      value={dueAt}
+                      onChange={(e) => setDueAt(e.target.value)}
+                      style={{ colorScheme: 'light' }}
+                    />
+                  </FormField>
+                )}
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <FormField label="Amount (₱)" htmlFor="opp-amount" required>
+                    <Input
+                      id="opp-amount"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      required
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="Status" htmlFor="opp-expense-status">
+                    <Select
+                      id="opp-expense-status"
+                      value={expenseStatus}
+                      onChange={(e) =>
+                        setExpenseStatus(e.target.value as 'pending' | 'paid')
+                      }
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="paid">Paid</option>
+                    </Select>
+                  </FormField>
+                </div>
+
+                {isEditing && card?.id ? (
+                  <OpportunityDocumentsPanel
+                    cardId={card.id}
+                    buildingId={buildingId || undefined}
+                    roomId={roomId || undefined}
+                    description="Attach a file or take a photo of the bill / receipt."
+                    docTypeOptions={EXPENSE_DOC_TYPE_OPTIONS}
+                    defaultDocType="receipt"
+                    uploadButtonLabel="Attach"
+                  />
+                ) : (
+                  <ReceiptImageField
+                    file={receiptFile}
+                    onChange={setReceiptFile}
+                    required={false}
+                    label="Attach or take photo"
+                    chooseFileLabel="Attach"
+                    allowPdf
+                  />
                 )}
               </>
             )}
 
-            {activeSection === 'payment' && isPayments && card?.id && (
-              <PaymentFollowUpPanel
-                cardId={card.id}
-                tenantId={card.tenantId}
-                invoiceId={card.invoiceId}
-                buildingId={buildingId || undefined}
-                roomId={roomId || undefined}
-                balanceAmount={card.amount}
-              />
-            )}
-
-            {activeSection === 'payment' && isExpenses && card?.id && (
-              <ExpenseFollowUpPanel
-                cardId={card.id}
-                expenseId={card.expenseId}
-                utilityBillId={card.utilityBillId}
-                buildingId={buildingId || undefined}
-                roomId={roomId || undefined}
-                amount={card.amount}
-                source={card.source || source}
-              />
-            )}
-
-            {activeSection === 'payment' && isMaintenance && card?.id && (
+            {activeSection === 'payment' && isMaintenance && (
+              card?.id ? (
               <MaintenanceFollowUpPanel
                 cardId={card.id}
                 maintenanceRequestId={card.maintenanceRequestId}
@@ -2988,6 +3804,62 @@ export function AddOpportunityModal({
                 roomId={roomId || undefined}
                 onUpdated={onSaved}
               />
+              ) : (
+                <div className="space-y-5">
+                  <FormField label="Issue title" htmlFor="opp-maint-title" required>
+                    <Input
+                      id="opp-maint-title"
+                      required
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Leaking faucet in kitchen"
+                    />
+                  </FormField>
+                  <FormField label="Description" htmlFor="opp-maint-description" required>
+                    <Textarea
+                      id="opp-maint-description"
+                      rows={4}
+                      required
+                      value={maintenanceDescription}
+                      onChange={(e) => setMaintenanceDescription(e.target.value)}
+                      placeholder="Describe the issue, access instructions, urgency…"
+                    />
+                  </FormField>
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <FormField label="Category" htmlFor="opp-maint-category" required>
+                      <Select
+                        id="opp-maint-category"
+                        required
+                        value={maintenanceCategory}
+                        onChange={(e) => setMaintenanceCategory(e.target.value)}
+                      >
+                        {MAINTENANCE_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {MAINTENANCE_CATEGORY_LABELS[cat] || cat}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField label="Priority" htmlFor="opp-maint-priority">
+                      <Select
+                        id="opp-maint-priority"
+                        value={maintenancePriority}
+                        onChange={(e) => setMaintenancePriority(e.target.value)}
+                      >
+                        {Object.keys(MAINTENANCE_PRIORITY_LABELS).map((priority) => (
+                          <option key={priority} value={priority}>
+                            {MAINTENANCE_PRIORITY_LABELS[priority]}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Photos and status updates are available after you create this follow-up
+                    card.
+                  </div>
+                </div>
+              )
             )}
 
             {activeSection === 'notes' && (

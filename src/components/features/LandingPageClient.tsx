@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   Building2,
@@ -252,27 +251,27 @@ export default function LandingPageClient({
         </div>
       </header>
 
-      {/* Hero: copy on the left, full room on the right, soft white blend (not property photos). */}
-      <section className="landing-hero-fade relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden bg-[#F8FAFC]">
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <Image
+      {/* Hero: copy on the left, furnished room on the right (brand photo, not listing uploads). */}
+      <section className="relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden bg-[#F8FAFC]">
+        <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+          {/* Static public asset — img avoids next/image fill collapsing inside the fade transform. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/brand/hero-room.jpg"
             alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-[68%_center]"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: '82% 50%' }}
           />
           <div
             className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(90deg, #F8FAFC 0%, rgba(248,250,252,0.92) 28%, rgba(248,250,252,0.55) 46%, rgba(248,250,252,0.18) 64%, transparent 82%)',
+                'linear-gradient(90deg, #F8FAFC 0%, rgba(248,250,252,0.9) 26%, rgba(248,250,252,0.35) 44%, rgba(248,250,252,0.06) 60%, transparent 74%)',
             }}
           />
         </div>
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
+        <div className="landing-hero-fade relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
           <div className="w-full max-w-xl lg:max-w-[32rem] xl:max-w-xl">
             <p className="mb-3 font-[family-name:var(--font-geist-sans)] text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl">
               Alfonso Properties

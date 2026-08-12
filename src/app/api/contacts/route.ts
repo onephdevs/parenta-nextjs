@@ -19,6 +19,11 @@ export async function GET(request: NextRequest) {
     const roleParam = searchParams.get('role')?.toUpperCase();
     const search = searchParams.get('search') || searchParams.get('q') || undefined;
     const activeOnly = searchParams.get('activeOnly') !== 'false';
+    const utilityTypeRaw = (searchParams.get('utilityType') || '').toLowerCase();
+    const utilityType =
+      utilityTypeRaw === 'electricity' || utilityTypeRaw === 'water'
+        ? utilityTypeRaw
+        : undefined;
 
     const role: ContactRole | undefined =
       roleParam && isContactRole(roleParam) ? roleParam : undefined;
@@ -29,7 +34,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const contacts = await listContacts({ role, search, activeOnly });
+    const contacts = await listContacts({ role, search, activeOnly, utilityType });
 
     return NextResponse.json({ success: true, data: contacts });
   } catch (error) {

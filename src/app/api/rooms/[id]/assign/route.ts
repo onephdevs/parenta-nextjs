@@ -254,6 +254,56 @@ export async function POST(request: Request, { params }: RouteParams) {
       // Don't fail the assignment if invoice generation fails
     }
 
+    // Payment history + Parenta txn IDs for deposit / advance / utility deposit
+    // (same pattern as pipeline lease generation)
+    try {
+      const { createPayment } = await import('@/lib/api/payments');
+      const assignmentId = String(assignmentResult.rows[0].id);
+      const paymentDate = new Date(`${String(startDate).slice(0, 10)}T00:00:00`);
+
+      if (depositAmount > 0) {
+        await createPayment({
+          tenantId: String(tenantId),
+          roomAssignmentId: assignmentId,
+          amount: depositAmount,
+          paymentType: 'deposit',
+          paymentMethod: 'cash',
+          paymentStatus: 'completed',
+          paymentDate,
+          notes: 'Security deposit collected on tenant assignment',
+        });
+      }
+      if (advanceAmountValue > 0) {
+        await createPayment({
+          tenantId: String(tenantId),
+          roomAssignmentId: assignmentId,
+          amount: advanceAmountValue,
+          paymentType: 'advance',
+          paymentMethod: 'cash',
+          paymentStatus: 'completed',
+          paymentDate,
+          notes: 'Advance rent collected on tenant assignment',
+        });
+      }
+      if (utilityDepositValue > 0) {
+        await createPayment({
+          tenantId: String(tenantId),
+          roomAssignmentId: assignmentId,
+          amount: utilityDepositValue,
+          paymentType: 'deposit',
+          paymentMethod: 'cash',
+          paymentStatus: 'completed',
+          paymentDate,
+          notes: 'Utility deposit collected on tenant assignment',
+        });
+      }
+    } catch (paymentError) {
+      console.error(
+        'Tenant assigned but deposit/advance payment history failed:',
+        paymentError
+      );
+    }
+
     logActivitySafe({
       actorUserId: session?.user?.id || null,
       actorRole: 'admin',

@@ -138,11 +138,11 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
 
   return {
     key: 'payments',
-    title: 'Payments due',
+    title: 'Rent due',
     count: ranked.length,
     items: ranked.slice(0, PREVIEW_LIMIT).map(({ urgencyRank: _, ...item }) => item),
     viewAllHref: '/admin/tasks?board=payments',
-    viewAllLabel: 'View payments pipeline',
+    viewAllLabel: 'View rent payment board',
   };
 }
 
@@ -218,7 +218,7 @@ async function getUtilitiesDue(): Promise<NeedsAttentionCard> {
     count: items.length,
     items: items.slice(0, PREVIEW_LIMIT),
     viewAllHref: '/admin/tasks?board=expenses',
-    viewAllLabel: 'View all utilities',
+    viewAllLabel: 'View electricity, water and expense board',
   };
 }
 
@@ -487,8 +487,8 @@ export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
 
   const fallbacks: NeedsAttentionCard[] = [
     empty('inquiries', 'New inquiries', '/admin/tasks?board=onboarding', 'View onboarding pipeline'),
-    empty('payments', 'Payments due', '/admin/tasks?board=payments', 'View payments pipeline'),
-    empty('utilities', 'Utilities due', '/admin/tasks?board=expenses', 'View expenses pipeline'),
+    empty('payments', 'Rent due', '/admin/tasks?board=payments', 'View rent payment board'),
+    empty('utilities', 'Utilities due', '/admin/tasks?board=expenses', 'View electricity, water and expense board'),
     empty('maintenance', 'Maintenance', '/admin/tasks?board=maintenance', 'View maintenance pipeline'),
     empty('deposits', 'Deposit balance zero', '/admin/reports/deposits', 'View deposits report'),
     empty('deposit_funded', 'Deposit-funded rent', '/admin/reports/deposits', 'View deposits'),

@@ -13,6 +13,7 @@ import {
   PAYMENT_DOC_TYPE_OPTIONS,
 } from './OpportunityDocumentsPanel';
 import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
+import ConfirmPaymentActions from '@/components/features/ConfirmPaymentActions';
 
 interface InvoiceSummary {
   id: string;
@@ -41,6 +42,7 @@ interface PaymentRow {
   paymentStatus?: string;
   paymentDate?: string | Date;
   referenceNumber?: string;
+  parentaTxnId?: string;
   notes?: string;
   receiptFilePath?: string;
   receiptFileName?: string;
@@ -231,7 +233,13 @@ export function PaymentFollowUpPanel({
         ? `/admin/financial/payments/new?tenantId=${encodeURIComponent(tenantId)}`
         : '/admin/financial/payments/new';
 
+  const pendingClaims = payments.filter(
+    (p) => (p.paymentStatus || '').toLowerCase() === 'pending'
+  );
   const sortedPayments = [...payments].sort((a, b) => {
+    const aPending = (a.paymentStatus || '').toLowerCase() === 'pending' ? 1 : 0;
+    const bPending = (b.paymentStatus || '').toLowerCase() === 'pending' ? 1 : 0;
+    if (aPending !== bPending) return bPending - aPending;
     const aMatch = notesMentionInvoice(a.notes, invoiceId) ? 1 : 0;
     const bMatch = notesMentionInvoice(b.notes, invoiceId) ? 1 : 0;
     return bMatch - aMatch;
@@ -375,9 +383,24 @@ export function PaymentFollowUpPanel({
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Recent payments</h3>
           <p className="text-xs text-gray-500">
-            Transaction ID, method, and what each payment was for.
+            Match the tenant’s transaction ID to the receipt, then confirm or reject pending
+            claims.
           </p>
         </div>
+
+        {pendingClaims.length > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-medium">
+              {pendingClaims.length === 1
+                ? '1 payment waiting for verification'
+                : `${pendingClaims.length} payments waiting for verification`}
+            </p>
+            <p className="mt-1 text-amber-900">
+              Open the receipt, re-type the transaction ID, then Confirm payment. Invoice
+              balance does not change until you confirm.
+            </p>
+          </div>
+        )}
 
         {!tenantId ? (
           <div className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
@@ -432,9 +455,15 @@ export function PaymentFollowUpPanel({
 
                   <dl className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                     <div>
-                      <dt className="text-xs text-gray-500">Transaction ID</dt>
+                      <dt className="text-xs text-gray-500">GCash / bank reference</dt>
                       <dd className="font-mono text-sm font-semibold text-gray-900">
                         {payment.referenceNumber || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-gray-500">Parenta txn</dt>
+                      <dd className="font-mono text-sm font-semibold text-gray-900">
+                        {payment.parentaTxnId || '—'}
                       </dd>
                     </div>
                     <div>
@@ -444,6 +473,24 @@ export function PaymentFollowUpPanel({
                       </dd>
                     </div>
                   </dl>
+
+                  {(payment.paymentStatus || '').toLowerCase() === 'pending' && (
+                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/80 p-3">
+                      <p className="mb-2 text-xs font-medium text-amber-950">
+                        Verify GCash reference against the receipt photo, then Confirm. Card
+                        moves to Paid when money is confirmed.
+                      </p>
+                      <ConfirmPaymentActions
+                        paymentId={payment.id}
+                        referenceNumber={payment.referenceNumber}
+                        amountLabel={formatCurrency(Number(payment.amount || 0))}
+                        onDone={() => {
+                          void loadPayments();
+                          void loadInvoice();
+                        }}
+                      />
+                    </div>
+                  )}
 
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <a

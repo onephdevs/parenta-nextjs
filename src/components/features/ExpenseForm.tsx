@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
@@ -9,6 +9,13 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { DollarSign, Tag, Calendar, Home, User, FileText } from 'lucide-react';
+import { contactDisplayName, type Contact } from '@/lib/constants/contacts';
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+} from '@/lib/constants/bills-expenses';
+
+const OTHER_VENDOR_VALUE = '__other__';
 
 interface Building {
   id: string | number;
@@ -107,6 +114,8 @@ export default function ExpenseForm({
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
+  const [vendors, setVendors] = useState<Contact[]>([]);
+  const [vendorIsOther, setVendorIsOther] = useState(false);
 
   const [formData, setFormData] = useState<ExpenseFormData>({
     buildingId: initialData?.buildingId || '',
@@ -124,9 +133,10 @@ export default function ExpenseForm({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [buildingsRes, roomsRes] = await Promise.all([
+        const [buildingsRes, roomsRes, vendorsRes] = await Promise.all([
           fetch('/api/buildings', { credentials: 'include' }),
           fetch('/api/rooms', { credentials: 'include' }),
+          fetch('/api/contacts?role=VENDOR', { credentials: 'include' }),
         ]);
 
         if (buildingsRes.ok) {
@@ -150,6 +160,13 @@ export default function ExpenseForm({
           setRooms(mappedRooms);
         } else {
           console.error('Failed to load rooms:', roomsRes.status);
+        }
+
+        if (vendorsRes.ok) {
+          const vendorsData = await vendorsRes.json();
+          if (vendorsData.success && Array.isArray(vendorsData.data)) {
+            setVendors(vendorsData.data as Contact[]);
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -301,12 +318,11 @@ export default function ExpenseForm({
                 onChange={(e) => handleInputChange('category', e.target.value)}
                 isInvalid={Boolean(errors.category)}
               >
-                <option value="cleaning">Cleaning</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="repair">Repair</option>
-                <option value="upgrade">Upgrade</option>
-                <option value="garbage_collection">Garbage Collection</option>
-                <option value="other">Other</option>
+                {EXPENSE_CATEGORIES.map((key) => (
+                  <option key={key} value={key}>
+                    {EXPENSE_CATEGORY_LABELS[key]}
+                  </option>
+                ))}
               </Select>
             </FormField>
 
@@ -404,19 +420,71 @@ export default function ExpenseForm({
 
       case 'vendor':
         return (
-          <FormField
-            label="Vendor"
-            htmlFor="vendor"
-          >
-            <Input
-              type="text"
-              id="vendor"
-              name="vendor"
-              value={formData.vendor}
-              onChange={(e) => handleInputChange('vendor', e.target.value)}
-              placeholder="Vendor or service provider name"
-            />
-          </FormField>
+          <div className="space-y-6">
+            <FormField
+              label="Vendor"
+              htmlFor="vendor"
+              hint="Vendors from your contacts"
+            >
+              <Select
+                id="vendor"
+                name="vendor"
+                value={
+                  vendorIsOther
+                    ? OTHER_VENDOR_VALUE
+                    : vendors.find(
+                        (v) => contactDisplayName(v) === formData.vendor.trim()
+                      )?.id || (formData.vendor ? OTHER_VENDOR_VALUE : '')
+                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (!value) {
+                    setVendorIsOther(false);
+                    handleInputChange('vendor', '');
+                    return;
+                  }
+                  if (value === OTHER_VENDOR_VALUE) {
+                    setVendorIsOther(true);
+                    handleInputChange('vendor', '');
+                    return;
+                  }
+                  const vendor = vendors.find((v) => v.id === value);
+                  setVendorIsOther(false);
+                  handleInputChange(
+                    'vendor',
+                    vendor ? contactDisplayName(vendor) : ''
+                  );
+                }}
+              >
+                <option value="">Select vendor</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {contactDisplayName(v)}
+                  </option>
+                ))}
+                <option value={OTHER_VENDOR_VALUE}>Other (type a name)</option>
+              </Select>
+            </FormField>
+            {(vendorIsOther ||
+              (formData.vendor &&
+                !vendors.some(
+                  (v) => contactDisplayName(v) === formData.vendor.trim()
+                ))) && (
+              <FormField label="Vendor name" htmlFor="vendorCustom">
+                <Input
+                  type="text"
+                  id="vendorCustom"
+                  name="vendorCustom"
+                  value={formData.vendor}
+                  onChange={(e) => {
+                    setVendorIsOther(true);
+                    handleInputChange('vendor', e.target.value);
+                  }}
+                  placeholder="Vendor or service provider name"
+                />
+              </FormField>
+            )}
+          </div>
         );
 
       case 'notes':

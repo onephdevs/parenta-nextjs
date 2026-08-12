@@ -8,6 +8,9 @@ import {
   isAllowedPaymentType,
   resolveAllowedPaymentMethod,
 } from '@/lib/constants/payment-methods';
+import { txnTypeFromPaymentType } from '@/lib/constants/transaction-ids';
+import { allocateParentaTxnId } from '@/lib/services/transaction-id-service';
+import { syncPaymentCardForTenant } from '@/lib/api/pipeline';
 
 const MAX_FILE_SIZE = CONSTANTS.MODULE.UPLOAD.MAX_FILE_SIZE_BYTES;
 const SUPPORTED_FILE_TYPES = CONSTANTS.MODULE.UPLOAD
@@ -115,10 +118,15 @@ export async function POST(request: Request) {
       'uploads/receipts'
     );
 
+    const parentaTxnId = await allocateParentaTxnId(
+      txnTypeFromPaymentType(paymentType)
+    );
+
     const noteParts = [
       notes || null,
+      `Parenta txn ${parentaTxnId}`,
       'Status: awaiting office verification — balance not updated yet.',
-      `Tenant submitted receipt for ${paymentType} (txn ${referenceNumber}).`,
+      `GCash / bank reference: ${referenceNumber}`,
     ].filter(Boolean);
 
     const paymentResult = await pool.query(
@@ -133,16 +141,17 @@ export async function POST(request: Request) {
          due_date,
          payment_status,
          reference_number,
+         parenta_txn_id,
          notes,
          receipt_file_path,
          receipt_file_name,
          receipt_file_size,
          receipt_uploaded_at
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, CURRENT_DATE, CURRENT_DATE, 'pending', $7, $8,
-         $9, $10, $11, CURRENT_TIMESTAMP
+         $1, $2, $3, $4, $5, $6, CURRENT_DATE, CURRENT_DATE, 'pending', $7, $8, $9,
+         $10, $11, $12, CURRENT_TIMESTAMP
        )
-       RETURNING id, payment_type, amount, payment_date, reference_number`,
+       RETURNING id, payment_type, amount, payment_date, reference_number, parenta_txn_id`,
       [
         tenant.id,
         assignment?.room_id || null,
@@ -151,6 +160,7 @@ export async function POST(request: Request) {
         paymentType,
         paymentMethod,
         referenceNumber,
+        parentaTxnId,
         noteParts.join('\n'),
         filePath,
         fileName,
@@ -160,6 +170,12 @@ export async function POST(request: Request) {
 
     const payment = paymentResult.rows[0];
 
+    try {
+      await syncPaymentCardForTenant(tenant.id);
+    } catch (syncErr) {
+      console.error('Rent Payment board sync after claim failed:', syncErr);
+    }
+
     logActivitySafe({
       actorUserId: access.userId,
       actorRole: 'tenant',
@@ -167,11 +183,12 @@ export async function POST(request: Request) {
       category: 'payments',
       entityType: 'payment',
       entityId: String(payment.id),
-      entityLabel: `₱${Number(payment.amount).toLocaleString()} — verify transaction ID`,
+      entityLabel: `₱${Number(payment.amount).toLocaleString()} — verify GCash reference`,
       afterData: {
         paymentId: payment.id,
         amount: parseFloat(payment.amount),
         referenceNumber: payment.reference_number,
+        parentaTxnId: payment.parenta_txn_id,
         paymentType: payment.payment_type,
       },
       link: `/admin/financial/payments/${payment.id}`,
@@ -179,6 +196,7 @@ export async function POST(request: Request) {
         link: `/admin/financial/payments/${payment.id}`,
         tenantId: tenant.id,
         referenceNumber: payment.reference_number,
+        parentaTxnId: payment.parenta_txn_id,
       },
     });
 
@@ -190,10 +208,11 @@ export async function POST(request: Request) {
         paymentType: payment.payment_type,
         paymentDate: payment.payment_date,
         referenceNumber: payment.reference_number,
+        parentaTxnId: payment.parenta_txn_id,
         status: 'pending',
       },
       message:
-        'Payment submitted for verification. Your balance updates after the office confirms the transaction ID.',
+        'Payment submitted for verification. Your balance updates after the office confirms the GCash / bank reference.',
     });
   } catch (error) {
     console.error('Error recording manual payment:', error);

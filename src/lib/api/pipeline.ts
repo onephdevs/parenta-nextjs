@@ -78,6 +78,8 @@ interface DbCard {
   move_in_paid_at?: Date | string | null;
   move_in_payment_method?: string | null;
   move_in_payment_notes?: string | null;
+  deposit_parenta_txn_id?: string | null;
+  advance_parenta_txn_id?: string | null;
   position: number;
   won_at: Date | string | null;
   lost_at: Date | string | null;
@@ -174,6 +176,8 @@ function mapCard(row: DbCard): PipelineCard {
     moveInPaidAt: toIso(row.move_in_paid_at),
     moveInPaymentMethod: row.move_in_payment_method || undefined,
     moveInPaymentNotes: row.move_in_payment_notes || undefined,
+    depositParentaTxnId: row.deposit_parenta_txn_id || undefined,
+    advanceParentaTxnId: row.advance_parenta_txn_id || undefined,
     position: row.position,
     wonAt: toIso(row.won_at),
     lostAt: toIso(row.lost_at),
@@ -935,6 +939,7 @@ export async function convertOnboardingCardToLeaseSigned(
         paymentMethod: 'cash',
         paymentStatus: 'completed',
         paymentDate,
+        parentaTxnId: card.depositParentaTxnId || undefined,
         notes: 'Security deposit collected on lease generation',
       });
     }
@@ -947,6 +952,7 @@ export async function convertOnboardingCardToLeaseSigned(
         paymentMethod: 'cash',
         paymentStatus: 'completed',
         paymentDate,
+        parentaTxnId: card.advanceParentaTxnId || undefined,
         notes: 'Advance rent collected on lease generation',
       });
     }
@@ -1055,6 +1061,7 @@ type PaymentStageSlug =
   | 'due'
   | 'reminder_sent'
   | 'overdue'
+  | 'pending_verification'
   | 'paid'
   | 'refund'
   | 'escalation';
@@ -1068,13 +1075,15 @@ function calendarDaysUntil(dueDateIso: string, today = new Date()): number {
 }
 
 /**
- * Map lease + invoice state → Payments board stage.
+ * Map lease + invoice state → Rent Payment board stage.
  * Preserves manual stages (reminder_sent, escalation, refund) while still unpaid / after paid.
+ * pending_verification wins while a tenant GCash claim awaits admin review.
  */
 export function resolvePaymentStageFromInvoice(input: {
   invoice: TenantInvoiceFocus | null;
   currentStageSlug?: string | null;
   dueSoonDays?: number;
+  hasPendingClaim?: boolean;
 }): PaymentStageSlug {
   const current = input.currentStageSlug || null;
   const dueSoonDays = input.dueSoonDays ?? PAYMENT_DUE_SOON_DAYS;
@@ -1095,6 +1104,9 @@ export function resolvePaymentStageFromInvoice(input: {
   ) {
     return 'paid';
   }
+
+  // Tenant uploaded receipt — stay here until admin confirms/rejects
+  if (input.hasPendingClaim) return 'pending_verification';
 
   if (current === 'escalation') return 'escalation';
 
@@ -1239,6 +1251,14 @@ export async function ensurePaymentFollowUpCard(input: {
   await ensureMaintenanceBoardExists();
 
   const invoice = await getFocusInvoiceForTenant(input.tenantId);
+  const pendingClaim = await pool.query<{ id: string }>(
+    `SELECT id FROM payments
+     WHERE tenant_id = $1
+       AND payment_status = 'pending'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [input.tenantId]
+  );
   const existing = await pool.query<{ id: string; stage_slug: string }>(
     `SELECT c.id, s.slug AS stage_slug
      FROM pipeline_cards c
@@ -1257,6 +1277,7 @@ export async function ensurePaymentFollowUpCard(input: {
   const targetStage = resolvePaymentStageFromInvoice({
     invoice,
     currentStageSlug: existing.rows[0]?.stage_slug || null,
+    hasPendingClaim: Boolean(pendingClaim.rows[0]),
   });
 
   const displayAmount =
@@ -1428,6 +1449,7 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
      VALUES ('maintenance', 'Maintenance', 'Tenant work orders from portal submissions', 5)
      ON CONFLICT (slug) DO NOTHING`
   );
+  await ensurePipelineBoardLabels();
 
   await pool.query(
     `INSERT INTO pipeline_stages (board_id, slug, name, color, sort_order, is_won, is_lost, is_terminal)
@@ -1469,12 +1491,73 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
        AND (ps.is_won = true OR ps.is_terminal = true)`
   );
 
+  // Rent Payment: Pending verification (GCash claim awaiting admin review)
+  await pool.query(
+    `INSERT INTO pipeline_stages (board_id, slug, name, color, sort_order, is_won, is_lost, is_terminal)
+     SELECT b.id, 'pending_verification', 'Pending verification', '#f59e0b', 5, false, false, false
+     FROM pipeline_boards b
+     WHERE b.slug = 'payments'
+       AND NOT EXISTS (
+         SELECT 1 FROM pipeline_stages ps
+         WHERE ps.board_id = b.id AND ps.slug = 'pending_verification'
+       )`
+  );
+  await pool.query(
+    `UPDATE pipeline_stages ps
+     SET sort_order = CASE ps.slug
+           WHEN 'paid' THEN 6
+           WHEN 'refund' THEN 7
+           WHEN 'escalation' THEN 8
+           ELSE ps.sort_order
+         END,
+         updated_at = CURRENT_TIMESTAMP
+     FROM pipeline_boards pb
+     WHERE ps.board_id = pb.id
+       AND pb.slug = 'payments'
+       AND ps.slug IN ('paid', 'refund', 'escalation')`
+  );
+  await pool.query(
+    `UPDATE pipeline_stages ps
+     SET name = 'Pending verification',
+         color = '#f59e0b',
+         sort_order = 5,
+         is_won = false,
+         is_lost = false,
+         is_terminal = false,
+         updated_at = CURRENT_TIMESTAMP
+     FROM pipeline_boards pb
+     WHERE ps.board_id = pb.id
+       AND pb.slug = 'payments'
+       AND ps.slug = 'pending_verification'`
+  );
+
   // Columns may be missing if migration not yet applied — add defensively
   await pool.query(
     `ALTER TABLE pipeline_cards
        ADD COLUMN IF NOT EXISTS invoice_id UUID,
        ADD COLUMN IF NOT EXISTS maintenance_request_id UUID,
        ADD COLUMN IF NOT EXISTS utility_bill_id UUID`
+  ).catch(() => undefined);
+
+  await pool.query(
+    `ALTER TABLE payments
+       ADD COLUMN IF NOT EXISTS parenta_txn_id TEXT`
+  ).catch(() => undefined);
+
+  await pool.query(
+    `ALTER TABLE pipeline_cards
+       ADD COLUMN IF NOT EXISTS deposit_parenta_txn_id TEXT,
+       ADD COLUMN IF NOT EXISTS advance_parenta_txn_id TEXT`
+  ).catch(() => undefined);
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS txn_sequences (
+       txn_type VARCHAR(8) NOT NULL,
+       year_yy SMALLINT NOT NULL,
+       last_value INTEGER NOT NULL DEFAULT 0,
+       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       PRIMARY KEY (txn_type, year_yy)
+     )`
   ).catch(() => undefined);
 }
 
@@ -1681,13 +1764,43 @@ export function utilityBillStatusToStageSlug(status: string | null | undefined):
   }
 }
 
+/** Keep built-in board display names in sync (slugs stay payments / expenses). */
+export async function ensurePipelineBoardLabels(): Promise<void> {
+  await pool.query(
+    `UPDATE pipeline_boards
+     SET name = 'Rent Payment',
+         description = 'Rent chase and tenant payment verification',
+         updated_at = CURRENT_TIMESTAMP
+     WHERE slug = 'payments'
+       AND (name IS DISTINCT FROM 'Rent Payment'
+            OR description IS DISTINCT FROM 'Rent chase and tenant payment verification')`
+  );
+  await pool.query(
+    `UPDATE pipeline_boards
+     SET name = 'Building Electricity, Water and Expense',
+         description = 'Electricity, water, and other building expense follow-up',
+         updated_at = CURRENT_TIMESTAMP
+     WHERE slug = 'expenses'
+       AND (name IS DISTINCT FROM 'Building Electricity, Water and Expense'
+            OR description IS DISTINCT FROM 'Electricity, water, and other building expense follow-up')`
+  );
+}
+
 /** Soft-ensure expenses board exists (seeded by migrations; idempotent). */
 export async function ensureExpensesBoardExists(): Promise<void> {
   await pool.query(
     `INSERT INTO pipeline_boards (slug, name, description, sort_order)
-     VALUES ('expenses', 'Building expenses', 'Vendor / utility bill follow-up', 3)
-     ON CONFLICT (slug) DO NOTHING`
+     VALUES (
+       'expenses',
+       'Building Electricity, Water and Expense',
+       'Electricity, water, and other building expense follow-up',
+       3
+     )
+     ON CONFLICT (slug) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description`
   );
+  await ensurePipelineBoardLabels();
 
   await pool.query(
     `INSERT INTO pipeline_stages (board_id, slug, name, color, sort_order, is_won, is_lost, is_terminal)
@@ -1700,7 +1813,8 @@ export async function ensureExpensesBoardExists(): Promise<void> {
          ('expenses', 'approval_pending', 'Approval pending', '#f59e0b', 3, false, false, false),
          ('expenses', 'approved', 'Approved', '#3b82f6', 4, false, false, false),
          ('expenses', 'payment_scheduled', 'Payment scheduled', '#14b8a6', 5, false, false, false),
-         ('expenses', 'paid', 'Paid', '#22c55e', 6, true, false, true)
+         ('expenses', 'paid', 'Paid', '#22c55e', 6, true, false, true),
+         ('expenses', 'reconciled', 'Reconciled', '#64748b', 7, true, false, true)
      ) AS s(board_slug, slug, name, color, sort_order, is_won, is_lost, is_terminal)
        ON b.slug = s.board_slug
      WHERE NOT EXISTS (
@@ -2830,6 +2944,45 @@ export async function updatePipelineCard(
         : existing.moveInPaidAt || new Date().toISOString()
       : null;
 
+  // Allocate Parenta txn IDs when onboarding Payment received is verified
+  let depositParentaTxnId: string | null =
+    existing.depositParentaTxnId || null;
+  let advanceParentaTxnId: string | null =
+    existing.advanceParentaTxnId || null;
+  if (existing.boardSlug === 'onboarding') {
+    if (moveInPaymentStatus === 'unpaid') {
+      depositParentaTxnId = null;
+      advanceParentaTxnId = null;
+    } else if (moveInPaymentStatus === 'paid') {
+      const depositNum =
+        depositAmount != null && Number(depositAmount) > 0
+          ? Number(depositAmount)
+          : 0;
+      const advanceNum =
+        advanceAmount != null && Number(advanceAmount) > 0
+          ? Number(advanceAmount)
+          : 0;
+      try {
+        const { allocateParentaTxnId } = await import(
+          '@/lib/services/transaction-id-service'
+        );
+        if (depositNum > 0 && !depositParentaTxnId) {
+          depositParentaTxnId = await allocateParentaTxnId('d');
+        }
+        if (depositNum <= 0) depositParentaTxnId = null;
+        if (advanceNum > 0 && !advanceParentaTxnId) {
+          advanceParentaTxnId = await allocateParentaTxnId('a');
+        }
+        if (advanceNum <= 0) advanceParentaTxnId = null;
+      } catch (err) {
+        console.error(
+          'Parenta txn allocate failed for onboarding move-in payment (non-fatal):',
+          err
+        );
+      }
+    }
+  }
+
   if (data.markLeaseSigned) {
     // Fall through: save fields first, then convert at end
   }
@@ -3283,8 +3436,10 @@ export async function updatePipelineCard(
        move_in_payment_method = $27,
        move_in_payment_notes = $28,
        assigned_to = $29,
+       deposit_parenta_txn_id = $30,
+       advance_parenta_txn_id = $31,
        updated_at = CURRENT_TIMESTAMP
-     WHERE id = $30`,
+     WHERE id = $32`,
     [
       title,
       firstName,
@@ -3319,6 +3474,8 @@ export async function updatePipelineCard(
       moveInPaymentMethod,
       moveInPaymentNotes,
       data.assignedTo !== undefined ? data.assignedTo : existing.assignedTo || null,
+      depositParentaTxnId,
+      advanceParentaTxnId,
       cardId,
     ]
   );

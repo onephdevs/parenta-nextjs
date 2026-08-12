@@ -57,7 +57,7 @@ export default function CreateBillExpenseModal({
       isOpen
       onClose={handleClose}
       title="Create bill or expense"
-      description="Choose what you want to record"
+      description="Same forms as Bills & expenses — saving adds a card on the Building Electricity, Water and Expense board"
       size="sm"
     >
       <div className="grid gap-3">

@@ -40,6 +40,7 @@ interface OpportunityDocumentsPanelProps {
   description?: string;
   docTypeOptions?: Array<{ value: string; label: string }>;
   defaultDocType?: string;
+  uploadButtonLabel?: string;
   onUploaded?: (doc: CardDocument) => void;
 }
 
@@ -50,6 +51,7 @@ export function OpportunityDocumentsPanel({
   description = 'Upload ID, income proof, lease drafts, and screening reports for this prospect.',
   docTypeOptions = DEFAULT_DOC_TYPE_OPTIONS,
   defaultDocType,
+  uploadButtonLabel = 'Upload',
   onUploaded,
 }: OpportunityDocumentsPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -184,7 +186,7 @@ export function OpportunityDocumentsPanel({
             isLoading={uploading}
           >
             <Upload className="mr-2 h-4 w-4" />
-            {uploading ? 'Uploading…' : 'Upload'}
+            {uploading ? 'Uploading…' : uploadButtonLabel}
           </Button>
           <TakePhotoButton
             disabled={uploading}

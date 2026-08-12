@@ -12,7 +12,10 @@ export interface Payment {
   paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;
   dueDate?: Date;
+  /** GCash / bank receipt number the tenant typed */
   referenceNumber?: string;
+  /** Internal Parenta id: txn-r-000001-26 */
+  parentaTxnId?: string;
   notes?: string;
   receiptFilePath?: string;
   receiptFileName?: string;
@@ -52,6 +55,7 @@ export interface CreatePaymentData {
   paymentDate: Date;
   dueDate?: Date;
   referenceNumber?: string;
+  parentaTxnId?: string;
   notes?: string;
 }
 
@@ -109,8 +113,8 @@ export async function createPayment(
   const query = `
     INSERT INTO payments (
       tenant_id, assignment_id, amount, payment_type, payment_method,
-      payment_date, due_date, reference_number, notes, payment_status
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      payment_date, due_date, reference_number, parenta_txn_id, notes, payment_status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *
   `;
   
@@ -127,6 +131,23 @@ export async function createPayment(
   const paymentMethod = paymentData.paymentMethod
     ? toCanonicalPaymentMethod(paymentData.paymentMethod)
     : null;
+
+  let parentaTxnId = paymentData.parentaTxnId || null;
+  if (!parentaTxnId) {
+    try {
+      const { allocateParentaTxnId } = await import(
+        '@/lib/services/transaction-id-service'
+      );
+      const { txnTypeFromPaymentType } = await import(
+        '@/lib/constants/transaction-ids'
+      );
+      parentaTxnId = await allocateParentaTxnId(
+        txnTypeFromPaymentType(paymentData.paymentType)
+      );
+    } catch (err) {
+      console.error('Parenta txn allocate failed (non-fatal):', err);
+    }
+  }
   
   const values = [
     paymentData.tenantId,
@@ -137,6 +158,7 @@ export async function createPayment(
     paymentData.paymentDate.toISOString().split('T')[0],
     paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0], // Default to payment_date if not provided
     paymentData.referenceNumber || null,
+    parentaTxnId,
     paymentData.notes || null,
     paymentStatus
   ];
@@ -159,6 +181,7 @@ export async function createPayment(
       paymentDate: new Date(row.payment_date),
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
       referenceNumber: row.reference_number,
+      parentaTxnId: row.parenta_txn_id || undefined,
       notes: row.notes,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
@@ -280,6 +303,7 @@ export async function getPayments(
       paymentDate: new Date(row.payment_date as string | Date),
       dueDate: row.due_date ? new Date(row.due_date as string | Date) : undefined,
       referenceNumber: (row.reference_number as string) || undefined,
+      parentaTxnId: (row.parenta_txn_id as string) || undefined,
       notes: (row.notes as string) || undefined,
       receiptFilePath: (row.receipt_file_path as string) || undefined,
       receiptFileName: (row.receipt_file_name as string) || undefined,
@@ -356,6 +380,7 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
       paymentDate: new Date(row.payment_date),
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
       referenceNumber: row.reference_number,
+      parentaTxnId: row.parenta_txn_id || undefined,
       notes: row.notes,
       receiptFilePath: row.receipt_file_path || undefined,
       receiptFileName: row.receipt_file_name || undefined,
@@ -443,6 +468,7 @@ export async function updatePayment(id: string, updateData: UpdatePaymentData): 
       paymentDate: new Date(row.payment_date),
       dueDate: row.due_date ? new Date(row.due_date) : undefined,
       referenceNumber: row.reference_number,
+      parentaTxnId: row.parenta_txn_id || undefined,
       notes: row.notes,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

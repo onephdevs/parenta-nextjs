@@ -475,13 +475,26 @@ export async function completeMoveOut(
           ? data.actual_moveout_date.toISOString().slice(0, 10)
           : String(data.actual_moveout_date).slice(0, 10);
 
+      let refundTxnId: string | null = null;
+      try {
+        const { allocateParentaTxnId } = await import(
+          '@/lib/services/transaction-id-service'
+        );
+        refundTxnId = await allocateParentaTxnId('e');
+      } catch (err) {
+        console.error(
+          'Parenta txn allocate failed for move-out refund expense (non-fatal):',
+          err
+        );
+      }
+
       await client.query(
         `INSERT INTO expenses (
            building_id, room_id, category, description, amount,
            expense_date, payment_method, expense_status, notes,
-           tenant_id, related_moveout_id, related_assignment_id
+           tenant_id, related_moveout_id, related_assignment_id, parenta_txn_id
          )
-         SELECT $1, $2, 'refund', $3, $4, $5::date, 'cash', 'paid', $6, $7, $8, $9
+         SELECT $1, $2, 'refund', $3, $4, $5::date, 'cash', 'paid', $6, $7, $8, $9, $10
          WHERE NOT EXISTS (
            SELECT 1 FROM expenses
            WHERE related_moveout_id = $8 AND category = 'refund'
@@ -508,6 +521,7 @@ export async function completeMoveOut(
           moveout.tenant_id,
           moveoutId,
           moveout.room_assignment_id,
+          refundTxnId,
         ]
       );
     }

@@ -1,14 +1,19 @@
 import pool from '@/lib/db';
 import {
   CONTACT_ROLES,
+  inferContactUtilityTypes,
   isContactRole,
   VENDOR_COMPANY_LAST_NAME,
   type Contact,
   type ContactRole,
 } from '@/lib/constants/contacts';
 
-export type { Contact, ContactRole };
-export { contactDisplayName, VENDOR_COMPANY_LAST_NAME } from '@/lib/constants/contacts';
+export type { Contact, ContactRole, VendorUtilityType };
+export {
+  contactDisplayName,
+  inferContactUtilityTypes,
+  VENDOR_COMPANY_LAST_NAME,
+} from '@/lib/constants/contacts';
 
 interface ContactRow {
   id: string;
@@ -50,6 +55,11 @@ function mapRow(row: ContactRow): Contact {
     userId: row.user_id || undefined,
     isActive: row.is_active !== false,
     roles,
+    utilityTypes: inferContactUtilityTypes({
+      firstName: row.first_name,
+      lastName: row.last_name,
+      notes: row.notes || undefined,
+    }),
     createdAt: row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : undefined,
   };
@@ -108,10 +118,12 @@ export async function listContacts(options?: {
   role?: ContactRole;
   activeOnly?: boolean;
   search?: string;
+  utilityType?: 'electricity' | 'water';
 }): Promise<Contact[]> {
   const role = options?.role;
   const activeOnly = options?.activeOnly !== false;
   const search = options?.search?.trim();
+  const utilityType = options?.utilityType;
 
   const params: unknown[] = [];
   const clauses: string[] = [];
@@ -166,7 +178,9 @@ export async function listContacts(options?: {
     params
   );
 
-  return result.rows.map((row) => mapRow(row as ContactRow));
+  const contacts = result.rows.map((row) => mapRow(row as ContactRow));
+  if (!utilityType) return contacts;
+  return contacts.filter((c) => (c.utilityTypes || []).includes(utilityType));
 }
 
 export async function createContact(input: CreateContactInput): Promise<Contact> {

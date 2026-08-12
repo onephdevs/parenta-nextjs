@@ -349,15 +349,25 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
       }
     }
 
+    let parentaTxnId: string | null = null;
+    try {
+      const { allocateParentaTxnId } = await import(
+        '@/lib/services/transaction-id-service'
+      );
+      parentaTxnId = await allocateParentaTxnId('b');
+    } catch (err) {
+      console.error('Parenta txn allocate failed for room utility bill (non-fatal):', err);
+    }
+
     const insertQuery = `
       INSERT INTO utility_bills (
         building_id, room_id, utility_type, provider_name, provider_account_number,
         billing_period_start, billing_period_end, due_date, amount,
         usage_amount, usage_unit, meter_reading_previous, meter_reading_current,
         allocation_method, bill_status, bill_url, notes, cost_bearer,
-        utility_unit_group_id
+        utility_unit_group_id, parenta_txn_id
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       RETURNING *
     `;
 
@@ -382,6 +392,7 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
       billData.notes || null,
       costBearer,
       utilityUnitGroupId,
+      parentaTxnId,
     ];
 
     const result = await client.query(insertQuery, values);
@@ -468,13 +479,26 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
               ? 'OWNER'
               : 'TENANT';
 
+          let childTxnId: string | null = null;
+          try {
+            const { allocateParentaTxnId } = await import(
+              '@/lib/services/transaction-id-service'
+            );
+            childTxnId = await allocateParentaTxnId('b');
+          } catch (err) {
+            console.error(
+              'Parenta txn allocate failed for split utility bill (non-fatal):',
+              err
+            );
+          }
+
           await client.query(
             `INSERT INTO utility_bills (
               building_id, room_id, utility_type, provider_name, provider_account_number,
               billing_period_start, billing_period_end, due_date, amount,
               usage_unit, allocation_method, parent_bill_id, bill_status, notes, cost_bearer,
-              utility_unit_group_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+              utility_unit_group_id, parenta_txn_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
             [
               buildingId,
               rooms[i].id,
@@ -495,6 +519,7 @@ export async function createRoomUtilityBill(billData: CreateUtilityBillInput) {
               }`,
               childBearer,
               utilityUnitGroupId,
+              childTxnId,
             ]
           );
         }

@@ -43,8 +43,8 @@ const BOARD_LINKS: QuickLinkCard[] = [
   },
   {
     id: 'board-billing',
-    title: 'Billing',
-    subtitle: 'Payments board',
+    title: 'Rent Payment',
+    subtitle: 'Rent chase board',
     href: '/admin/tasks?board=payments',
     count: 0,
     icon: Wallet,
@@ -53,8 +53,8 @@ const BOARD_LINKS: QuickLinkCard[] = [
   },
   {
     id: 'board-expenses',
-    title: 'Expenses',
-    subtitle: 'Bills & utilities',
+    title: 'Electricity, Water & Expense',
+    subtitle: 'Building bills board',
     href: '/admin/tasks?board=expenses',
     count: 0,
     icon: Zap,

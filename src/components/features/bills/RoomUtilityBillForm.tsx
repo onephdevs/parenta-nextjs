@@ -17,6 +17,13 @@ import {
   formatPaymentNotesForPeople,
   preserveLedgerTagOnSave,
 } from '@/lib/format-payment-notes';
+import {
+  contactDisplayName,
+  inferContactUtilityTypes,
+  type Contact,
+} from '@/lib/constants/contacts';
+
+const OTHER_PROVIDER_VALUE = '__other__';
 
 interface Building {
   id: string;
@@ -134,6 +141,8 @@ export default function RoomUtilityBillForm({
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [unitGroups, setUnitGroups] = useState<UtilityUnitGroupOption[]>([]);
+  const [vendors, setVendors] = useState<Contact[]>([]);
+  const [providerIsOther, setProviderIsOther] = useState(false);
 
   const [formData, setFormData] = useState<RoomUtilityBillFormData>({
     scope: initialData?.scope || 'unit',
@@ -166,9 +175,10 @@ export default function RoomUtilityBillForm({
   useEffect(() => {
     const load = async () => {
       try {
-        const [bRes, rRes] = await Promise.all([
+        const [bRes, rRes, vRes] = await Promise.all([
           fetch('/api/buildings'),
           fetch('/api/rooms'),
+          fetch('/api/contacts?role=VENDOR'),
         ]);
 
         if (bRes.ok) {
@@ -209,12 +219,47 @@ export default function RoomUtilityBillForm({
             })
           );
         }
+
+        if (vRes.ok) {
+          const data = await vRes.json();
+          if (data.success && Array.isArray(data.data)) {
+            setVendors(data.data as Contact[]);
+          }
+        }
       } catch (error) {
         console.error(error);
       }
     };
     load();
   }, []);
+
+  const vendorsForType = useMemo(() => {
+    return vendors.filter((v) => {
+      const types = v.utilityTypes?.length
+        ? v.utilityTypes
+        : inferContactUtilityTypes(v);
+      return types.includes(formData.utilityType);
+    });
+  }, [vendors, formData.utilityType]);
+
+  const selectedVendorId = useMemo(() => {
+    if (providerIsOther) return OTHER_PROVIDER_VALUE;
+    const match = vendorsForType.find(
+      (v) => contactDisplayName(v) === formData.providerName.trim()
+    );
+    return match?.id || '';
+  }, [providerIsOther, vendorsForType, formData.providerName]);
+
+  useEffect(() => {
+    if (providerIsOther || vendorsForType.length === 0) return;
+    const names = vendorsForType.map((v) => contactDisplayName(v));
+    const nextName = names[0] || '';
+    setFormData((prev) => {
+      if (names.includes(prev.providerName.trim())) return prev;
+      if (prev.providerName === nextName) return prev;
+      return { ...prev, providerName: nextName };
+    });
+  }, [formData.utilityType, vendorsForType, providerIsOther]);
 
   const filteredRooms = useMemo(() => {
     if (!formData.buildingId) return rooms;
@@ -385,6 +430,7 @@ export default function RoomUtilityBillForm({
       }
       if (field === 'utilityType' && typeof value === 'string') {
         next.usageUnit = value === 'electricity' ? 'kWh' : 'm³';
+        setProviderIsOther(false);
       }
       if (field === 'buildingId') {
         next.roomId = '';
@@ -608,15 +654,67 @@ export default function RoomUtilityBillForm({
                 </div>
               )}
 
-            <FormField label="Provider Name" htmlFor="providerName">
-              <Input
-                type="text"
+            <FormField
+              label="Provider / vendor"
+              htmlFor="providerName"
+              hint={
+                formData.utilityType === 'electricity'
+                  ? 'Electric vendors from your contacts'
+                  : 'Water vendors from your contacts'
+              }
+            >
+              <Select
                 id="providerName"
-                value={formData.providerName}
-                onChange={(e) => handleInputChange('providerName', e.target.value)}
-                placeholder="e.g., Meralco, Maynilad (optional)"
-              />
+                value={selectedVendorId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (!value) {
+                    setProviderIsOther(false);
+                    handleInputChange('providerName', '');
+                    return;
+                  }
+                  if (value === OTHER_PROVIDER_VALUE) {
+                    setProviderIsOther(true);
+                    handleInputChange('providerName', '');
+                    return;
+                  }
+                  const vendor = vendorsForType.find((v) => v.id === value);
+                  setProviderIsOther(false);
+                  handleInputChange(
+                    'providerName',
+                    vendor ? contactDisplayName(vendor) : ''
+                  );
+                }}
+              >
+                <option value="">Select provider</option>
+                {vendorsForType.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {contactDisplayName(v)}
+                  </option>
+                ))}
+                <option value={OTHER_PROVIDER_VALUE}>Other (type a name)</option>
+              </Select>
             </FormField>
+
+            {providerIsOther && (
+              <FormField
+                label="Provider name"
+                htmlFor="providerNameCustom"
+                hint="Saved on this bill only — not added to vendors"
+              >
+                <Input
+                  type="text"
+                  id="providerNameCustom"
+                  value={formData.providerName}
+                  onChange={(e) => handleInputChange('providerName', e.target.value)}
+                  placeholder={
+                    formData.utilityType === 'electricity'
+                      ? 'e.g. Meralco'
+                      : 'e.g. Maynilad'
+                  }
+                />
+              </FormField>
+            )}
 
             <FormField label="Account Number" htmlFor="providerAccountNumber">
               <Input

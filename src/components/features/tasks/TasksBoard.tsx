@@ -1020,7 +1020,11 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
 
             <Button type="button" size="sm" onClick={openAdd}>
               <Plus className="mr-1.5 h-4 w-4" />
-              Add opportunity
+              {activeSlug === 'expenses'
+                ? 'Add bill or expense'
+                : activeSlug === 'payments'
+                  ? 'Add rent payment'
+                  : 'Add opportunity'}
             </Button>
 
             <div className="relative" ref={overflowRef}>

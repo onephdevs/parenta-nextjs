@@ -193,6 +193,16 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
         ? expenseData.roomId
         : null;
     const hasRoomId = roomId !== null;
+
+    let parentaTxnId: string | null = null;
+    try {
+      const { allocateParentaTxnId } = await import(
+        '@/lib/services/transaction-id-service'
+      );
+      parentaTxnId = await allocateParentaTxnId('e');
+    } catch (err) {
+      console.error('Expense parenta txn allocate failed (non-fatal):', err);
+    }
     
     let query: string;
     let values: unknown[];
@@ -201,9 +211,9 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
       query = `
         INSERT INTO expenses (
           building_id, room_id, category, amount, description,
-          vendor_name, expense_date, receipt_url, notes
+          vendor_name, expense_date, receipt_url, notes, parenta_txn_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
       
@@ -217,14 +227,15 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
         expenseData.expenseDate || new Date(),
         expenseData.receiptUrl || null,
         expenseData.notes || null,
+        parentaTxnId,
       ];
     } else {
       query = `
         INSERT INTO expenses (
           building_id, category, amount, description,
-          vendor_name, expense_date, receipt_url, notes
+          vendor_name, expense_date, receipt_url, notes, parenta_txn_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `;
       
@@ -237,6 +248,7 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
         expenseData.expenseDate || new Date(),
         expenseData.receiptUrl || null,
         expenseData.notes || null,
+        parentaTxnId,
       ];
     }
     
@@ -256,9 +268,9 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
           const query = `
             INSERT INTO expenses (
               building_id, category, amount, description,
-              vendor_name, expense_date, receipt_url, notes
+              vendor_name, expense_date, receipt_url, notes, parenta_txn_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
           `;
           
@@ -271,6 +283,7 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
             expenseData.expenseDate || new Date(),
             expenseData.receiptUrl || null,
             expenseData.notes || null,
+            parentaTxnId,
           ];
           
           const result = await pool.query(query, values);
