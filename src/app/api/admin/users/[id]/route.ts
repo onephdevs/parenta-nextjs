@@ -52,7 +52,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       `SELECT id, email, username, role, first_name, last_name,
               is_active, email_verified, created_at, updated_at
        FROM users
-       WHERE id = $1 AND role = 'admin'`,
+       WHERE id = $1 AND role IN ('admin', 'caretaker')`,
       [id]
     );
 
@@ -119,7 +119,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
 
       // Keep at least one active admin
-      if (!isActive) {
+      if (!isActive && existing.rows[0].role === 'admin') {
         const activeCount = await pool.query<{ count: string }>(
           `SELECT COUNT(*)::text AS count
            FROM users
@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const result = await pool.query<AdminUserRow>(
       `UPDATE users
        SET ${updates.join(', ')}
-       WHERE id = $${paramIndex} AND role = 'admin'
+       WHERE id = $${paramIndex} AND role IN ('admin', 'caretaker')
        RETURNING id, email, username, role, first_name, last_name,
                  is_active, email_verified, created_at, updated_at`,
       values

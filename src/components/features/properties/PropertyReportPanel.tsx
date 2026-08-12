@@ -19,6 +19,7 @@ import {
   Home,
   Info,
   Plus,
+  StickyNote,
   UserPlus,
   Wallet,
   Wrench,
@@ -27,18 +28,22 @@ import type { PropertyBuildingReport } from '@/lib/api/properties';
 import { getImageUrl } from '@/lib/format/image-url';
 import { Button } from '@/components/ui/Button';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import { AddNotesButton } from '@/components/features/notes/EntityNotesModal';
 import { LightboxImage } from '@/components/ui/ImageLightbox';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 
 interface PropertyReportPanelProps {
   buildingId: string;
+  buildingName?: string;
   onAddTenant?: () => void;
   onAddRoom?: () => void;
   onRecordPayment?: () => void;
   onMaintenance?: () => void;
   /** Refresh parent after creating a tenant from a unit card / fallback button. */
   onTenantCreated?: () => void;
+  /** Refresh property notes list after saving a note. */
+  onNoteSaved?: () => void;
 }
 
 function formatCurrency(amount: number) {
@@ -103,11 +108,13 @@ function UnitThumbs({
 
 export default function PropertyReportPanel({
   buildingId,
+  buildingName,
   onAddTenant,
   onAddRoom,
   onRecordPayment,
   onMaintenance,
   onTenantCreated,
+  onNoteSaved,
 }: PropertyReportPanelProps) {
   const months = useMemo(() => monthOptions(12), []);
   const [month, setMonth] = useState(months[0]?.value || '');
@@ -194,6 +201,16 @@ export default function PropertyReportPanel({
             <Button leftIcon={<Wallet className="h-4 w-4" />}>Record Payment</Button>
           </Link>
         )}
+        <AddNotesButton
+          entityType="building"
+          entityId={buildingId}
+          entityLabel={buildingName}
+          label="Add note"
+          variant="outline"
+          size="md"
+          leftIcon={<StickyNote className="h-4 w-4" />}
+          onSaved={() => onNoteSaved?.()}
+        />
         {onAddTenant ? (
           <Button
             type="button"

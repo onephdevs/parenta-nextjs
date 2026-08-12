@@ -9,6 +9,7 @@ import type {
   PipelineCard,
   PipelineCardStatus,
   PipelineLeaseStatus,
+  PipelineViewingStatus,
   PipelineStage,
 } from '@/types/database';
 
@@ -61,6 +62,7 @@ interface DbCard {
   due_at: Date | string | null;
   next_action_at: Date | string | null;
   viewing_at: Date | string | null;
+  viewing_status?: string | null;
   notes: string | null;
   prior_stage_id: string | null;
   prior_board_id: string | null;
@@ -158,6 +160,7 @@ function mapCard(row: DbCard): PipelineCard {
     dueAt: toIso(row.due_at),
     nextActionAt: toIso(row.next_action_at),
     viewingAt: toIso(row.viewing_at),
+    viewingStatus: (row.viewing_status as PipelineViewingStatus) || undefined,
     notes: row.notes || undefined,
     priorStageId: row.prior_stage_id || undefined,
     priorBoardId: row.prior_board_id || undefined,
@@ -503,9 +506,18 @@ export async function movePipelineCard(
        card_status = $3,
        won_at = COALESCE($4::timestamptz, won_at),
        lost_at = COALESCE($5::timestamptz, lost_at),
+       assigned_to = COALESCE(assigned_to, $7),
        updated_at = CURRENT_TIMESTAMP
      WHERE id = $6`,
-    [stageId, position, cardStatus, wonAt, lostAt, cardId]
+    [
+      stageId,
+      position,
+      cardStatus,
+      wonAt,
+      lostAt,
+      cardId,
+      !card.assigned_to && options?.userId ? options.userId : null,
+    ]
   );
 
   await pool.query(
@@ -2489,6 +2501,80 @@ export async function getPipelineCardById(cardId: string): Promise<PipelineCard 
   return mapCard(result.rows[0]);
 }
 
+/**
+ * Record a touch on a card (document upload, etc.) and auto-claim if unassigned.
+ * Always stores created_by so History shows which account made the change.
+ */
+export async function recordPipelineCardActivity(
+  cardId: string,
+  options: {
+    userId?: string | null;
+    eventType?: string;
+    note: string;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<void> {
+  const existing = await getPipelineCardById(cardId);
+  if (!existing) return;
+
+  const userId = options.userId || null;
+  let claimedName: string | null = null;
+
+  if (!existing.assignedTo && userId) {
+    await pool.query(
+      `UPDATE pipeline_cards
+       SET assigned_to = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND assigned_to IS NULL`,
+      [userId, cardId]
+    );
+    const nameRow = await pool.query<{ first_name: string; last_name: string }>(
+      `SELECT first_name, last_name FROM users WHERE id = $1`,
+      [userId]
+    );
+    claimedName = nameRow.rows[0]
+      ? `${nameRow.rows[0].first_name} ${nameRow.rows[0].last_name}`.trim()
+      : 'admin';
+
+    await pool.query(
+      `INSERT INTO pipeline_card_events (
+         card_id, event_type, from_board_id, to_board_id, note, metadata, created_by
+       ) VALUES ($1, 'assignee_changed', $2, $2, $3, $4::jsonb, $5)`,
+      [
+        cardId,
+        existing.boardId,
+        `Assigned to ${claimedName} (auto)`,
+        JSON.stringify({
+          changes: [`Assigned to ${claimedName} (auto)`],
+          fields: [
+            {
+              field: 'assignedTo',
+              label: 'Assignee',
+              from: null,
+              to: claimedName,
+              summary: `Assigned to ${claimedName} (auto)`,
+            },
+          ],
+        }),
+        userId,
+      ]
+    );
+  }
+
+  await pool.query(
+    `INSERT INTO pipeline_card_events (
+       card_id, event_type, from_board_id, to_board_id, note, metadata, created_by
+     ) VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6)`,
+    [
+      cardId,
+      options.eventType || 'updated',
+      existing.boardId,
+      options.note,
+      JSON.stringify(options.metadata || { note: options.note }),
+      userId,
+    ]
+  );
+}
+
 export interface PipelineCardEvent {
   id: string;
   cardId: string;
@@ -2791,6 +2877,7 @@ export interface UpdatePipelineCardData {
   dueAt?: string | null;
   nextActionAt?: string | null;
   viewingAt?: string | null;
+  viewingStatus?: PipelineViewingStatus | null;
   notes?: string | null;
   lostReason?: string | null;
   markAsLost?: boolean;
@@ -2996,9 +3083,25 @@ export async function updatePipelineCard(
     changeNotes.push(change.summary);
   };
 
+  // Auto-claim: whoever edits an unassigned card becomes the owner.
+  // Explicit assign / unassign from the UI still wins via data.assignedTo.
+  let effectiveAssignedTo = data.assignedTo;
+  if (
+    effectiveAssignedTo === undefined &&
+    !existing.assignedTo &&
+    userId
+  ) {
+    effectiveAssignedTo = userId;
+  }
+
   const nextAssignedTo =
-    data.assignedTo !== undefined ? data.assignedTo : existing.assignedTo || null;
-  if (data.assignedTo !== undefined && nextAssignedTo !== (existing.assignedTo || null)) {
+    effectiveAssignedTo !== undefined
+      ? effectiveAssignedTo
+      : existing.assignedTo || null;
+  if (
+    effectiveAssignedTo !== undefined &&
+    nextAssignedTo !== (existing.assignedTo || null)
+  ) {
     if (!nextAssignedTo) {
       recordChange({
         field: 'assignedTo',
@@ -3022,7 +3125,10 @@ export async function updatePipelineCard(
         label: 'Assignee',
         from: existing.assignedToName || null,
         to: name,
-        summary: `Assigned to ${name}`,
+        summary:
+          data.assignedTo !== undefined
+            ? `Assigned to ${name}`
+            : `Assigned to ${name} (auto)`,
       });
     }
   }
@@ -3420,26 +3526,27 @@ export async function updatePipelineCard(
        due_at = $11,
        next_action_at = $12,
        viewing_at = $13,
-       notes = $14,
-       lost_reason = $15,
-       background_check_status = $16,
-       background_check_notes = $17,
-       lease_status = $18,
-       lease_start_date = $19,
-       lease_end_date = $20,
-       move_in_date = $21,
-       assignment_id = COALESCE($22, assignment_id),
-       deposit_amount = $23,
-       advance_amount = $24,
-       move_in_payment_status = $25,
-       move_in_paid_at = $26,
-       move_in_payment_method = $27,
-       move_in_payment_notes = $28,
-       assigned_to = $29,
-       deposit_parenta_txn_id = $30,
-       advance_parenta_txn_id = $31,
+       viewing_status = $14,
+       notes = $15,
+       lost_reason = $16,
+       background_check_status = $17,
+       background_check_notes = $18,
+       lease_status = $19,
+       lease_start_date = $20,
+       lease_end_date = $21,
+       move_in_date = $22,
+       assignment_id = COALESCE($23, assignment_id),
+       deposit_amount = $24,
+       advance_amount = $25,
+       move_in_payment_status = $26,
+       move_in_paid_at = $27,
+       move_in_payment_method = $28,
+       move_in_payment_notes = $29,
+       assigned_to = $30,
+       deposit_parenta_txn_id = $31,
+       advance_parenta_txn_id = $32,
        updated_at = CURRENT_TIMESTAMP
-     WHERE id = $32`,
+     WHERE id = $33`,
     [
       title,
       firstName,
@@ -3458,6 +3565,7 @@ export async function updatePipelineCard(
       data.dueAt !== undefined ? data.dueAt : existing.dueAt || null,
       data.nextActionAt !== undefined ? data.nextActionAt : existing.nextActionAt || null,
       viewingAt,
+      data.viewingStatus !== undefined ? data.viewingStatus || null : existing.viewingStatus || null,
       data.notes !== undefined ? data.notes?.trim() || null : existing.notes || null,
       markAsLost || data.lostReason !== undefined ? lostReason : existing.lostReason || null,
       backgroundCheckStatus,
@@ -3473,7 +3581,7 @@ export async function updatePipelineCard(
       moveInPaidAt,
       moveInPaymentMethod,
       moveInPaymentNotes,
-      data.assignedTo !== undefined ? data.assignedTo : existing.assignedTo || null,
+      nextAssignedTo,
       depositParentaTxnId,
       advanceParentaTxnId,
       cardId,
@@ -3481,7 +3589,7 @@ export async function updatePipelineCard(
   );
 
   const eventType =
-    data.assignedTo !== undefined &&
+    effectiveAssignedTo !== undefined &&
     nextAssignedTo !== (existing.assignedTo || null) &&
     changeNotes.length === 1
       ? 'assignee_changed'
@@ -3512,7 +3620,7 @@ export async function updatePipelineCard(
   // Keep maintenance request assignee in sync with board card assignee
   if (
     boardSlug === 'maintenance' &&
-    data.assignedTo !== undefined &&
+    effectiveAssignedTo !== undefined &&
     nextAssignedTo !== (existing.assignedTo || null) &&
     existing.maintenanceRequestId
   ) {

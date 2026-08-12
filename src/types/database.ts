@@ -946,6 +946,12 @@ export type PipelineBackgroundCheckStatus =
   | 'pending'
   | 'approved'
   | 'failed';
+export type PipelineViewingStatus =
+  | 'scheduled'
+  | 'completed'
+  | 'no_show'
+  | 'cancelled'
+  | 'rescheduled';
 export type PipelineLeaseStatus =
   | 'not_started'
   | 'generated'
@@ -1004,6 +1010,7 @@ export interface PipelineCard {
   dueAt?: string;
   nextActionAt?: string;
   viewingAt?: string;
+  viewingStatus?: PipelineViewingStatus;
   notes?: string;
   priorStageId?: string;
   priorBoardId?: string;
@@ -1068,6 +1075,7 @@ export interface CreatePipelineCardData {
   dueAt?: string;
   nextActionAt?: string;
   viewingAt?: string;
+  viewingStatus?: PipelineViewingStatus;
   notes?: string;
   lostReason?: string;
 }

@@ -28,6 +28,7 @@ import {
   type CardFieldPair,
   defaultFieldsForBoard,
   formatCardFieldValue,
+  getCardBoardValue,
   loadCardFields,
 } from '@/lib/pipeline/cardFields';
 import { AddOpportunityModal } from './NewPipelineCardModal';
@@ -436,7 +437,8 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       if (sortKey === 'title') {
         cmp = a.title.localeCompare(b.title);
       } else if (sortKey === 'amount') {
-        cmp = (a.amount || 0) - (b.amount || 0);
+        cmp =
+          getCardBoardValue(a, activeSlug) - getCardBoardValue(b, activeSlug);
       } else if (sortKey === 'dueAt') {
         cmp =
           new Date(a.dueAt || 0).getTime() - new Date(b.dueAt || 0).getTime();
@@ -448,7 +450,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     });
 
     return list;
-  }, [cards, tagFilter, searchQuery, sortKey, sortDesc]);
+  }, [cards, tagFilter, searchQuery, sortKey, sortDesc, activeSlug]);
 
   const cardsByStage = useMemo(() => {
     const map = new Map<string, PipelineCard[]>();
@@ -666,6 +668,14 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     activeSlug === 'payments';
 
   const opportunityCount = filteredCards.length;
+  const boardTotalAmount = useMemo(
+    () =>
+      filteredCards.reduce(
+        (sum, card) => sum + getCardBoardValue(card, activeSlug),
+        0
+      ),
+    [filteredCards, activeSlug]
+  );
   const sortActive = sortKey !== 'updatedAt' || !sortDesc ? 1 : 0;
 
   function openAdd() {
@@ -931,10 +941,10 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             <span className="text-sm font-medium text-blue-600">
               {opportunityCount}{' '}
               {opportunityCount === 1 ? 'opportunity' : 'opportunities'}
-              {showMoney && activeBoard ? (
+              {showMoney ? (
                 <span className="text-gray-400">
                   {' '}
-                  · {formatPeso(activeBoard.openTotalAmount)}
+                  · {formatPeso(boardTotalAmount)}
                 </span>
               ) : null}
             </span>
@@ -1268,11 +1278,13 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
                     <td className="px-3 py-2.5 text-gray-700">
                       {formatCardFieldValue(fieldPair[0], card, {
                         monthlySuffix: showMoney,
+                        boardSlug: activeSlug,
                       })}
                     </td>
                     <td className="px-3 py-2.5 text-gray-700">
                       {formatCardFieldValue(fieldPair[1], card, {
                         monthlySuffix: showMoney,
+                        boardSlug: activeSlug,
                       })}
                     </td>
                   </tr>
@@ -1294,6 +1306,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
                 cards={cardsByStage.get(stage.id) || []}
                 isDropTarget={dropStageId === stage.id}
                 fieldPair={fieldPair}
+                boardSlug={activeSlug}
                 assignees={assignees}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
@@ -1394,6 +1407,7 @@ function StageColumn({
   cards,
   isDropTarget,
   fieldPair,
+  boardSlug,
   assignees,
   onDragOver,
   onDrop,
@@ -1407,6 +1421,7 @@ function StageColumn({
   cards: PipelineCard[];
   isDropTarget: boolean;
   fieldPair: CardFieldPair;
+  boardSlug: PipelineBoardSlug;
   assignees: PipelineAssigneeOption[];
   onDragOver: (e: React.DragEvent, stageId: string) => void;
   onDrop: (e: React.DragEvent, stageId: string) => void;
@@ -1416,7 +1431,10 @@ function StageColumn({
   onAssign: (cardId: string, assignedTo: string | null) => void;
   showMoney: boolean;
 }) {
-  const total = cards.reduce((sum, c) => sum + (c.amount || 0), 0);
+  const total = cards.reduce(
+    (sum, c) => sum + getCardBoardValue(c, boardSlug),
+    0
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(stage.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1496,6 +1514,7 @@ function StageColumn({
             card={card}
             stage={stage}
             fieldPair={fieldPair}
+            boardSlug={boardSlug}
             showMonthlySuffix={showMoney}
             assignees={assignees}
             onDragStart={onDragStart}

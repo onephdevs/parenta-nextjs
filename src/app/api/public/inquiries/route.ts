@@ -70,11 +70,6 @@ export async function POST(request: Request) {
       }
     }
 
-    if (isHero) {
-      if (!firstName) firstName = 'Website';
-      if (!lastName) lastName = 'Inquiry';
-    }
-
     const rawBuildingId =
       typeof body.buildingId === 'string' ? body.buildingId.trim() : '';
     const buildingId =
@@ -88,18 +83,19 @@ export async function POST(request: Request) {
             ? body.company
             : '';
 
-    if (!firstName || firstName.length < 1) {
-      return NextResponse.json(
-        { success: false, error: 'Please enter your first name' },
-        { status: 400 }
-      );
-    }
-
-    if (!lastName || lastName.length < 1) {
-      return NextResponse.json(
-        { success: false, error: 'Please enter your last name' },
-        { status: 400 }
-      );
+    if (!isHero) {
+      if (!firstName || firstName.length < 1) {
+        return NextResponse.json(
+          { success: false, error: 'Please enter your first name' },
+          { status: 400 }
+        );
+      }
+      if (!lastName || lastName.length < 1) {
+        return NextResponse.json(
+          { success: false, error: 'Please enter your last name' },
+          { status: 400 }
+        );
+      }
     }
 
     const emailOk = Boolean(email && EMAIL_RE.test(email));
@@ -235,8 +231,8 @@ export async function POST(request: Request) {
         boardSlug: 'onboarding',
         stageSlug: 'new_inquiry',
         title: isHero ? `Inquiry · ${title}` : fullName,
-        contactFirstName: firstName,
-        contactLastName: lastName,
+        contactFirstName: isHero ? '' : firstName,
+        contactLastName: isHero ? '' : lastName,
         contactEmail: emailOk ? email : undefined,
         contactPhone: phoneOk ? phone : phone || undefined,
         buildingId: resolvedBuildingId,

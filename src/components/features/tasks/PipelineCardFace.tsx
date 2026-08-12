@@ -10,7 +10,7 @@ import {
   Tag,
   UserRoundX,
 } from 'lucide-react';
-import type { PipelineCard, PipelineStage } from '@/types/database';
+import type { PipelineBoardSlug, PipelineCard, PipelineStage } from '@/types/database';
 import {
   type CardFieldPair,
   fieldLabel,
@@ -28,6 +28,7 @@ interface PipelineCardFaceProps {
   card: PipelineCard;
   stage: PipelineStage;
   fieldPair: CardFieldPair;
+  boardSlug?: PipelineBoardSlug | null;
   showMonthlySuffix: boolean;
   assignees: PipelineAssigneeOption[];
   onDragStart: (cardId: string) => void;
@@ -79,6 +80,7 @@ export function PipelineCardFace({
   card,
   stage,
   fieldPair,
+  boardSlug,
   showMonthlySuffix,
   assignees,
   onDragStart,
@@ -118,25 +120,10 @@ export function PipelineCardFace({
   }, [assignOpen]);
 
   function handleCall() {
-    const phone = card.contactPhone?.trim();
-    if (!phone) {
-      onOpen();
-      return;
-    }
-    window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+    onOpen();
   }
 
   function handleMessage() {
-    const email = card.contactEmail?.trim();
-    if (email) {
-      window.location.href = `mailto:${email}?subject=${encodeURIComponent(`Re: ${card.title}`)}`;
-      return;
-    }
-    const phone = card.contactPhone?.trim();
-    if (phone) {
-      window.location.href = `sms:${phone.replace(/\s+/g, '')}`;
-      return;
-    }
     onOpen();
   }
 
@@ -268,7 +255,10 @@ export function PipelineCardFace({
           <div key={key} className="flex items-baseline justify-between gap-2 text-xs">
             <span className="shrink-0 text-gray-400">{fieldLabel(key)}</span>
             <span className="truncate text-right font-medium text-gray-800">
-              {formatCardFieldValue(key, card, { monthlySuffix: showMonthlySuffix })}
+              {formatCardFieldValue(key, card, {
+                monthlySuffix: showMonthlySuffix,
+                boardSlug,
+              })}
             </span>
           </div>
         ))}

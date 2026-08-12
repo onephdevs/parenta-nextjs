@@ -56,12 +56,12 @@ function formatWhen(iso: string): string {
 }
 
 function displayValue(value: string | string[] | null | undefined): string {
-  if (value == null) return '(none)';
+  if (value == null) return '(cleared)';
   if (Array.isArray(value)) {
-    return value.length ? value.join(', ') : '(none)';
+    return value.length ? value.join(', ') : '(cleared)';
   }
   const trimmed = String(value).trim();
-  return trimmed || '(none)';
+  return trimmed || '(cleared)';
 }
 
 function parseFieldChanges(metadata?: Record<string, unknown>): HistoryFieldChange[] {
@@ -318,23 +318,14 @@ function eventTitle(event: DisplayEvent, fields: HistoryFieldChange[]): string {
 }
 
 function FieldChangeDetails({ change }: { change: HistoryFieldChange }) {
+  const fromText = displayValue(change.from);
+  const toText = displayValue(change.to);
+
   return (
-    <div className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-800">
+    <div className="text-sm">
       <p className="font-medium text-gray-900">{change.label}</p>
-      <dl className="mt-1.5 space-y-1">
-        <div className="grid grid-cols-[4.5rem_1fr] gap-2">
-          <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Previous
-          </dt>
-          <dd className="text-gray-700">{displayValue(change.from)}</dd>
-        </div>
-        <div className="grid grid-cols-[4.5rem_1fr] gap-2">
-          <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Now</dt>
-          <dd className="text-gray-900">{displayValue(change.to)}</dd>
-        </div>
-      </dl>
       {(change.added?.length || change.removed?.length) ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
           {change.added?.map((tag) => (
             <span
               key={`add-${tag}`}
@@ -352,7 +343,11 @@ function FieldChangeDetails({ change }: { change: HistoryFieldChange }) {
             </span>
           ))}
         </div>
-      ) : null}
+      ) : (
+        <p className="mt-0.5 text-xs text-gray-500">
+          {fromText} → {toText}
+        </p>
+      )}
     </div>
   );
 }
@@ -420,8 +415,60 @@ export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps
     <ul className="max-h-[28rem] space-y-0 overflow-y-auto border-l border-gray-200 pl-4">
       {displayEvents.map((event) => {
         const fields = resolveFieldChanges(event);
-        const title = eventTitle(event, fields);
         const vagueTags = isVagueTagsOnlyEvent(event);
+        const actorLine = [
+          event.actorName ? `by ${event.actorName}` : 'by System',
+          formatWhen(event.createdAt),
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
+        // Field updates + assignee changes: one timeline row per field
+        if (
+          (event.eventType === 'updated' || event.eventType === 'assignee_changed') &&
+          fields.length > 0 &&
+          !vagueTags
+        ) {
+          return fields.map((change, idx) => (
+            <li
+              key={`${event.id}-${change.field}-${idx}`}
+              className="relative pb-5 last:pb-0"
+            >
+              <span
+                aria-hidden
+                className="absolute -left-[1.3rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-indigo-500 shadow"
+              />
+              <p className="text-sm font-medium text-gray-900">{change.label}</p>
+              <p className="mt-0.5 text-xs text-gray-500">{actorLine}</p>
+              {change.added?.length || change.removed?.length ? (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {change.added?.map((tag) => (
+                    <span
+                      key={`add-${tag}`}
+                      className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-600/20"
+                    >
+                      + {tag}
+                    </span>
+                  ))}
+                  {change.removed?.map((tag) => (
+                    <span
+                      key={`rem-${tag}`}
+                      className="inline-flex items-center rounded-md bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 line-through"
+                    >
+                      − {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {displayValue(change.from)} → {displayValue(change.to)}
+                </p>
+              )}
+            </li>
+          ));
+        }
+
+        const title = eventTitle(event, fields);
 
         return (
           <li key={event.id} className="relative pb-5 last:pb-0">
@@ -430,12 +477,13 @@ export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps
               className="absolute -left-[1.3rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-indigo-500 shadow"
             />
             <p className="text-sm font-medium text-gray-900">{title}</p>
+            <p className="mt-0.5 text-xs text-gray-500">{actorLine}</p>
             {vagueTags ? (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-0.5 text-xs text-gray-500">
                 Older edit — previous and new tag values were not saved.
               </p>
             ) : fields.length > 0 ? (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-3">
                 {fields.map((change, idx) => (
                   <FieldChangeDetails
                     key={`${event.id}-${change.field}-${idx}`}
@@ -444,16 +492,11 @@ export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps
                 ))}
               </div>
             ) : null}
-            <p className="mt-1.5 text-xs text-gray-500">
-              {[event.actorName || 'System', formatWhen(event.createdAt)]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
             {event.fromStageName &&
               event.toStageName &&
               event.eventType !== 'stage_changed' &&
               !title.includes(event.toStageName) && (
-                <p className="mt-0.5 text-xs text-gray-400">
+                <p className="mt-0.5 text-xs text-gray-500">
                   {event.fromStageName} → {event.toStageName}
                 </p>
               )}

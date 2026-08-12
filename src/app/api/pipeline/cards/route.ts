@@ -63,12 +63,6 @@ export async function POST(request: Request) {
     }
 
     if (body.boardSlug === 'onboarding') {
-      if (!body.contactFirstName?.trim() || !body.contactLastName?.trim()) {
-        return NextResponse.json(
-          { success: false, error: 'First and last name are required' },
-          { status: 400 }
-        );
-      }
       const hasBuilding = Boolean(body.buildingId);
       const hasRoom = Boolean(body.roomId);
       // Building alone is OK (website / early inquiry). Room requires building.

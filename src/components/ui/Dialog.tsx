@@ -32,9 +32,15 @@ export function Dialog({
   className,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
 
+  // Lock scroll + Escape while open. Keep onClose in the listener without
+  // re-running focus on every parent re-render (inline onClose identities change).
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -43,7 +49,13 @@ export function Dialog({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', onKeyDown);
-    panelRef.current?.focus();
+
+    // Focus the panel only when the dialog first opens — never steal focus
+    // from inputs after each keystroke / parent re-render.
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true;
+      panelRef.current?.focus();
+    }
 
     return () => {
       document.body.style.overflow = previousOverflow;

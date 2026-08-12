@@ -15,7 +15,7 @@ import { getImageUrl } from '@/lib/format/image-url';
 import { useNotifications } from '@/hooks/useNotifications';
 import EditBuildingModal from '@/components/features/EditBuildingModal';
 import DeleteBuildingModal from '@/components/features/DeleteBuildingModal';
-import { AddNotesButton, EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
+import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import {
   formatBuildingAddress,
   googleMapsUrl,
@@ -28,12 +28,15 @@ interface MainPropertyCardProps {
   detail: PropertyBuildingDetail;
   onBuildingUpdated: () => void;
   onBuildingDeleted: () => void;
+  /** Bump after adding a note from the action row so the list reloads. */
+  notesRefreshKey?: number;
 }
 
 export default function MainPropertyCard({
   detail,
   onBuildingUpdated,
   onBuildingDeleted,
+  notesRefreshKey = 0,
 }: MainPropertyCardProps) {
   const { building, buildingImages } = detail;
   const { showNotification } = useNotifications();
@@ -112,186 +115,169 @@ export default function MainPropertyCard({
 
   return (
     <>
-      <div style={{ fontFamily: LATO }}>
-        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
-          <div className="flex flex-col md:flex-row">
-            <div className="relative h-48 w-full flex-shrink-0 bg-gray-100 md:h-auto md:min-h-[200px] md:w-[240px] lg:w-[280px]">
-              {hero ? (
-                <button
-                  type="button"
-                  onClick={() => openEdit('photos')}
-                  className="group relative h-full w-full"
-                  aria-label="Edit property photos"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={hero} alt={building.name} className="h-full w-full object-cover" />
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
-                    Change photo
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openEdit('photos')}
-                  className="flex h-full min-h-[12rem] w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-gray-500 transition hover:border-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                >
-                  <Camera className="h-7 w-7" />
-                  <span className="text-sm font-medium">Add property photo</span>
-                </button>
-              )}
-            </div>
-
-            <div className="relative flex flex-1 flex-col gap-3 p-5">
-              <div className="absolute right-3 top-3">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((v) => !v)}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-                  aria-label="Property options"
-                >
-                  <MoreVertical className="h-5 w-5" />
-                </button>
-                {menuOpen && (
-                  <>
-                    <button
-                      type="button"
-                      className="fixed inset-0 z-10 cursor-default"
-                      aria-label="Close menu"
-                      onClick={() => setMenuOpen(false)}
-                    />
-                    <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                      <button
-                        type="button"
-                        className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          openEdit('basic');
-                        }}
-                      >
-                        Edit property
-                      </button>
-                      <AddNotesButton
-                        entityType="building"
-                        entityId={building.id}
-                        entityLabel={building.name}
-                        onSaved={() => onBuildingUpdated()}
-                        renderTrigger={(open) => (
-                          <button
-                            type="button"
-                            className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                            onClick={() => {
-                              setMenuOpen(false);
-                              open();
-                            }}
-                          >
-                            Add note
-                          </button>
-                        )}
-                      />
-                      <Link
-                        href={`/admin/buildings/${building.id}/rooms`}
-                        className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        Manage rooms
-                      </Link>
-                      <button
-                        type="button"
-                        className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        Delete property
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {editingName ? (
-                <div className="pr-8">
-                  <input
-                    ref={nameInputRef}
-                    value={nameDraft}
-                    disabled={savingName}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    onBlur={() => {
-                      void saveName();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void saveName();
-                      }
-                      if (e.key === 'Escape') {
-                        setNameDraft(building.name);
-                        setEditingName(false);
-                      }
-                    }}
-                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-[24px] font-bold leading-none text-gray-900 focus:border-gray-500 focus:outline-none"
-                    aria-label="Property name"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-start gap-2 pr-8">
-                  <h3 className="text-[24px] font-bold leading-tight text-gray-900">
-                    {building.name}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setEditingName(true)}
-                    className="mt-1 rounded-md p-1 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-                    aria-label="Edit property name"
-                    title="Edit property name"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-
-              <p className="text-[13px] leading-snug text-gray-600">{address}</p>
-
-              <a
-                href={mapsHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[12px] font-normal leading-none text-blue-600 hover:text-blue-700"
+      <div
+        className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)]"
+        style={{ fontFamily: LATO }}
+      >
+        <div className="flex flex-col lg:flex-row">
+          {/* Photo */}
+          <div className="relative h-48 w-full flex-shrink-0 bg-gray-100 lg:h-auto lg:min-h-[200px] lg:w-[220px] xl:w-[260px]">
+            {hero ? (
+              <button
+                type="button"
+                onClick={() => openEdit('photos')}
+                className="group relative h-full w-full"
+                aria-label="Edit property photos"
               >
-                <MapPin className="h-4 w-4" style={{ color: TEAL }} />
-                Open on Google Maps
-              </a>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={hero} alt={building.name} className="h-full w-full object-cover" />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+                  Change photo
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openEdit('photos')}
+                className="flex h-full min-h-[12rem] w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-gray-500 transition hover:border-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              >
+                <Camera className="h-7 w-7" />
+                <span className="text-sm font-medium">Add property photo</span>
+              </button>
+            )}
+          </div>
 
-              <div className="mt-auto flex flex-wrap items-center gap-3 pt-1 text-[12px] font-normal leading-none text-gray-600">
-                <span className="inline-flex items-center gap-1.5">
-                  <Home className="h-4 w-4" style={{ color: TEAL }} />
-                  {roomCount} Rooms
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Users className="h-4 w-4" style={{ color: TEAL }} />
-                  {detail.tenantCount || 0} Tenants
-                </span>
-                <AddNotesButton
-                  entityType="building"
-                  entityId={building.id}
-                  entityLabel={building.name}
-                  label="Add note"
-                  onSaved={() => onBuildingUpdated()}
+          {/* Property info */}
+          <div className="relative flex min-w-0 flex-1 flex-col gap-3 p-5 lg:max-w-[340px] xl:max-w-[380px]">
+            {editingName ? (
+              <div>
+                <input
+                  ref={nameInputRef}
+                  value={nameDraft}
+                  disabled={savingName}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onBlur={() => {
+                    void saveName();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void saveName();
+                    }
+                    if (e.key === 'Escape') {
+                      setNameDraft(building.name);
+                      setEditingName(false);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-[24px] font-bold leading-none text-gray-900 focus:border-gray-500 focus:outline-none"
+                  aria-label="Property name"
                 />
               </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <h3 className="text-[24px] font-bold leading-tight text-gray-900">
+                  {building.name}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingName(true)}
+                  className="mt-1 rounded-md p-1 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+                  aria-label="Edit property name"
+                  title="Edit property name"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <p className="text-[13px] leading-snug text-gray-600">{address}</p>
+
+            <a
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[12px] font-normal leading-none text-blue-600 hover:text-blue-700"
+            >
+              <MapPin className="h-4 w-4" style={{ color: TEAL }} />
+              Open on Google Maps
+            </a>
+
+            <div className="mt-auto flex flex-wrap items-center gap-3 pt-1 text-[12px] font-normal leading-none text-gray-600">
+              <span className="inline-flex items-center gap-1.5">
+                <Home className="h-4 w-4" style={{ color: TEAL }} />
+                {roomCount} Rooms
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-4 w-4" style={{ color: TEAL }} />
+                {detail.tenantCount || 0} Tenants
+              </span>
             </div>
           </div>
-        </div>
 
-        <div className="border-t border-gray-100 p-5">
-          <EntityNotesPanel
-            entityType="building"
-            entityId={building.id}
-            entityLabel={building.name}
-            title="Property notes"
-            compact
-          />
+          {/* Notes (right side) */}
+          <div className="relative flex min-h-[160px] min-w-0 flex-1 flex-col border-t border-gray-100 bg-gray-50/70 p-4 lg:border-l lg:border-t-0">
+            <div className="absolute right-2 top-2 z-10">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-white hover:text-gray-700"
+                aria-label="Property options"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </button>
+              {menuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-10 cursor-default"
+                    aria-label="Close menu"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        openEdit('basic');
+                      }}
+                    >
+                      Edit property
+                    </button>
+                    <Link
+                      href={`/admin/buildings/${building.id}/rooms`}
+                      className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Manage rooms
+                    </Link>
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      Delete property
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <EntityNotesPanel
+              entityType="building"
+              entityId={building.id}
+              entityLabel={building.name}
+              title="Notes"
+              compact
+              dense
+              showAddButton={false}
+              refreshKey={notesRefreshKey}
+              className="min-h-0 flex-1 pr-7"
+            />
+          </div>
         </div>
       </div>
 

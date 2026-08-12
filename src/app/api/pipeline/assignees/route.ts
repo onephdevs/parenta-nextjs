@@ -9,7 +9,7 @@ interface AssigneeRow {
 }
 
 /**
- * List admin/staff users available as opportunity / maintenance assignees.
+ * List admin users available as opportunity / maintenance assignees.
  */
 export async function GET() {
   try {
@@ -20,7 +20,7 @@ export async function GET() {
       `SELECT id, first_name, last_name
        FROM users
        WHERE is_active = true
-         AND role IN ('admin', 'staff')
+         AND role = 'admin'
        ORDER BY first_name ASC, last_name ASC`
     );
 

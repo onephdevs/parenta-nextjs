@@ -183,7 +183,9 @@ export async function POST(request: NextRequest) {
 
     if (pipelineCardId) {
       try {
-        const { getPipelineCardById } = await import('@/lib/api/pipeline');
+        const { getPipelineCardById, recordPipelineCardActivity } = await import(
+          '@/lib/api/pipeline'
+        );
         const card = await getPipelineCardById(pipelineCardId);
         if (card?.title) {
           contextLabel = `opportunity “${card.title}”`;
@@ -191,8 +193,30 @@ export async function POST(request: NextRequest) {
             ? `/admin/tasks?board=${card.boardSlug}`
             : '/admin/tasks';
         }
+        const docLabel = documentType === 'receipt' ? 'Receipt' : 'Document';
+        await recordPipelineCardActivity(pipelineCardId, {
+          userId: session.user.id,
+          eventType: 'updated',
+          note: `${docLabel} uploaded: ${displayName || documentName || originalFileName}`,
+          metadata: {
+            changes: [
+              `${docLabel} uploaded: ${displayName || documentName || originalFileName}`,
+            ],
+            fields: [
+              {
+                field: 'document',
+                label: docLabel,
+                from: null,
+                to: displayName || documentName || originalFileName || 'Uploaded',
+                summary: `${docLabel} uploaded`,
+              },
+            ],
+            documentType: documentType || null,
+            documentId: documentId || null,
+          },
+        });
       } catch {
-        /* non-fatal for activity label */
+        /* non-fatal for activity label / card history */
       }
     } else if (tenantId) {
       try {

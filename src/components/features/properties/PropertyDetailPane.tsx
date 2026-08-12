@@ -39,6 +39,7 @@ export default function PropertyDetailPane({
   const [addTenantOpen, setAddTenantOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
 
   // Close action modals when the loaded property changes (avoids creating into wrong building)
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function PropertyDetailPane({
     setAddTenantOpen(false);
     setRecordPaymentOpen(false);
     setMaintenanceOpen(false);
+    setNotesRefreshKey(0);
   }, [detail?.building.id]);
 
   useEffect(() => {
@@ -90,15 +92,18 @@ export default function PropertyDetailPane({
               detail={detail}
               onBuildingUpdated={onBuildingUpdated}
               onBuildingDeleted={onBuildingDeleted}
+              notesRefreshKey={notesRefreshKey}
             />
 
             <PropertyReportPanel
               buildingId={detail.building.id}
+              buildingName={detail.building.name}
               onAddRoom={() => setAddRoomOpen(true)}
               onAddTenant={() => setAddTenantOpen(true)}
               onRecordPayment={() => setRecordPaymentOpen(true)}
               onMaintenance={() => setMaintenanceOpen(true)}
               onTenantCreated={onBuildingUpdated}
+              onNoteSaved={() => setNotesRefreshKey((k) => k + 1)}
             />
 
             <div>

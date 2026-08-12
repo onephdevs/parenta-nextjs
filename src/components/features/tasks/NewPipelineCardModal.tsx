@@ -38,6 +38,7 @@ import type {
   PipelineBoardSlug,
   PipelineCard,
   PipelineLeaseStatus,
+  PipelineViewingStatus,
 } from '@/types/database';
 import {
   LEASE_DURATION_PRESETS,
@@ -76,6 +77,12 @@ import {
   MAINTENANCE_CATEGORY_LABELS,
   MAINTENANCE_PRIORITY_LABELS,
 } from '@/lib/constants/maintenance';
+import {
+  DEFAULT_PIPELINE_LEAD_SOURCE,
+  normalizePipelineLeadSource,
+  PIPELINE_LEAD_SOURCES,
+} from '@/lib/pipeline/lead-sources';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const CUSTOM_VENDOR_VALUE = '__custom__';
 
@@ -227,6 +234,13 @@ const onboardingSections: SectionedFormSection<FormSection>[] = [
     icon: <Tag className="h-4 w-4" />,
     title: 'Tags',
     subtitle: 'Label this opportunity so you can monitor follow-ups.',
+  },
+  {
+    id: 'notes',
+    label: 'Notes',
+    icon: <FileText className="h-4 w-4" />,
+    title: 'Notes & messages',
+    subtitle: 'Message from the inquiry form and admin follow-up notes.',
   },
 ];
 
@@ -422,25 +436,26 @@ function computeOnboardingSectionMeta(input: {
       : { status: 'optional', statusHint: 'Optional viewing date' },
     status: { status: 'optional', statusHint: 'Mark lost or move boards' },
     tags: { status: 'optional', statusHint: 'Optional labels' },
+    notes: { status: 'optional', statusHint: 'Inquiry message and admin notes' },
     history: { status: 'optional', statusHint: 'Change log' },
   };
 
   meta.documents = docsDone
     ? { status: 'done', statusHint: 'Documents uploaded' }
     : {
-        status: 'ready',
+        status: input.isEditing ? 'ready' : 'blocked',
         statusHint: input.isEditing
-          ? 'Optional — upload ID / income docs when ready'
-          : 'Optional — available after you create the card',
+          ? 'Upload ID / income docs when ready'
+          : 'Create the opportunity first to upload documents',
       };
 
   meta.screening = screeningDone
     ? { status: 'done', statusHint: 'Screening in progress or complete' }
     : {
-        status: hasContact ? 'ready' : 'blocked',
-        statusHint: hasContact
-          ? 'Update background / credit check status'
-          : 'Add contact first',
+        status: input.isEditing ? 'ready' : 'blocked',
+        statusHint: input.isEditing
+          ? 'Update ID verification / screening status'
+          : 'Create the opportunity first to set screening status',
       };
 
   if (paymentDone) {
@@ -529,6 +544,7 @@ export function AddOpportunityModal({
   const isExpenses = board.slug === 'expenses';
   const isMaintenance = board.slug === 'maintenance';
   const baseSections = sectionsForBoard(board, isEditing);
+  const { showSuccess } = useNotifications();
 
   const [activeSection, setActiveSection] = useState<FormSection>(
     board.slug === 'expenses' ||
@@ -560,6 +576,13 @@ export function AddOpportunityModal({
   const [maintenanceCategory, setMaintenanceCategory] = useState<string>('plumbing');
   const [maintenancePriority, setMaintenancePriority] = useState('medium');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [moveInReceiptFile, setMoveInReceiptFile] = useState<File | null>(null);
+  const [existingMoveInReceipt, setExistingMoveInReceipt] = useState<{
+    id: string;
+    documentName: string;
+    fileName: string;
+    mimeType?: string;
+  } | null>(null);
   /** Raw notes from DB (may include [ledger:…] tags) — preserved on save */
   const [notesRaw, setNotesRaw] = useState('');
 
@@ -569,7 +592,7 @@ export function AddOpportunityModal({
   const [phone, setPhone] = useState('');
   const [buildingId, setBuildingId] = useState('');
   const [roomId, setRoomId] = useState('');
-  const [source, setSource] = useState('Walk-in');
+  const [source, setSource] = useState(DEFAULT_PIPELINE_LEAD_SOURCE);
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [title, setTitle] = useState('');
@@ -579,6 +602,7 @@ export function AddOpportunityModal({
   const [tags, setTags] = useState<string[]>([]);
   const [markAsLost, setMarkAsLost] = useState(false);
   const [lostReason, setLostReason] = useState('');
+  const [viewingStatus, setViewingStatus] = useState<PipelineViewingStatus | ''>('');
   const [backgroundCheckStatus, setBackgroundCheckStatus] =
     useState<PipelineBackgroundCheckStatus>('not_started');
   const [backgroundCheckNotes, setBackgroundCheckNotes] = useState('');
@@ -636,6 +660,8 @@ export function AddOpportunityModal({
     setMoveBoardId('');
     setMoveStageId('');
     setMoveError(null);
+    setMoveInReceiptFile(null);
+    setExistingMoveInReceipt(null);
 
     if (card) {
       setFirstName(card.contactFirstName || '');
@@ -644,7 +670,7 @@ export function AddOpportunityModal({
       setPhone(card.contactPhone || '');
       setBuildingId(card.buildingId || '');
       setRoomId(card.roomId || '');
-      setSource(card.source || 'Walk-in');
+      setSource(normalizePipelineLeadSource(card.source));
       setAmount(card.amount != null ? String(card.amount) : '');
       setNotesRaw(card.notes || '');
       setNotes(formatPaymentNotesForPeople(card.notes || ''));
@@ -663,6 +689,7 @@ export function AddOpportunityModal({
           (card.tags || []).some((t) => t.toLowerCase() === 'lost')
       );
       setLostReason(card.lostReason || '');
+      setViewingStatus(card.viewingStatus || '');
       setBackgroundCheckStatus(card.backgroundCheckStatus || 'not_started');
       setBackgroundCheckNotes(card.backgroundCheckNotes || '');
       setLeaseStatus(card.leaseStatus || 'not_started');
@@ -728,6 +755,9 @@ export function AddOpportunityModal({
         setExpenseCategory('maintenance');
         setExpenseStatus('pending');
       }
+      if (card.id && board.slug === 'onboarding') {
+        void loadMoveInReceipt(card.id);
+      }
     } else {
       setFirstName('');
       setLastName('');
@@ -735,7 +765,7 @@ export function AddOpportunityModal({
       setPhone('');
       setBuildingId('');
       setRoomId('');
-      setSource('Walk-in');
+      setSource(DEFAULT_PIPELINE_LEAD_SOURCE);
       setAmount('');
       setNotesRaw('');
       setNotes('');
@@ -1018,7 +1048,7 @@ export function AddOpportunityModal({
     }
   }
 
-  async function uploadExpenseReceipt(cardId: string, file: File) {
+  async function uploadPipelineCardReceipt(cardId: string, file: File) {
     const form = new FormData();
     form.append('file', file);
     form.append('documentName', file.name || 'Receipt');
@@ -1032,6 +1062,44 @@ export function AddOpportunityModal({
     if (!json.success) {
       throw new Error(json.error || 'Failed to upload receipt');
     }
+    return json.data as {
+      id: string;
+      documentName: string;
+      fileName: string;
+      mimeType?: string;
+    };
+  }
+
+  async function loadMoveInReceipt(cardId: string) {
+    try {
+      const res = await fetch(
+        `/api/documents?pipelineCardId=${encodeURIComponent(cardId)}&limit=50`
+      );
+      const json = await res.json();
+      if (!json.success) return;
+      const docs = (json.data || []) as Array<{
+        id: string;
+        documentName: string;
+        fileName: string;
+        documentType?: string;
+        mimeType?: string;
+      }>;
+      const receipt = docs.find((doc) => doc.documentType === 'receipt') || null;
+      setExistingMoveInReceipt(receipt);
+    } catch {
+      setExistingMoveInReceipt(null);
+    }
+  }
+
+  async function uploadExpenseReceipt(cardId: string, file: File) {
+    await uploadPipelineCardReceipt(cardId, file);
+  }
+
+  async function persistMoveInReceiptIfNeeded(cardId: string) {
+    if (!moveInReceiptFile) return;
+    const uploaded = await uploadPipelineCardReceipt(cardId, moveInReceiptFile);
+    setMoveInReceiptFile(null);
+    setExistingMoveInReceipt(uploaded);
   }
 
   async function findExpensesBoardCard(opts: {
@@ -1384,6 +1452,15 @@ export function AddOpportunityModal({
         throw new Error(json.error || 'Failed to mark payment as paid');
       }
       onSaved?.(json.data?.card as PipelineCard | undefined);
+      try {
+        await persistMoveInReceiptIfNeeded(card.id);
+      } catch (uploadErr) {
+        setError(
+          uploadErr instanceof Error
+            ? uploadErr.message
+            : 'Payment saved, but receipt upload failed'
+        );
+      }
     } catch (err) {
       setMoveInPaymentStatus('unpaid');
       setError(err instanceof Error ? err.message : 'Failed to mark payment as paid');
@@ -1497,6 +1574,7 @@ export function AddOpportunityModal({
         throw new Error(json.error || json.details || 'Failed to generate lease');
       }
       setLeaseStatus('generated');
+      showSuccess('Lease generated');
       onSaved?.(json.data?.card as PipelineCard | undefined);
       onClose();
     } catch (err) {
@@ -1512,9 +1590,9 @@ export function AddOpportunityModal({
     setError(null);
 
     try {
-      if (isOnboarding || board.slug === 'payments') {
+      if (isPayments) {
         if (!firstName.trim() || !lastName.trim()) {
-          setActiveSection(isPayments ? 'payment' : 'contact');
+          setActiveSection('payment');
           throw new Error('First and last name are required');
         }
       }
@@ -1714,6 +1792,7 @@ export function AddOpportunityModal({
           tags,
           notes: preserveLedgerTagOnSave(notes, notesRaw) || null,
           viewingAt: viewingAt ? new Date(viewingAt).toISOString() : null,
+          viewingStatus: viewingStatus || null,
           dueAt: dueAt
             ? isExpenses || isPayments
               ? new Date(`${dueAt}T12:00:00`).toISOString()
@@ -1755,6 +1834,10 @@ export function AddOpportunityModal({
         if (!json.success) {
           throw new Error(json.error || json.details || 'Failed to save opportunity');
         }
+        if (isOnboarding && card.id) {
+          await persistMoveInReceiptIfNeeded(card.id);
+        }
+        showSuccess('Save complete');
         onSaved?.(json.data?.card as PipelineCard | undefined);
         onClose();
         return;
@@ -1927,6 +2010,7 @@ export function AddOpportunityModal({
             tags,
             notes: notes.trim() || null,
             viewingAt: viewingAt ? new Date(viewingAt).toISOString() : null,
+            viewingStatus: viewingStatus || null,
             lostReason: markAsLost ? lostReason.trim() : lostReason.trim() || null,
             markAsLost,
             backgroundCheckStatus,
@@ -1959,6 +2043,7 @@ export function AddOpportunityModal({
             patchJson.error || patchJson.details || 'Failed to save opportunity details'
           );
         }
+        await persistMoveInReceiptIfNeeded(createdId);
       }
 
       onCreated();
@@ -2126,19 +2211,17 @@ export function AddOpportunityModal({
             {activeSection === 'contact' && (
               <>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <FormField label="First name" htmlFor="opp-first-name" required>
+                  <FormField label="First name" htmlFor="opp-first-name">
                     <Input
                       id="opp-first-name"
-                      required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       placeholder="Maria"
                     />
                   </FormField>
-                  <FormField label="Last name" htmlFor="opp-last-name" required>
+                  <FormField label="Last name" htmlFor="opp-last-name">
                     <Input
                       id="opp-last-name"
-                      required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       placeholder="Lopez"
@@ -2184,15 +2267,6 @@ export function AddOpportunityModal({
                       </option>
                     ))}
                   </Select>
-                </FormField>
-                <FormField label="Message" htmlFor="opp-message">
-                  <Textarea
-                    id="opp-message"
-                    rows={4}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Move-in timeline, preferred unit size, questions…"
-                  />
                 </FormField>
               </>
             )}
@@ -2294,15 +2368,15 @@ export function AddOpportunityModal({
                     value={source}
                     onChange={(e) => setSource(e.target.value)}
                   >
-                    <option>Walk-in</option>
-                    <option>FB Ad</option>
-                    <option>Referral</option>
-                    <option>Website</option>
-                    <option>Other</option>
+                    {PIPELINE_LEAD_SOURCES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </Select>
                 </FormField>
                 <FormField
-                  label="Viewing"
+                  label="Viewing date & time"
                   htmlFor="opp-viewing"
                   hint="Saving with a viewing date moves this card to Viewing scheduled and adds viewing tags."
                 >
@@ -2312,6 +2386,24 @@ export function AddOpportunityModal({
                     value={viewingAt}
                     onChange={(e) => setViewingAt(e.target.value)}
                   />
+                </FormField>
+                <FormField
+                  label="Viewing status"
+                  htmlFor="opp-viewing-status"
+                  hint="Update after the viewing has taken place."
+                >
+                  <Select
+                    id="opp-viewing-status"
+                    value={viewingStatus}
+                    onChange={(e) => setViewingStatus(e.target.value as PipelineViewingStatus | '')}
+                  >
+                    <option value="">Not set</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="no_show">No-show</option>
+                    <option value="rescheduled">Rescheduled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </Select>
                 </FormField>
               </>
             )}
@@ -2368,8 +2460,9 @@ export function AddOpportunityModal({
             )}
 
             {activeSection === 'screening' && (
+              card?.id ? (
               <div className="space-y-5">
-                <FormField label="Background / credit check" htmlFor="opp-bg-status">
+                <FormField label="ID verification / screening" htmlFor="opp-bg-status">
                   <Select
                     id="opp-bg-status"
                     value={backgroundCheckStatus}
@@ -2386,17 +2479,22 @@ export function AddOpportunityModal({
                 <FormField
                   label="Screening notes"
                   htmlFor="opp-bg-notes"
-                  hint="Reference number, agency, or reason for hold."
+                  hint="ID attachment reference, verification notes, or reason for hold."
                 >
                   <Textarea
                     id="opp-bg-notes"
                     rows={3}
                     value={backgroundCheckNotes}
                     onChange={(e) => setBackgroundCheckNotes(e.target.value)}
-                    placeholder="Credit check submitted to… / pending employer verify…"
+                    placeholder="ID photo received / awaiting employer verification…"
                   />
                 </FormField>
               </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Create the opportunity first, then reopen this card to set screening and ID verification status.
+                </div>
+              )
             )}
 
             {activeSection === 'payment' && isOnboarding && (
@@ -2732,6 +2830,43 @@ export function AddOpportunityModal({
                       placeholder="Optional"
                     />
                   </FormField>
+
+                  <div className="col-span-6">
+                    {existingMoveInReceipt && !moveInReceiptFile ? (
+                      <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-950">
+                        <p className="font-medium">Receipt on file</p>
+                        <button
+                          type="button"
+                          className="mt-1 text-sm font-medium text-emerald-800 underline"
+                          onClick={() =>
+                            window.open(
+                              `/api/documents/${existingMoveInReceipt.id}/download`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            )
+                          }
+                        >
+                          {existingMoveInReceipt.documentName ||
+                            existingMoveInReceipt.fileName ||
+                            'View receipt'}
+                        </button>
+                        {!card?.assignmentId ? (
+                          <p className="mt-1 text-xs text-emerald-700">
+                            Upload a new photo below to replace it.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <ReceiptImageField
+                      file={moveInReceiptFile}
+                      onChange={setMoveInReceiptFile}
+                      required={false}
+                      disabled={Boolean(card?.assignmentId)}
+                      label="Payment receipt / transfer proof"
+                      chooseFileLabel="Upload"
+                      allowPdf
+                    />
+                  </div>
                 </div>
 
                 {(card?.depositParentaTxnId ||
@@ -3111,6 +3246,24 @@ export function AddOpportunityModal({
                 tags={tags}
                 onChange={setTags}
               />
+            )}
+
+            {activeSection === 'notes' && (
+              <div className="space-y-5">
+                <FormField
+                  label="Notes"
+                  htmlFor="opp-notes-onboarding"
+                  hint="Message from the inquiry form and any admin follow-up notes."
+                >
+                  <Textarea
+                    id="opp-notes-onboarding"
+                    rows={6}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Move-in timeline, preferred unit size, questions, or follow-up context…"
+                  />
+                </FormField>
+              </div>
             )}
 
             {activeSection === 'history' && card?.id && (

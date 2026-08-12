@@ -231,6 +231,12 @@ export interface EntityNotesPanelProps {
   className?: string;
   /** Compact list without card chrome (for embedding). */
   compact?: boolean;
+  /** Tighter spacing for sidebar / side-panel layouts. */
+  dense?: boolean;
+  /** Show the header Add note button. Default true. */
+  showAddButton?: boolean;
+  /** Bump to reload notes after an external add. */
+  refreshKey?: number | string;
 }
 
 /** Historical notes list + add button for any supported entity. */
@@ -241,6 +247,9 @@ export function EntityNotesPanel({
   title = 'Notes',
   className,
   compact = false,
+  dense = false,
+  showAddButton = true,
+  refreshKey,
 }: EntityNotesPanelProps) {
   const { showSuccess, showError } = useNotifications();
   const [notes, setNotes] = useState<EntityNoteItem[]>([]);
@@ -271,7 +280,7 @@ export function EntityNotesPanel({
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   const handleDelete = async () => {
     if (!noteToDelete) return;
@@ -296,34 +305,48 @@ export function EntityNotesPanel({
   };
 
   const list = (
-    <>
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className={dense ? 'flex h-full min-h-0 flex-col' : undefined}>
+      <div className={`flex items-center justify-between gap-2 ${dense ? 'mb-2' : 'mb-3'}`}>
         <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        <AddNotesButton
-          entityType={entityType}
-          entityId={entityId}
-          entityLabel={entityLabel}
-          label="Add note"
-          onSaved={(note) => setNotes((prev) => [note, ...prev])}
-        />
+        {showAddButton ? (
+          <AddNotesButton
+            entityType={entityType}
+            entityId={entityId}
+            entityLabel={entityLabel}
+            label="Add note"
+            onSaved={(note) => setNotes((prev) => [note, ...prev])}
+          />
+        ) : null}
       </div>
 
       {loading ? (
-        <p className="py-4 text-sm text-gray-500">Loading notes…</p>
+        <p className={`text-sm text-gray-500 ${dense ? 'py-2' : 'py-4'}`}>Loading notes…</p>
       ) : notes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-sm text-gray-500">
+        <p
+          className={`rounded-lg border border-dashed border-gray-200 bg-white/80 text-center text-sm text-gray-500 ${
+            dense ? 'flex flex-1 items-center justify-center px-3 py-4' : 'px-3 py-6'
+          }`}
+        >
           No notes yet. Add the first one.
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul
+          className={
+            dense
+              ? 'min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5'
+              : 'space-y-3'
+          }
+        >
           {notes.map((note) => (
             <li
               key={note.id}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-3"
+              className={`rounded-lg border border-gray-200 bg-white ${
+                dense ? 'px-2.5 py-2' : 'px-3 py-3'
+              }`}
             >
-              <div className="mb-1.5 flex items-start justify-between gap-2">
+              <div className={`flex items-start justify-between gap-2 ${dense ? 'mb-1' : 'mb-1.5'}`}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className={`font-medium text-gray-900 ${dense ? 'text-xs' : 'text-sm'}`}>
                     {formatAuthorName(note.createdByName)}
                     {formatAuthorRole(note.createdByRole) ? (
                       <span className="ml-1.5 font-normal text-gray-500">
@@ -349,10 +372,14 @@ export function EntityNotesPanel({
                   isDisabled={deletingId === note.id}
                   aria-label="Delete note"
                 >
-                  Delete
+                  {dense ? '' : 'Delete'}
                 </Button>
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+              <p
+                className={`whitespace-pre-wrap leading-relaxed text-gray-700 ${
+                  dense ? 'line-clamp-4 text-xs' : 'text-sm'
+                }`}
+              >
                 {note.body}
               </p>
             </li>
@@ -371,7 +398,7 @@ export function EntityNotesPanel({
         variant="danger"
         isLoading={!!deletingId}
       />
-    </>
+    </div>
   );
 
   if (compact) {
