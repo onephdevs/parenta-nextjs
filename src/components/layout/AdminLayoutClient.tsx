@@ -58,6 +58,15 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
     setReturnTo(sanitizeReturnTo(params.get('returnTo')));
   }, [pathname]);
 
+  // Keep portaled overlays (modals) aligned with the desktop sidebar rail
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--admin-sidebar-width', sidebarOpen ? '16rem' : '4rem');
+    return () => {
+      root.style.removeProperty('--admin-sidebar-width');
+    };
+  }, [sidebarOpen]);
+
   // Resolve friendly names for any UUID segments in the path
   useEffect(() => {
     const paths = pathname.split('/').filter(Boolean);
@@ -181,14 +190,14 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar — collapses to icon rail, never fully hidden */}
       <div
         className={`relative z-[60] hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${
-          sidebarOpen ? 'lg:w-64' : 'lg:w-0'
+          sidebarOpen ? 'lg:w-64' : 'lg:w-16'
         }`}
       >
-        <div className={`flex w-64 flex-col ${sidebarOpen ? '' : 'hidden'}`}>
-          <AdminSidebar />
+        <div className={`flex h-full flex-col ${sidebarOpen ? 'w-64' : 'w-16'}`}>
+          <AdminSidebar collapsed={!sidebarOpen} />
         </div>
       </div>
 

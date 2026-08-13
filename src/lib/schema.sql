@@ -90,14 +90,16 @@ CREATE TABLE IF NOT EXISTS tenants (
   tenant_status VARCHAR(20) DEFAULT 'active' CHECK (tenant_status IN ('active', 'inactive', 'pending', 'terminated')),
   notes TEXT,
   is_active BOOLEAN DEFAULT true,
+  -- True while person has an active room assignment; person row persists after vacate
+  is_tenant BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tenant Room Assignments (many-to-many with history)
+-- Tenant Room Assignments (many-to-many with forever history; snapshots survive unlink)
 CREATE TABLE IF NOT EXISTS tenant_room_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL,
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   start_date DATE NOT NULL,
   end_date DATE,
@@ -105,6 +107,11 @@ CREATE TABLE IF NOT EXISTS tenant_room_assignments (
   deposit_paid DECIMAL(10,2),
   assignment_status VARCHAR(20) DEFAULT 'active' CHECK (assignment_status IN ('active', 'terminated', 'pending')),
   notes TEXT,
+  tenant_name_snapshot VARCHAR(255),
+  tenant_email_snapshot VARCHAR(255),
+  tenant_phone_snapshot VARCHAR(50),
+  tenant_emergency_name_snapshot VARCHAR(255),
+  tenant_emergency_phone_snapshot VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -476,6 +483,7 @@ CREATE INDEX IF NOT EXISTS idx_rooms_active ON rooms(is_active);
 CREATE INDEX IF NOT EXISTS idx_tenants_user ON tenants(user_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email);
 CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(tenant_status);
+CREATE INDEX IF NOT EXISTS idx_tenants_is_tenant ON tenants(is_tenant);
 CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(is_active);
 
 -- Tenant Room Assignments indexes

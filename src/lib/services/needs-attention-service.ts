@@ -335,7 +335,7 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
 
 async function getDepositFundedAlerts(): Promise<NeedsAttentionCard> {
   try {
-    // Bills recently paid (or partially covered) via deposit ledger apply — not cash
+    // Bills recently covered via legacy deposit_ledger apply — not cash
     const result = await pool.query(`
       SELECT DISTINCT ON (i.id)
         i.id,
@@ -346,20 +346,19 @@ async function getDepositFundedAlerts(): Promise<NeedsAttentionCard> {
         t.first_name,
         t.last_name,
         r.room_number,
-        dt.amount AS deposit_amount,
-        dt.transaction_date,
-        dt.reason
-      FROM deposit_transactions dt
-      JOIN deposit_ledgers dl ON dl.id = dt.deposit_ledger_id
-      JOIN invoices i ON i.id = dt.applied_to_invoice_id
+        dl.amount AS deposit_amount,
+        dl.transaction_date,
+        dl.description AS reason
+      FROM deposit_ledger dl
+      JOIN invoices i ON i.id = dl.applied_to_invoice_id
       JOIN tenants t ON t.id = i.tenant_id
       LEFT JOIN tenant_room_assignments tra
         ON tra.tenant_id = t.id AND tra.assignment_status = 'active'
       LEFT JOIN rooms r ON r.id = tra.room_id
-      WHERE dt.amount < 0
-        AND dt.applied_to_invoice_id IS NOT NULL
-        AND dt.transaction_date >= CURRENT_DATE - INTERVAL '60 days'
-      ORDER BY i.id, dt.transaction_date DESC
+      WHERE dl.transaction_type = 'applied'
+        AND dl.applied_to_invoice_id IS NOT NULL
+        AND dl.transaction_date >= CURRENT_DATE - INTERVAL '60 days'
+      ORDER BY i.id, dl.transaction_date DESC
       LIMIT 50
     `);
 
@@ -403,22 +402,30 @@ async function getDepositFundedAlerts(): Promise<NeedsAttentionCard> {
 
 async function getDepositAlerts(): Promise<NeedsAttentionCard> {
   try {
+    // Active tenants whose net deposit_ledger balance is zero (or fully applied)
     const result = await pool.query(`
       SELECT
-        dl.id,
-        dl.deposit_type,
-        dl.running_balance,
         t.id AS tenant_id,
         t.first_name,
         t.last_name,
-        r.room_number
-      FROM deposit_ledgers dl
-      JOIN tenants t ON t.id = dl.tenant_id
-      JOIN tenant_room_assignments tra ON tra.id = dl.assignment_id
+        r.room_number,
+        COALESCE(bal.balance, 0) AS running_balance
+      FROM tenants t
+      JOIN tenant_room_assignments tra
+        ON tra.tenant_id = t.id AND tra.assignment_status = 'active'
       LEFT JOIN rooms r ON r.id = tra.room_id
-      WHERE dl.is_active = true
-        AND dl.running_balance = 0
-        AND tra.assignment_status = 'active'
+      LEFT JOIN LATERAL (
+        SELECT
+          COALESCE(SUM(CASE WHEN transaction_type = 'deposit' THEN amount ELSE 0 END), 0)
+          - COALESCE(SUM(CASE WHEN transaction_type IN ('refund', 'applied') THEN amount ELSE 0 END), 0)
+          AS balance
+        FROM deposit_ledger dl
+        WHERE dl.tenant_id = t.id
+      ) bal ON true
+      WHERE COALESCE(bal.balance, 0) = 0
+        AND EXISTS (
+          SELECT 1 FROM deposit_ledger dl2 WHERE dl2.tenant_id = t.id
+        )
       ORDER BY t.last_name, t.first_name
       LIMIT 50
     `);
@@ -426,11 +433,10 @@ async function getDepositAlerts(): Promise<NeedsAttentionCard> {
     const items: NeedsAttentionItem[] = result.rows.map((row) => {
       const name = `${row.first_name} ${row.last_name}`.trim();
       const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
-      const type = String(row.deposit_type || 'SECURITY');
       return {
-        id: String(row.id),
+        id: String(row.tenant_id),
         title: name,
-        subtitle: `${room} • ${type} deposit balance ₱0`,
+        subtitle: `${room} • deposit balance ₱0`,
         urgency: 'soon' as const,
         href: `/admin/tenants/${row.tenant_id}`,
       };
@@ -445,7 +451,6 @@ async function getDepositAlerts(): Promise<NeedsAttentionCard> {
       viewAllLabel: 'View deposits report',
     };
   } catch (error) {
-    // Table may not exist until Phase 1 migration is applied
     console.warn(
       'deposit alerts skipped:',
       error instanceof Error ? error.message : error

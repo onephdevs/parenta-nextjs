@@ -263,14 +263,22 @@ export default function DisbursementReportPage() {
                   </td>
                 </tr>
                 <tr className="bg-gray-50">
-                  <td className="py-3 font-medium text-gray-900">= Cash Allowance</td>
+                  <td className="py-3 font-medium text-gray-900">= After expenses</td>
                   <td className="py-3 text-right font-semibold tabular-nums">
-                    {formatPhp(w.cashAllowance)}
+                    {formatPhp(w.afterExpenses)}
                   </td>
                 </tr>
-                <tr>
-                  <td className="py-3 text-gray-700">+ Cash for Deposit</td>
-                  <td className="py-3 text-right tabular-nums">
+                {w.imaCashAllowance > 0 && (
+                  <tr>
+                    <td className="py-3 text-gray-700">− Ima cash allowance</td>
+                    <td className="py-3 text-right tabular-nums text-red-700">
+                      ({formatPhp(w.imaCashAllowance)})
+                    </td>
+                  </tr>
+                )}
+                <tr className="bg-gray-50">
+                  <td className="py-3 font-medium text-gray-900">= Cash for deposit</td>
+                  <td className="py-3 text-right font-semibold tabular-nums">
                     {formatPhp(w.cashForDeposit)}
                   </td>
                 </tr>

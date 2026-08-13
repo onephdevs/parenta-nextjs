@@ -8,6 +8,8 @@ export interface Tenant {
   phone?: string;
   dateOfBirth?: Date;
   tenantStatus: 'active' | 'pending' | 'inactive' | 'terminated';
+  /** True while person currently rents a unit; false for pending/former. */
+  isTenant: boolean;
   moveInDate?: Date;
   moveOutDate?: Date;
   previousAddress?: string;
@@ -41,6 +43,14 @@ export interface RoomAssignment {
   depositValidUntil?: Date;
   depositRefundable?: boolean;
   notes?: string;
+  leasePackageTemplateId?: string | null;
+  leasePackageTemplateName?: string | null;
+  leasePackageTermMonths?: number | null;
+  leasePackageDepositMonths?: number | null;
+  leasePackageAdvanceMonths?: number | null;
+  leasePackageGracePeriodDays?: number | null;
+  leasePackagePenaltyType?: 'percentage' | 'flat_fee' | null;
+  leasePackagePenaltyFee?: number | null;
 }
 
 export interface TenantWithAssignments extends Tenant {
@@ -85,7 +95,11 @@ export async function getAllTenants(options?: {
     const values: unknown[] = [];
     let paramCount = 0;
 
-    if (options?.status) {
+    if (options?.status === 'current') {
+      whereClause += ` WHERE t.is_tenant = true`;
+    } else if (options?.status === 'former') {
+      whereClause += ` WHERE t.is_tenant = false AND t.tenant_status IN ('inactive', 'terminated')`;
+    } else if (options?.status) {
       paramCount++;
       whereClause += ` WHERE t.tenant_status = $${paramCount}`;
       values.push(options.status);
@@ -216,10 +230,18 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
         ra.*,
         r.id as room_id,
         r.room_number,
-        b.name as building_name
+        b.name as building_name,
+        lpt.name as lease_package_template_name,
+        lpt.term_months as lease_package_term_months,
+        lpt.deposit_months as lease_package_deposit_months,
+        lpt.advance_months as lease_package_advance_months,
+        lpt.grace_period_days as lease_package_grace_period_days,
+        lpt.penalty_type as lease_package_penalty_type,
+        lpt.penalty_fee as lease_package_penalty_fee
       FROM tenant_room_assignments ra
       JOIN rooms r ON ra.room_id = r.id
       JOIN buildings b ON r.building_id = b.id
+      LEFT JOIN lease_package_templates lpt ON lpt.id = ra.lease_package_template_id
       WHERE ra.tenant_id = $1
         AND ra.assignment_status = 'active'
         AND (ra.end_date IS NULL OR ra.end_date::date >= CURRENT_DATE)
@@ -236,10 +258,18 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
         ra.*,
         r.id as room_id,
         r.room_number,
-        b.name as building_name
+        b.name as building_name,
+        lpt.name as lease_package_template_name,
+        lpt.term_months as lease_package_term_months,
+        lpt.deposit_months as lease_package_deposit_months,
+        lpt.advance_months as lease_package_advance_months,
+        lpt.grace_period_days as lease_package_grace_period_days,
+        lpt.penalty_type as lease_package_penalty_type,
+        lpt.penalty_fee as lease_package_penalty_fee
       FROM tenant_room_assignments ra
       JOIN rooms r ON ra.room_id = r.id
       JOIN buildings b ON r.building_id = b.id
+      LEFT JOIN lease_package_templates lpt ON lpt.id = ra.lease_package_template_id
       WHERE ra.tenant_id = $1
       ORDER BY ra.start_date DESC
     `;
@@ -297,9 +327,9 @@ export async function createTenant(tenantData: Partial<Tenant>): Promise<Tenant>
       first_name, last_name, email, phone, date_of_birth,
       emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
       employment_status, employer_name, monthly_income, previous_address,
-      security_deposit, tenant_status, lease_start_date, lease_end_date, notes
+      security_deposit, tenant_status, is_tenant, lease_start_date, lease_end_date, notes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, false, $15, $16, $17)
     RETURNING *
   `;
 
@@ -348,6 +378,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
     phone: (row.phone as string) || undefined,
     dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth as string) : undefined,
     tenantStatus: row.tenant_status as 'active' | 'pending' | 'inactive' | 'terminated',
+    isTenant: Boolean(row.is_tenant),
     moveInDate: row.move_in_date ? new Date(row.move_in_date as string) : undefined,
     moveOutDate: row.move_out_date ? new Date(row.move_out_date as string) : undefined,
     previousAddress: row.previous_address as string,
@@ -390,6 +421,38 @@ function mapRowToAssignment(row: Record<string, unknown>): RoomAssignment {
     depositValidUntil: row.deposit_valid_until ? new Date(row.deposit_valid_until as string) : undefined,
     depositRefundable: row.deposit_refundable !== undefined ? (row.deposit_refundable as boolean) : undefined,
     notes: row.notes as string,
+    leasePackageTemplateId: row.lease_package_template_id
+      ? String(row.lease_package_template_id)
+      : null,
+    leasePackageTemplateName: row.lease_package_template_name
+      ? String(row.lease_package_template_name)
+      : null,
+    leasePackageTermMonths:
+      row.lease_package_term_months == null
+        ? null
+        : Number(row.lease_package_term_months),
+    leasePackageDepositMonths:
+      row.lease_package_deposit_months == null
+        ? null
+        : Number(row.lease_package_deposit_months),
+    leasePackageAdvanceMonths:
+      row.lease_package_advance_months == null
+        ? null
+        : Number(row.lease_package_advance_months),
+    leasePackageGracePeriodDays:
+      row.lease_package_grace_period_days == null
+        ? null
+        : Number(row.lease_package_grace_period_days),
+    leasePackagePenaltyType:
+      row.lease_package_penalty_type === 'flat_fee'
+        ? 'flat_fee'
+        : row.lease_package_penalty_type === 'percentage'
+          ? 'percentage'
+          : null,
+    leasePackagePenaltyFee:
+      row.lease_package_penalty_fee == null
+        ? null
+        : Number(row.lease_package_penalty_fee),
   };
 }
 
@@ -399,47 +462,105 @@ export async function updateTenant(id: string, updates: Partial<{
   lastName: string;
   email: string;
   phone: string;
+  dateOfBirth: Date | string | null;
   tenantStatus: string;
-  notes: string;
+  moveInDate: Date | string | null;
+  moveOutDate: Date | string | null;
+  previousAddress: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  emergencyContactRelationship: string | null;
+  employmentStatus: string | null;
+  employerName: string | null;
+  monthlyIncome: number | null;
+  securityDeposit: number | null;
+  leaseStartDate: Date | string | null;
+  leaseEndDate: Date | string | null;
+  notes: string | null;
 }>): Promise<Tenant | boolean> {
   const setClause: string[] = [];
   const values: unknown[] = [];
   let paramIndex = 1;
 
-  if (updates.firstName !== undefined) {
-    setClause.push(`first_name = $${paramIndex}`);
-    values.push(updates.firstName);
+  const push = (column: string, value: unknown) => {
+    setClause.push(`${column} = $${paramIndex}`);
+    values.push(value);
     paramIndex++;
-  }
+  };
 
-  if (updates.lastName !== undefined) {
-    setClause.push(`last_name = $${paramIndex}`);
-    values.push(updates.lastName);
-    paramIndex++;
+  if (updates.firstName !== undefined) push('first_name', updates.firstName);
+  if (updates.lastName !== undefined) push('last_name', updates.lastName);
+  if (updates.email !== undefined) push('email', updates.email);
+  if (updates.phone !== undefined) push('phone', updates.phone || null);
+  if (updates.dateOfBirth !== undefined) {
+    push(
+      'date_of_birth',
+      updates.dateOfBirth ? new Date(updates.dateOfBirth as string | Date) : null
+    );
   }
-
-  if (updates.email !== undefined) {
-    setClause.push(`email = $${paramIndex}`);
-    values.push(updates.email);
-    paramIndex++;
+  if (updates.moveInDate !== undefined) {
+    push(
+      'move_in_date',
+      updates.moveInDate ? new Date(updates.moveInDate as string | Date) : null
+    );
   }
-
-  if (updates.phone !== undefined) {
-    setClause.push(`phone = $${paramIndex}`);
-    values.push(updates.phone);
-    paramIndex++;
+  if (updates.moveOutDate !== undefined) {
+    push(
+      'move_out_date',
+      updates.moveOutDate ? new Date(updates.moveOutDate as string | Date) : null
+    );
+  }
+  if (updates.previousAddress !== undefined) {
+    push('previous_address', updates.previousAddress || null);
+  }
+  if (updates.emergencyContactName !== undefined) {
+    push('emergency_contact_name', updates.emergencyContactName || null);
+  }
+  if (updates.emergencyContactPhone !== undefined) {
+    push('emergency_contact_phone', updates.emergencyContactPhone || null);
+  }
+  if (updates.emergencyContactRelationship !== undefined) {
+    push(
+      'emergency_contact_relationship',
+      updates.emergencyContactRelationship || null
+    );
+  }
+  if (updates.employmentStatus !== undefined) {
+    push('employment_status', updates.employmentStatus || null);
+  }
+  if (updates.employerName !== undefined) {
+    push('employer_name', updates.employerName || null);
+  }
+  if (updates.monthlyIncome !== undefined) {
+    push('monthly_income', updates.monthlyIncome);
+  }
+  if (updates.securityDeposit !== undefined) {
+    push('security_deposit', updates.securityDeposit);
+  }
+  if (updates.leaseStartDate !== undefined) {
+    push(
+      'lease_start_date',
+      updates.leaseStartDate ? new Date(updates.leaseStartDate as string | Date) : null
+    );
+  }
+  if (updates.leaseEndDate !== undefined) {
+    push(
+      'lease_end_date',
+      updates.leaseEndDate ? new Date(updates.leaseEndDate as string | Date) : null
+    );
   }
 
   if (updates.tenantStatus !== undefined) {
-    setClause.push(`tenant_status = $${paramIndex}`);
-    values.push(updates.tenantStatus);
-    paramIndex++;
+    push('tenant_status', updates.tenantStatus);
+    if (updates.tenantStatus === 'inactive' || updates.tenantStatus === 'terminated') {
+      setClause.push(`is_tenant = false`);
+    } else if (updates.tenantStatus === 'active') {
+      setClause.push(`is_tenant = true`);
+    }
   }
 
   if (updates.notes !== undefined) {
-    setClause.push(`notes = $${paramIndex}`);
-    values.push(updates.notes);
-    paramIndex++;
+    push('notes', updates.notes || null);
   }
 
   if (setClause.length === 0) {
@@ -471,12 +592,73 @@ export async function updateTenant(id: string, updates: Partial<{
   }
 }
 
-// Delete tenant
+export class TenantHistoryProtectedError extends Error {
+  constructor(message = 'Cannot delete this person: room occupancy history must be kept. Deactivate instead.') {
+    super(message);
+    this.name = 'TenantHistoryProtectedError';
+  }
+}
+
+/** Soft-deactivate: end active assignments, is_tenant=false, keep person + history. */
+export async function deactivateTenant(id: string): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const active = await client.query(
+      `SELECT id, room_id FROM tenant_room_assignments
+       WHERE tenant_id = $1 AND assignment_status = 'active'`,
+      [id]
+    );
+
+    const { endTenancyAndVacate } = await import('@/lib/services/tenant-lifecycle');
+    for (const row of active.rows) {
+      await endTenancyAndVacate(client, {
+        roomId: String(row.room_id),
+        tenantId: id,
+        endDate: new Date(),
+        assignmentId: String(row.id),
+        deactivatePerson: true,
+      });
+    }
+
+    await client.query(
+      `UPDATE tenants
+       SET is_tenant = false,
+           tenant_status = 'terminated',
+           is_active = false,
+           move_out_date = COALESCE(move_out_date, CURRENT_DATE),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deactivating tenant:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// Delete tenant — blocked when occupancy history exists (information is gold)
 export async function deleteTenant(id: string): Promise<boolean> {
   try {
+    const history = await pool.query(
+      `SELECT 1 FROM tenant_room_assignments WHERE tenant_id = $1 LIMIT 1`,
+      [id]
+    );
+    if (history.rows.length > 0) {
+      throw new TenantHistoryProtectedError();
+    }
+
     const result = await pool.query('DELETE FROM tenants WHERE id = $1', [id]);
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   } catch (error) {
+    if (error instanceof TenantHistoryProtectedError) throw error;
     console.error('Error deleting tenant:', error);
     throw new Error(`Failed to delete tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -537,16 +719,16 @@ export async function endTenantAssignment(tenantId: string, roomId: string, move
       ['terminated', moveOutDate, tenantId, roomId, 'active']
     );
 
-    // Update tenant status to inactive
+    // Update tenant — former tenant, keep person row
     await client.query(
-      'UPDATE tenants SET tenant_status = $1, move_out_date = $2 WHERE id = $3',
+      'UPDATE tenants SET is_tenant = false, tenant_status = $1, move_out_date = $2 WHERE id = $3',
       ['inactive', moveOutDate, tenantId]
     );
 
-    // Update room status to available
+    // Update room status to vacant
     await client.query(
-      'UPDATE rooms SET status = $1 WHERE id = $2',
-      ['available', roomId]
+      'UPDATE rooms SET room_status = $1 WHERE id = $2',
+      ['vacant', roomId]
     );
 
     await client.query('COMMIT');

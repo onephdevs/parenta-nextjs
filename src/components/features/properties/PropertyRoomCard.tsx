@@ -183,10 +183,10 @@ export default function PropertyRoomCard({
                   e.stopPropagation();
                   onViewDetails(room.id);
                 }}
-                className="rounded px-2.5 py-1.5 text-[12px] font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-gray-900 shadow-sm hover:border-gray-900 hover:bg-gray-900 hover:text-white"
                 title="View room details"
               >
-                View room
+                View
               </button>
             )}
           </div>

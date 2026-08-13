@@ -171,7 +171,6 @@ model contacts {
   tenants              tenants?               @relation(fields: [tenant_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
   users                users?                 @relation(fields: [user_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
   contact_roles        contact_roles[]
-  deposit_transactions deposit_transactions[]
 
   @@index([tenant_id], map: "idx_contacts_tenant_id")
   @@index([user_id], map: "idx_contacts_user_id")
@@ -252,50 +251,6 @@ model deposit_ledger {
   @@index([tenant_id], map: "idx_deposit_ledger_tenant_id")
   @@index([transaction_date], map: "idx_deposit_ledger_transaction_date")
   @@index([transaction_type], map: "idx_deposit_ledger_transaction_type")
-}
-
-/// Per-lease deposit account (SECURITY | UTILITY) with running balance.
-model deposit_ledgers {
-  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  assignment_id        String                 @db.Uuid
-  tenant_id            String                 @db.Uuid
-  deposit_type         String                 @db.VarChar(20)
-  initial_amount       Decimal                @default(0) @db.Decimal(10, 2)
-  running_balance      Decimal                @default(0) @db.Decimal(10, 2)
-  is_active            Boolean?               @default(true)
-  created_at           DateTime?              @default(now()) @db.Timestamp(6)
-  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
-  tenant_room_assignments tenant_room_assignments @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  tenants              tenants                @relation("TenantDepositLedgers", fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  deposit_transactions deposit_transactions[]
-
-  @@unique([assignment_id, deposit_type])
-  @@index([assignment_id], map: "idx_deposit_ledgers_assignment_id")
-  @@index([tenant_id], map: "idx_deposit_ledgers_tenant_id")
-  @@index([deposit_type], map: "idx_deposit_ledgers_type")
-}
-
-model deposit_transactions {
-  id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  deposit_ledger_id     String          @db.Uuid
-  amount                Decimal         @db.Decimal(10, 2)
-  reason                String
-  transaction_date      DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
-  created_by_contact_id String?         @db.Uuid
-  created_by_user_id    String?         @db.Uuid
-  applied_to_invoice_id String?         @db.Uuid
-  payment_id            String?         @db.Uuid
-  created_at            DateTime?       @default(now()) @db.Timestamp(6)
-  deposit_ledgers       deposit_ledgers @relation(fields: [deposit_ledger_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  contacts              contacts?       @relation(fields: [created_by_contact_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
-  users                 users?          @relation("DepositTxnCreator", fields: [created_by_user_id], references: [id], onUpdate: NoAction, onDelete: SetNull)
-  invoices              invoices?       @relation(fields: [applied_to_invoice_id], references: [id], onUpdate: NoAction)
-  payments              payments?       @relation("DepositTxnPayment", fields: [payment_id], references: [id], onUpdate: NoAction)
-
-  @@index([deposit_ledger_id], map: "idx_deposit_transactions_ledger_id")
-  @@index([transaction_date], map: "idx_deposit_transactions_date")
-  @@index([created_by_contact_id], map: "idx_deposit_transactions_created_by_contact")
-  @@index([applied_to_invoice_id], map: "idx_deposit_transactions_invoice")
 }
 
 model document_categories {
@@ -453,7 +408,6 @@ model invoices {
   created_at           DateTime?             @default(now()) @db.Timestamp(6)
   updated_at           DateTime?             @default(now()) @db.Timestamp(6)
   deposit_ledger       deposit_ledger[]
-  deposit_transactions deposit_transactions[]
   invoice_line_items   invoice_line_items[]
   tenants              tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   payment_allocations  payment_allocations[]
@@ -526,7 +480,6 @@ model payments {
   updated_at              DateTime?                @default(now()) @db.Timestamp(6)
   asset_billing           asset_billing[]
   deposit_ledger          deposit_ledger[]
-  deposit_transactions    deposit_transactions[] @relation("DepositTxnPayment")
   payment_allocations     payment_allocations[]
   tenant_room_assignments tenant_room_assignments? @relation(fields: [assignment_id], references: [id], onUpdate: NoAction)
   rooms                   rooms?                   @relation(fields: [room_id], references: [id], onUpdate: NoAction)
@@ -622,7 +575,6 @@ model tenant_room_assignments {
   pipeline_cards          pipeline_cards[]
   rooms                   rooms            @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   tenants                 tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  deposit_ledgers         deposit_ledgers[]
   expenses                expenses[]
 
   @@index([start_date, end_date], map: "idx_assignments_dates")
@@ -694,7 +646,6 @@ model tenants {
   asset_billing                  asset_billing[]
   communications                 communications[]
   deposit_ledger                 deposit_ledger[]
-  deposit_ledgers                deposit_ledgers[] @relation("TenantDepositLedgers")
   documents                      documents[]
   expenses                       expenses[]
   invoices                       invoices[]
@@ -730,7 +681,6 @@ model users {
   audit_logs            audit_logs[]
   communications        communications[]
   deposit_ledger        deposit_ledger[]
-  deposit_transactions  deposit_transactions[] @relation("DepositTxnCreator")
   documents             documents[]
   notifications         notifications[]
   pipeline_cards_created pipeline_cards[] @relation("PipelineCardCreator")

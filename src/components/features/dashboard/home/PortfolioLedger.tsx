@@ -239,7 +239,7 @@ export default function PortfolioLedger() {
           <div>
             <div className="text-lg font-semibold text-slate-900">Cash summary</div>
             <div className="text-xs text-slate-500">
-              Same Grand Total line as the apartment records: collection, less expenses, plus deposits and cheques
+              Matches apartment records: collection − expenses − cash allowance + cheque = grand total
             </div>
           </div>
           <span className="rounded bg-slate-50 px-2 py-1 font-mono text-xs text-slate-500 ring-1 ring-slate-200">
@@ -264,7 +264,7 @@ export default function PortfolioLedger() {
               {peso(data.grandTotal)}
             </div>
             <div className="mt-1 text-[11px] leading-snug text-slate-300">
-              Cash left this period after expenses
+              Cash left this period (same as Excel Grand Total)
             </div>
           </div>
         </div>

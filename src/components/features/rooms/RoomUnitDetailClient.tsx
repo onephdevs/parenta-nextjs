@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
@@ -8,23 +8,12 @@ import type { RoomPageDetail } from '@/lib/api/properties';
 import type { Room } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/Button';
-import RoomDetailsContent from '@/components/features/rooms/RoomDetailsContent';
-import ImageUpload from '@/components/features/ImageUpload';
-import ImageGallery from '@/components/features/ImageGallery';
+import RoomDetailsContent, {
+  formatUnitLabel,
+} from '@/components/features/rooms/RoomDetailsContent';
 import EditRoomForm from '@/components/features/EditRoomForm';
 import DeleteRoomModal from '@/components/features/DeleteRoomModal';
 import TenantAssignmentManager from '@/components/features/TenantAssignmentManager';
-
-interface RoomImage {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  filePath: string;
-  mimeType: string;
-  caption?: string;
-  isPrimary: boolean;
-  createdAt: Date;
-}
 
 interface RoomUnitDetailClientProps {
   detail: RoomPageDetail;
@@ -51,46 +40,28 @@ function toEditRoom(detail: RoomPageDetail): Room & { buildingName?: string } {
         ? status
         : 'vacant',
     description: room.description,
-    amenities: Array.isArray(room.amenities) ? room.amenities.join(', ') : String(room.amenities || ''),
+    amenities: Array.isArray(room.amenities)
+      ? room.amenities.join(', ')
+      : String(room.amenities || ''),
     isActive: true,
     createdAt: room.createdAt ? new Date(room.createdAt) : new Date(),
     updatedAt: room.updatedAt ? new Date(room.updatedAt) : new Date(),
   };
 }
 
-export default function RoomUnitDetailClient({ detail: initialDetail }: RoomUnitDetailClientProps) {
+export default function RoomUnitDetailClient({
+  detail: initialDetail,
+}: RoomUnitDetailClientProps) {
   const router = useRouter();
   const { showNotification } = useNotifications();
   const [detail, setDetail] = useState(initialDetail);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [images, setImages] = useState<RoomImage[]>([]);
-  const [imagesLoading, setImagesLoading] = useState(true);
 
   useEffect(() => {
     setDetail(initialDetail);
   }, [initialDetail]);
-
-  const fetchImages = useCallback(async () => {
-    setImagesLoading(true);
-    try {
-      const response = await fetch(
-        `/api/images?entityType=room&entityId=${detail.room.id}`,
-        { credentials: 'include' }
-      );
-      const result = await response.json();
-      setImages(result.success ? result.data : []);
-    } catch {
-      setImages([]);
-    } finally {
-      setImagesLoading(false);
-    }
-  }, [detail.room.id]);
-
-  useEffect(() => {
-    void fetchImages();
-  }, [fetchImages]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -112,7 +83,6 @@ export default function RoomUnitDetailClient({ detail: initialDetail }: RoomUnit
         throw new Error(json.error || 'Failed to refresh room');
       }
       setDetail(json.data as RoomPageDetail);
-      await fetchImages();
       router.refresh();
     } catch (err) {
       showNotification({
@@ -159,7 +129,9 @@ export default function RoomUnitDetailClient({ detail: initialDetail }: RoomUnit
               Rooms
             </Link>
             <span>/</span>
-            <span className="font-medium text-gray-800">Unit {detail.room.roomNumber}</span>
+            <span className="font-medium text-gray-800">
+              {formatUnitLabel(detail.room.roomNumber)}
+            </span>
           </nav>
           <h1 className="text-xl font-bold text-gray-900">{detail.building.name}</h1>
         </div>
@@ -198,38 +170,10 @@ export default function RoomUnitDetailClient({ detail: initialDetail }: RoomUnit
         }}
       />
 
-      <section id="photos" className="scroll-mt-6">
-        <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Photos</p>
-        <div className="space-y-4 overflow-hidden rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
-          <div className="rounded-xl border-2 border-dashed border-gray-200 p-4">
-            <ImageUpload
-              entityType="room"
-              entityId={detail.room.id}
-              onUploadComplete={() => {
-                void fetchImages();
-                void refresh();
-              }}
-              maxImages={20}
-            />
-          </div>
-          {imagesLoading ? (
-            <p className="py-6 text-center text-sm text-gray-500">Loading photos…</p>
-          ) : (
-            <ImageGallery
-              images={images}
-              entityType="room"
-              entityId={detail.room.id}
-              onImageUpdate={() => {
-                void fetchImages();
-                void refresh();
-              }}
-            />
-          )}
-        </div>
-      </section>
-
       <section>
-        <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Tenant assignment</p>
+        <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">
+          Tenant assignment
+        </p>
         <div className="overflow-hidden rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
           <TenantAssignmentManager
             roomId={detail.room.id}

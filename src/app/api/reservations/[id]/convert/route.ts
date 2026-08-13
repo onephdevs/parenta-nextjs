@@ -46,6 +46,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       advanceAmount: assignmentData.advanceAmount,
       notes: assignmentData.notes,
       generateInvoices: assignmentData.generateInvoices !== false, // Default to true
+      leasePackageTemplateId: assignmentData.leasePackageTemplateId || null,
     });
 
     // Generate invoices if requested (open-ended leases get the next 12 months as drafts)

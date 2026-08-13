@@ -322,7 +322,14 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
         phone.includes(term) ||
         propertyLabel.includes(term);
 
-      const matchesStatus = !selectedStatus || tenant.tenantStatus === selectedStatus;
+      const matchesStatus =
+        !selectedStatus ||
+        (selectedStatus === 'current'
+          ? tenant.isTenant === true || tenant.tenantStatus === 'active'
+          : selectedStatus === 'former'
+            ? tenant.isTenant === false &&
+              (tenant.tenantStatus === 'inactive' || tenant.tenantStatus === 'terminated')
+            : tenant.tenantStatus === selectedStatus);
 
       const matchesProperty =
         !selectedBuildingId ||
@@ -555,8 +562,10 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
             onChange={(e) => setSelectedStatus(e.target.value)}
           >
             <option value="">All Status</option>
+            <option value="current">Current tenants</option>
             <option value="active">Active</option>
             <option value="pending">Pending</option>
+            <option value="former">Former tenants</option>
             <option value="inactive">Inactive</option>
             <option value="terminated">Terminated</option>
           </Select>

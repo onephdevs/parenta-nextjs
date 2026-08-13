@@ -41,11 +41,16 @@ import type {
   PipelineViewingStatus,
 } from '@/types/database';
 import {
-  LEASE_DURATION_PRESETS,
   computeLeaseEndDate,
-  getEffectiveLeaseMonths,
   todayLocalISO,
 } from '@/lib/lease-dates';
+import {
+  LeasePackageSelect,
+  LeasePackageSummary,
+  amountsFromLeasePackage,
+  useLeasePackageTemplates,
+  type LeasePackageTemplate,
+} from '@/components/features/leasing/LeasePackageFields';
 import { OpportunityTagsField } from './OpportunityTagsField';
 import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 import { OpportunityDocumentsPanel } from './OpportunityDocumentsPanel';
@@ -613,6 +618,9 @@ export function AddOpportunityModal({
   const [leaseDurationMonths, setLeaseDurationMonths] = useState(12);
   const [customLeaseMonths, setCustomLeaseMonths] = useState<number | ''>('');
   const [generatingLease, setGeneratingLease] = useState(false);
+  const { packages: leasePackages, loading: leasePackagesLoading } =
+    useLeasePackageTemplates();
+  const [leasePackageTemplateId, setLeasePackageTemplateId] = useState('');
   const [moveInTotalPaid, setMoveInTotalPaid] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMonths, setDepositMonths] = useState(1);
@@ -640,12 +648,18 @@ export function AddOpportunityModal({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const todayISO = todayLocalISO();
-  const isCustomDuration = leaseDurationMonths === 0;
-  const isOpenEndedLease = leaseDurationMonths === -1;
-  const effectiveLeaseMonths = getEffectiveLeaseMonths(
-    leaseDurationMonths,
-    customLeaseMonths === '' ? null : Number(customLeaseMonths)
-  );
+  const selectedLeasePackage: LeasePackageTemplate | null =
+    leasePackages.find((p) => p.id === leasePackageTemplateId) || null;
+  const isOpenEndedLease = selectedLeasePackage
+    ? selectedLeasePackage.termMonths == null
+    : leaseDurationMonths === -1;
+  const effectiveLeaseMonths = selectedLeasePackage
+    ? selectedLeasePackage.termMonths ?? 0
+    : leaseDurationMonths === -1
+      ? 0
+      : leaseDurationMonths === 0
+        ? Number(customLeaseMonths) || 0
+        : Number(leaseDurationMonths) || 0;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -698,6 +712,7 @@ export function AddOpportunityModal({
       setMoveInDate(card.moveInDate?.slice(0, 10) || card.leaseStartDate?.slice(0, 10) || '');
       setLeaseDurationMonths(12);
       setCustomLeaseMonths('');
+      setLeasePackageTemplateId(card.leasePackageTemplateId || '');
       const savedDeposit = card.depositAmount != null ? Number(card.depositAmount) : null;
       const savedAdvance = card.advanceAmount != null ? Number(card.advanceAmount) : null;
       const hasSavedMoveIn =
@@ -784,6 +799,7 @@ export function AddOpportunityModal({
       setMoveInDate('');
       setLeaseDurationMonths(12);
       setCustomLeaseMonths('');
+      setLeasePackageTemplateId('');
       setMoveInTotalPaid('');
       setDepositAmount('');
       setDepositMonths(1);
@@ -1201,6 +1217,16 @@ export function AddOpportunityModal({
     });
   }, [roomId, rooms]);
 
+  // Apply saved/selected package terms once packages are loaded
+  useEffect(() => {
+    if (!leasePackageTemplateId || leasePackagesLoading) return;
+    if (card?.assignmentId || moveInPaymentStatus === 'paid') return;
+    const pkg = leasePackages.find((p) => p.id === leasePackageTemplateId);
+    if (!pkg) return;
+    applyLeasePackage(pkg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leasePackageTemplateId, leasePackagesLoading, leasePackages]);
+
   // Keep Total / Deposit in sync with room rent × selected months (unpaid only)
   useEffect(() => {
     if (!isOpen || !isOnboarding) return;
@@ -1261,13 +1287,26 @@ export function AddOpportunityModal({
           cfgJson?.data ||
           cfgJson?.config ||
           (cfgJson?.success ? cfgJson.data : null);
-        if (cfg && moveInPaymentStatus !== 'paid' && !card?.assignmentId) {
+        if (
+          !leasePackageTemplateId &&
+          cfg &&
+          moveInPaymentStatus !== 'paid' &&
+          !card?.assignmentId
+        ) {
           const depMo = Math.max(0, Math.round(Number(cfg.depositMonths) || 1));
           const advMo = Math.max(0, Math.round(Number(cfg.advanceMonths) || 1));
           setDepositMonths(depMo);
           setAdvanceMonths(advMo);
           if (!moveInAmountsManualRef.current) {
             fillMoveInAmountsFromRent(depMo, advMo, rent);
+          }
+        } else if (leasePackageTemplateId && selectedLeasePackage) {
+          const amounts = amountsFromLeasePackage(selectedLeasePackage, rent);
+          setRequiredDeposit(amounts.depositAmount);
+          setRequiredAdvance(amounts.advanceAmount);
+          setFeeChecklistReady(true);
+          if (!moveInAmountsManualRef.current) {
+            fillMoveInAmountsFromRent(amounts.depositMonths, amounts.advanceMonths, rent);
           }
         } else if (!moveInAmountsManualRef.current) {
           fillMoveInAmountsFromRent(depositMonths, advanceMonths, rent);
@@ -1313,10 +1352,32 @@ export function AddOpportunityModal({
     }
   }
 
-  function applyDurationToEnd(start: string, duration: number, custom: number | '') {
-    const months = getEffectiveLeaseMonths(duration, custom === '' ? null : Number(custom));
-    if (!start || months <= 0) return '';
+  function applyDurationToEnd(start: string, months: number | null | undefined) {
+    if (!start || months == null || months <= 0) return '';
     return computeLeaseEndDate(start, months);
+  }
+
+  function applyLeasePackage(pkg: LeasePackageTemplate | null) {
+    if (!pkg) return;
+    const rent = getMonthlyRentForPayment();
+    const amounts = amountsFromLeasePackage(pkg, rent);
+    setDepositMonths(amounts.depositMonths);
+    setAdvanceMonths(amounts.advanceMonths);
+    setLeaseDurationMonths(pkg.termMonths == null ? -1 : pkg.termMonths);
+    setCustomLeaseMonths('');
+    if (pkg.termMonths == null) {
+      setLeaseEndDate('');
+    } else if (leaseStartDate) {
+      setLeaseEndDate(applyDurationToEnd(leaseStartDate, pkg.termMonths));
+    }
+    if (rent > 0) {
+      setRequiredDeposit(amounts.depositAmount);
+      setRequiredAdvance(amounts.advanceAmount);
+      setFeeChecklistReady(true);
+      if (!moveInAmountsManualRef.current) {
+        fillMoveInAmountsFromRent(amounts.depositMonths, amounts.advanceMonths, rent);
+      }
+    }
   }
 
   function getMoveInSplit(overrides?: { total?: string; deposit?: string }) {
@@ -1421,6 +1482,11 @@ export function AddOpportunityModal({
       setError('Select building and room before recording payment');
       return;
     }
+    if (!leasePackageTemplateId) {
+      setActiveSection('payment');
+      setError('Select a lease template before recording payment');
+      return;
+    }
     if (!moveInPaymentDate) {
       setError('Payment date is required');
       return;
@@ -1441,6 +1507,7 @@ export function AddOpportunityModal({
           amount: amount.trim() !== '' ? Number(amount) : undefined,
           depositAmount: deposit,
           advanceAmount: advance,
+          leasePackageTemplateId: leasePackageTemplateId || null,
           moveInPaymentStatus: 'paid',
           moveInPaidAt: new Date(`${moveInPaymentDate}T12:00:00`).toISOString(),
           moveInPaymentMethod,
@@ -1521,6 +1588,11 @@ export function AddOpportunityModal({
       setError('Confirm payment under Payment before generating a lease');
       return;
     }
+    if (!leasePackageTemplateId) {
+      setActiveSection('lease');
+      setError('Select a lease template before generating a lease');
+      return;
+    }
     if (!leaseStartDate) {
       setError('Lease start date is required');
       return;
@@ -1556,6 +1628,7 @@ export function AddOpportunityModal({
           amount: rentAmount,
           depositAmount: deposit,
           advanceAmount: advance,
+          leasePackageTemplateId: leasePackageTemplateId || null,
           moveInPaymentStatus: 'paid',
           moveInPaidAt: moveInPaymentDate
             ? new Date(`${moveInPaymentDate}T12:00:00`).toISOString()
@@ -1812,6 +1885,7 @@ export function AddOpportunityModal({
             const { advance } = getMoveInSplit();
             return moveInTotalPaid.trim() !== '' ? advance : null;
           })(),
+          leasePackageTemplateId: leasePackageTemplateId || null,
           moveInPaymentStatus,
           moveInPaidAt:
             moveInPaymentStatus === 'paid' && moveInPaymentDate
@@ -2024,6 +2098,7 @@ export function AddOpportunityModal({
               const { advance } = getMoveInSplit();
               return moveInTotalPaid.trim() !== '' ? advance : null;
             })(),
+            leasePackageTemplateId: leasePackageTemplateId || null,
             moveInPaymentStatus,
             moveInPaidAt:
               moveInPaymentStatus === 'paid' && moveInPaymentDate
@@ -2535,7 +2610,7 @@ export function AddOpportunityModal({
                   {feeChecklistReady && (
                     <div className="col-span-6 rounded-lg border border-teal-200 bg-teal-50/60 p-4">
                       <p className="text-sm font-medium text-gray-900">
-                        Onboarding fee checklist (from property deposit rules)
+                        Onboarding fee checklist (from lease template)
                       </p>
                       <ul className="mt-3 space-y-2 text-sm text-gray-800">
                         <li className="flex justify-between gap-3">
@@ -2586,7 +2661,7 @@ export function AddOpportunityModal({
                     <div className="col-span-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <p className="text-sm font-medium text-gray-900">
-                          Calculate from monthly rent
+                          Lease template (deposit &amp; advance)
                         </p>
                         {getMonthlyRentForPayment() > 0 ? (
                           <p className="text-xs text-gray-600">
@@ -2598,58 +2673,31 @@ export function AddOpportunityModal({
                           </p>
                         )}
                       </div>
-                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <FormField label="Deposit months" htmlFor="opp-deposit-months">
-                          <Select
-                            id="opp-deposit-months"
-                            value={String(depositMonths)}
+                      <div className="mt-3">
+                        <FormField label="Lease Template" htmlFor="opp-lease-package-payment" required>
+                          <LeasePackageSelect
+                            id="opp-lease-package-payment"
+                            value={leasePackageTemplateId}
+                            packages={leasePackages}
+                            loading={leasePackagesLoading}
                             disabled={savingPayment}
-                            onChange={(e) => {
-                              applyMoveInMonths(Number(e.target.value), advanceMonths);
+                            onChange={(id, pkg) => {
+                              setLeasePackageTemplateId(id);
+                              applyLeasePackage(pkg);
                             }}
-                          >
-                            {[0, 1, 2, 3, 4, 5, 6].map((m) => {
-                              const rent = getMonthlyRentForPayment();
-                              const priced =
-                                rent > 0
-                                  ? ` — ₱${(rent * m).toLocaleString('en-PH')}`
-                                  : '';
-                              return (
-                                <option key={`dep-${m}`} value={m}>
-                                  {m === 0
-                                    ? '0 months'
-                                    : `${m} month${m === 1 ? '' : 's'}${priced}`}
-                                </option>
-                              );
-                            })}
-                          </Select>
-                        </FormField>
-                        <FormField label="Advance months" htmlFor="opp-advance-months">
-                          <Select
-                            id="opp-advance-months"
-                            value={String(advanceMonths)}
-                            disabled={savingPayment}
-                            onChange={(e) => {
-                              applyMoveInMonths(depositMonths, Number(e.target.value));
-                            }}
-                          >
-                            {[0, 1, 2, 3, 4, 5, 6].map((m) => {
-                              const rent = getMonthlyRentForPayment();
-                              const priced =
-                                rent > 0
-                                  ? ` — ₱${(rent * m).toLocaleString('en-PH')}`
-                                  : '';
-                              return (
-                                <option key={`adv-${m}`} value={m}>
-                                  {m === 0
-                                    ? '0 months'
-                                    : `${m} month${m === 1 ? '' : 's'}${priced}`}
-                                </option>
-                              );
-                            })}
-                          </Select>
+                          />
                         </FormField>
                       </div>
+                      {selectedLeasePackage ? (
+                        <p className="mt-3 text-xs text-gray-600">
+                          Deposit {depositMonths} mo · Advance {advanceMonths} mo — amounts
+                          update from monthly rent × template.
+                        </p>
+                      ) : (
+                        <p className="mt-3 text-xs text-amber-700">
+                          Select a lease template to calculate deposit and advance.
+                        </p>
+                      )}
                       {moveInAmountsManual && getMonthlyRentForPayment() > 0 && (
                         <button
                           type="button"
@@ -2954,7 +3002,7 @@ export function AddOpportunityModal({
                           setMoveInDate((prev) => (!prev || prev === leaseStartDate ? start : prev));
                           if (!isOpenEndedLease) {
                             setLeaseEndDate(
-                              applyDurationToEnd(start, leaseDurationMonths, customLeaseMonths)
+                              applyDurationToEnd(start, selectedLeasePackage?.termMonths ?? effectiveLeaseMonths)
                             );
                           }
                         }}
@@ -2963,64 +3011,28 @@ export function AddOpportunityModal({
                     </FormField>
 
                     <FormField
-                      label="Lease Duration"
-                      htmlFor="opp-lease-duration"
-                      hint="Presets auto-set the end date. Choose Custom for other lengths."
+                      label="Lease Template"
+                      htmlFor="opp-lease-package"
+                      required
+                      hint="Term, deposit, and advance come from the selected package."
                     >
-                      <Select
-                        id="opp-lease-duration"
-                        value={leaseDurationMonths}
+                      <LeasePackageSelect
+                        id="opp-lease-package"
+                        value={leasePackageTemplateId}
+                        packages={leasePackages}
+                        loading={leasePackagesLoading}
                         disabled={Boolean(card?.assignmentId)}
-                        onChange={(e) => {
-                          const duration = Number(e.target.value);
-                          setLeaseDurationMonths(duration);
-                          if (duration === -1) {
-                            setLeaseEndDate('');
-                            return;
-                          }
-                          if (duration !== 0) {
-                            setLeaseEndDate(
-                              applyDurationToEnd(leaseStartDate, duration, customLeaseMonths)
-                            );
-                          }
+                        onChange={(id, pkg) => {
+                          setLeasePackageTemplateId(id);
+                          applyLeasePackage(pkg);
                         }}
-                      >
-                        {LEASE_DURATION_PRESETS.map((months) => (
-                          <option key={months} value={months}>
-                            {months} month{months !== 1 ? 's' : ''}
-                            {months === 12 ? ' (default)' : ''}
-                          </option>
-                        ))}
-                        <option value={0}>Custom</option>
-                        <option value={-1}>Open-ended</option>
-                      </Select>
+                      />
                     </FormField>
 
-                    {isCustomDuration ? (
-                      <FormField
-                        label="Custom Duration (months)"
-                        htmlFor="opp-lease-custom-months"
-                        required
-                        hint="End date updates from start + this many months"
-                      >
-                        <Input
-                          id="opp-lease-custom-months"
-                          type="number"
-                          min={1}
-                          step={1}
-                          value={customLeaseMonths}
-                          disabled={Boolean(card?.assignmentId)}
-                          onChange={(e) => {
-                            const custom =
-                              e.target.value === '' ? '' : Number(e.target.value);
-                            setCustomLeaseMonths(custom);
-                            setLeaseEndDate(
-                              applyDurationToEnd(leaseStartDate, 0, custom)
-                            );
-                          }}
-                          placeholder="e.g., 9"
-                        />
-                      </FormField>
+                    {selectedLeasePackage ? (
+                      <div className="sm:col-span-2">
+                        <LeasePackageSummary template={selectedLeasePackage} />
+                      </div>
                     ) : null}
 
                     <FormField

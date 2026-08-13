@@ -7,7 +7,7 @@ import { EditTenantForm } from '@/components/features/EditTenantForm';
 
 interface EditTenantPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; tab?: string; step?: string }>;
 }
 
 export default async function EditTenantPage({ params, searchParams }: EditTenantPageProps) {
@@ -20,6 +20,7 @@ export default async function EditTenantPage({ params, searchParams }: EditTenan
   const { id } = await params;
   const query = await searchParams;
   const returnTo = sanitizeReturnTo(query.returnTo);
+  const initialTab = query.tab || query.step || 'tenant';
 
   try {
     const tenant = await getTenantById(id);
@@ -30,7 +31,7 @@ export default async function EditTenantPage({ params, searchParams }: EditTenan
 
     return (
       <div className="min-h-0 flex-1 bg-white">
-        <EditTenantForm tenant={tenant} returnTo={returnTo} />
+        <EditTenantForm tenant={tenant} returnTo={returnTo} initialTab={initialTab} />
       </div>
     );
   } catch (error) {

@@ -5,7 +5,7 @@ import { ArrowLeft, UserPlus, X } from 'lucide-react';
 import type { RoomPageDetail } from '@/lib/api/properties';
 import TenantForm from '@/components/features/TenantForm';
 import AppLoader from '@/components/ui/AppLoader';
-import RoomDetailsContent from './RoomDetailsContent';
+import RoomDetailsContent, { formatUnitLabel } from './RoomDetailsContent';
 
 interface RoomDetailsModalProps {
   isOpen: boolean;
@@ -81,15 +81,14 @@ export default function RoomDetailsModal({
 
   if (!isOpen || !roomId) return null;
 
-  const title = detail ? `Room ${detail.room.roomNumber}` : 'Room details';
-  const subtitle = detail?.building.name;
+  const title = detail ? formatUnitLabel(detail.room.roomNumber) : 'Room details';
   const isVacant = Boolean(detail && !detail.room.tenant);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Dim overlay over the main content area (beside sidebar on desktop) */}
       <div
-        className={`absolute inset-0 bg-gray-900/50 transition-opacity duration-300 lg:left-64 ${
+        className={`absolute inset-0 bg-gray-900/50 transition-opacity duration-300 lg:left-[var(--admin-sidebar-width,16rem)] ${
           slidIn ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={onClose}
@@ -97,12 +96,12 @@ export default function RoomDetailsModal({
       />
 
       {/* Full-height slide-over anchored to the right of the main section */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex justify-end lg:left-64">
+      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex justify-end lg:left-[var(--admin-sidebar-width,16rem)]">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="room-details-modal-title"
-          className={`pointer-events-auto flex h-full w-full flex-col overflow-hidden bg-white text-gray-900 shadow-2xl transition-transform duration-300 ease-out lg:w-[80%] lg:rounded-l-2xl ${
+          className={`pointer-events-auto flex h-full w-full flex-col overflow-hidden bg-white text-gray-900 shadow-2xl transition-transform duration-300 ease-out lg:w-[min(92%,72rem)] lg:rounded-l-2xl ${
             slidIn ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
@@ -124,8 +123,10 @@ export default function RoomDetailsModal({
                   >
                     {title}
                   </h1>
-                  {subtitle && (
-                    <p className="mt-1 truncate text-sm text-gray-600">{subtitle}</p>
+                  {detail?.building.name && (
+                    <p className="mt-0.5 truncate text-sm text-gray-500">
+                      {detail.building.name}
+                    </p>
                   )}
                 </div>
               </div>
@@ -152,8 +153,8 @@ export default function RoomDetailsModal({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-[#E2E5F7]">
-            <div className="mx-auto max-w-4xl p-4 sm:p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50">
+            <div className="mx-auto max-w-5xl p-4 sm:p-6">
               {loading && (
                 <AppLoader
                   variant="inline"
@@ -172,6 +173,7 @@ export default function RoomDetailsModal({
               {!loading && !error && detail && (
                 <RoomDetailsContent
                   detail={detail}
+                  variant="modal"
                   hideRoomEdit
                   onDocumentsChanged={() => {
                     void loadDetail(detail.room.id);

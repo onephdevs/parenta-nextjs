@@ -3,16 +3,18 @@
  *
  * Dynamic values
  * --------------
- * Designer live preview uses SAMPLE_LEASE_CONTEXT (fake data below).
+ * Designer live preview uses a real active assignment via
+ * getLeaseDesignerPreviewContext() (Balibago/Villasol). SAMPLE_LEASE_CONTEXT
+ * is only a fallback when no lease exists.
  * Real leases resolve the same {{tokens}} from live DB records when a lease
  * is generated (see lease-agreement-document.ts → LeaseTemplateContext).
  *
  * Admin source of truth for each token:
- * - lease.*          → tenant assignment / lease terms / late-fee settings
+ * - lease.*          → tenant assignment / lease package / late-fee settings
  * - building.name    → Buildings admin (buildings.name)
  * - building.address → Buildings admin (address lines + city/state/postal)
  * - building.houseRules → Buildings admin (buildings.description) until a dedicated field exists
- * - building.petPolicy  → not stored in DB yet (preview sample only; add building field to edit as admin)
+ * - building.petPolicy  → not stored in DB yet (preview sample text; add building field to edit as admin)
  * - tenant.*         → Tenants admin
  * - landlord.companyName → brand constant / LANDLORD_COMPANY_NAME env (Alfonso)
  * - unit.number      → Rooms admin
@@ -211,7 +213,7 @@ export const LEASE_TEMPLATE_VARIABLES: LeaseTemplateVariableDef[] = [
     label: 'name',
     category: 'building',
     description: 'Building name',
-    sampleValue: 'Sunset Apartments',
+    sampleValue: 'APARTMENT-1 BALIBAGO',
     format: 'text',
   },
   {
@@ -220,7 +222,7 @@ export const LEASE_TEMPLATE_VARIABLES: LeaseTemplateVariableDef[] = [
     label: 'address',
     category: 'building',
     description: 'Building address',
-    sampleValue: '123 Mabini St, Makati',
+    sampleValue: 'A. Santos St., Angeles, Pampanga',
     format: 'text',
   },
   {
@@ -457,44 +459,41 @@ Payment shall be made by the Tenant to the Landlord on the {{lease.dueDay}} of e
 
 export const SAMPLE_LEASE_CONTEXT: LeaseTemplateContext = {
   lease: {
-    rentAmount: 15000,
-    securityDeposit: 7500,
-    advanceRent: 15000,
+    rentAmount: 4800,
+    securityDeposit: 9600,
+    advanceRent: 4800,
     dueDay: 5,
-    lateFeeGraceDays: 5,
-    lateFeeLabel: '$500',
-    startDate: '2026-08-04',
-    endDate: '2027-02-03',
-    moveInDate: '2026-08-04',
+    lateFeeGraceDays: 0,
+    lateFeeLabel: 'None',
+    startDate: '2026-08-05',
+    endDate: '2027-02-04',
+    moveInDate: '2026-08-05',
   },
   building: {
-    name: 'Sunset Apartments',
-    address: '123 Mabini St, Makati, Metro Manila 1200',
+    name: 'APARTMENT-1 BALIBAGO',
+    address: 'A. Santos St., Brgy. Balibago, Angeles, Pampanga',
     depositValidityDays: 5,
     nonRefundableAfterDays: 5,
     petPolicy: 'No pets without prior written approval from management.',
-    houseRules: 'Quiet hours 10:00 PM – 7:00 AM. Common areas must be kept clean.',
+    houseRules: 'Quiet hours and house rules as posted by management.',
   },
   tenant: {
-    name: 'Adrian Estopace',
-    email: 'adrian@example.com',
-    phone: '+63 917 123 4567',
+    name: 'Tenant Unit 1',
+    email: null,
+    phone: null,
   },
   landlord: {
     companyName: LANDLORD_COMPANY_NAME,
   },
   unit: {
-    number: '4B',
+    number: '1',
   },
-  occupants: [
-    { name: 'Adrian Estopace', role: 'Primary' },
-    { name: 'Reyna Santos', role: 'Co-signer', relationship: 'Spouse' },
-  ],
+  occupants: [{ name: 'Tenant Unit 1', role: 'Primary' }],
   customClauses: [],
-  documentId: 'sample-doc-id',
+  documentId: null,
   isDraft: true,
   conditions: {
-    has_co_tenants: true,
+    has_co_tenants: false,
     has_pet_policy: true,
     has_house_rules: true,
     has_custom_clauses: false,

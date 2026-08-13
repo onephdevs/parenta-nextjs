@@ -143,6 +143,10 @@ export interface RoomAssignmentHistoryItem {
   tenantId: string | null;
   tenantName: string;
   tenantEmail?: string | null;
+  tenantPhone?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  tenantExists?: boolean;
   startDate: string | Date;
   endDate?: string | Date | null;
   monthlyRate: number;
@@ -879,9 +883,8 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     occupancyRatePercent: occupancyRaw.occupancy_rate_percent || 0,
   };
 
-  const assignmentHistory: RoomAssignmentHistoryItem[] = (historyRaw || [])
-    .slice(0, 5)
-    .map((item: Record<string, unknown>) => {
+  const assignmentHistory: RoomAssignmentHistoryItem[] = (historyRaw || []).map(
+    (item: Record<string, unknown>) => {
       const displayName = String(item.display_name || '').trim();
       const fallbackName = `${item.first_name || ''} ${item.last_name || ''}`.trim();
       return {
@@ -889,12 +892,17 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
         tenantId: (item.live_tenant_id as string | null) ?? (item.tenant_id as string | null) ?? null,
         tenantName: displayName || fallbackName || 'Unknown tenant',
         tenantEmail: (item.display_email as string | null) ?? (item.email as string | null) ?? null,
+        tenantPhone: (item.display_phone as string | null) ?? (item.phone as string | null) ?? null,
+        emergencyContactName: (item.display_emergency_name as string | null) ?? null,
+        emergencyContactPhone: (item.display_emergency_phone as string | null) ?? null,
+        tenantExists: Boolean(item.tenant_exists),
         startDate: item.start_date as string | Date,
         endDate: (item.end_date as string | Date | null) ?? null,
         monthlyRate: parseFloat(String(item.monthly_rate)) || 0,
         assignmentStatus: String(item.assignment_status || ''),
       };
-    });
+    }
+  );
 
   const assets: PropertyRoomAsset[] = (assetsResult.rows || []).map((a) => ({
     id: String(a.id),

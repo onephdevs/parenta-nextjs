@@ -602,11 +602,21 @@ export async function getRoomAssignmentHistory(roomId: string) {
           TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, '')))
         ) as display_name,
         COALESCE(NULLIF(tra.tenant_email_snapshot, ''), t.email) as display_email,
+        COALESCE(NULLIF(tra.tenant_phone_snapshot, ''), t.phone) as display_phone,
+        COALESCE(
+          NULLIF(tra.tenant_emergency_name_snapshot, ''),
+          t.emergency_contact_name
+        ) as display_emergency_name,
+        COALESCE(
+          NULLIF(tra.tenant_emergency_phone_snapshot, ''),
+          t.emergency_contact_phone
+        ) as display_emergency_phone,
         t.first_name,
         t.last_name,
         t.email,
         t.phone,
         t.tenant_status,
+        t.is_tenant,
         t.id as live_tenant_id,
         (t.id IS NOT NULL) as tenant_exists
       FROM tenant_room_assignments tra
@@ -664,22 +674,20 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
     }
     
     // Create assignment
-    const tenantSnap = await client.query(
-      `SELECT first_name, last_name, email FROM tenants WHERE id = $1`,
-      [tenantId]
+    const { loadTenantContactSnapshot, markPersonAsCurrentTenant } = await import(
+      '@/lib/services/tenant-lifecycle'
     );
-    const snap = tenantSnap.rows[0];
-    const tenantNameSnapshot = snap
-      ? `${snap.first_name || ''} ${snap.last_name || ''}`.trim()
-      : null;
+    const snap = await loadTenantContactSnapshot(client, tenantId);
 
     const assignmentQuery = `
       INSERT INTO tenant_room_assignments (
         tenant_id, room_id, start_date, monthly_rate, deposit_paid, notes, assignment_status,
-        tenant_name_snapshot, tenant_email_snapshot, billing_cycle_start_day
+        tenant_name_snapshot, tenant_email_snapshot,
+        tenant_phone_snapshot, tenant_emergency_name_snapshot, tenant_emergency_phone_snapshot,
+        billing_cycle_start_day
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, 'active', $7, $8,
+        $1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, $11,
         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31)
       )
       RETURNING *
@@ -692,8 +700,11 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
       assignmentData.monthlyRate,
       assignmentData.depositPaid || 0,
       assignmentData.notes,
-      tenantNameSnapshot,
-      snap?.email || null,
+      snap.tenantNameSnapshot,
+      snap.tenantEmailSnapshot,
+      snap.tenantPhoneSnapshot,
+      snap.tenantEmergencyNameSnapshot,
+      snap.tenantEmergencyPhoneSnapshot,
     ]);
     
     // Update room status to occupied
@@ -702,11 +713,10 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
       ['occupied', roomId]
     );
     
-    // Update tenant status to active
-    await client.query(
-      'UPDATE tenants SET tenant_status = $1, move_in_date = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      ['active', assignmentData.startDate, tenantId]
-    );
+    await markPersonAsCurrentTenant(client, {
+      tenantId,
+      moveInDate: assignmentData.startDate,
+    });
     
     await client.query('COMMIT');
     return assignmentResult.rows[0];
@@ -720,54 +730,15 @@ export async function assignTenantToRoom(roomId: string, tenantId: string, assig
   }
 }
 
-// Unassign tenant from room (end assignment)
+// Unassign tenant from room (end assignment — history retained)
 export async function unassignTenantFromRoom(roomId: string, tenantId: string, endDate: Date, notes?: string) {
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    // End the current assignment
-    const updateAssignmentQuery = `
-      UPDATE tenant_room_assignments 
-      SET end_date = $1, assignment_status = 'terminated', notes = COALESCE($2, notes), updated_at = CURRENT_TIMESTAMP
-      WHERE room_id = $3 AND tenant_id = $4 AND assignment_status = 'active'
-      RETURNING *
-    `;
-    
-    const assignmentResult = await client.query(updateAssignmentQuery, [
-      endDate,
-      notes,
-      roomId,
-      tenantId
-    ]);
-    
-    if (assignmentResult.rows.length === 0) {
-      throw new Error('No active assignment found');
-    }
-    
-    // Update room status to vacant
-    await client.query(
-      'UPDATE rooms SET room_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      ['vacant', roomId]
-    );
-    
-    // Update tenant status and move out date
-    await client.query(
-      'UPDATE tenants SET tenant_status = $1, move_out_date = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      ['inactive', endDate, tenantId]
-    );
-    
-    await client.query('COMMIT');
-    return assignmentResult.rows[0];
-    
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error unassigning tenant from room:', error);
-    throw error;
-  } finally {
-    client.release();
-  }
+  const { endTenancyAndVacateTx } = await import('@/lib/services/tenant-lifecycle');
+  return endTenancyAndVacateTx({
+    roomId,
+    tenantId,
+    endDate,
+    notes: notes ?? null,
+  });
 }
 
 // Get room financial summary

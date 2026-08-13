@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTenantById, updateTenant, deleteTenant } from '../../../../lib/api/tenants';
+import { getTenantById, updateTenant, deleteTenant, deactivateTenant, TenantHistoryProtectedError } from '../../../../lib/api/tenants';
 import { requireAdmin } from '@/lib/api-auth';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 
@@ -145,12 +145,35 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     if (error) return error;
 
     const { id } = await params;
+    const url = new URL(request.url);
+    const mode = url.searchParams.get('mode'); // 'deactivate' soft-ends tenancy
     const before = await getTenantById(id);
     const label = before
       ? `${before.firstName || before.first_name || ''} ${before.lastName || before.last_name || ''}`.trim() ||
         before.email ||
         id
       : id;
+
+    if (mode === 'deactivate') {
+      await deactivateTenant(id);
+      logActivitySafe({
+        actorUserId: session?.user?.id || null,
+        actorRole: 'admin',
+        actionType: 'tenant.deactivated',
+        category: 'tenants',
+        entityType: 'tenant',
+        entityId: id,
+        entityLabel: label,
+        beforeData: before as unknown as Record<string, unknown>,
+        afterData: { isTenant: false, tenantStatus: 'terminated' },
+        link: `/admin/tenants/${id}`,
+        metadata: { link: `/admin/tenants/${id}` },
+      });
+      return NextResponse.json({
+        success: true,
+        message: 'Person deactivated. Occupancy history retained.',
+      });
+    }
     
     await deleteTenant(id);
 
@@ -174,19 +197,18 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     console.error('Delete tenant error:', error);
-    
-    // Handle specific errors
-    if (error instanceof Error) {
-      if (error.message.includes('active room assignments')) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Cannot delete tenant',
-            details: 'Tenant has active room assignments. Please end assignments first.'
-          },
-          { status: 409 }
-        );
-      }
+
+    if (error instanceof TenantHistoryProtectedError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Cannot delete person with occupancy history',
+          details: error.message,
+          code: 'HISTORY_PROTECTED',
+          hint: 'Use ?mode=deactivate to end tenancy without deleting history.',
+        },
+        { status: 409 }
+      );
     }
     
     return NextResponse.json(

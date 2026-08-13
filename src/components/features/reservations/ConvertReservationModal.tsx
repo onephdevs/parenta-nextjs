@@ -12,6 +12,13 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
 import { Home, Calendar, DollarSign, Settings, FileText } from 'lucide-react';
+import {
+  LeasePackageSelect,
+  LeasePackageSummary,
+  amountsFromLeasePackage,
+  useLeasePackageTemplates,
+} from '@/components/features/leasing/LeasePackageFields';
+import { addMonthsToDate } from '@/components/features/tenants/profile/leaseTemplates';
 
 interface ConvertReservationModalProps {
   reservation: ReservationWithDetails;
@@ -77,7 +84,12 @@ export default function ConvertReservationModal({
     advanceAmount: '',
     notes: reservation.notes || '',
     generateInvoices: true,
+    leasePackageTemplateId: '',
   });
+  const { packages: leasePackages, loading: leasePackagesLoading } =
+    useLeasePackageTemplates();
+  const selectedLeasePackage =
+    leasePackages.find((p) => p.id === formData.leasePackageTemplateId) || null;
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -92,6 +104,16 @@ export default function ConvertReservationModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (!formData.leasePackageTemplateId) {
+      showNotification({
+        type: 'error',
+        title: 'Lease template required',
+        message: 'Select a lease template before converting.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
     if (formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
       showNotification({
@@ -118,6 +140,7 @@ export default function ConvertReservationModal({
         body: JSON.stringify({
           startDate: formData.startDate,
           endDate: formData.endDate || null,
+          leasePackageTemplateId: formData.leasePackageTemplateId || null,
           depositPaid: formData.depositPaid
             ? parseFloat(formData.depositPaid)
             : reservation.reservationDeposit,
@@ -206,7 +229,37 @@ export default function ConvertReservationModal({
               />
             </FormField>
 
-            <FormField
+                        <FormField label="Lease Template" htmlFor="leasePackageTemplateId" required>
+              <LeasePackageSelect
+                id="leasePackageTemplateId"
+                value={formData.leasePackageTemplateId}
+                packages={leasePackages}
+                loading={leasePackagesLoading}
+                onChange={(id, pkg) => {
+                  const rent = Number(reservation.monthlyRate) || 0;
+                  const amounts = amountsFromLeasePackage(pkg, rent);
+                  setFormData((prev) => ({
+                    ...prev,
+                    leasePackageTemplateId: id,
+                    depositPaid:
+                      amounts.depositAmount > 0
+                        ? String(amounts.depositAmount)
+                        : prev.depositPaid,
+                    advanceAmount:
+                      amounts.advanceAmount > 0 ? String(amounts.advanceAmount) : '',
+                    endDate:
+                      pkg?.termMonths != null && prev.startDate
+                        ? addMonthsToDate(prev.startDate, pkg.termMonths)
+                        : prev.endDate,
+                  }));
+                }}
+              />
+            </FormField>
+            {selectedLeasePackage ? (
+              <LeasePackageSummary template={selectedLeasePackage} className="mb-4" />
+            ) : null}
+
+<FormField
               label="Lease End Date (Optional)"
               htmlFor="endDate"
               hint="Leave empty for month-to-month lease"

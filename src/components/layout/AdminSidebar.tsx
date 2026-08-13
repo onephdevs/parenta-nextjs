@@ -23,7 +23,12 @@ const NAV_BG = '#000000';
 const NAV_ACCENT = '#FFFFFF';
 const LATO = 'var(--font-lato), Lato, sans-serif';
 
-export default function AdminSidebar() {
+interface AdminSidebarProps {
+  /** When true, show icon-only rail so navigation stays usable. */
+  collapsed?: boolean;
+}
+
+export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
@@ -130,15 +135,39 @@ export default function AdminSidebar() {
         </svg>
       ),
     },
+    {
+      name: 'People',
+      href: '/admin/people',
+      icon: (
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+          />
+        </svg>
+      ),
+    },
     { type: 'divider', id: 'after-people' },
     {
-      name: 'Leases',
-      href: '/admin/lease-management',
+      name: 'Leasing',
+      href: '/admin/leasing',
       icon: (
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
+      children: [
+        {
+          name: 'Lease Templates',
+          href: '/admin/leasing',
+        },
+        {
+          name: 'Lease Management',
+          href: '/admin/lease-management',
+        },
+      ],
     },
     {
       name: 'Documents',
@@ -326,10 +355,18 @@ export default function AdminSidebar() {
   };
 
   const parentRowClass = (highlighted: boolean) =>
-    `flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
-      highlighted
-        ? 'bg-white/10 font-semibold text-white'
-        : 'font-medium text-white/70 hover:bg-white/[0.06] hover:text-white'
+    `flex w-full items-center rounded-lg text-sm transition-colors ${
+      collapsed
+        ? `justify-center px-0 py-2.5 ${
+            highlighted
+              ? 'bg-white/10 font-semibold text-white'
+              : 'font-medium text-white/70 hover:bg-white/[0.06] hover:text-white'
+          }`
+        : `gap-3 px-2.5 py-1.5 ${
+            highlighted
+              ? 'bg-white/10 font-semibold text-white'
+              : 'font-medium text-white/70 hover:bg-white/[0.06] hover:text-white'
+          }`
     }`;
 
   const renderChildLink = (child: MenuItem) => {
@@ -353,7 +390,7 @@ export default function AdminSidebar() {
 
   const renderMenuItem = (item: MenuItem) => {
     const hasChildren = Boolean(item.children && item.children.length > 0);
-    const isExpanded = expandedSections.includes(item.name);
+    const isExpanded = !collapsed && expandedSections.includes(item.name);
     // A child that duplicates the parent href should not steal the parent highlight
     // (same pattern as Properties → /admin/properties vs All Rooms).
     const childIsActive = Boolean(
@@ -375,7 +412,11 @@ export default function AdminSidebar() {
             <Link
               href={item.href}
               className={parentRowClass(parentHighlight)}
-              onClick={() => setExpandedSections([item.name])}
+              title={collapsed ? item.name : undefined}
+              aria-label={collapsed ? item.name : undefined}
+              onClick={() => {
+                if (!collapsed) setExpandedSections([item.name]);
+              }}
             >
               {item.icon && (
                 <span
@@ -385,7 +426,7 @@ export default function AdminSidebar() {
                   {item.icon}
                 </span>
               )}
-              <span>{item.name}</span>
+              {!collapsed && <span>{item.name}</span>}
             </Link>
           ) : (
             <button
@@ -393,6 +434,8 @@ export default function AdminSidebar() {
               onClick={() => toggleSection(item.name)}
               className={parentRowClass(parentHighlight)}
               aria-expanded={isExpanded}
+              title={collapsed ? item.name : undefined}
+              aria-label={collapsed ? item.name : undefined}
             >
               {item.icon && (
                 <span
@@ -402,7 +445,7 @@ export default function AdminSidebar() {
                   {item.icon}
                 </span>
               )}
-              <span>{item.name}</span>
+              {!collapsed && <span>{item.name}</span>}
             </button>
           )}
           {isExpanded && (
@@ -419,6 +462,8 @@ export default function AdminSidebar() {
         key={item.name}
         href={item.href!}
         className={parentRowClass(active)}
+        title={collapsed ? item.name : undefined}
+        aria-label={collapsed ? item.name : undefined}
         onClick={() => setExpandedSections([])}
       >
         {item.icon && (
@@ -429,7 +474,7 @@ export default function AdminSidebar() {
             {item.icon}
           </span>
         )}
-        <span>{item.name}</span>
+        {!collapsed && <span>{item.name}</span>}
       </Link>
     );
   };
@@ -440,21 +485,35 @@ export default function AdminSidebar() {
       style={{ backgroundColor: NAV_BG, fontFamily: LATO }}
     >
       {/* Logo */}
-      <div className="flex h-16 items-center border-b border-white/10 px-4">
-        <Link href="/admin" className="flex items-center" aria-label="Alfonso Properties">
-          <BrandLogo variant="full" height={32} priority className="brightness-0 invert" />
+      <div
+        className={`flex h-16 items-center border-b border-white/10 ${
+          collapsed ? 'justify-center px-2' : 'px-4'
+        }`}
+      >
+        <Link
+          href="/admin"
+          className="flex items-center"
+          aria-label="Alfonso Properties"
+          title={collapsed ? 'Alfonso Properties' : undefined}
+        >
+          <BrandLogo
+            variant={collapsed ? 'mark' : 'full'}
+            height={collapsed ? 28 : 32}
+            priority
+            className="brightness-0 invert"
+          />
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3">
+      <nav className={`flex-1 overflow-y-auto py-3 ${collapsed ? 'px-1.5' : 'px-3'}`}>
         <div className="space-y-0.5">
           {menuItems.map((entry) =>
             isDivider(entry) ? (
               <div
                 key={entry.id}
                 role="separator"
-                className="mx-2 my-3 border-t border-white/10"
+                className={`my-3 border-t border-white/10 ${collapsed ? 'mx-1' : 'mx-2'}`}
               />
             ) : (
               renderMenuItem(entry)
@@ -464,36 +523,66 @@ export default function AdminSidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="border-t border-white/10 p-4">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-black"
+      <div className={`border-t border-white/10 ${collapsed ? 'p-2' : 'p-4'}`}>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <Link
+              href="/admin/profile"
+              title={displayName}
+              aria-label={displayName}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold uppercase text-black"
               style={{ backgroundColor: NAV_ACCENT }}
             >
               {session?.user?.firstName || session?.user?.lastName ? (
                 `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
               ) : (
-                <svg className="h-6 w-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               )}
+            </Link>
+            <button
+              onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+              className="p-1.5 text-white/40 transition-colors hover:text-white"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold uppercase text-black"
+                style={{ backgroundColor: NAV_ACCENT }}
+              >
+                {session?.user?.firstName || session?.user?.lastName ? (
+                  `${session.user.firstName?.charAt(0) || ''}${session.user.lastName?.charAt(0) || ''}`
+                ) : (
+                  <svg className="h-6 w-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                )}
+              </div>
             </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{displayName}</p>
+              <p className="truncate text-xs text-white/50">{session?.user?.email || ''}</p>
+            </div>
+            <button
+              onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+              className="p-1 text-white/40 transition-colors hover:text-white"
+              title="Sign out"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{displayName}</p>
-            <p className="truncate text-xs text-white/50">{session?.user?.email || ''}</p>
-          </div>
-          <button
-            onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-            className="p-1 text-white/40 transition-colors hover:text-white"
-            title="Sign out"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

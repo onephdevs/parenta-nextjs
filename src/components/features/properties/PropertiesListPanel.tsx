@@ -101,7 +101,7 @@ export default function PropertiesListPanel({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
             />
           </div>
           <button
@@ -122,7 +122,7 @@ export default function PropertiesListPanel({
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortValue)}
-              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-gray-900 focus:outline-none"
               aria-label="Sort properties"
             >
               <option value="name-asc">Name A–Z</option>
@@ -133,7 +133,7 @@ export default function PropertiesListPanel({
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterValue)}
-              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-gray-900 focus:outline-none"
             >
               <option value="all">All properties</option>
               <option value="has_vacant">Has vacant rooms</option>

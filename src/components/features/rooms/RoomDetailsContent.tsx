@@ -3,16 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Building2,
   Bell,
-  Camera,
   FileText,
   Home,
   MapPin,
-  Plus,
   User,
   Users,
   Wallet,
+  Building2,
 } from 'lucide-react';
 import type {
   PropertyRoomAsset,
@@ -35,6 +33,7 @@ import { MAX_FILE_SIZE, SUPPORTED_FILE_TYPES } from '@/types/document';
 import TenantProfileModal from '@/components/features/tenants/TenantProfileModal';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import { AddNotesButton, EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
+import RoomShowcaseGallery from '@/components/features/rooms/RoomShowcaseGallery';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 const TEAL = '#39CCCC';
@@ -43,10 +42,20 @@ interface RoomDetailsContentProps {
   detail: RoomPageDetail;
   /** Hide pencil / edit affordance on the room card (e.g. inside view modal). */
   hideRoomEdit?: boolean;
+  /** Modal view drops redundant building chrome and embeds the showcase gallery. */
+  variant?: 'page' | 'modal';
   /** Called after a lease document is uploaded so the parent can refresh. */
   onDocumentsChanged?: () => void;
   /** Called after a tenant is created/assigned from the in-page modal. */
   onTenantCreated?: () => void;
+}
+
+/** Avoid "Unit Unit 1" when roomNumber already includes Unit. */
+export function formatUnitLabel(roomNumber: string): string {
+  const trimmed = (roomNumber || '').trim();
+  if (!trimmed) return 'Unit';
+  if (/^unit\b/i.test(trimmed)) return trimmed;
+  return `Unit ${trimmed}`;
 }
 
 function cardClassName() {
@@ -131,6 +140,7 @@ function statusLabel(roomStatus: string) {
 
 export default function RoomDetailsContent({
   detail,
+  variant = 'page',
   onDocumentsChanged,
   onTenantCreated,
 }: RoomDetailsContentProps) {
@@ -142,12 +152,14 @@ export default function RoomDetailsContent({
   const [uploadingLease, setUploadingLease] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [profileTenantId, setProfileTenantId] = useState<string | null>(null);
+  const isModal = variant === 'modal';
 
   useEffect(() => {
     setDocuments(detail.room.documents || []);
   }, [detail.room.id, detail.room.documents]);
 
   const { room, building, financialSummary, assets = [] } = detail;
+  const unitLabel = formatUnitLabel(room.roomNumber);
   const tenant = room.tenant;
   const { appliances, furniture, other } = splitAssets(assets);
   const amenityFallback = room.amenities.length ? room.amenities.join(', ') : '';
@@ -266,21 +278,11 @@ export default function RoomDetailsContent({
   return (
     <>
     <div className="space-y-5" style={{ fontFamily: LATO }}>
-      {/* Building banner */}
-      <div className="rounded-xl bg-sky-50 px-4 py-2.5 text-center">
-        <Link
-          href={`/admin/properties?buildingId=${building.id}`}
-          className="text-sm font-bold uppercase tracking-wide text-sky-900 hover:underline"
-        >
-          {building.name}
-        </Link>
-      </div>
-
-      {/* Unit header */}
+      {/* Unit summary */}
       <div className={`${cardClassName()} p-5`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-indigo-700">Unit {room.roomNumber}</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{unitLabel}</h2>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <div>
                 <span className="text-gray-500">Status: </span>
@@ -328,20 +330,10 @@ export default function RoomDetailsContent({
                 )
               )}
             </select>
-            <Link href={`/admin/rooms/${room.id}#photos`}>
-              <Button variant="outline" size="sm" leftIcon={<Camera className="h-3.5 w-3.5" />}>
-                Photos
-              </Button>
-            </Link>
-            <Link href={`/admin/rooms/${room.id}#photos`}>
-              <Button size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />}>
-                Add
-              </Button>
-            </Link>
             <AddNotesButton
               entityType="room"
               entityId={room.id}
-              entityLabel={`Unit ${room.roomNumber}`}
+              entityLabel={unitLabel}
               label="Add note"
               onSaved={() => onDocumentsChanged?.()}
             />
@@ -617,7 +609,7 @@ export default function RoomDetailsContent({
             <EntityNotesPanel
               entityType="room"
               entityId={room.id}
-              entityLabel={`Unit ${room.roomNumber}`}
+              entityLabel={unitLabel}
               title="Room notes"
               compact
             />
@@ -635,7 +627,17 @@ export default function RoomDetailsContent({
       </section>
 
       <AssignmentHistoryCard detail={detail} />
-      <BuildingSummaryCard detail={detail} />
+      {!isModal && <BuildingSummaryCard detail={detail} />}
+
+      {/* Showcase gallery — Airbnb-style collage + photo tour */}
+      <div className={`${cardClassName()} p-4 sm:p-5`}>
+        <RoomShowcaseGallery
+          roomId={room.id}
+          unitLabel={unitLabel}
+          amenities={room.amenities}
+          onImagesChanged={() => onDocumentsChanged?.()}
+        />
+      </div>
     </div>
 
     <TenantProfileModal
@@ -652,46 +654,85 @@ function AssignmentHistoryCard({ detail }: { detail: RoomPageDetail }) {
 
   return (
     <div>
-      <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Assignment history</p>
+      <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Occupant history</p>
       <div className={cardClassName()}>
         {history.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[12px] text-gray-400">No assignment history</p>
+          <p className="px-4 py-6 text-center text-[12px] text-gray-400">
+            No previous occupants.
+          </p>
         ) : (
           <ul>
-            {history.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 last:border-b-0"
-              >
-                <div className="min-w-0">
-                  {item.tenantId ? (
-                    <Link
-                      href={`/admin/tenants/${item.tenantId}`}
-                      className="truncate text-[13px] font-bold leading-none text-gray-900 hover:underline"
-                    >
-                      {item.tenantName}
-                    </Link>
-                  ) : (
-                    <p className="truncate text-[13px] font-bold leading-none text-gray-900">
-                      {item.tenantName}
+            {history.map((item) => {
+              const status = (item.assignmentStatus || '').replace(/_/g, ' ');
+              const isCurrent = status === 'active' && !item.endDate;
+              return (
+                <li
+                  key={item.id}
+                  className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3.5 last:border-b-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    {item.tenantId && item.tenantExists !== false ? (
+                      <Link
+                        href={`/admin/tenants/${item.tenantId}`}
+                        className="truncate text-[13px] font-bold leading-none text-gray-900 hover:underline"
+                      >
+                        {item.tenantName}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-[13px] font-bold leading-none text-gray-900">
+                        {item.tenantName}
+                        {item.tenantExists === false && (
+                          <span className="ml-1.5 text-[10px] font-medium text-gray-400">
+                            (archived)
+                          </span>
+                        )}
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-[11px] font-normal leading-none text-gray-500">
+                      {formatShortDate(item.startDate)}
+                      {' – '}
+                      {item.endDate ? formatShortDate(item.endDate) : 'Present'}
                     </p>
-                  )}
-                  <p className="mt-1.5 text-[11px] font-normal leading-none text-gray-500">
-                    {formatShortDate(item.startDate)}
-                    {' – '}
-                    {item.endDate ? formatShortDate(item.endDate) : 'Present'}
-                  </p>
-                </div>
-                <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none text-gray-600">
-                    {item.assignmentStatus.replace(/_/g, ' ')}
-                  </span>
-                  <span className="text-[12px] font-medium leading-none text-gray-900">
-                    {formatCurrency(item.monthlyRate)}
-                  </span>
-                </div>
-              </li>
-            ))}
+                    <div className="mt-2 space-y-1 text-[11px] text-gray-600">
+                      {item.tenantPhone && (
+                        <p className="truncate">
+                          <span className="text-gray-400">Phone: </span>
+                          {item.tenantPhone}
+                        </p>
+                      )}
+                      {item.tenantEmail && (
+                        <p className="truncate">
+                          <span className="text-gray-400">Email: </span>
+                          {item.tenantEmail}
+                        </p>
+                      )}
+                      {(item.emergencyContactName || item.emergencyContactPhone) && (
+                        <p className="truncate">
+                          <span className="text-gray-400">Emergency: </span>
+                          {[item.emergencyContactName, item.emergencyContactPhone]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none ${
+                        isCurrent
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {isCurrent ? 'Current' : status || 'Past'}
+                    </span>
+                    <span className="text-[12px] font-medium leading-none text-gray-900">
+                      {formatCurrency(item.monthlyRate)}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

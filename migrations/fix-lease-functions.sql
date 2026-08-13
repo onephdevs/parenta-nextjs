@@ -136,9 +136,9 @@ BEGIN
     RETURN false;
   END IF;
   
-  -- End the current lease
+  -- End the current lease (keep history row)
   UPDATE tenant_room_assignments
-  SET assignment_status = 'past',
+  SET assignment_status = 'terminated',
       updated_at = CURRENT_TIMESTAMP
   WHERE id = v_renewal.room_assignment_id;
   

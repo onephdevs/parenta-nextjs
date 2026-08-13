@@ -16,6 +16,14 @@ import { FormField } from '@/components/forms/FormField';
 import { Alert } from '@/components/ui/Alert';
 import { Dialog } from '@/components/ui/Dialog';
 import { cn } from '@/lib/utils';
+import {
+  LeasePackageSelect,
+  LeasePackageSummary,
+  amountsFromLeasePackage,
+  useLeasePackageTemplates,
+  type LeasePackageTemplate,
+} from '@/components/features/leasing/LeasePackageFields';
+import { addMonthsToDate } from '@/components/features/tenants/profile/leaseTemplates';
 
 /** Fallback only when a building has no deposit config saved */
 const DEFAULT_MINIMUM_DEPOSIT_AMOUNT = 0;
@@ -56,8 +64,10 @@ interface TenantFormData {
   monthlyRent?: number;
   depositMonths: number;
   advanceMonths: number;
+  leasePackageTemplateId?: string;
   /**
    * Duration preset: 1–24 = months, 0 = custom (use customLeaseMonths), -1 = open-ended.
+   * Derived from lease package when selected.
    */
   leaseDurationMonths: number;
   /** Used when leaseDurationMonths === 0 (Custom). */
@@ -136,8 +146,8 @@ const SECTION_FIELDS: Record<SectionId, string[]> = {
   personal: ['firstName', 'lastName', 'email', 'phone'],
   emergency: ['emergencyContactPhone'],
   employment: ['monthlyIncome'],
-  housing: ['monthlyRent', 'depositMonths', 'advanceMonths'],
-  lease: ['leaseStartDate', 'customLeaseMonths'],
+  housing: ['monthlyRent', 'leasePackageTemplateId'],
+  lease: ['leaseStartDate', 'leasePackageTemplateId'],
   notes: [],
 };
 
@@ -160,14 +170,13 @@ const INITIAL_FORM_DATA: TenantFormData = {
   monthlyRent: undefined,
   depositMonths: 1,
   advanceMonths: 1,
+  leasePackageTemplateId: '',
   leaseDurationMonths: 12,
   customLeaseMonths: undefined,
   leaseStartDate: '',
   leaseEndDate: '',
   notes: '',
 };
-
-const LEASE_DURATION_PRESETS = [1, 3, 6, 12, 18, 24] as const;
 
 function todayLocalISO(): string {
   const d = new Date();
@@ -243,16 +252,13 @@ function getFieldError(name: string, data: TenantFormData): string {
       }
       return '';
     case 'depositMonths':
-      if (data.depositMonths == null || Number.isNaN(Number(data.depositMonths))) {
-        return 'Deposit months is required';
-      }
-      if (data.depositMonths < 0) return 'Deposit months cannot be negative';
       return '';
     case 'advanceMonths':
-      if (data.advanceMonths == null || Number.isNaN(Number(data.advanceMonths))) {
-        return 'Advance months is required';
+      return '';
+    case 'leasePackageTemplateId':
+      if (data.roomId && !data.leasePackageTemplateId) {
+        return 'Select a lease template';
       }
-      if (data.advanceMonths < 0) return 'Advance months cannot be negative';
       return '';
     case 'leaseStartDate':
       if (data.roomId && !data.leaseStartDate) {
@@ -307,6 +313,8 @@ export default function TenantForm({
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
+  const { packages: leasePackages, loading: leasePackagesLoading } =
+    useLeasePackageTemplates();
   const [overrideMonthlyRent, setOverrideMonthlyRent] = useState(false);
   const [minimumDepositAmount, setMinimumDepositAmount] = useState(
     DEFAULT_MINIMUM_DEPOSIT_AMOUNT
@@ -546,22 +554,53 @@ export default function TenantForm({
     };
   }, [formData.buildingId]);
 
+  const selectedLeasePackage: LeasePackageTemplate | null =
+    leasePackages.find((p) => p.id === formData.leasePackageTemplateId) || null;
   const computedDeposit = (formData.monthlyRent || 0) * formData.depositMonths;
   const computedAdvance = (formData.monthlyRent || 0) * formData.advanceMonths;
   const effectiveDeposit =
-    formData.roomId && computedDeposit < minimumDepositAmount
-      ? minimumDepositAmount
-      : computedDeposit;
+    formData.leasePackageTemplateId
+      ? computedDeposit
+      : formData.roomId && computedDeposit < minimumDepositAmount
+        ? minimumDepositAmount
+        : computedDeposit;
   const depositRaisedToMinimum =
-    Boolean(formData.roomId) && computedDeposit < minimumDepositAmount;
+    !formData.leasePackageTemplateId &&
+    Boolean(formData.roomId) &&
+    computedDeposit < minimumDepositAmount;
   const hasRentForTotal = Boolean(formData.monthlyRent && formData.monthlyRent > 0);
   const rentLocked = !overrideMonthlyRent && Boolean(formData.roomId);
   const rentDisabled = !overrideMonthlyRent && !formData.roomId;
   const todayISO = todayLocalISO();
-  const effectiveLeaseMonths = getEffectiveLeaseMonths(formData);
-  const isCustomDuration = formData.leaseDurationMonths === 0;
-  const isOpenEndedLease = formData.leaseDurationMonths === -1;
+  const effectiveLeaseMonths = selectedLeasePackage
+    ? selectedLeasePackage.termMonths ?? 0
+    : getEffectiveLeaseMonths(formData);
+  const isOpenEndedLease = selectedLeasePackage
+    ? selectedLeasePackage.termMonths == null
+    : formData.leaseDurationMonths === -1;
   const leaseEndDateLocked = effectiveLeaseMonths > 0;
+
+  function applyLeasePackageToForm(pkg: LeasePackageTemplate | null) {
+    if (!pkg) return;
+    const rent = Number(formData.monthlyRent) || 0;
+    const amounts = amountsFromLeasePackage(pkg, rent);
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        leasePackageTemplateId: pkg.id,
+        depositMonths: amounts.depositMonths,
+        advanceMonths: amounts.advanceMonths,
+        leaseDurationMonths: pkg.termMonths == null ? -1 : pkg.termMonths,
+        customLeaseMonths: undefined as number | undefined,
+      };
+      if (pkg.termMonths == null) {
+        next.leaseEndDate = '';
+      } else if (prev.leaseStartDate) {
+        next.leaseEndDate = addMonthsToDate(prev.leaseStartDate, pkg.termMonths);
+      }
+      return next;
+    });
+  }
 
   const collectErrors = useCallback((fields?: string[]): FormErrors => {
     const names =
@@ -765,6 +804,7 @@ export default function TenantForm({
             monthlyRate,
             depositPaid,
             advanceAmount,
+            leasePackageTemplateId: formData.leasePackageTemplateId || null,
           }),
         });
 
@@ -1372,60 +1412,27 @@ export default function TenantForm({
                   </FormField>
 
                   <FormField
-                    label="Deposit Months"
-                    htmlFor="depositMonths"
-                    required
-                    error={errors.depositMonths}
-                    hint={
-                      hasRentForTotal
-                        ? `Deposit: ₱${computedDeposit.toLocaleString()}`
-                        : 'Enter any number of months (default 1)'
-                    }
+                    label="Lease Template"
+                    htmlFor="leasePackageTemplateId"
+                    required={Boolean(formData.roomId)}
+                    error={errors.leasePackageTemplateId}
+                    hint="Deposit and advance months come from the template"
+                    className="sm:col-span-2"
                   >
-                    <Input
-                      type="number"
-                      name="depositMonths"
-                      id="depositMonths"
-                      min={0}
-                      step={0.5}
-                      value={formData.depositMonths}
-                      onChange={handleInputChange}
-                      onBlur={handleBlur}
-                      isInvalid={Boolean(errors.depositMonths)}
-                      placeholder="e.g., 1"
+                    <LeasePackageSelect
+                      id="leasePackageTemplateId"
+                      value={formData.leasePackageTemplateId || ''}
+                      packages={leasePackages}
+                      loading={leasePackagesLoading}
+                      onChange={(_id, pkg) => applyLeasePackageToForm(pkg)}
                     />
-                    {depositRaisedToMinimum && (
-                      <p className="mt-1 text-xs text-amber-700">
-                        Building minimum of ₱{minimumDepositAmount.toLocaleString()} will be charged
-                        on assign
-                      </p>
-                    )}
                   </FormField>
 
-                  <FormField
-                    label="Advance Months"
-                    htmlFor="advanceMonths"
-                    required
-                    error={errors.advanceMonths}
-                    hint={
-                      hasRentForTotal
-                        ? `Advance: ₱${computedAdvance.toLocaleString()}`
-                        : 'Enter any number of months (default 1)'
-                    }
-                  >
-                    <Input
-                      type="number"
-                      name="advanceMonths"
-                      id="advanceMonths"
-                      min={0}
-                      step={0.5}
-                      value={formData.advanceMonths}
-                      onChange={handleInputChange}
-                      onBlur={handleBlur}
-                      isInvalid={Boolean(errors.advanceMonths)}
-                      placeholder="e.g., 1"
-                    />
-                  </FormField>
+                  {selectedLeasePackage ? (
+                    <div className="sm:col-span-2">
+                      <LeasePackageSummary template={selectedLeasePackage} />
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-col justify-center rounded-md border border-gray-200 bg-gray-50 p-4">
                     {hasRentForTotal ? (
@@ -1493,54 +1500,20 @@ export default function TenantForm({
                 </FormField>
 
                 <FormField
-                  label="Lease Duration"
-                  htmlFor="leaseDurationMonths"
+                  label="Lease Template"
+                  htmlFor="leasePackageTemplateId-lease"
                   required={Boolean(formData.roomId)}
-                  hint={
-                    isCustomDuration
-                      ? 'Enter the month count in the field that appears below'
-                      : 'Presets auto-set the end date. Choose Custom for other lengths.'
-                  }
+                  error={errors.leasePackageTemplateId}
+                  hint="End date is calculated from the template term"
                 >
-                  <Select
-                    name="leaseDurationMonths"
-                    id="leaseDurationMonths"
-                    value={formData.leaseDurationMonths}
-                    onChange={handleInputChange}
-                  >
-                    {LEASE_DURATION_PRESETS.map((months) => (
-                      <option key={months} value={months}>
-                        {months} month{months !== 1 ? 's' : ''}
-                        {months === 12 ? ' (default)' : ''}
-                      </option>
-                    ))}
-                    <option value="0">Custom</option>
-                    <option value="-1">Open-ended</option>
-                  </Select>
+                  <LeasePackageSelect
+                    id="leasePackageTemplateId-lease"
+                    value={formData.leasePackageTemplateId || ''}
+                    packages={leasePackages}
+                    loading={leasePackagesLoading}
+                    onChange={(_id, pkg) => applyLeasePackageToForm(pkg)}
+                  />
                 </FormField>
-
-                {isCustomDuration ? (
-                  <FormField
-                    label="Custom Duration (months)"
-                    htmlFor="customLeaseMonths"
-                    required
-                    error={errors.customLeaseMonths}
-                    hint="End date updates from start + this many months"
-                  >
-                    <Input
-                      type="number"
-                      name="customLeaseMonths"
-                      id="customLeaseMonths"
-                      min={1}
-                      step={1}
-                      value={formData.customLeaseMonths ?? ''}
-                      onChange={handleInputChange}
-                      onBlur={handleBlur}
-                      isInvalid={Boolean(errors.customLeaseMonths)}
-                      placeholder="e.g., 9"
-                    />
-                  </FormField>
-                ) : null}
 
                 <FormField
                   label="Lease End Date"
@@ -1553,9 +1526,7 @@ export default function TenantForm({
                         ? `Auto-set for ${effectiveLeaseMonths} month${
                             effectiveLeaseMonths !== 1 ? 's' : ''
                           } from start`
-                        : isCustomDuration
-                          ? 'Enter custom months above to calculate end date'
-                          : 'Select a start date to calculate end date'
+                        : 'Select a lease template and start date'
                   }
                 >
                   <Input

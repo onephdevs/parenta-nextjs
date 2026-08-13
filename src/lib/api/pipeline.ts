@@ -76,6 +76,7 @@ interface DbCard {
   move_in_date?: Date | string | null;
   deposit_amount?: string | number | null;
   advance_amount?: string | number | null;
+  lease_package_template_id?: string | null;
   move_in_payment_status?: string | null;
   move_in_paid_at?: Date | string | null;
   move_in_payment_method?: string | null;
@@ -174,6 +175,9 @@ function mapCard(row: DbCard): PipelineCard {
     moveInDate: toIsoDateOnly(row.move_in_date),
     depositAmount: row.deposit_amount != null ? Number(row.deposit_amount) : undefined,
     advanceAmount: row.advance_amount != null ? Number(row.advance_amount) : undefined,
+    leasePackageTemplateId: row.lease_package_template_id
+      ? String(row.lease_package_template_id)
+      : undefined,
     moveInPaymentStatus:
       row.move_in_payment_status === 'paid' ? 'paid' : 'unpaid',
     moveInPaidAt: toIso(row.move_in_paid_at),
@@ -664,6 +668,12 @@ export async function convertOnboardingCardToLeaseSigned(
     );
   }
 
+  if (!card.leasePackageTemplateId) {
+    throw new Error(
+      'Select a lease template under Lease before generating a lease'
+    );
+  }
+
   const depositPaid =
     card.depositAmount != null && Number(card.depositAmount) >= 0
       ? Number(card.depositAmount)
@@ -738,23 +748,22 @@ export async function convertOnboardingCardToLeaseSigned(
       throw new Error('Room is already occupied');
     }
 
-    const tenantSnap = await client.query(
-      `SELECT first_name, last_name, email FROM tenants WHERE id = $1`,
-      [tenantId]
+    const { loadTenantContactSnapshot, markPersonAsCurrentTenant } = await import(
+      '@/lib/services/tenant-lifecycle'
     );
-    const snap = tenantSnap.rows[0];
-    const tenantNameSnapshot = snap
-      ? `${snap.first_name || ''} ${snap.last_name || ''}`.trim()
-      : `${firstName} ${lastName}`;
+    const snap = await loadTenantContactSnapshot(client, tenantId);
+    const tenantNameSnapshot =
+      snap.tenantNameSnapshot || `${firstName} ${lastName}`.trim() || null;
 
     const assignmentResult = await client.query(
       `INSERT INTO tenant_room_assignments
          (tenant_id, room_id, start_date, end_date, monthly_rate,
           deposit_paid, advance_paid, utility_deposit_paid, assignment_status,
           notes, tenant_name_snapshot, tenant_email_snapshot,
-          billing_cycle_start_day)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10, $11,
-         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31))
+          tenant_phone_snapshot, tenant_emergency_name_snapshot, tenant_emergency_phone_snapshot,
+          billing_cycle_start_day, lease_package_template_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10, $11, $12, $13, $14,
+         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31), $15)
        RETURNING id`,
       [
         tenantId,
@@ -767,28 +776,27 @@ export async function convertOnboardingCardToLeaseSigned(
         utilityDepositPaid > 0 ? utilityDepositPaid : 0,
         notes,
         tenantNameSnapshot,
-        snap?.email || email || null,
+        snap.tenantEmailSnapshot || email || null,
+        snap.tenantPhoneSnapshot,
+        snap.tenantEmergencyNameSnapshot,
+        snap.tenantEmergencyPhoneSnapshot,
+        card.leasePackageTemplateId || null,
       ]
     );
     assignmentId = String(assignmentResult.rows[0].id);
 
-    await client.query(
-      `UPDATE tenants
-       SET tenant_status = 'active',
-           move_in_date = $1,
-           lease_start_date = $2,
-           lease_end_date = $3,
-           security_deposit = COALESCE($4, security_deposit),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5`,
-      [
-        moveInDate,
-        startDate,
-        endDate,
-        depositPaid > 0 ? depositPaid : null,
-        tenantId,
-      ]
-    );
+    await markPersonAsCurrentTenant(client, {
+      tenantId,
+      moveInDate: moveInDate || startDate,
+      leaseEndDate: endDate,
+    });
+
+    if (depositPaid > 0) {
+      await client.query(
+        `UPDATE tenants SET security_deposit = COALESCE($1, security_deposit), updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [depositPaid, tenantId]
+      );
+    }
 
     await client.query(
       `UPDATE rooms
@@ -1756,7 +1764,7 @@ export async function ensureMaintenancePipelineCard(input: {
     const assigned = await updatePipelineCard(card.id, {
       assignedTo: input.assignedTo,
     });
-    return { card: assigned, created: true };
+    return { card: assigned.card, created: true };
   }
 
   return { card, created: true };
@@ -2889,6 +2897,7 @@ export interface UpdatePipelineCardData {
   moveInDate?: string | null;
   depositAmount?: number | null;
   advanceAmount?: number | null;
+  leasePackageTemplateId?: string | null;
   moveInPaymentStatus?: 'unpaid' | 'paid';
   moveInPaidAt?: string | null;
   moveInPaymentMethod?: string | null;
@@ -3012,6 +3021,10 @@ export async function updatePipelineCard(
     data.advanceAmount !== undefined
       ? data.advanceAmount
       : existing.advanceAmount ?? null;
+  const leasePackageTemplateId =
+    data.leasePackageTemplateId !== undefined
+      ? data.leasePackageTemplateId
+      : existing.leasePackageTemplateId || null;
   const moveInPaymentStatus: 'unpaid' | 'paid' =
     data.moveInPaymentStatus !== undefined
       ? data.moveInPaymentStatus
@@ -3545,8 +3558,9 @@ export async function updatePipelineCard(
        assigned_to = $30,
        deposit_parenta_txn_id = $31,
        advance_parenta_txn_id = $32,
+       lease_package_template_id = $33,
        updated_at = CURRENT_TIMESTAMP
-     WHERE id = $33`,
+     WHERE id = $34`,
     [
       title,
       firstName,
@@ -3584,6 +3598,7 @@ export async function updatePipelineCard(
       nextAssignedTo,
       depositParentaTxnId,
       advanceParentaTxnId,
+      leasePackageTemplateId,
       cardId,
     ]
   );

@@ -91,6 +91,7 @@ export const EXPENSE_CATEGORIES = [
   'fuel_diesel',
   'staff_salary',
   'refund',
+  'cash_allowance',
   'other',
 ] as const;
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
@@ -105,6 +106,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   fuel_diesel: 'Fuel / diesel',
   staff_salary: 'Staff salary',
   refund: 'Refund',
+  cash_allowance: 'Cash allowance',
   other: 'Other',
 };
 
@@ -139,8 +141,16 @@ export function normalizeExpenseCategory(raw: string | null | undefined): Expens
     food_allowance: 'food_allowance',
     fuel_diesel: 'fuel_diesel',
     staff_salary: 'staff_salary',
+    worker_wages: 'staff_salary',
+    salary: 'staff_salary',
     refund: 'refund',
     garbage_collection: 'garbage_collection',
+    utilities: 'other',
+    services: 'other',
+    supplies: 'maintenance',
+    cash_allowance: 'cash_allowance',
+    owner_draw: 'cash_allowance',
+    ima_cash_allowance: 'cash_allowance',
   };
   if (upperAliases[key]) return upperAliases[key];
   if ((EXPENSE_CATEGORIES as readonly string[]).includes(key)) {

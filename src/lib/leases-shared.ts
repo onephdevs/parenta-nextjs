@@ -38,6 +38,14 @@ export interface LeaseDetail extends LeaseListItem {
   agreementDocumentUrl: string | null;
   agreementDocumentName: string | null;
   rentDueDay: number;
+  leasePackageTemplateId: string | null;
+  leasePackageTemplateName?: string | null;
+  leasePackageTermMonths?: number | null;
+  leasePackageDepositMonths?: number | null;
+  leasePackageAdvanceMonths?: number | null;
+  leasePackageGracePeriodDays?: number | null;
+  leasePackagePenaltyType?: 'percentage' | 'flat_fee' | null;
+  leasePackagePenaltyFee?: number | null;
 }
 
 export function formatLeaseTerm(startDate: string | null, endDate: string | null): string {

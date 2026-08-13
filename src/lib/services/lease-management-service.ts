@@ -324,10 +324,11 @@ export async function completeMoveOut(
       ]
     );
     
-    // Update tenant status to inactive
+    // Update tenant: former tenant, keep person row forever
     await client.query(
       `UPDATE tenants
        SET tenant_status = 'inactive',
+           is_tenant = false,
            is_active = false,
            move_out_date = COALESCE(move_out_date, $2::date),
            updated_at = CURRENT_TIMESTAMP
@@ -335,10 +336,10 @@ export async function completeMoveOut(
       [moveout.tenant_id, data.actual_moveout_date]
     );
     
-    // Update room assignment status to past
+    // Terminate assignment (never delete — forever room history)
     await client.query(
       `UPDATE tenant_room_assignments
-       SET assignment_status = 'past',
+       SET assignment_status = 'terminated',
            end_date = COALESCE(end_date, $2::date),
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,

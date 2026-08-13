@@ -574,6 +574,7 @@ export async function convertReservationToAssignment(
     advanceAmount?: number;
     notes?: string;
     generateInvoices?: boolean;
+    leasePackageTemplateId?: string | null;
   }
 ): Promise<{ reservation: Reservation; assignmentId: string }> {
   const client = await pool.connect();
@@ -597,6 +598,18 @@ export async function convertReservationToAssignment(
       throw new Error('Only active reservations can be converted');
     }
 
+    if (!assignmentData.leasePackageTemplateId) {
+      throw new Error('Lease template is required');
+    }
+
+    const pkgCheck = await client.query(
+      `SELECT id FROM lease_package_templates WHERE id = $1 AND is_active = true LIMIT 1`,
+      [assignmentData.leasePackageTemplateId]
+    );
+    if (pkgCheck.rows.length === 0) {
+      throw new Error('Lease template not found or inactive');
+    }
+
     // Check if reservation is expired
     const expiryDate = new Date(reservation.expiry_date);
     if (expiryDate < new Date()) {
@@ -607,11 +620,12 @@ export async function convertReservationToAssignment(
     const assignmentQuery = `
       INSERT INTO tenant_room_assignments (
         tenant_id, room_id, start_date, end_date, monthly_rate, 
-        deposit_paid, assignment_status, notes, billing_cycle_start_day
+        deposit_paid, advance_paid, assignment_status, notes,
+        billing_cycle_start_day, lease_package_template_id
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, 'active', $7,
-        LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31)
+        $1, $2, $3, $4, $5, $6, $7, 'active', $8,
+        LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31), $9
       )
       RETURNING id
     `;
@@ -623,7 +637,9 @@ export async function convertReservationToAssignment(
       assignmentData.endDate?.toISOString().split('T')[0] || null,
       reservation.monthly_rate,
       assignmentData.depositPaid || reservation.reservation_deposit || 0,
+      assignmentData.advanceAmount ?? null,
       assignmentData.notes || reservation.notes || null,
+      assignmentData.leasePackageTemplateId,
     ]);
 
     const assignmentId = assignmentResult.rows[0].id;
@@ -649,13 +665,16 @@ export async function convertReservationToAssignment(
       ['occupied', reservation.room_id]
     );
 
-    // Update tenant status
+    // Update tenant status — currently renting
     await client.query(
       `UPDATE tenants 
-       SET tenant_status = 'active', 
+       SET is_tenant = true,
+           tenant_status = 'active', 
+           is_active = true,
            move_in_date = $1,
            lease_start_date = $1,
            lease_end_date = $2,
+           move_out_date = NULL,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $3`,
       [

@@ -13,8 +13,6 @@ import {
 } from './property-utils';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
-const TEAL = '#39CCCC';
-const SELECTED_BG = '#E2E5F7';
 
 interface PropertyListCardProps {
   building: PropertyListBuilding;
@@ -67,15 +65,14 @@ export default function PropertyListCard({
       className={cn(
         'overflow-hidden rounded-xl border transition-shadow',
         isSelected
-          ? 'border-transparent shadow-sm ring-1 ring-[#c5cae8]'
+          ? 'border-gray-900 bg-gray-50 shadow-sm'
           : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
       )}
-      style={isSelected ? { backgroundColor: SELECTED_BG } : undefined}
     >
       <div
         className={cn(
           'flex items-center gap-2 px-4 py-3',
-          isSelected && 'border-l-[3px] border-l-blue-500'
+          isSelected && 'border-l-[3px] border-l-gray-900'
         )}
       >
         <button
@@ -86,7 +83,7 @@ export default function PropertyListCard({
           }}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
-          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded bg-white/80">
+          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded bg-gray-100">
             {thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={thumb} alt="" className="h-full w-full object-cover" />
@@ -102,13 +99,13 @@ export default function PropertyListCard({
               {building.name}, {address}
             </p>
 
-            <div className="mt-2 flex items-center gap-3 text-[12px] font-normal leading-none text-gray-700">
+            <div className="mt-2 flex items-center gap-3 text-[12px] font-normal leading-none text-gray-600">
               <span className="inline-flex items-center gap-1">
-                <Home className="h-3.5 w-3.5" style={{ color: TEAL }} />
+                <Home className="h-3.5 w-3.5 text-gray-900" />
                 {building.totalUnits || 0} Rooms
               </span>
               <span className="inline-flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" style={{ color: TEAL }} />
+                <Users className="h-3.5 w-3.5 text-gray-900" />
                 {building.occupiedUnits || 0} Tenants
               </span>
             </div>
@@ -123,7 +120,7 @@ export default function PropertyListCard({
             onSelect();
             onToggleExpand();
           }}
-          className="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-white/60 hover:text-gray-700"
+          className="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
         >
           <svg
             className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-180')}
@@ -137,7 +134,7 @@ export default function PropertyListCard({
       </div>
 
       {isExpanded && (
-        <div className="bg-white px-4">
+        <div className="border-t border-gray-100 bg-white">
           {roomsLoading && (
             <p className="py-3 text-center text-xs text-gray-500">Loading rooms…</p>
           )}
@@ -150,13 +147,14 @@ export default function PropertyListCard({
                 ? `${room.tenant.firstName} ${room.tenant.lastName}`.trim()
                 : 'No tenants';
               const area = formatArea(room.squareFootage) ?? '—';
+              const isActive = activeRoomId === room.id;
 
               return (
                 <div
                   key={room.id}
                   className={cn(
-                    'flex w-full items-start gap-2 border-b border-gray-100 py-3 last:border-b-0 transition-colors',
-                    activeRoomId === room.id ? 'bg-[#E2E5F7]/70' : 'hover:bg-gray-50'
+                    'flex w-full items-center gap-2 border-b border-gray-100 px-4 py-3 last:border-b-0 transition-colors',
+                    isActive ? 'bg-gray-100' : 'hover:bg-gray-50'
                   )}
                   style={{ fontFamily: LATO }}
                 >
@@ -166,7 +164,7 @@ export default function PropertyListCard({
                       onSelect();
                       onSelectRoom(room.id);
                     }}
-                    className="flex min-w-0 flex-1 items-start justify-between gap-3 px-0 text-left"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-[12px] font-bold leading-none text-gray-900">
@@ -190,7 +188,7 @@ export default function PropertyListCard({
                       onSelect();
                       onViewRoom(room.id);
                     }}
-                    className="mt-0.5 flex-shrink-0 rounded px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    className="inline-flex h-8 flex-shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-[11px] font-semibold text-gray-900 shadow-sm hover:border-gray-900 hover:bg-gray-900 hover:text-white"
                   >
                     View
                   </button>

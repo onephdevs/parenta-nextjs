@@ -189,6 +189,12 @@ export async function PATCH(request: Request, context: RouteContext) {
               : body.advanceAmount === null || body.advanceAmount === ''
                 ? null
                 : Number(body.advanceAmount),
+          leasePackageTemplateId:
+            body.leasePackageTemplateId === undefined
+              ? undefined
+              : body.leasePackageTemplateId === null || body.leasePackageTemplateId === ''
+                ? null
+                : String(body.leasePackageTemplateId),
           moveInPaymentStatus:
             body.moveInPaymentStatus === 'paid' || body.moveInPaymentStatus === 'unpaid'
               ? body.moveInPaymentStatus

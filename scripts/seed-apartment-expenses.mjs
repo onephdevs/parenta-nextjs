@@ -3,6 +3,9 @@
  * Import monthly operating expenses (Jun 16 – Jul 15 2026)
  * for APARTMENT-1 BALIBAGO and APRTMENT-2 VILLASOL.
  *
+ * Matches spreadsheet Total Expenses = ₱110,353
+ * (Ima Cash Allowance is a post-expense cash draw, not an expense.)
+ *
  * Usage: node scripts/seed-apartment-expenses.mjs
  */
 import { config } from 'dotenv';
@@ -32,165 +35,38 @@ const DEFAULT_DATE = '2026-06-30';
 
 /** @type {ExpenseRow[]} */
 const EXPENSES = [
-  // Cleaning & maintenance (shared) — 5 weeks
-  {
-    date: '2026-06-16',
-    description: 'Cleaning & Maintenance Villasol & Balibago',
-    amount: 600,
-    category: 'cleaning',
-    building: 'both',
-  },
-  {
-    date: '2026-06-22',
-    description: 'Cleaning & Maintenance Villasol & Balibago',
-    amount: 600,
-    category: 'cleaning',
-    building: 'both',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Cleaning & Maintenance Villasol & Balibago',
-    amount: 600,
-    category: 'cleaning',
-    building: 'both',
-  },
-  {
-    date: '2026-07-07',
-    description: 'Cleaning & Maintenance Villasol & Balibago',
-    amount: 600,
-    category: 'cleaning',
-    building: 'both',
-  },
+  { date: '2026-06-16', description: 'Cleaning & Maintenance Villasol & Balibago', amount: 600, category: 'cleaning', building: 'both' },
+  { date: '2026-06-22', description: 'Cleaning & Maintenance Villasol & Balibago', amount: 600, category: 'cleaning', building: 'both' },
+  { date: '2026-06-30', description: 'Cleaning & Maintenance Villasol & Balibago', amount: 600, category: 'cleaning', building: 'both' },
+  { date: '2026-07-07', description: 'Cleaning & Maintenance Villasol & Balibago', amount: 600, category: 'cleaning', building: 'both' },
+  { date: '2026-07-15', description: 'Cleaning & Maintenance Villasol & Balibago', amount: 600, category: 'cleaning', building: 'both' },
+  { date: '2026-06-30', description: 'Garbage Collector month of June Balibago', amount: 1500, category: 'garbage_collection', building: 'apt1', vendor: 'Garbage collector' },
+  { date: '2026-06-30', description: 'Garbage Collector month of June Villasol', amount: 1000, category: 'garbage_collection', building: 'apt2', vendor: 'Garbage collector' },
+  { date: '2026-06-30', description: 'Food Allowance for Cleaner and Me', amount: 1000, category: 'food_allowance', building: 'both' },
+  { date: '2026-06-30', description: 'Pick Up Diesel for apartment maintenance', amount: 5000, category: 'fuel_diesel', building: 'both', vendor: 'Diesel' },
+  { date: '2026-06-30', description: 'Electric Bill Aprt-1 Balibago - June', amount: 32046, category: 'other', building: 'apt1', vendor: 'Electric utility' },
+  { date: '2026-06-30', description: 'Electric Bill Aprt-2 Villasol - June', amount: 15435, category: 'other', building: 'apt2', vendor: 'Electric utility' },
+  { date: '2026-06-30', description: 'Water Bill Aprt-1 Balibago - June', amount: 6578, category: 'other', building: 'apt1', vendor: 'Water utility' },
+  { date: '2026-06-30', description: 'Water Bill Aprt-2 Villasol - June', amount: 2752, category: 'other', building: 'apt2', vendor: 'Water utility' },
+  { date: '2026-06-30', description: 'Salary for June 2026', amount: 15000, category: 'staff_salary', building: 'both' },
+  { date: '2026-06-30', description: 'Refund Aprt-1 Unit 5 moved out', amount: 8426, category: 'refund', building: 'apt1', room: 'Unit 5' },
+  { date: '2026-06-30', description: 'Surveyor Villasol', amount: 15000, category: 'other', building: 'apt2', vendor: 'Surveyor' },
+  { date: '2026-06-30', description: 'Surveyor Lunch', amount: 1242, category: 'food_allowance', building: 'apt2' },
+  { date: '2026-06-30', description: 'Secretary Food', amount: 1596, category: 'food_allowance', building: 'both' },
+  { date: '2026-06-30', description: '2pcs PVC', amount: 230, category: 'maintenance', building: 'both' },
+  { date: '2026-06-30', description: '3pcs Bulb', amount: 268, category: 'maintenance', building: 'both' },
+  { date: '2026-06-30', description: '1pc Gripo', amount: 280, category: 'maintenance', building: 'both' },
+];
+
+/** Not part of Total Expenses (110,353) — cash waterfall draw only */
+const CASH_ALLOWANCES = [
   {
     date: '2026-07-15',
-    description: 'Cleaning & Maintenance Villasol & Balibago',
-    amount: 600,
-    category: 'cleaning',
+    description: 'Ima Cash Allowance',
+    amount: 20000,
+    category: 'cash_allowance',
     building: 'both',
-  },
-
-  {
-    date: '2026-06-30',
-    description: 'Garbage Collector month of June Balibago',
-    amount: 1500,
-    category: 'garbage_collection',
-    building: 'apt1',
-    vendor: 'Garbage collector',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Garbage Collector month of June Villasol',
-    amount: 1000,
-    category: 'garbage_collection',
-    building: 'apt2',
-    vendor: 'Garbage collector',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Food Allowance for Cleaner and Me',
-    amount: 1000,
-    category: 'other',
-    building: 'both',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Pick Up Diesel for apartment maintenance',
-    amount: 5000,
-    category: 'maintenance',
-    building: 'both',
-    vendor: 'Diesel',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Electric Bill Aprt-1 Balibago - June',
-    amount: 32046,
-    category: 'utilities',
-    building: 'apt1',
-    vendor: 'Electric utility',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Electric Bill Aprt-2 Villasol - June',
-    amount: 15435,
-    category: 'utilities',
-    building: 'apt2',
-    vendor: 'Electric utility',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Water Bill Aprt-1 Balibago - June',
-    amount: 6578,
-    category: 'utilities',
-    building: 'apt1',
-    vendor: 'Water utility',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Water Bill Aprt-2 Villasol - June',
-    amount: 2752,
-    category: 'utilities',
-    building: 'apt2',
-    vendor: 'Water utility',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Salary for June 2026',
-    amount: 15000,
-    category: 'worker_wages',
-    building: 'both',
-  },
-
-  // Other expenses
-  {
-    date: '2026-06-30',
-    description: 'Refund Aprt-1 Unit 5 moved out',
-    amount: 8426,
-    category: 'other',
-    building: 'apt1',
-    room: 'Unit 5',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Surveyor Villasol',
-    amount: 15000,
-    category: 'services',
-    building: 'apt2',
-    vendor: 'Surveyor',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Surveyor Lunch',
-    amount: 1242,
-    category: 'other',
-    building: 'apt2',
-  },
-  {
-    date: '2026-06-30',
-    description: 'Secretary Food',
-    amount: 1596,
-    category: 'other',
-    building: 'both',
-  },
-  {
-    date: '2026-06-30',
-    description: '2pcs PVC',
-    amount: 230,
-    category: 'supplies',
-    building: 'both',
-  },
-  {
-    date: '2026-06-30',
-    description: '3pcs Bulb',
-    amount: 268,
-    category: 'supplies',
-    building: 'both',
-  },
-  {
-    date: '2026-06-30',
-    description: '1pc Gripo',
-    amount: 280,
-    category: 'supplies',
-    building: 'both',
+    vendor: 'Ima',
   },
 ];
 
@@ -295,11 +171,7 @@ try {
         : row.building === 'apt2'
           ? [{ id: apt2.id, label: 'Apt2' }]
           : row.building === 'both'
-            ? [
-                // Shared costs recorded once under Apt1 with note, amount full
-                // (keeps total spend correct without double-counting)
-                { id: apt1.id, label: 'shared→Apt1' },
-              ]
+            ? [{ id: apt1.id, label: 'shared→Apt1' }]
             : [{ id: null, label: 'unassigned' }];
 
     for (const target of targets) {
@@ -322,6 +194,17 @@ try {
       } else {
         skipped += 1;
       }
+    }
+  }
+
+  for (const row of CASH_ALLOWANCES) {
+    const description = `${row.description} (shared Balibago & Villasol)`;
+    const result = await insertExpense(row, apt1.id, null, description, row.amount);
+    if (result === 'created') {
+      created += 1;
+      console.log(`  + ${row.date} ₱${row.amount} ${description} [cash allowance]`);
+    } else {
+      skipped += 1;
     }
   }
 

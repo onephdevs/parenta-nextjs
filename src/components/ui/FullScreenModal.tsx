@@ -45,13 +45,13 @@ export default function FullScreenModal({
     <div className="pointer-events-none fixed inset-0 z-[100] h-[100dvh] w-screen overflow-hidden">
       {/* Dim overlay — only over the main content area on desktop */}
       <div
-        className="pointer-events-auto absolute inset-0 bg-gray-900/50 lg:left-64"
+        className="pointer-events-auto absolute inset-0 bg-gray-900/50 lg:left-[var(--admin-sidebar-width,16rem)]"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel: full viewport height; inset past sidebar (w-64) on lg+ */}
-      <div className="pointer-events-auto absolute inset-y-0 bottom-0 left-0 right-0 flex h-[100dvh] max-h-[100dvh] flex-col bg-white text-gray-900 shadow-xl lg:left-64">
+      {/* Panel: full viewport height; inset past sidebar on lg+ */}
+      <div className="pointer-events-auto absolute inset-y-0 bottom-0 left-0 right-0 flex h-[100dvh] max-h-[100dvh] flex-col bg-white text-gray-900 shadow-xl lg:left-[var(--admin-sidebar-width,16rem)]">
         {/* Header */}
         <div className="z-10 flex-shrink-0 border-b border-gray-200 bg-white px-6 py-4">
           <div className="flex items-center justify-between gap-4">

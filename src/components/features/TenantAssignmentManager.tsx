@@ -15,6 +15,13 @@ import { FormField } from '@/components/forms/FormField';
 import AddOccupantModal from './AddOccupantModal';
 import { Plus, UserPlus, X, History } from 'lucide-react';
 import Link from 'next/link';
+import {
+  LeasePackageSelect,
+  LeasePackageSummary,
+  amountsFromLeasePackage,
+  useLeasePackageTemplates,
+} from '@/components/features/leasing/LeasePackageFields';
+import { addMonthsToDate } from '@/components/features/tenants/profile/leaseTemplates';
 
 interface Tenant {
   id: string;
@@ -102,12 +109,18 @@ export default function TenantAssignmentManager({
   const [assignFormData, setAssignFormData] = useState({
     tenantId: '',
     startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
     monthlyRate: roomMonthlyRate.toString(),
     depositPaid: '',
     advanceAmount: '',
     utilityDepositAmount: '',
     notes: '',
+    leasePackageTemplateId: '',
   });
+  const { packages: leasePackages, loading: leasePackagesLoading } =
+    useLeasePackageTemplates();
+  const selectedLeasePackage =
+    leasePackages.find((p) => p.id === assignFormData.leasePackageTemplateId) || null;
   const [buildingConfig, setBuildingConfig] = useState<any>(null);
   const [requiredDeposit, setRequiredDeposit] = useState(0);
   const [requiredAdvance, setRequiredAdvance] = useState(0);
@@ -296,6 +309,12 @@ export default function TenantAssignmentManager({
     e.preventDefault();
     setLoading(true);
 
+    if (!assignFormData.leasePackageTemplateId) {
+      showError('Select a lease template');
+      setLoading(false);
+      return;
+    }
+
     const currentRequiredDeposit = calculateRequiredDeposit();
     if (currentRequiredDeposit > 0) {
       const depositPaid = assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : 0;
@@ -342,6 +361,7 @@ export default function TenantAssignmentManager({
         body: JSON.stringify({
           tenantId: assignFormData.tenantId,
           startDate: assignFormData.startDate,
+          endDate: assignFormData.endDate || null,
           monthlyRate: parseFloat(assignFormData.monthlyRate),
           depositPaid: assignFormData.depositPaid ? parseFloat(assignFormData.depositPaid) : undefined,
           advanceAmount: assignFormData.advanceAmount ? parseFloat(assignFormData.advanceAmount) : undefined,
@@ -349,6 +369,7 @@ export default function TenantAssignmentManager({
             ? parseFloat(assignFormData.utilityDepositAmount)
             : undefined,
           notes: assignFormData.notes,
+          leasePackageTemplateId: assignFormData.leasePackageTemplateId || null,
         }),
       });
 
@@ -360,11 +381,13 @@ export default function TenantAssignmentManager({
         setAssignFormData({
           tenantId: '',
           startDate: new Date().toISOString().split('T')[0],
+          endDate: '',
           monthlyRate: roomMonthlyRate.toString(),
           depositPaid: '',
           advanceAmount: '',
           utilityDepositAmount: '',
           notes: '',
+          leasePackageTemplateId: '',
         });
         onAssignmentChange();
       } else {
@@ -693,10 +716,52 @@ export default function TenantAssignmentManager({
               type="number"
               step="0.01"
               value={assignFormData.monthlyRate}
-              onChange={(e) => setAssignFormData({ ...assignFormData, monthlyRate: e.target.value })}
+              onChange={(e) => {
+                const monthlyRate = e.target.value;
+                setAssignFormData((prev) => {
+                  const next = { ...prev, monthlyRate };
+                  const pkg = leasePackages.find((p) => p.id === prev.leasePackageTemplateId);
+                  if (pkg) {
+                    const amounts = amountsFromLeasePackage(pkg, Number(monthlyRate) || 0);
+                    next.depositPaid =
+                      amounts.depositAmount > 0 ? String(amounts.depositAmount) : '';
+                    next.advanceAmount =
+                      amounts.advanceAmount > 0 ? String(amounts.advanceAmount) : '';
+                  }
+                  return next;
+                });
+              }}
               required
             />
           </FormField>
+
+          <FormField htmlFor="leasePackageTemplateId" label="Lease Template" required>
+            <LeasePackageSelect
+              id="leasePackageTemplateId"
+              value={assignFormData.leasePackageTemplateId}
+              packages={leasePackages}
+              loading={leasePackagesLoading}
+              onChange={(id, pkg) => {
+                const rent = Number(assignFormData.monthlyRate) || roomMonthlyRate;
+                const amounts = amountsFromLeasePackage(pkg, rent);
+                setAssignFormData((prev) => ({
+                  ...prev,
+                  leasePackageTemplateId: id,
+                  depositPaid: amounts.depositAmount > 0 ? String(amounts.depositAmount) : '',
+                  advanceAmount: amounts.advanceAmount > 0 ? String(amounts.advanceAmount) : '',
+                  endDate:
+                    pkg?.termMonths != null && prev.startDate
+                      ? addMonthsToDate(prev.startDate, pkg.termMonths)
+                      : '',
+                }));
+                if (pkg) {
+                  setRequiredDeposit(amounts.depositAmount);
+                  setRequiredAdvance(amounts.advanceAmount);
+                }
+              }}
+            />
+          </FormField>
+          {selectedLeasePackage ? <LeasePackageSummary template={selectedLeasePackage} /> : null}
 
           <FormField
             htmlFor="depositPaid"
@@ -733,11 +798,15 @@ export default function TenantAssignmentManager({
             />
           </FormField>
 
-          {buildingConfig && requiredAdvance > 0 && (
+          {(selectedLeasePackage || (buildingConfig && requiredAdvance > 0)) && (
             <FormField
               htmlFor="advanceAmount"
-              label="Advance Payment (₱) (Optional)"
-              hint={`Min: ₱${requiredAdvance.toLocaleString()}. Any advance rent payment made at the start of the lease.`}
+              label="Advance Payment (₱)"
+              hint={
+                requiredAdvance > 0
+                  ? `From template/building: ₱${requiredAdvance.toLocaleString()}.`
+                  : 'Advance rent from the selected lease template.'
+              }
             >
               <Input
                 id="advanceAmount"
@@ -812,7 +881,7 @@ export default function TenantAssignmentManager({
                 type="date"
                 value={unassignFormData.endDate}
                 onChange={(e) => setUnassignFormData({ ...unassignFormData, endDate: e.target.value })}
-                min={unassignFormData.startDate || '2000-01-01'}
+                min={currentTenant?.start_date?.slice(0, 10) || '2000-01-01'}
                 max="2099-12-31"
                 required
                 style={{ colorScheme: 'light' }}

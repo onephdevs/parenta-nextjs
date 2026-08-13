@@ -54,14 +54,16 @@ const APT1 = [
     deposit: 9600,
     utilityDeposit: 1000,
     depositPaidOn: '2026-07-13',
+    electric: 195,
+    water: 194,
     notes: 'New tenant — 1mo advance + 2mo deposit + utility deposit',
   },
   { room: 'Unit 4', rentDue: '2026-06-28', rentPaid: 4800, rentPaidOn: '2026-07-01', electric: 1534, water: 284 },
-  { room: 'Unit 5', vacant: true, notes: 'Vacant — moved out with refund' },
+  { room: 'Unit 5', vacant: true, electric: 1630, water: 194, notes: 'Vacant — moved out with refund' },
   { room: 'Unit 6', rentDue: '2026-07-01', rentPaid: 4800, rentPaidOn: '2026-07-05', electric: 1498, water: 194 },
-  { room: 'Unit 7', rentDue: '2026-06-22', rentPaid: 3000, rentPaidOn: '2026-06-23', electric: 713, water: 344 },
-  { room: 'Unit 8', vacant: true },
-  { room: 'Unit 9', vacant: true },
+  { room: 'Unit 7', rentDue: '2026-06-22', rentPaid: 3000, rentPaidOn: '2026-06-23', electric: 719, water: 344 },
+  { room: 'Unit 8', vacant: true, electric: 43, water: 194 },
+  { room: 'Unit 9', vacant: true, electric: 179, water: 194 },
   { room: 'Unit 10', rentDue: '2026-07-01', rentPaid: 4800, rentPaidOn: '2026-07-05', electric: 599, water: 194 },
   { room: 'Unit 11', rentDue: '2026-07-08', rentPaid: 4800, rentPaidOn: '2026-07-11', electric: 2350, water: 224 },
   { room: 'Unit 12', rentDue: '2026-07-08', rentPaid: 4800, rentPaidOn: '2026-07-10', electric: 647, water: 284 },
@@ -69,7 +71,7 @@ const APT1 = [
   { room: 'Unit 14', rentDue: '2026-06-23', rentPaid: 4800, rentPaidOn: '2026-06-24', electric: 1030, water: 194 },
   { room: 'Unit 15', rentDue: '2026-06-17', rentPaid: 4800, rentPaidOn: '2026-06-16', electric: 1570, water: 194 },
   { room: 'Unit 16', rentDue: '2026-07-04', rentPaid: 4800, rentPaidOn: '2026-07-05', electric: 215, water: 284 },
-  { room: 'Unit 17', rentDue: '2026-06-18', rentPaid: 4800, rentPaidOn: '2026-06-21', electric: 298, water: 224 },
+  { room: 'Unit 17', rentDue: '2026-06-18', rentPaid: 4800, rentPaidOn: '2026-06-21', electric: 299, water: 224 },
   { room: 'Unit 18', rentDue: '2026-07-04', rentPaid: 4800, rentPaidOn: '2026-07-06', electric: 623, water: 194 },
   {
     room: 'Unit 19',
@@ -77,12 +79,14 @@ const APT1 = [
     deposit: 9600,
     utilityDeposit: 1000,
     depositPaidOn: '2026-06-29',
+    electric: 175,
+    water: 194,
     notes: 'New tenant — 1mo advance + 2mo deposit + utility deposit',
   },
   { room: 'Unit 20', rentDue: '2026-07-05', rentPaid: 4800, rentPaidOn: '2026-07-05', electric: 491, water: 314 },
-  { room: 'Unit 21', rentDue: '2026-07-08', rentPaid: 4800, rentPaidOn: '2026-07-10', electric: 478, water: 354 },
+  { room: 'Unit 21', rentDue: '2026-07-08', rentPaid: 4800, rentPaidOn: '2026-07-10', electric: 479, water: 354 },
   { room: 'Unit 22', rentDue: '2026-07-06', rentPaid: 4800, rentPaidOn: '2026-07-05', electric: 203, water: 294 },
-  { room: 'Unit 23', rentDue: '2026-06-30', rentPaid: 4800, rentPaidOn: '2026-07-01', electric: 3734, water: 334 },
+  { room: 'Unit 23', rentDue: '2026-06-30', rentPaid: 4800, rentPaidOn: '2026-07-01', electric: 3754, water: 334 },
   { room: 'Unit 24', rentDue: '2026-06-19', rentPaid: 4800, rentPaidOn: '2026-06-21', electric: 155, water: 294 },
   { room: 'Unit 25', rentDue: '2026-06-22', rentPaid: 4800, rentPaidOn: '2026-06-23', electric: 1174, water: 294 },
   {
@@ -90,21 +94,24 @@ const APT1 = [
     rentDue: '2026-06-17',
     rentPaid: 4800,
     rentPaidOn: '2026-06-26',
-    electric: 835,
+    electric: 2590,
+    water: 354,
     electricPaid: false,
-    notes: 'Electric unpaid 835',
+    notes: 'Electric unpaid 2590',
   },
   {
     room: 'Unit 27',
     rentDue: '2026-07-04',
     electric: 275,
     water: 194,
+    waterPaid: false,
     notes: 'Used all deposit till Aug 4 — no rent cash payment this period',
   },
-  { room: 'Unit 28', vacant: true },
+  { room: 'Unit 28', vacant: true, electric: 43 },
   { room: 'Unit 29', rentDue: '2026-06-29', rentPaid: 4800, rentPaidOn: '2026-07-09', electric: 1582, water: 294 },
-  { room: 'Unit 30', vacant: true },
-  { room: 'Store', rentDue: '2026-07-08', rentPaid: 3500, rentPaidOn: '2026-07-08', electric: 1738, water: 194 },
+  { room: 'Unit 30', vacant: true, electric: 43 },
+  { room: 'Store', rentDue: '2026-07-08', rentPaid: 3500, rentPaidOn: '2026-07-08', electric: 1736, water: 194 },
+  { room: 'Admin', vacant: true, electric: 2370, water: 1544, notes: 'Common / admin meters' },
 ];
 
 /** @type {LedgerRow[]} */
@@ -126,6 +133,8 @@ const APT2 = [
     depositPaidOn: '2026-07-14',
     electric: 144,
     water: 152,
+    electricPaid: false,
+    waterPaid: false,
     notes: 'New tenant — 1mo advance + 1mo deposit + utility deposit',
   },
 ];
@@ -260,7 +269,7 @@ async function insertUtilityBill({
        billing_period_start, billing_period_end, due_date,
        amount, bill_status, allocation_method, notes
      ) VALUES (
-       $1,$2,$3,$4,$5::date,$6::date,$7::date,$8,$9,'per_unit_metered',$10
+       $1,$2,$3,$4,$5::date,$6::date,$7::date,$8,$9,'SUBMETERED',$10
      )`,
     [
       buildingId,
@@ -446,9 +455,49 @@ async function importBuilding(label, buildingPattern, rows) {
   );
 }
 
+async function insertHardwareCheque() {
+  const building = await findBuilding('%apartment-1%');
+  if (!building) return { skipped: true, reason: 'no building' };
+  const room = await findRoom(building.id, 'Store');
+  if (!room) return { skipped: true, reason: 'no store' };
+  const assignment = await findActiveAssignment(room.id);
+  if (!assignment) return { skipped: true, reason: 'no tenant' };
+
+  const exists = await client.query(
+    `SELECT id FROM payments
+     WHERE tenant_id = $1 AND amount = 25000
+       AND LOWER(COALESCE(payment_method,'')) IN ('cheque','check')
+       AND payment_date = '2026-07-15'::date
+       AND notes ILIKE $2
+     LIMIT 1`,
+    [assignment.tenant_id, `%${NOTE_TAG}%`]
+  );
+  if (exists.rows.length) return { skipped: true };
+
+  await client.query(
+    `INSERT INTO payments (
+       tenant_id, assignment_id, room_id, amount, payment_type, payment_method,
+       payment_date, due_date, payment_status, notes
+     ) VALUES ($1,$2,$3,25000,'rent','cheque','2026-07-15'::date,'2026-07-15'::date,'paid',$4)`,
+    [
+      assignment.tenant_id,
+      assignment.assignment_id,
+      room.id,
+      `Hardware Rental Fee July 15 Cheq [${NOTE_TAG}]`,
+    ]
+  );
+  return { created: true };
+}
+
 try {
   await importBuilding('APT1', '%apartment-1%', APT1);
   await importBuilding('APT2', '%villasol%', APT2);
+  const cheque = await insertHardwareCheque();
+  console.log(
+    cheque.created
+      ? 'Hardware rental cheque ₱25000 recorded.'
+      : `Hardware rental cheque skipped (${cheque.reason || 'already exists'}).`
+  );
   console.log('\nLedger import complete.');
 } catch (err) {
   console.error(err);

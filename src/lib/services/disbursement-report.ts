@@ -1,11 +1,11 @@
 /**
- * Disbursement / cash-flow waterfall report.
+ * Disbursement / cash-flow waterfall report (apartment records).
  *
- * Total Collection
- * − Expenses
- * = Cash Allowance
- * + Cash for Deposit
- * + Cheque payments
+ * Total Collection (cash, incl. deposits; excl. cheques)
+ * − Expenses (operating)
+ * − Cash allowance (e.g. Ima)
+ * = Cash for deposit
+ * + Cheque payments (e.g. hardware)
  * = Grand Total
  */
 
@@ -19,7 +19,11 @@ import {
 export interface DisbursementWaterfall {
   totalCollection: number;
   expenses: number;
-  cashAllowance: number;
+  /** Collection − expenses (before Ima / owner draw) */
+  afterExpenses: number;
+  /** Owner draw such as Ima Cash Allowance */
+  imaCashAllowance: number;
+  /** Collection − expenses − Ima (= Excel “CASH For Deposit”) */
   cashForDeposit: number;
   chequePayments: number;
   grandTotal: number;
@@ -66,15 +70,13 @@ export async function generateDisbursementReport(params: {
       ? [startDate, endDate, buildingId]
       : [startDate, endDate];
 
-    // Total Collection: paid non-deposit payments that are NOT cheque
-    // (cash + bank/gcash/other operating collections)
+    // Total Collection: all paid non-cheque payments (rent, advance, utility, deposit)
     const collectionResult = await client.query(
       `
       SELECT COALESCE(SUM(p.amount), 0) AS total
       FROM payments p
       WHERE p.payment_date BETWEEN $1 AND $2
         AND p.payment_status IN ('paid', 'completed', 'confirmed')
-        AND COALESCE(p.payment_type, '') NOT IN ('deposit')
         AND LOWER(COALESCE(p.payment_method, 'cash')) NOT IN ('cheque', 'check')
         AND ${PAYMENT_IS_REVENUE_UNIT}
         ${buildingFilterPayments}
@@ -88,21 +90,20 @@ export async function generateDisbursementReport(params: {
       FROM expenses e
       WHERE e.expense_date BETWEEN $1 AND $2
         AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+        AND COALESCE(e.category, 'other') NOT IN ('cash_allowance', 'owner_draw')
         ${buildingFilterExpenses}
       `,
       paramsBase
     );
 
-    const depositCashResult = await client.query(
+    const cashAllowanceResult = await client.query(
       `
-      SELECT COALESCE(SUM(p.amount), 0) AS total
-      FROM payments p
-      WHERE p.payment_date BETWEEN $1 AND $2
-        AND p.payment_status IN ('paid', 'completed', 'confirmed')
-        AND p.payment_type = 'deposit'
-        AND LOWER(COALESCE(p.payment_method, 'cash')) = 'cash'
-        AND ${PAYMENT_IS_REVENUE_UNIT}
-        ${buildingFilterPayments}
+      SELECT COALESCE(SUM(e.amount), 0) AS total
+      FROM expenses e
+      WHERE e.expense_date BETWEEN $1 AND $2
+        AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+        AND COALESCE(e.category, 'other') IN ('cash_allowance', 'owner_draw')
+        ${buildingFilterExpenses}
       `,
       paramsBase
     );
@@ -122,10 +123,11 @@ export async function generateDisbursementReport(params: {
 
     const totalCollection = num(collectionResult.rows[0]?.total);
     const expenses = num(expensesResult.rows[0]?.total);
-    const cashAllowance = num(totalCollection - expenses);
-    const cashForDeposit = num(depositCashResult.rows[0]?.total);
+    const imaCashAllowance = num(cashAllowanceResult.rows[0]?.total);
+    const afterExpenses = num(totalCollection - expenses);
+    const cashForDeposit = num(afterExpenses - imaCashAllowance);
     const chequePayments = num(chequeResult.rows[0]?.total);
-    const grandTotal = num(cashAllowance + cashForDeposit + chequePayments);
+    const grandTotal = num(cashForDeposit + chequePayments);
 
     const byMethod = await client.query(
       `
@@ -206,7 +208,8 @@ export async function generateDisbursementReport(params: {
       waterfall: {
         totalCollection,
         expenses,
-        cashAllowance,
+        afterExpenses,
+        imaCashAllowance,
         cashForDeposit,
         chequePayments,
         grandTotal,

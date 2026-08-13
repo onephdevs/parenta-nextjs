@@ -118,6 +118,8 @@ export interface Tenant {
   leaseEndDate?: Date;
   securityDeposit?: number;
   tenantStatus: 'active' | 'inactive' | 'pending' | 'terminated';
+  /** True while person currently rents a unit; false for pending/former. */
+  isTenant?: boolean;
   notes?: string;
   isActive: boolean;
   createdAt: Date;
@@ -169,6 +171,7 @@ export interface DatabaseTenant {
   lease_end_date?: Date;
   security_deposit?: number;
   tenant_status: 'active' | 'inactive' | 'pending' | 'terminated';
+  is_tenant?: boolean;
   notes?: string;
   is_active: boolean;
   created_at: Date;
@@ -1044,6 +1047,8 @@ export interface PipelineCard {
   depositAmount?: number;
   /** Move-in advance rent amount collected before Generate lease */
   advanceAmount?: number;
+  /** Selected commercial lease package for onboarding → assignment */
+  leasePackageTemplateId?: string;
   moveInPaymentStatus?: 'unpaid' | 'paid';
   moveInPaidAt?: string;
   moveInPaymentMethod?: string;

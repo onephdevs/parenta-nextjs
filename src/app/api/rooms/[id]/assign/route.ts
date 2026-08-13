@@ -32,7 +32,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       depositPaid, 
       advanceAmount,
       utilityDepositAmount,
-      notes
+      notes,
+      leasePackageTemplateId,
     } = await request.json();
     
     // Validation
@@ -46,6 +47,38 @@ export async function POST(request: Request, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    if (!leasePackageTemplateId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Lease template is required',
+          details: 'Select a lease package template before assigning a tenant',
+        },
+        { status: 400 }
+      );
+    }
+
+    let packageDepositMonths: number | null | undefined;
+    let packageAdvanceMonths: number | null | undefined;
+    const pkgResult = await client.query(
+      `SELECT deposit_months, advance_months
+       FROM lease_package_templates
+       WHERE id = $1 AND is_active = true
+       LIMIT 1`,
+      [leasePackageTemplateId]
+    );
+    if (pkgResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Lease template not found or inactive' },
+        { status: 400 }
+      );
+    }
+    packageDepositMonths =
+      pkgResult.rows[0].deposit_months == null
+        ? null
+        : Number(pkgResult.rows[0].deposit_months);
+    packageAdvanceMonths = Number(pkgResult.rows[0].advance_months ?? 0);
 
     // Get room and building information
     const roomResult = await client.query(
@@ -103,8 +136,20 @@ export async function POST(request: Request, { params }: RouteParams) {
       requiredDeposit = 0;
     }
 
-    // Apply building minimum only when config exists (0 is a valid minimum)
-    if (buildingConfig) {
+    // Lease package overrides deposit/advance requirements when selected
+    if (leasePackageTemplateId && packageDepositMonths !== undefined) {
+      requiredDeposit =
+        packageDepositMonths == null
+          ? 0
+          : monthlyRateValue * packageDepositMonths;
+      requiredAdvance =
+        packageAdvanceMonths == null
+          ? 0
+          : monthlyRateValue * packageAdvanceMonths;
+    }
+
+    // Apply building minimum only when no package and config exists (0 is a valid minimum)
+    if (!leasePackageTemplateId && buildingConfig) {
       const minimumDeposit = buildingConfig.minimumDepositAmount ?? 0;
       if (requiredDeposit < minimumDeposit) {
         requiredDeposit = minimumDeposit;
@@ -168,23 +213,20 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     await client.query('BEGIN');
 
-    // End any existing active assignments for this tenant
+    // End any existing active assignments for this tenant (keep history rows)
     await client.query(
       `UPDATE tenant_room_assignments 
-       SET assignment_status = 'terminated', end_date = CURRENT_DATE 
+       SET assignment_status = 'terminated', end_date = CURRENT_DATE,
+           updated_at = CURRENT_TIMESTAMP
        WHERE tenant_id = $1 AND assignment_status = 'active'`,
       [tenantId]
     );
 
-    // Snapshot tenant identity for history (survives later tenant delete/rename)
-    const tenantSnap = await client.query(
-      `SELECT first_name, last_name, email FROM tenants WHERE id = $1`,
-      [tenantId]
+    // Snapshot tenant identity for forever history
+    const { loadTenantContactSnapshot, markPersonAsCurrentTenant } = await import(
+      '@/lib/services/tenant-lifecycle'
     );
-    const snap = tenantSnap.rows[0];
-    const tenantNameSnapshot = snap
-      ? `${snap.first_name || ''} ${snap.last_name || ''}`.trim()
-      : null;
+    const snap = await loadTenantContactSnapshot(client, tenantId);
 
     // Create new assignment with advance, utility deposit, and validity tracking
     const assignmentResult = await client.query(
@@ -192,9 +234,10 @@ export async function POST(request: Request, { params }: RouteParams) {
        (tenant_id, room_id, start_date, end_date, monthly_rate, deposit_paid, 
         advance_paid, utility_deposit_paid, deposit_valid_until, deposit_refundable, 
         assignment_status, notes, tenant_name_snapshot, tenant_email_snapshot,
-        billing_cycle_start_day)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13,
-         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31))
+        tenant_phone_snapshot, tenant_emergency_name_snapshot, tenant_emergency_phone_snapshot,
+        billing_cycle_start_day, lease_package_template_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13, $14, $15, $16,
+         LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31), $17)
        RETURNING *`,
       [
         tenantId, 
@@ -208,22 +251,20 @@ export async function POST(request: Request, { params }: RouteParams) {
         depositValidUntil || null,
         depositRefundable,
         notes || null,
-        tenantNameSnapshot || null,
-        snap?.email || null,
+        snap.tenantNameSnapshot,
+        snap.tenantEmailSnapshot,
+        snap.tenantPhoneSnapshot,
+        snap.tenantEmergencyNameSnapshot,
+        snap.tenantEmergencyPhoneSnapshot,
+        leasePackageTemplateId || null,
       ]
     );
 
-    // Update tenant status and move-in date
-    await client.query(
-      `UPDATE tenants 
-       SET tenant_status = 'active', 
-           move_in_date = $1,
-           lease_start_date = $1,
-           lease_end_date = $3,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [startDate, tenantId, endDate || null]
-    );
+    await markPersonAsCurrentTenant(client, {
+      tenantId,
+      moveInDate: startDate,
+      leaseEndDate: endDate || null,
+    });
 
     // Update room status to occupied
     await client.query(
@@ -358,5 +399,61 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   } finally {
     client.release();
+  }
+}
+
+/** End tenancy / vacate room — keeps assignment history forever. */
+export async function DELETE(request: Request, { params }: RouteParams) {
+  try {
+    const { session, error } = await requireAdmin();
+    if (error) return error;
+
+    const { id: roomId } = await params;
+    const body = await request.json().catch(() => ({}));
+    const tenantId = body.tenantId as string | undefined;
+    const endDate = (body.endDate as string | undefined) || new Date().toISOString().slice(0, 10);
+    const notes = (body.notes as string | undefined) || null;
+
+    if (!tenantId) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const { endTenancyAndVacateTx } = await import('@/lib/services/tenant-lifecycle');
+    const result = await endTenancyAndVacateTx({
+      roomId,
+      tenantId,
+      endDate,
+      notes,
+    });
+
+    logActivitySafe({
+      actorUserId: session?.user?.id || null,
+      actorRole: 'admin',
+      actionType: 'tenant.unassigned',
+      category: 'tenants',
+      entityType: 'tenant',
+      entityId: tenantId,
+      entityLabel: `Room ${roomId}`,
+      afterData: { roomId, tenantId, endDate, assignmentId: result.assignmentId },
+      link: `/admin/tenants/${tenantId}`,
+      metadata: { link: `/admin/tenants/${tenantId}`, roomId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: result,
+      message: 'Tenant unassigned; room vacant. Occupant history retained.',
+    });
+  } catch (err) {
+    console.error('Unassign tenant error:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const status = message.includes('No active assignment') ? 404 : 500;
+    return NextResponse.json(
+      { success: false, error: 'Failed to unassign tenant', details: message },
+      { status }
+    );
   }
 }

@@ -114,9 +114,10 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
         lease_end_date,
         tenant_status,
         notes,
-        is_active
+        is_active,
+        is_tenant
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, false)
       RETURNING id
     `;
     
@@ -281,13 +282,13 @@ async function createTenantProfileOnly(data: CreateTenantWithUserData & {
        date_of_birth, emergency_contact_name, emergency_contact_phone,
        emergency_contact_relationship, employment_status, employer_name,
        monthly_income, previous_address, security_deposit,
-       lease_start_date, lease_end_date, tenant_status, notes, is_active
+       lease_start_date, lease_end_date, tenant_status, notes, is_active, is_tenant
      ) VALUES (
        $1, $2, $3, $4, $5,
        $6, $7, $8,
        $9, $10, $11,
        $12, $13, $14,
-       $15, $16, 'pending', $17, true
+       $15, $16, 'pending', $17, true, false
      )
      RETURNING id`,
     [

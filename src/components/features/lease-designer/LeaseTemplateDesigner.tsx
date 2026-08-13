@@ -8,6 +8,7 @@ import {
   SAMPLE_LEASE_CONTEXT,
   type LeaseSignatureMethod,
   type LeaseTemplate,
+  type LeaseTemplateContext,
   type LeaseTemplateSection,
   type LeaseTemplateVariableDef,
 } from '@/lib/lease-templates/types';
@@ -40,6 +41,7 @@ import {
   Printer,
   Save,
   Search,
+  Pencil,
   Table2,
   Trash2,
   Upload as PublishIcon,
@@ -517,6 +519,13 @@ export default function LeaseTemplateDesigner() {
   const [templates, setTemplates] = useState<LeaseTemplate[]>([]);
   const [template, setTemplate] = useState<LeaseTemplate | null>(null);
   const [variables, setVariables] = useState<LeaseTemplateVariableDef[]>([]);
+  const [previewContext, setPreviewContext] = useState<LeaseTemplateContext>(SAMPLE_LEASE_CONTEXT);
+  const [previewMeta, setPreviewMeta] = useState<{
+    packageName: string | null;
+    buildingName: string | null;
+    unitNumber: string | null;
+    source: string;
+  } | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [sectionDraft, setSectionDraft] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
@@ -534,6 +543,10 @@ export default function LeaseTemplateDesigner() {
   const [deleteTarget, setDeleteTarget] = useState<LeaseTemplateSection | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeSection = useMemo(() => {
     if (!template || !activeSectionId) return null;
@@ -601,11 +614,11 @@ export default function LeaseTemplateDesigner() {
       title: s.id === activeSectionId ? titleDraft.trim() || s.title : s.title,
       body: bodyForSection(s, s.id === activeSectionId),
     }));
-    return renderTemplateSections(sectionsForPreview, SAMPLE_LEASE_CONTEXT, {
+    return renderTemplateSections(sectionsForPreview, previewContext, {
       highlight: true,
       requireWitness: template.requireWitness,
     });
-  }, [template, sortedSections, activeSectionId, bodyForSection, titleDraft]);
+  }, [template, sortedSections, activeSectionId, bodyForSection, titleDraft, previewContext]);
 
   useEffect(() => {
     const key = activeSection?.sectionKey;
@@ -668,11 +681,29 @@ export default function LeaseTemplateDesigner() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const tplRes = await fetch('/api/lease-templates?scope=all');
+      const [tplRes, ctxRes] = await Promise.all([
+        fetch('/api/lease-templates?scope=all'),
+        fetch('/api/lease-templates/preview-context'),
+      ]);
       const data = await tplRes.json();
+      const ctxJson = await ctxRes.json().catch(() => null);
+
+      if (ctxRes.ok && ctxJson?.success && ctxJson.data?.context) {
+        setPreviewContext(ctxJson.data.context);
+        setPreviewMeta({
+          packageName: ctxJson.data.meta?.packageName || null,
+          buildingName: ctxJson.data.context.building?.name || null,
+          unitNumber: ctxJson.data.context.unit?.number || null,
+          source: ctxJson.data.meta?.source || 'assignment',
+        });
+        if (Array.isArray(ctxJson.data.variables) && ctxJson.data.variables.length > 0) {
+          setVariables(ctxJson.data.variables);
+        }
+      }
+
       if (tplRes.status === 503 && data.code === 'MIGRATION_REQUIRED') {
         setMigrationRequired(true);
-        setVariables(data.data?.variables || []);
+        if (!ctxJson?.data?.variables) setVariables(data.data?.variables || []);
         setTemplate(null);
         return;
       }
@@ -681,7 +712,9 @@ export default function LeaseTemplateDesigner() {
       }
 
       setMigrationRequired(false);
-      setVariables(data.data.variables || []);
+      if (!ctxJson?.data?.variables) {
+        setVariables(data.data.variables || []);
+      }
       const list: LeaseTemplate[] = (data.data.templates || []).filter(
         (t: LeaseTemplate) => t.status !== 'archived'
       );
@@ -770,6 +803,62 @@ export default function LeaseTemplateDesigner() {
   const markDirty = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v);
     setDirty(true);
+  };
+
+  const beginEditName = () => {
+    if (!template) return;
+    setNameDraft(template.name);
+    setEditingName(true);
+    requestAnimationFrame(() => nameInputRef.current?.select());
+  };
+
+  const cancelEditName = () => {
+    setEditingName(false);
+    setNameDraft(template?.name || '');
+  };
+
+  const saveTemplateName = async () => {
+    if (!template) return;
+    const nextName = nameDraft.trim();
+    if (!nextName) {
+      showNotification({
+        type: 'error',
+        title: 'Name required',
+        message: 'Enter a template name',
+      });
+      return;
+    }
+    if (nextName === template.name) {
+      setEditingName(false);
+      return;
+    }
+
+    setSavingName(true);
+    try {
+      const res = await fetch(`/api/lease-templates/${template.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nextName }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to rename');
+      setTemplate(data.data);
+      setTemplates((prev) => prev.map((t) => (t.id === data.data.id ? data.data : t)));
+      setEditingName(false);
+      showNotification({
+        type: 'success',
+        title: 'Renamed',
+        message: `Template renamed to “${nextName}”`,
+      });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'Rename failed',
+        message: err instanceof Error ? err.message : 'Could not save name',
+      });
+    } finally {
+      setSavingName(false);
+    }
   };
 
   const persistSection = async () => {
@@ -1115,7 +1204,57 @@ export default function LeaseTemplateDesigner() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-2">
-            <h2 className="truncate text-base font-semibold text-gray-900">{template.name}</h2>
+            {editingName ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void saveTemplateName();
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancelEditName();
+                    }
+                  }}
+                  disabled={savingName}
+                  className="min-w-[12rem] max-w-md flex-1 rounded-md border border-blue-300 px-2 py-1 text-base font-semibold text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  aria-label="Template name"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void saveTemplateName()}
+                  isLoading={savingName}
+                >
+                  Save
+                </Button>
+                <button
+                  type="button"
+                  onClick={cancelEditName}
+                  disabled={savingName}
+                  className="text-xs text-gray-500 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={beginEditName}
+                className="group inline-flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-gray-50"
+                title="Edit template name"
+              >
+                <h2 className="truncate text-base font-semibold text-gray-900">
+                  {template.name}
+                </h2>
+                <Pencil className="h-3.5 w-3.5 shrink-0 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            )}
             <span className="text-xs text-gray-500">{statusLabel}</span>
             {dirty && (
               <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
@@ -1414,7 +1553,20 @@ export default function LeaseTemplateDesigner() {
           {/* Column 3 — Printable preview */}
           <aside className="flex max-h-[calc(100vh-9rem)] flex-col overflow-hidden bg-slate-100/80">
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5">
-              <p className="text-sm font-medium text-gray-900">Printable preview</p>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Printable preview</p>
+                {previewMeta?.source === 'assignment' && previewMeta.buildingName ? (
+                  <p className="text-[11px] text-gray-500">
+                    Live sample · {previewMeta.buildingName}
+                    {previewMeta.unitNumber ? ` · Unit ${previewMeta.unitNumber}` : ''}
+                    {previewMeta.packageName ? ` · ${previewMeta.packageName}` : ''}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-amber-600">
+                    Using fallback sample (no active lease found)
+                  </p>
+                )}
+              </div>
               <div className="flex items-center gap-1">
                 <button
                   type="button"

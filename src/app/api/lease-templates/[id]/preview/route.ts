@@ -8,6 +8,7 @@ import {
   renderTemplateSections,
 } from '@/lib/lease-templates/render';
 import { SAMPLE_LEASE_CONTEXT } from '@/lib/lease-templates/types';
+import { getLeaseDesignerPreviewContext } from '@/lib/lease-templates/preview-context';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -15,7 +16,7 @@ interface RouteParams {
 
 /**
  * POST /api/lease-templates/[id]/preview
- * Live-preview a section body or the full template against sample (or provided) context.
+ * Live-preview a section body or the full template against real (or provided) context.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
@@ -26,7 +27,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
-    const context = { ...SAMPLE_LEASE_CONTEXT, ...(body.context || {}) };
+    const { context: liveContext } = await getLeaseDesignerPreviewContext({
+      buildingId: body.buildingId || null,
+      assignmentId: body.assignmentId || null,
+    });
+    const context = {
+      ...(liveContext || SAMPLE_LEASE_CONTEXT),
+      ...(body.context || {}),
+    };
 
     if (body.sectionBody != null) {
       return NextResponse.json({

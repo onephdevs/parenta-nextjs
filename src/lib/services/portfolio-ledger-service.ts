@@ -33,6 +33,15 @@ export type {
 
 const PAID = `p.payment_status IN ('paid', 'completed', 'confirmed')`;
 const OPEN_INVOICE = `i.invoice_status IN ('sent', 'partial', 'overdue')`;
+/** Operating expenses only — cash allowance / owner draws are a separate waterfall line */
+const OPERATING_EXPENSE = `COALESCE(e.category, 'other') NOT IN ('cash_allowance', 'owner_draw')`;
+const CASH_ALLOWANCE_EXPENSE = `COALESCE(e.category, 'other') IN ('cash_allowance', 'owner_draw')`;
+/** Excel Total Collection = all paid cash (rent, advance, utility, deposit); cheques are added later */
+const COLLECTION_PAYMENT = `
+  ${PAID}
+  AND LOWER(COALESCE(p.payment_method, 'cash')) NOT IN ('cheque', 'check')
+  AND ${PAYMENT_IS_REVENUE_UNIT}
+`;
 
 function num(v: unknown): number {
   return Math.round((Number(v) || 0) * 100) / 100;
@@ -71,19 +80,35 @@ function monthKey(year: number, month1: number): string {
 }
 
 function rangeFromYearMonth(year: number, month1: number) {
-  const start = new Date(Date.UTC(year, month1 - 1, 1));
-  const end = new Date(Date.UTC(year, month1, 0));
-  const priorEnd = new Date(Date.UTC(year, month1 - 1, 0));
-  const priorStart = new Date(Date.UTC(priorEnd.getUTCFullYear(), priorEnd.getUTCMonth(), 1));
+  /**
+   * Apartment records billing cycle: 16th of previous month → 15th of selected month.
+   * Example: July 2026 → 2026-06-16 … 2026-07-15
+   */
+  const end = new Date(Date.UTC(year, month1 - 1, 15));
+  const start = new Date(Date.UTC(year, month1 - 2, 16));
+  const priorEnd = new Date(Date.UTC(year, month1 - 2, 15));
+  const priorStart = new Date(Date.UTC(year, month1 - 3, 16));
   const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const startLabel = start.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endLabel = end.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const cycleMonth = end.toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
   return {
     startDate: iso(start),
     endDate: iso(end),
-    periodLabel: start.toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    }),
+    periodLabel: `${cycleMonth} (${startLabel} – ${endLabel})`,
     monthKey: monthKey(year, month1),
     priorStart: iso(priorStart),
     priorEnd: iso(priorEnd),
@@ -282,10 +307,7 @@ export async function getPortfolioLedger(params: {
         LIMIT 1
       ) r2 ON p.room_id IS NULL
       WHERE p.payment_date BETWEEN $1 AND $2
-        AND ${PAID}
-        AND COALESCE(p.payment_type, '') NOT IN ('deposit')
-        AND LOWER(COALESCE(p.payment_method, 'cash')) NOT IN ('cheque', 'check')
-        AND ${PAYMENT_IS_REVENUE_UNIT}
+        AND ${COLLECTION_PAYMENT}
       GROUP BY 1
       `,
       [startDate, endDate]
@@ -295,10 +317,7 @@ export async function getPortfolioLedger(params: {
       SELECT COALESCE(SUM(p.amount), 0) AS total
       FROM payments p
       WHERE p.payment_date BETWEEN $1 AND $2
-        AND ${PAID}
-        AND COALESCE(p.payment_type, '') NOT IN ('deposit')
-        AND LOWER(COALESCE(p.payment_method, 'cash')) NOT IN ('cheque', 'check')
-        AND ${PAYMENT_IS_REVENUE_UNIT}
+        AND ${COLLECTION_PAYMENT}
         ${PAYMENT_BUILDING}
       `,
       [priorStart, priorEnd, buildingId]
@@ -309,6 +328,7 @@ export async function getPortfolioLedger(params: {
       FROM expenses e
       WHERE e.expense_date BETWEEN $1 AND $2
         AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+        AND ${OPERATING_EXPENSE}
         ${buildingClause('e')}
       `,
       base
@@ -319,6 +339,7 @@ export async function getPortfolioLedger(params: {
       FROM expenses e
       WHERE e.expense_date BETWEEN $1 AND $2
         AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+        AND ${OPERATING_EXPENSE}
         ${buildingClause('e')}
       GROUP BY 1
       ORDER BY amount DESC
@@ -353,10 +374,7 @@ export async function getPortfolioLedger(params: {
           SELECT COALESCE(SUM(p.amount), 0)
           FROM payments p
           WHERE p.payment_date BETWEEN $1 AND $2
-            AND ${PAID}
-            AND COALESCE(p.payment_type, '') NOT IN ('deposit')
-            AND LOWER(COALESCE(p.payment_method, 'cash')) NOT IN ('cheque', 'check')
-            AND ${PAYMENT_IS_REVENUE_UNIT}
+            AND ${COLLECTION_PAYMENT}
             ${PAYMENT_BUILDING}
         ) AS collection,
         (
@@ -364,18 +382,17 @@ export async function getPortfolioLedger(params: {
           FROM expenses e
           WHERE e.expense_date BETWEEN $1 AND $2
             AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+            AND ${OPERATING_EXPENSE}
             ${buildingClause('e')}
         ) AS expenses,
         (
-          SELECT COALESCE(SUM(p.amount), 0)
-          FROM payments p
-          WHERE p.payment_date BETWEEN $1 AND $2
-            AND ${PAID}
-            AND p.payment_type = 'deposit'
-            AND LOWER(COALESCE(p.payment_method, 'cash')) = 'cash'
-            AND ${PAYMENT_IS_REVENUE_UNIT}
-            ${PAYMENT_BUILDING}
-        ) AS cash_for_deposit,
+          SELECT COALESCE(SUM(e.amount), 0)
+          FROM expenses e
+          WHERE e.expense_date BETWEEN $1 AND $2
+            AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+            AND ${CASH_ALLOWANCE_EXPENSE}
+            ${buildingClause('e')}
+        ) AS cash_allowance,
         (
           SELECT COALESCE(SUM(p.amount), 0)
           FROM payments p
@@ -551,6 +568,7 @@ export async function getPortfolioLedger(params: {
   }
   const priorCollection = num(priorCollectionRes.rows[0]?.total);
   const utilityBulk = utilityExpenseRes.rows.reduce((s, row) => s + num(row.amount), 0);
+  // Company utility invoices already live in `expenses`; only add unmetered building-level bills
   const expensesTotal = num(expensesTotalRes.rows[0]?.total) + utilityBulk;
 
   const expenseMap = new Map<string, number>();
@@ -573,19 +591,26 @@ export async function getPortfolioLedger(params: {
 
   const wf = waterfallRes.rows[0] || {};
   const wfCollection = num(wf.collection);
-  const cashForDeposit = num(wf.cash_for_deposit);
+  const cashAllowance = num(wf.cash_allowance);
   const cheque = num(wf.cheque);
+  // Excel apartment records:
+  // Collection − Expenses = subtotal
+  // − Cash allowance (Ima) = Cash for deposit
+  // + Cheque (hardware) = Grand Total
+  const afterExpenses = num(wfCollection - expensesTotal);
+  const cashForDeposit = num(afterExpenses - cashAllowance);
+  const grandTotal = num(cashForDeposit + cheque);
+
   const waterfall: WaterfallStep[] = [
-    { label: 'Rent collected', value: wfCollection, sign: '+' },
-    { label: 'Operating expenses', value: -expensesTotal, sign: '-' },
+    { label: 'Total collection', value: wfCollection, sign: '+' },
+    { label: 'Less expenses', value: -expensesTotal, sign: '-' },
   ];
-  if (cashForDeposit !== 0) {
-    waterfall.push({ label: 'Cash for deposit', value: cashForDeposit, sign: '+' });
+  if (cashAllowance !== 0) {
+    waterfall.push({ label: 'Ima cash allowance', value: -cashAllowance, sign: '-' });
   }
   if (cheque !== 0) {
-    waterfall.push({ label: 'Cheque payments', value: cheque, sign: '+' });
+    waterfall.push({ label: 'Hardware / cheque', value: cheque, sign: '+' });
   }
-  const grandTotal = num(wfCollection - expensesTotal + cashForDeposit + cheque);
 
   const rentRollAll: RentRollRow[] = rentRollRes.rows.map((row) => {
     const derived = deriveStatus({

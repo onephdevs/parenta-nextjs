@@ -263,6 +263,14 @@ export async function getLeaseById(id: string): Promise<LeaseDetail | null> {
       tra.tenant_name_snapshot,
       tra.tenant_email_snapshot,
       tra.created_at,
+      tra.lease_package_template_id,
+      lpt.name AS lease_package_template_name,
+      lpt.term_months AS lease_package_term_months,
+      lpt.deposit_months AS lease_package_deposit_months,
+      lpt.advance_months AS lease_package_advance_months,
+      lpt.grace_period_days AS lease_package_grace_period_days,
+      lpt.penalty_type AS lease_package_penalty_type,
+      lpt.penalty_fee AS lease_package_penalty_fee,
       r.room_number,
       b.id AS building_id,
       b.name AS building_name,
@@ -287,6 +295,7 @@ export async function getLeaseById(id: string): Promise<LeaseDetail | null> {
     JOIN buildings b ON b.id = r.building_id
     LEFT JOIN tenants t ON t.id = tra.tenant_id
     LEFT JOIN documents d ON d.id = t.tenant_agreement_document_id
+    LEFT JOIN lease_package_templates lpt ON lpt.id = tra.lease_package_template_id
     WHERE tra.id = $1
     LIMIT 1
     `,
@@ -320,6 +329,38 @@ export async function getLeaseById(id: string): Promise<LeaseDetail | null> {
       startDate: row.start_date as string | Date | null,
       fallbackDay: 5,
     }),
+    leasePackageTemplateId: row.lease_package_template_id
+      ? String(row.lease_package_template_id)
+      : null,
+    leasePackageTemplateName: row.lease_package_template_name
+      ? String(row.lease_package_template_name)
+      : null,
+    leasePackageTermMonths:
+      row.lease_package_term_months == null
+        ? null
+        : Number(row.lease_package_term_months),
+    leasePackageDepositMonths:
+      row.lease_package_deposit_months == null
+        ? null
+        : Number(row.lease_package_deposit_months),
+    leasePackageAdvanceMonths:
+      row.lease_package_advance_months == null
+        ? null
+        : Number(row.lease_package_advance_months),
+    leasePackageGracePeriodDays:
+      row.lease_package_grace_period_days == null
+        ? null
+        : Number(row.lease_package_grace_period_days),
+    leasePackagePenaltyType:
+      row.lease_package_penalty_type == null || row.lease_package_penalty_type === ''
+        ? null
+        : String(row.lease_package_penalty_type) === 'flat_fee'
+          ? 'flat_fee'
+          : 'percentage',
+    leasePackagePenaltyFee:
+      row.lease_package_penalty_fee == null
+        ? null
+        : Number(row.lease_package_penalty_fee),
   };
 }
 
@@ -404,4 +445,319 @@ export async function getLeaseDocuments(tenantId: string, roomId: string) {
     category: row.document_type ? String(row.document_type) : null,
     createdAt: row.created_at ? String(row.created_at) : null,
   }));
+}
+
+export interface UpdateLeaseInput {
+  roomId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  monthlyRate?: number;
+  depositPaid?: number | null;
+  advancePaid?: number | null;
+  utilityDepositPaid?: number | null;
+  notes?: string | null;
+  templateName?: string | null;
+  leasePackageTemplateId?: string | null;
+  reason: string;
+}
+
+export async function updateLease(
+  id: string,
+  input: UpdateLeaseInput
+): Promise<{ before: LeaseDetail; after: LeaseDetail }> {
+  const existing = await getLeaseById(id);
+  if (!existing) {
+    throw new Error('Lease not found');
+  }
+
+  const reason = input.reason.trim();
+  if (!reason) {
+    throw new Error('Reason is required');
+  }
+
+  const nextRoomId = input.roomId ?? existing.roomId;
+  const nextStart = input.startDate !== undefined ? input.startDate : existing.startDate;
+  const nextEnd = input.endDate !== undefined ? input.endDate : existing.endDate;
+  const nextRate =
+    input.monthlyRate !== undefined ? Number(input.monthlyRate) : existing.monthlyRate;
+  const nextDeposit =
+    input.depositPaid !== undefined
+      ? input.depositPaid
+      : existing.depositPaid;
+  const nextAdvance =
+    input.advancePaid !== undefined ? input.advancePaid : existing.advancePaid;
+  const nextUtility =
+    input.utilityDepositPaid !== undefined
+      ? input.utilityDepositPaid
+      : existing.utilityDepositPaid;
+
+  if (!nextRoomId) {
+    throw new Error('Room is required');
+  }
+  if (!Number.isFinite(nextRate) || nextRate < 0) {
+    throw new Error('Invalid rent amount');
+  }
+
+  const nextTemplateId =
+    input.leasePackageTemplateId !== undefined
+      ? input.leasePackageTemplateId
+      : existing.leasePackageTemplateId;
+  if (!nextTemplateId) {
+    throw new Error('Lease template is required');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    if (nextRoomId !== existing.roomId) {
+      const conflict = await client.query(
+        `
+        SELECT id FROM tenant_room_assignments
+        WHERE room_id = $1
+          AND id <> $2
+          AND assignment_status = 'active'
+          AND (end_date IS NULL OR end_date::date >= CURRENT_DATE)
+        LIMIT 1
+        `,
+        [nextRoomId, id]
+      );
+      if (conflict.rows.length > 0) {
+        throw new Error('Selected unit already has an active lease');
+      }
+
+      await client.query(
+        `UPDATE rooms SET room_status = 'vacant', updated_at = NOW() WHERE id = $1`,
+        [existing.roomId]
+      );
+      await client.query(
+        `UPDATE rooms SET room_status = 'occupied', updated_at = NOW() WHERE id = $1`,
+        [nextRoomId]
+      );
+    }
+
+    await client.query(
+      `
+      UPDATE tenant_room_assignments
+      SET
+        room_id = $2,
+        start_date = $3,
+        end_date = $4,
+        monthly_rate = $5,
+        deposit_paid = $6,
+        advance_paid = $7,
+        utility_deposit_paid = $8,
+        notes = COALESCE($9, notes),
+        lease_package_template_id = $10,
+        updated_at = NOW()
+      WHERE id = $1
+      `,
+      [
+        id,
+        nextRoomId,
+        nextStart || null,
+        nextEnd || null,
+        nextRate,
+        nextDeposit ?? null,
+        nextAdvance ?? null,
+        nextUtility ?? null,
+        input.notes !== undefined ? input.notes : null,
+        nextTemplateId,
+      ]
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  const after = await getLeaseById(id);
+  if (!after) {
+    throw new Error('Lease updated but could not be reloaded');
+  }
+
+  return { before: existing, after };
+}
+
+export interface RenewLeaseInput {
+  roomId?: string;
+  startDate: string;
+  endDate: string;
+  monthlyRate: number;
+  depositPaid?: number | null;
+  advancePaid?: number | null;
+  templateName?: string | null;
+  leasePackageTemplateId?: string | null;
+  notes?: string | null;
+  options: {
+    retainPreviousDetails: boolean;
+    carryOverDeposit: boolean;
+    waiveAdvance: boolean;
+    waivePenalties: boolean;
+    waiveOutstanding: boolean;
+  };
+}
+
+function addDaysIso(isoDate: string, days: number): string {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(isoDate)
+    ? new Date(`${isoDate}T12:00:00`)
+    : new Date(isoDate);
+  d.setDate(d.getDate() + days);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/**
+ * Renew: keep current lease history, create a new upcoming/active assignment.
+ * Old lease end is set to the day before the new start when needed.
+ */
+export async function renewLease(
+  currentLeaseId: string,
+  input: RenewLeaseInput
+): Promise<{ previous: LeaseDetail; renewed: LeaseDetail }> {
+  const existing = await getLeaseById(currentLeaseId);
+  if (!existing) {
+    throw new Error('Lease not found');
+  }
+  if (!existing.tenantId) {
+    throw new Error('Lease has no tenant');
+  }
+
+  const startDate = String(input.startDate).slice(0, 10);
+  const endDate = String(input.endDate).slice(0, 10);
+  const roomId = input.roomId || existing.roomId;
+  const monthlyRate = Number(input.monthlyRate);
+
+  if (!startDate || !endDate) {
+    throw new Error('Start and end dates are required');
+  }
+  if (!input.leasePackageTemplateId) {
+    throw new Error('Lease template is required');
+  }
+  if (!Number.isFinite(monthlyRate) || monthlyRate < 0) {
+    throw new Error('Invalid rent amount');
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(`${startDate}T12:00:00`);
+  const isUpcoming = start > today;
+  const newStatus = isUpcoming ? 'pending' : 'active';
+
+  const depositPaid = input.options.carryOverDeposit
+    ? existing.depositPaid || 0
+    : input.depositPaid ?? 0;
+  const advancePaid = input.options.waiveAdvance ? 0 : input.advancePaid ?? 0;
+
+  const client = await pool.connect();
+  let newId = '';
+  try {
+    await client.query('BEGIN');
+
+    // Ensure previous lease ends the day before renewal starts
+    const previousEnd = addDaysIso(startDate, -1);
+    if (!existing.endDate || existing.endDate > previousEnd) {
+      await client.query(
+        `
+        UPDATE tenant_room_assignments
+        SET end_date = $2::date,
+            updated_at = NOW()
+        WHERE id = $1
+        `,
+        [currentLeaseId, previousEnd]
+      );
+    }
+
+    // Conflict: another active lease on room (excluding current)
+    const conflict = await client.query(
+      `
+      SELECT id FROM tenant_room_assignments
+      WHERE room_id = $1
+        AND id <> $2
+        AND assignment_status = 'active'
+        AND (end_date IS NULL OR end_date::date >= CURRENT_DATE)
+        AND start_date::date <= $3::date
+      LIMIT 1
+      `,
+      [roomId, currentLeaseId, endDate]
+    );
+    if (conflict.rows.length > 0) {
+      throw new Error('Selected unit already has an overlapping active lease');
+    }
+
+    const noteParts = [
+      input.notes?.trim() || '',
+      input.templateName ? `Template: ${input.templateName}` : '',
+      'Renewed from previous lease',
+      input.options.carryOverDeposit ? 'Deposit carried over' : '',
+      input.options.waiveAdvance ? 'Advance waived' : '',
+      input.options.waivePenalties ? 'Penalties waived' : '',
+      input.options.waiveOutstanding ? 'Outstanding balance waived' : '',
+    ].filter(Boolean);
+
+    const insert = await client.query(
+      `
+      INSERT INTO tenant_room_assignments (
+        tenant_id, room_id, start_date, end_date, monthly_rate,
+        deposit_paid, advance_paid, utility_deposit_paid,
+        assignment_status, notes, lease_package_template_id
+      )
+      VALUES ($1, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING id
+      `,
+      [
+        existing.tenantId,
+        roomId,
+        startDate,
+        endDate,
+        monthlyRate,
+        depositPaid,
+        advancePaid,
+        existing.utilityDepositPaid || 0,
+        newStatus,
+        noteParts.join('\n') || null,
+        input.leasePackageTemplateId,
+      ]
+    );
+    newId = String(insert.rows[0].id);
+
+    if (input.options.waiveOutstanding) {
+      await client.query(
+        `
+        UPDATE invoices
+        SET invoice_status = 'cancelled',
+            updated_at = NOW()
+        WHERE tenant_id = $1
+          AND LOWER(COALESCE(invoice_status, '')) IN ('unpaid', 'pending', 'sent', 'overdue', 'partial')
+        `,
+        [existing.tenantId]
+      ).catch(() => undefined);
+    }
+
+    await client.query(
+      `UPDATE rooms SET room_status = 'occupied', updated_at = NOW() WHERE id = $1`,
+      [roomId]
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  const [previous, renewed] = await Promise.all([
+    getLeaseById(currentLeaseId),
+    getLeaseById(newId),
+  ]);
+  if (!previous || !renewed) {
+    throw new Error('Renewal saved but could not reload leases');
+  }
+  return { previous, renewed };
 }
