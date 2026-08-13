@@ -42,7 +42,6 @@ import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
-import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
 import {
   MaintenanceThreadPanel,
   type MaintenanceThreadHandle,
@@ -604,7 +603,6 @@ export default function AdminMaintenancePage() {
           <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             <Card padding="sm" className="bg-gray-50">
               <h4 className="mb-2 font-medium text-gray-900">{selectedRequest.title}</h4>
-              <p className="text-sm text-gray-600">{selectedRequest.description}</p>
               <div className="mt-2 flex items-center gap-2 text-sm text-gray-700">
                 <Building className="h-4 w-4" />
                 {selectedRequest.building_name} — {selectedRequest.room_number}
@@ -613,11 +611,6 @@ export default function AdminMaintenancePage() {
                 <User className="h-4 w-4" />
                 {selectedRequest.tenant_name}
               </div>
-              <MaintenancePhotoGallery
-                photos={selectedRequest.attachments || []}
-                emptyLabel="No photos attached by tenant"
-                className="mt-4"
-              />
             </Card>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -706,6 +699,23 @@ export default function AdminMaintenancePage() {
               ref={threadRef}
               requestId={selectedRequest.id}
               hideSubmitButton
+              status={updateData.status || selectedRequest.status}
+              title="Discussion"
+              seedMessage={{
+                authorName: selectedRequest.tenant_name || 'Tenant',
+                authorRole: 'tenant',
+                body: [
+                  selectedRequest.title,
+                  selectedRequest.description,
+                ]
+                  .filter(Boolean)
+                  .join('\n\n'),
+                createdAt: selectedRequest.request_date,
+                photos: (selectedRequest.attachments || []).map((a) => ({
+                  url: a.url,
+                  fileName: a.fileName,
+                })),
+              }}
               disabled={['closed', 'cancelled'].includes(
                 String(updateData.status || selectedRequest.status).toLowerCase()
               )}

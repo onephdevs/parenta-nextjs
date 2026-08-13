@@ -1,5 +1,6 @@
 import { getAllTenants, getTenantStats } from '@/lib/api/tenants';
 import { getAllBuildings } from '@/lib/api/buildings';
+import { getTenantListInsights } from '@/lib/services/tenant-list-insights';
 import TenantsList from '@/components/features/TenantsList';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
@@ -17,8 +18,15 @@ async function getTenantsData() {
       getAllBuildings({ limit: 100 }),
     ]);
 
+    const tenantIds = tenantsData.tenants.map((t) => t.id);
+    const insightsMap = await getTenantListInsights(tenantIds);
+    const tenants = tenantsData.tenants.map((t) => ({
+      ...t,
+      insights: insightsMap[t.id],
+    }));
+
     return {
-      tenants: tenantsData.tenants,
+      tenants,
       stats,
       buildings: buildingsData.buildings,
     };

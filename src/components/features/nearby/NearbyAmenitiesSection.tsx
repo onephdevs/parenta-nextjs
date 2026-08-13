@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
-  Building2,
   Building,
   Bus,
   Car,
@@ -28,6 +27,10 @@ import {
   type NearbyPlace,
 } from '@/lib/maps/nearby-amenities';
 import type { CommuteEstimate, CommuteMode } from '@/lib/maps/commute';
+import {
+  NearbyPropertyPicker,
+  type NearbyPropertyOption,
+} from '@/components/features/nearby/NearbyPropertyPicker';
 
 const NearbyMap = dynamic(() => import('./NearbyMap'), {
   ssr: false,
@@ -38,16 +41,7 @@ const NearbyMap = dynamic(() => import('./NearbyMap'), {
   ),
 });
 
-export interface NearbyPropertyOption {
-  id: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  address: string;
-  availableUnits: number;
-  latitude: number | null;
-  longitude: number | null;
-}
+export type { NearbyPropertyOption };
 
 interface NearbyApiData {
   origin: {
@@ -109,11 +103,6 @@ const DEFAULT_LIST_CATEGORY: AmenityCategory = 'school';
 function formatDistance(meters: number): string {
   if (meters < 1000) return `${meters} m`;
   return `${(meters / 1000).toFixed(1)} km`;
-}
-
-function propertyLabel(p: NearbyPropertyOption): string {
-  const loc = [p.city, p.state].filter(Boolean).join(', ');
-  return loc ? `${p.name} — ${loc}` : p.name;
 }
 
 function hexAlpha(hex: string, alpha: number): string {
@@ -440,31 +429,20 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
         </div>
 
         <div className="mb-6 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between lg:mb-5">
-          <label className="block min-w-0 flex-1 sm:max-w-md">
-            <span className="mb-1.5 block text-sm font-medium text-[#111827]">Property</span>
-            <div className="relative">
-              <Building2 className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
-              <select
-                value={buildingId}
-                onChange={(e) => {
-                  setBuildingId(e.target.value);
-                  setCommute(null);
-                  setCommuteError(null);
-                  setSelectedCommuteMode(null);
-                  setSelectedPlace(null);
-                  setRoute(null);
-                  setRouteError(null);
-                }}
-                className="w-full appearance-none rounded-xl border border-slate-200 bg-[#F8FAFC] py-2.5 pr-8 pl-10 text-sm text-[#111827] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-              >
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {propertyLabel(p)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </label>
+          <NearbyPropertyPicker
+            properties={properties}
+            value={buildingId}
+            onChange={(nextId) => {
+              setBuildingId(nextId);
+              setCommute(null);
+              setCommuteError(null);
+              setSelectedCommuteMode(null);
+              setSelectedPlace(null);
+              setRoute(null);
+              setRouteError(null);
+            }}
+            className="w-full sm:max-w-md"
+          />
 
           <div
             className="inline-flex rounded-xl bg-slate-100 p-1"
@@ -566,6 +544,10 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
                     destination={mapDestination}
                     destinationColor={commuteRouteColor}
                     onSelectPlace={handleSelectPlace}
+                    onLocateHome={() => {
+                      clearSelectedPlace();
+                      setSelectedCommuteMode(null);
+                    }}
                     sizeTick={mapSizeTick}
                     className="h-full min-h-0 w-full"
                   />

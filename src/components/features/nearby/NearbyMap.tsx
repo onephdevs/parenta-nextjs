@@ -92,6 +92,60 @@ const placeIcons = (() => {
   return map;
 })();
 
+function LocateHomeControl({
+  home,
+  onLocate,
+}: {
+  home: { latitude: number; longitude: number };
+  onLocate?: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const Control = L.Control.extend({
+      onAdd() {
+        const container = L.DomUtil.create(
+          'div',
+          'leaflet-bar leaflet-control nearby-locate-control'
+        );
+        const button = L.DomUtil.create('a', '', container) as HTMLAnchorElement;
+        button.href = '#';
+        button.title = 'Locate apartment';
+        button.setAttribute('aria-label', 'Locate apartment');
+        button.role = 'button';
+        button.innerHTML = `
+          <span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:#111827;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 2v3"/>
+              <path d="M12 19v3"/>
+              <path d="M2 12h3"/>
+              <path d="M19 12h3"/>
+            </svg>
+          </span>
+        `;
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(button, 'click', (e) => {
+          L.DomEvent.preventDefault(e);
+          onLocate?.();
+          map.flyTo([home.latitude, home.longitude], Math.max(map.getZoom(), 17), {
+            duration: 0.55,
+          });
+        });
+        return container;
+      },
+    });
+
+    const control = new Control({ position: 'bottomright' });
+    map.addControl(control);
+    return () => {
+      map.removeControl(control);
+    };
+  }, [map, home.latitude, home.longitude, onLocate]);
+
+  return null;
+}
+
 function InvalidateSize({ tick }: { tick: number }) {
   const map = useMap();
   useEffect(() => {
@@ -215,6 +269,8 @@ export interface NearbyMapProps {
   onSelectPlace?: (place: NearbyPlace) => void;
   /** Bump when the container is shown (mobile overlay / resize) so Leaflet recaptures size */
   sizeTick?: number;
+  /** Clear selection / route before recentering on the apartment */
+  onLocateHome?: () => void;
   className?: string;
 }
 
@@ -229,6 +285,7 @@ export default function NearbyMap({
   destinationColor = '#111827',
   onSelectPlace,
   sizeTick = 0,
+  onLocateHome,
   className,
 }: NearbyMapProps) {
   const destIcon = useMemo(
@@ -254,6 +311,7 @@ export default function NearbyMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ZoomControl position="bottomright" />
+        <LocateHomeControl home={home} onLocate={onLocateHome} />
         <ScaleControl position="bottomleft" imperial={false} />
         <InvalidateSize tick={sizeTick} />
         <MapViewport

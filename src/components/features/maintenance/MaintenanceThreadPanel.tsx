@@ -5,14 +5,16 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useState,
 } from 'react';
-import { Star, X } from 'lucide-react';
-import { FormField } from '@/components/forms/FormField';
-import { Textarea } from '@/components/ui/Textarea';
-import { TakePhotoButton } from '@/components/features/TakePhotoButton';
-import { LightboxImage } from '@/components/ui/ImageLightbox';
-import { MaintenanceReactionBar } from '@/components/features/maintenance/MaintenanceReactionBar';
+import {
+  MaintenanceDiscussionComposer,
+  MaintenanceDiscussionHeader,
+  MaintenanceDiscussionMessage,
+  type DiscussionMessage,
+  type DiscussionPhoto,
+} from '@/components/features/maintenance/MaintenanceDiscussion';
 import { cn } from '@/lib/utils';
 
 export interface MaintenanceThreadUpdate {
@@ -62,6 +64,14 @@ export interface MaintenanceThreadHandle {
   hasDraft: () => boolean;
 }
 
+export interface MaintenanceThreadSeed {
+  authorName: string;
+  authorRole?: string;
+  body: string;
+  createdAt: string;
+  photos?: DiscussionPhoto[];
+}
+
 interface MaintenanceThreadPanelProps {
   requestId: string;
   /** Optional defaults for board-style standalone Post button */
@@ -71,36 +81,11 @@ interface MaintenanceThreadPanelProps {
   /** Hide inner Post update button when parent Save Changes owns submit */
   hideSubmitButton?: boolean;
   onPosted?: (payload: MaintenanceThreadSaveResult) => void;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function updateTypeLabel(type: string) {
-  switch (type) {
-    case 'status_change':
-      return 'Status';
-    case 'acknowledgement':
-      return 'Acknowledged';
-    case 'feedback':
-      return 'Feedback';
-    case 'closed':
-      return 'Closed';
-    case 'reply':
-      return 'Reply';
-    default:
-      return 'Update';
-  }
+  /** Original request shown as first timeline message */
+  seedMessage?: MaintenanceThreadSeed | null;
+  /** Request status for header badge */
+  status?: string | null;
+  title?: string;
 }
 
 function appendFields(form: FormData, fields: MaintenanceThreadPersistFields) {
@@ -131,6 +116,9 @@ export const MaintenanceThreadPanel = forwardRef<
     className,
     hideSubmitButton = false,
     onPosted,
+    seedMessage,
+    status,
+    title = 'Discussion',
   },
   ref
 ) {
@@ -284,135 +272,101 @@ export const MaintenanceThreadPanel = forwardRef<
     [note, photo, postWithFields]
   );
 
+  const messages: DiscussionMessage[] = useMemo(() => {
+    const list: DiscussionMessage[] = [];
+    if (seedMessage?.body?.trim()) {
+      list.push({
+        id: `seed-${requestId}`,
+        authorName: seedMessage.authorName || 'Tenant',
+        authorRole: seedMessage.authorRole || 'tenant',
+        body: seedMessage.body,
+        createdAt: seedMessage.createdAt,
+        photos: seedMessage.photos,
+        isSeed: true,
+      });
+    }
+    for (const u of updates) {
+      list.push({
+        id: u.id,
+        authorName: u.authorName || u.authorRole,
+        authorRole: u.authorRole,
+        body: u.body,
+        createdAt: u.createdAt,
+        updateType: u.updateType,
+        rating: u.rating,
+        photoUrl: u.photoUrl,
+        photoFileName: u.photoFileName,
+        reactions: u.reactions,
+      });
+    }
+    return list;
+  }, [requestId, seedMessage, updates]);
+
   return (
-    <div className={cn('space-y-4', className)}>
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900">Conversation</h3>
-        <p className="text-xs text-gray-500">
-          {hideSubmitButton
-            ? 'Optional reply for the tenant — saved with Save Changes.'
-            : 'One Post update saves status, assignee, and your reply (tenant notified).'}
-        </p>
+    <div
+      className={cn(
+        'overflow-hidden rounded-xl border border-gray-200 bg-white',
+        className
+      )}
+    >
+      <div className="px-4 pt-4">
+        <MaintenanceDiscussionHeader title={title} status={status} />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="px-4 py-3">
+        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-      {loading ? (
-        <p className="text-sm text-gray-500">Loading conversation…</p>
-      ) : updates.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-500">
-          No updates yet. Add a reply below if needed.
-        </p>
-      ) : (
-        <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
-          {updates.map((u) => (
-            <li
-              key={u.id}
-              className={cn(
-                'rounded-lg border px-3 py-2',
-                u.authorRole === 'tenant'
-                  ? 'border-emerald-100 bg-emerald-50/40'
-                  : 'border-gray-200 bg-white'
-              )}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-medium text-gray-700">
-                  {u.authorName || u.authorRole} · {updateTypeLabel(u.updateType)}
-                </p>
-                <p className="text-xs text-gray-500">{formatDate(u.createdAt)}</p>
-              </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-900">{u.body}</p>
-              {u.rating != null && (
-                <p className="mt-1 inline-flex items-center gap-1 text-xs text-amber-700">
-                  <Star className="h-3.5 w-3.5 fill-current" />
-                  {u.rating}/5
-                </p>
-              )}
-              {u.photoUrl && (
-                <div className="mt-2">
-                  <LightboxImage
-                    src={u.photoUrl}
-                    alt={u.photoFileName || 'Progress photo'}
-                    title={u.photoFileName || 'Progress photo'}
-                    wrapperClassName="block overflow-hidden rounded-md"
-                    className="h-24 w-auto max-w-full object-cover"
-                  />
-                </div>
-              )}
-              <MaintenanceReactionBar
-                updateId={u.id}
-                reactions={
-                  u.reactions || { like: 0, heart: 0, myReaction: null }
+        {loading ? (
+          <p className="py-6 text-sm text-gray-500">Loading discussion…</p>
+        ) : messages.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
+            No messages yet. Add a comment below.
+          </p>
+        ) : (
+          <div className="max-h-80 overflow-y-auto pr-1">
+            {messages.map((message, index) => (
+              <MaintenanceDiscussionMessage
+                key={message.id}
+                message={message}
+                isLast={index === messages.length - 1}
+                reactionBusy={reactionBusyId === message.id}
+                onToggleReaction={(id, reaction) =>
+                  void toggleReaction(id, reaction)
                 }
-                disabled={reactionBusyId === u.id}
-                onToggle={(id, reaction) => void toggleReaction(id, reaction)}
               />
-            </li>
-          ))}
-        </ul>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       {!disabled && (
-        <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <FormField
-            label="Reply / progress update"
-            htmlFor={`thread-note-${requestId}`}
-          >
-            <Textarea
-              id={`thread-note-${requestId}`}
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Will fix tomorrow · Parts ordered · Work completed…"
-            />
-          </FormField>
-          <div className="flex flex-wrap items-start gap-3">
-            <TakePhotoButton
-              disabled={saving}
-              onCapture={(file) => {
-                if (preview) URL.revokeObjectURL(preview);
-                setPhoto(file);
-                setPreview(URL.createObjectURL(file));
-              }}
-              title="Attach progress photo"
-              description="Optional photo for the tenant."
-              fileNamePrefix="maintenance-progress"
-            />
-            {preview && (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={preview}
-                  alt="Progress preview"
-                  className="h-16 w-16 rounded-md object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={clearPhoto}
-                  className="absolute -right-1.5 -top-1.5 rounded-full bg-gray-900 p-0.5 text-white"
-                  aria-label="Remove photo"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-            {!hideSubmitButton && (
-              <button
-                type="button"
-                className="ml-auto inline-flex items-center rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                disabled={saving || (!note.trim() && !photo)}
-                onClick={() => {
-                  if (!fields) {
-                    setError('Missing form fields');
-                    return;
-                  }
-                  void postWithFields(fields);
-                }}
-              >
-                {saving ? 'Posting…' : 'Post update'}
-              </button>
-            )}
-          </div>
+        <div className="px-4 pb-4">
+          <MaintenanceDiscussionComposer
+            value={note}
+            onChange={setNote}
+            photoPreview={preview}
+            saving={saving}
+            hideSendButton={hideSubmitButton}
+            hint={
+              hideSubmitButton
+                ? 'Reply is sent with Save Changes — tenant is notified.'
+                : undefined
+            }
+            placeholder="Add a comment"
+            onClearPhoto={clearPhoto}
+            onAttach={(file) => {
+              if (preview) URL.revokeObjectURL(preview);
+              setPhoto(file);
+              setPreview(URL.createObjectURL(file));
+            }}
+            onSend={() => {
+              if (!fields) {
+                setError('Missing form fields');
+                return;
+              }
+              void postWithFields(fields);
+            }}
+          />
         </div>
       )}
     </div>

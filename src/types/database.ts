@@ -128,6 +128,24 @@ export interface Tenant {
   currentRoomNumber?: string;
   currentBuildingName?: string;
   currentBuildingId?: string;
+  /** Enriched signals for work-item list (rent, utils, maintenance) */
+  insights?: {
+    balance: number;
+    pastDueAmount: number;
+    daysPastDue: number;
+    daysUntilDue: number | null;
+    nextDueDate: string | null;
+    hasOpenRent: boolean;
+    hasOpenBills: boolean;
+    hasUnpaidWater: boolean;
+    hasUnpaidElectricity: boolean;
+    openMaintenanceCount: number;
+    hasUrgentMaintenance: boolean;
+    isNew: boolean;
+    hasPaymentConfirmation: boolean;
+    hasPartialPayment: boolean;
+    hasUnsignedLease: boolean;
+  };
 }
 
 export interface DatabaseTenant {

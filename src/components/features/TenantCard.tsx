@@ -35,10 +35,15 @@ function StatRow({
 }
 
 function propertyUnitLabel(tenant: Tenant): string | null {
-  const room = tenant.currentRoomNumber?.trim();
+  const raw = tenant.currentRoomNumber?.trim();
+  const room = raw
+    ? /^unit\b/i.test(raw)
+      ? raw
+      : `Unit ${raw}`
+    : null;
   const building = tenant.currentBuildingName?.trim();
-  if (room && building) return `Unit ${room} · ${building}`;
-  if (room) return `Unit ${room}`;
+  if (room && building) return `${room} · ${building}`;
+  if (room) return room;
   if (building) return building;
   return null;
 }

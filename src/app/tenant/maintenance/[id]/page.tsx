@@ -8,27 +8,28 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
-  MessageSquare,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
   Button,
   Select,
-  Textarea,
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
-import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
-import { MaintenanceReactionBar } from '@/components/features/maintenance/MaintenanceReactionBar';
+import {
+  MaintenanceDiscussionComposer,
+  MaintenanceDiscussionHeader,
+  MaintenanceDiscussionMessage,
+  type DiscussionMessage,
+} from '@/components/features/maintenance/MaintenanceDiscussion';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
-import { LightboxImage } from '@/components/ui/ImageLightbox';
 import { formatMaintenanceCategory } from '@/lib/constants/maintenance';
 
 interface MaintenancePhoto {
@@ -84,23 +85,6 @@ function formatDate(value?: string | null) {
     hour: 'numeric',
     minute: '2-digit',
   });
-}
-
-function updateTypeLabel(type: string) {
-  switch (type) {
-    case 'feedback':
-      return 'Feedback';
-    case 'acknowledgement':
-      return 'Acknowledged';
-    case 'closed':
-      return 'Closed';
-    case 'reply':
-      return 'Reply';
-    case 'status_change':
-      return 'Status';
-    default:
-      return 'Update';
-  }
 }
 
 export default function TenantMaintenanceDetailPage() {
@@ -288,6 +272,33 @@ export default function TenantMaintenanceDetailPage() {
     String(request.status).toLowerCase()
   );
 
+  const discussionMessages: DiscussionMessage[] = [
+    {
+      id: `seed-${request.id}`,
+      authorName: 'You',
+      authorRole: 'tenant',
+      body: [request.title, request.description].filter(Boolean).join('\n\n'),
+      createdAt: request.createdAt,
+      photos: (request.attachments || []).map((a) => ({
+        url: a.url,
+        fileName: a.fileName,
+      })),
+      isSeed: true,
+    },
+    ...(request.updates || []).map((u) => ({
+      id: u.id,
+      authorName: u.authorName || u.authorRole,
+      authorRole: u.authorRole,
+      body: u.body,
+      createdAt: u.createdAt,
+      updateType: u.updateType,
+      rating: u.rating,
+      photoUrl: u.photoUrl,
+      photoFileName: u.photoFileName,
+      reactions: u.reactions,
+    })),
+  ];
+
   return (
     <div className={theme.page}>
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-8 sm:px-6">
@@ -307,16 +318,6 @@ export default function TenantMaintenanceDetailPage() {
             <MaintenanceStatusBadge status={request.status} />
             <MaintenancePriorityBadge priority={request.priority} />
           </div>
-          <p className={cn('mt-3 whitespace-pre-wrap', theme.body)}>
-            {request.description}
-          </p>
-
-          {(request.attachments?.length || 0) > 0 && (
-            <MaintenancePhotoGallery
-              photos={request.attachments || []}
-              className="mt-4"
-            />
-          )}
 
           <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
             <div>
@@ -355,98 +356,49 @@ export default function TenantMaintenanceDetailPage() {
               {formatDate(request.completedDate)}
             </div>
           )}
-          {request.notes && (
-            <div className="mt-3 rounded-md bg-gray-50 p-3">
-              <p className="text-sm text-gray-900">
-                <MessageSquare className="mr-1 inline h-4 w-4" />
-                <span className="font-medium">Notes:</span> {request.notes}
-              </p>
-            </div>
-          )}
 
-          <div className="mt-6 space-y-3 border-t border-gray-100 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Conversation
-            </p>
-            {(request.updates?.length || 0) === 0 ? (
-              <p className="rounded-md border border-dashed border-gray-200 px-3 py-3 text-sm text-gray-500">
-                No updates yet. Office replies and your comments will appear here.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {request.updates!.map((u) => (
-                  <div
-                    key={u.id}
-                    className={cn(
-                      'rounded-md border px-3 py-2',
-                      u.authorRole === 'tenant'
-                        ? 'border-emerald-100 bg-emerald-50/40'
-                        : 'border-gray-100 bg-gray-50'
-                    )}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-                      <span>
-                        {u.authorName || u.authorRole} · {updateTypeLabel(u.updateType)}
-                      </span>
-                      <span>{formatDate(u.createdAt)}</span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-gray-900">
-                      {u.body}
-                    </p>
-                    {u.rating != null && (
-                      <p className="mt-1 text-xs text-amber-700">
-                        Rating: {u.rating}/5
-                      </p>
-                    )}
-                    {u.photoUrl && (
-                      <div className="mt-2">
-                        <LightboxImage
-                          src={u.photoUrl}
-                          alt={u.photoFileName || 'Progress photo'}
-                          title={u.photoFileName || 'Progress photo'}
-                          wrapperClassName="block overflow-hidden rounded-md"
-                          className="h-24 w-auto max-w-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <MaintenanceReactionBar
-                      updateId={u.id}
-                      reactions={
-                        u.reactions || {
-                          like: 0,
-                          heart: 0,
-                          myReaction: null,
-                        }
+          <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="px-4 pt-4">
+              <MaintenanceDiscussionHeader
+                title="Discussion"
+                status={request.status}
+              />
+            </div>
+
+            <div className="px-4 py-3">
+              {discussionMessages.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
+                  No messages yet.
+                </p>
+              ) : (
+                <div>
+                  {discussionMessages.map((message, index) => (
+                    <MaintenanceDiscussionMessage
+                      key={message.id}
+                      message={message}
+                      isLast={index === discussionMessages.length - 1}
+                      reactionBusy={reactionBusyId === message.id}
+                      reactionsDisabled={isPreview}
+                      onToggleReaction={(id, reaction) =>
+                        void toggleReaction(id, reaction)
                       }
-                      disabled={isPreview || reactionBusyId === u.id}
-                      onToggle={(id, reaction) => void toggleReaction(id, reaction)}
                     />
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
 
             {!isClosed && (
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
-                <FormField label="Write a reply" htmlFor="reply-body">
-                  <Textarea
-                    id="reply-body"
-                    rows={3}
-                    value={replyDraft}
-                    onChange={(e) => setReplyDraft(e.target.value)}
-                    placeholder="Comment or reply to the office…"
-                    disabled={isPreview}
-                  />
-                </FormField>
+              <div className="space-y-3 px-4 pb-4">
+                <MaintenanceDiscussionComposer
+                  value={replyDraft}
+                  onChange={setReplyDraft}
+                  disabled={isPreview}
+                  saving={actionBusy}
+                  placeholder="Add a comment"
+                  onSend={() => void runTenantAction('reply')}
+                />
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    isDisabled={actionBusy || isPreview || !replyDraft.trim()}
-                    onClick={() => void runTenantAction('reply')}
-                  >
-                    Send reply
-                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -469,12 +421,13 @@ export default function TenantMaintenanceDetailPage() {
                 {showClosePanel && (
                   <div className="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3">
                     <FormField label="Closing note (optional)" htmlFor="close-note">
-                      <Textarea
+                      <textarea
                         id="close-note"
                         rows={2}
                         value={replyDraft}
                         onChange={(e) => setReplyDraft(e.target.value)}
                         placeholder="Optional note when closing…"
+                        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                       />
                     </FormField>
                     <FormField label="Rating" htmlFor="close-rating">

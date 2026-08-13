@@ -1,19 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { MessageSquare, Star, Wrench, X } from 'lucide-react';
+import { Save, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/forms/FormField';
 import { Select } from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/Textarea';
 import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
-import { MaintenancePhotoGallery } from '@/components/features/MaintenancePhotoGallery';
-import { MaintenanceReactionBar } from '@/components/features/maintenance/MaintenanceReactionBar';
-import { TakePhotoButton } from '@/components/features/TakePhotoButton';
-import { LightboxImage } from '@/components/ui/ImageLightbox';
+import { MaintenanceThreadPanel } from '@/components/features/maintenance/MaintenanceThreadPanel';
 import {
   formatMaintenanceCategory,
   formatMaintenancePriority,
@@ -25,23 +21,6 @@ interface MaintenanceAttachment {
   fileName?: string;
   url: string;
   mimeType?: string;
-}
-
-interface MaintenanceUpdateItem {
-  id: string;
-  authorRole: string;
-  authorName?: string;
-  body: string;
-  updateType: string;
-  rating?: number;
-  photoUrl?: string;
-  photoFileName?: string;
-  createdAt: string;
-  reactions?: {
-    like: number;
-    heart: number;
-    myReaction: 'like' | 'heart' | null;
-  };
 }
 
 interface MaintenanceDetail {
@@ -62,7 +41,6 @@ interface MaintenanceDetail {
   request_date?: string | Date;
   created_at?: string | Date;
   attachments?: MaintenanceAttachment[];
-  updates?: MaintenanceUpdateItem[];
 }
 
 interface AssigneeOption {
@@ -93,21 +71,11 @@ function formatDate(value?: string | Date | null) {
   });
 }
 
-function updateTypeLabel(type: string) {
-  switch (type) {
-    case 'status_change':
-      return 'Status';
-    case 'acknowledgement':
-      return 'Acknowledged';
-    case 'feedback':
-      return 'Feedback';
-    case 'closed':
-      return 'Closed';
-    case 'reply':
-      return 'Reply';
-    default:
-      return 'Progress';
-  }
+function toIso(value?: string | Date | null): string {
+  if (!value) return new Date().toISOString();
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return new Date().toISOString();
+  return d.toISOString();
 }
 
 export function MaintenanceFollowUpPanel({
@@ -115,29 +83,17 @@ export function MaintenanceFollowUpPanel({
   onUpdated,
 }: MaintenanceFollowUpPanelProps) {
   const [request, setRequest] = useState<MaintenanceDetail | null>(null);
-  const [updates, setUpdates] = useState<MaintenanceUpdateItem[]>([]);
   const [loading, setLoading] = useState(Boolean(maintenanceRequestId));
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [savingFields, setSavingFields] = useState(false);
   const [status, setStatus] = useState('open');
   const [priority, setPriority] = useState('medium');
   const [assignedTo, setAssignedTo] = useState('');
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
-  const [progressNote, setProgressNote] = useState('');
-  const [progressPhoto, setProgressPhoto] = useState<File | null>(null);
-  const [progressPreview, setProgressPreview] = useState<string | null>(null);
-  const [reactionBusyId, setReactionBusyId] = useState<string | null>(null);
-
-  const clearProgressPhoto = () => {
-    if (progressPreview) URL.revokeObjectURL(progressPreview);
-    setProgressPhoto(null);
-    setProgressPreview(null);
-  };
 
   const load = useCallback(async () => {
     if (!maintenanceRequestId) {
       setRequest(null);
-      setUpdates([]);
       setLoading(false);
       return;
     }
@@ -157,7 +113,6 @@ export function MaintenanceFollowUpPanel({
       setStatus(String(data.status || 'open'));
       setPriority(String(data.priority || 'medium'));
       setAssignedTo(data.assigned_to ? String(data.assigned_to) : '');
-      setUpdates((data.updates || []) as MaintenanceUpdateItem[]);
     } catch (err) {
       setRequest(null);
       setError(err instanceof Error ? err.message : 'Failed to load request');
@@ -179,83 +134,32 @@ export function MaintenanceFollowUpPanel({
       .catch(() => undefined);
   }, []);
 
-  const toggleReaction = async (
-    updateId: string,
-    reaction: 'like' | 'heart'
-  ) => {
-    setReactionBusyId(updateId);
+  const saveFieldsOnly = async () => {
+    if (!maintenanceRequestId) return;
+    setSavingFields(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/maintenance/updates/${updateId}/reactions`, {
-        method: 'POST',
+      const res = await fetch('/api/maintenance', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reaction }),
+        body: JSON.stringify({
+          id: maintenanceRequestId,
+          status,
+          priority,
+          assignedTo: assignedTo || null,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Could not update reaction');
-      }
-      const nextReactions = json.data.reactions as {
-        like: number;
-        heart: number;
-        myReaction: 'like' | 'heart' | null;
-      };
-      setUpdates((prev) =>
-        prev.map((u) =>
-          u.id === updateId ? { ...u, reactions: nextReactions } : u
-        )
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reaction failed');
-    } finally {
-      setReactionBusyId(null);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (progressPreview) URL.revokeObjectURL(progressPreview);
-    };
-  }, [progressPreview]);
-
-  async function postProgress() {
-    if (!maintenanceRequestId) return;
-    if (!progressNote.trim() && !progressPhoto) {
-      setError('Add a progress note or photo');
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      if (progressNote.trim()) form.append('body', progressNote.trim());
-      form.append('status', status);
-      form.append('priority', priority);
-      form.append('assignedTo', assignedTo || '');
-      if (progressPhoto) form.append('photo', progressPhoto);
-
-      const res = await fetch(
-        `/api/maintenance/${encodeURIComponent(maintenanceRequestId)}/updates`,
-        { method: 'POST', body: form }
-      );
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Failed to post update');
-      }
-      setProgressNote('');
-      clearProgressPhoto();
-      if (Array.isArray(json.data?.updates)) {
-        setUpdates(json.data.updates);
-      } else {
-        await load();
+        throw new Error(json.error || 'Failed to update request');
       }
       onUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to post update');
+      setError(err instanceof Error ? err.message : 'Failed to update request');
     } finally {
-      setSaving(false);
+      setSavingFields(false);
     }
-  }
+  };
 
   if (!maintenanceRequestId) {
     return (
@@ -282,9 +186,9 @@ export function MaintenanceFollowUpPanel({
     .filter(Boolean)
     .join(' · ');
   const isClosed =
-    request.status === 'closed' ||
-    request.status === 'completed' ||
-    request.status === 'cancelled';
+    status === 'closed' ||
+    status === 'completed' ||
+    status === 'cancelled';
 
   return (
     <div className="space-y-6">
@@ -305,9 +209,9 @@ export function MaintenanceFollowUpPanel({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <MaintenanceStatusBadge status={String(request.status || 'open')} />
+            <MaintenanceStatusBadge status={String(status || 'open')} />
             <MaintenancePriorityBadge
-              priority={String(request.priority || 'medium')}
+              priority={String(priority || 'medium')}
             />
           </div>
         </div>
@@ -328,13 +232,13 @@ export function MaintenanceFollowUpPanel({
           <div>
             <dt className="text-xs text-gray-500">Priority</dt>
             <dd className="font-medium text-gray-900">
-              {formatMaintenancePriority(request.priority)}
+              {formatMaintenancePriority(priority)}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500">Status</dt>
             <dd className="font-medium text-gray-900">
-              {formatMaintenanceStatus(request.status)}
+              {formatMaintenanceStatus(status)}
             </dd>
           </div>
           {request.tenant_email && (
@@ -350,94 +254,14 @@ export function MaintenanceFollowUpPanel({
             </div>
           )}
         </dl>
-
-        {request.description && (
-          <div className="mt-4 border-t border-gray-200 pt-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Description
-            </p>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
-              {request.description}
-            </p>
-          </div>
-        )}
-
-        <div className="mt-4">
-          <MaintenancePhotoGallery
-            photos={(request.attachments || []).map((a) => ({
-              id: a.id,
-              fileName: a.fileName,
-              url: a.url,
-              mimeType: a.mimeType,
-            }))}
-            emptyLabel="No photos attached"
-          />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Progress & replies</h3>
-          <p className="text-xs text-gray-500">
-            Tenant is notified for each update you post.
-          </p>
-        </div>
-
-        {updates.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-500">
-            No progress updates yet.
-          </p>
-        ) : (
-          <ul className="space-y-3">
-            {updates.map((u) => (
-              <li
-                key={u.id}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-gray-700">
-                    {u.authorName || u.authorRole} · {updateTypeLabel(u.updateType)}
-                  </p>
-                  <p className="text-xs text-gray-500">{formatDate(u.createdAt)}</p>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-gray-900">{u.body}</p>
-                {u.rating != null && (
-                  <p className="mt-1 inline-flex items-center gap-1 text-xs text-amber-700">
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    {u.rating}/5
-                  </p>
-                )}
-                {u.photoUrl && (
-                  <div className="mt-2">
-                    <LightboxImage
-                      src={u.photoUrl}
-                      alt={u.photoFileName || 'Progress photo'}
-                      title={u.photoFileName || 'Progress photo'}
-                      wrapperClassName="block overflow-hidden rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
-                      className="h-28 w-auto max-w-full object-cover"
-                    />
-                  </div>
-                )}
-                <MaintenanceReactionBar
-                  updateId={u.id}
-                  reactions={
-                    u.reactions || { like: 0, heart: 0, myReaction: null }
-                  }
-                  disabled={reactionBusyId === u.id}
-                  onToggle={(id, reaction) => void toggleReaction(id, reaction)}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       {!isClosed && (
         <section className="space-y-4 rounded-lg border border-gray-200 p-4">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Post progress update</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Update request</h3>
             <p className="text-xs text-gray-500">
-              One click saves status, priority, assignee, and your reply for the tenant.
+              Change status or assignee, then comment in the discussion below.
             </p>
           </div>
 
@@ -482,61 +306,55 @@ export function MaintenanceFollowUpPanel({
             </FormField>
           </div>
 
-          <FormField label="Update note" htmlFor="maint-progress-note">
-            <Textarea
-              id="maint-progress-note"
-              rows={3}
-              value={progressNote}
-              onChange={(e) => setProgressNote(e.target.value)}
-              placeholder="e.g. Replaced lock cylinder, tested door…"
-            />
-          </FormField>
-
-          <div className="flex flex-wrap items-start gap-3">
-            <TakePhotoButton
-              disabled={saving}
-              onCapture={(file) => {
-                if (progressPreview) URL.revokeObjectURL(progressPreview);
-                setProgressPhoto(file);
-                setProgressPreview(URL.createObjectURL(file));
-              }}
-              title="Take progress photo"
-              description="Capture work progress for the tenant."
-              fileNamePrefix="maintenance-progress"
-            />
-            {progressPreview && (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={progressPreview}
-                  alt="Progress preview"
-                  className="h-20 w-20 rounded-md object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={clearProgressPhoto}
-                  className="absolute -right-1.5 -top-1.5 rounded-full bg-gray-900 p-0.5 text-white"
-                  aria-label="Remove photo"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-
           <div className="flex justify-end">
             <Button
               type="button"
-              onClick={() => void postProgress()}
-              isLoading={saving}
-              disabled={saving}
-              leftIcon={<MessageSquare className="h-4 w-4" />}
+              size="sm"
+              variant="outline"
+              leftIcon={<Save className="h-4 w-4" />}
+              isLoading={savingFields}
+              isDisabled={savingFields}
+              onClick={() => void saveFieldsOnly()}
             >
-              Post update
+              Save status
             </Button>
           </div>
         </section>
       )}
+
+      <MaintenanceThreadPanel
+        requestId={maintenanceRequestId}
+        status={status}
+        title="Discussion"
+        fields={{
+          status,
+          priority,
+          assignedTo: assignedTo || null,
+        }}
+        disabled={isClosed}
+        seedMessage={{
+          authorName: request.tenant_name || 'Tenant',
+          authorRole: 'tenant',
+          body: [request.title, request.description].filter(Boolean).join('\n\n'),
+          createdAt: toIso(request.request_date || request.created_at),
+          photos: (request.attachments || []).map((a) => ({
+            url: a.url,
+            fileName: a.fileName,
+          })),
+        }}
+        onPosted={(result) => {
+          if (result.request?.status) setStatus(String(result.request.status));
+          if (result.request?.priority) setPriority(String(result.request.priority));
+          if (result.request && 'assignedTo' in result.request) {
+            setAssignedTo(
+              result.request.assignedTo != null
+                ? String(result.request.assignedTo)
+                : ''
+            );
+          }
+          onUpdated?.();
+        }}
+      />
     </div>
   );
 }

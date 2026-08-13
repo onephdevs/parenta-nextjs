@@ -88,7 +88,7 @@ function UnitThumbs({
             <LightboxImage
               src={getImageUrl(t.imagePath)}
               alt={t.roomNumber}
-              title={`Unit ${t.roomNumber}`}
+              title={t.roomNumber}
               wrapperClassName="h-full w-full focus:outline-none"
               className="h-full w-full object-cover"
             />
@@ -566,7 +566,7 @@ export default function PropertyReportPanel({
                       <LightboxImage
                         src={getImageUrl(unit.imagePath)}
                         alt={unit.roomNumber}
-                        title={`Unit ${unit.roomNumber}`}
+                        title={unit.roomNumber}
                         wrapperClassName="block h-full w-full focus:outline-none"
                         className="h-full w-full object-cover"
                       />
@@ -579,7 +579,7 @@ export default function PropertyReportPanel({
                   <div className="p-3">
                     <div className="flex items-start justify-between gap-1">
                       <p className="truncate text-sm font-semibold text-indigo-900">
-                        Unit {unit.roomNumber}
+                        {unit.roomNumber}
                       </p>
                       <span className="text-xs text-gray-500">
                         {unit.reason === 'awaiting_signature'
