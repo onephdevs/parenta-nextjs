@@ -67,16 +67,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!referenceNumberRaw) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Reference / transaction number is required',
-        },
-        { status: 400 }
-      );
-    }
-
     if (!paymentIdRaw && !invoiceIdRaw && !paymentDateRaw) {
       return NextResponse.json(
         {
@@ -162,13 +152,13 @@ export async function POST(request: NextRequest) {
           paymentMethod,
           paymentDateRaw || invoice.due_date,
           invoice.due_date,
-          referenceNumberRaw,
+          referenceNumberRaw || null,
           parentaTxnId,
           [
             `Parenta txn ${parentaTxnId}`,
             `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})`,
             'Status: awaiting office verification — invoice balance not updated yet.',
-            `GCash / bank reference: ${referenceNumberRaw}`,
+            referenceNumberRaw ? `GCash / bank reference: ${referenceNumberRaw}` : null,
             notesRaw ? `Tenant notes: ${notesRaw}` : null,
           ]
             .filter(Boolean)
@@ -176,7 +166,7 @@ export async function POST(request: NextRequest) {
         ]
       );
       paymentId = createPayment.rows[0].id;
-      // Do not allocate until an admin confirms the transaction ID / receipt.
+      // Do not allocate until an admin confirms the receipt.
     } else {
       // Custom payment date (no existing payment / invoice)
       if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
@@ -204,14 +194,16 @@ export async function POST(request: NextRequest) {
           paymentType,
           paymentMethod,
           paymentDateRaw,
-          referenceNumberRaw,
+          referenceNumberRaw || null,
           parentaTxnId,
           [
             `Parenta txn ${parentaTxnId}`,
-            `GCash / bank reference: ${referenceNumberRaw}`,
+            referenceNumberRaw ? `GCash / bank reference: ${referenceNumberRaw}` : null,
             notesRaw || `Receipt uploaded for payment dated ${paymentDateRaw}`,
             'Status: awaiting office verification — balance not updated yet.',
-          ].join('\n'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
         ]
       );
       paymentId = createPayment.rows[0].id;
@@ -258,7 +250,10 @@ export async function POST(request: NextRequest) {
            receipt_file_name = $2,
            receipt_file_size = $3,
            receipt_uploaded_at = CURRENT_TIMESTAMP,
-           payment_status = 'pending',
+           payment_status = CASE
+             WHEN payment_status IN ('paid', 'completed', 'confirmed') THEN payment_status
+             ELSE 'pending'
+           END,
            payment_method = COALESCE(NULLIF($5, ''), payment_method),
            reference_number = COALESCE(NULLIF($6, ''), reference_number),
            parenta_txn_id = COALESCE(parenta_txn_id, $7),
@@ -313,7 +308,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message:
-        'Payment submitted for verification. Your invoice balance updates after the office confirms the GCash / bank reference.',
+        'Payment submitted for verification. Your invoice balance updates after the office confirms it.',
       data: {
         paymentId: paymentRow.id,
         invoiceId: linkedInvoiceId,

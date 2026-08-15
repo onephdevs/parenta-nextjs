@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: 'Receipt image required',
         details:
-          'All tenant payments require a receipt screenshot and reference number. Use Pay online or Upload receipt.',
+          'All tenant payments require a receipt screenshot. Use Pay online or Upload receipt.',
       },
       { status: 400 }
     );

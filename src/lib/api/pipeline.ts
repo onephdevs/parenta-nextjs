@@ -1120,6 +1120,7 @@ export function resolvePaymentStageFromInvoice(input: {
     balance <= 0 ||
     status === 'paid' ||
     status === 'cancelled' ||
+    status === 'draft' ||
     billStatus === 'PAID'
   ) {
     return 'paid';
@@ -1175,6 +1176,7 @@ async function getFocusInvoiceForTenant(
      FROM invoices
      WHERE tenant_id = $1
        AND invoice_status IS DISTINCT FROM 'cancelled'
+       AND invoice_status IS DISTINCT FROM 'draft'
      ORDER BY COALESCE(negotiated_due_date, due_date) DESC NULLS LAST, created_at DESC
      LIMIT 1`,
     [tenantId]

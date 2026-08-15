@@ -40,21 +40,12 @@ export default function ConfirmPaymentActions({
     if (action === 'confirm') {
       const expected = normalizeTxn(referenceNumber);
       const entered = normalizeTxn(confirmedReference);
-      if (!expected) {
-        showNotification({
-          type: 'error',
-          title: 'Missing transaction ID',
-          message:
-            'This payment has no reference number. Ask the tenant to resubmit with a transaction ID.',
-        });
-        return;
-      }
-      if (!entered || entered !== expected) {
+      if (expected && entered && entered !== expected) {
         showNotification({
           type: 'error',
           title: 'Transaction ID mismatch',
           message:
-            'Entered reference does not match the tenant’s transaction ID. Check the receipt and try again.',
+            'Entered reference does not match the one on file. Leave it blank to confirm without a match.',
         });
         return;
       }
@@ -123,16 +114,14 @@ export default function ConfirmPaymentActions({
       <ConfirmDialog
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={(value) => void runAction('confirm', value)}
+        onConfirm={() => void runAction('confirm')}
         title="Confirm payment received"
-        message={`Confirm ${amountLabel} was received.\n\nTenant transaction ID on file: ${
-          referenceNumber || 'N/A'
-        }\n\nType the transaction / reference number to verify it matches the receipt.`}
+        message={`Confirm ${amountLabel} was received? Reference number is optional for now${
+          referenceNumber ? ` (on file: ${referenceNumber})` : ''
+        }.`}
         confirmText="Confirm received"
         cancelText="Cancel"
         variant="success"
-        mode="prompt"
-        promptPlaceholder="Enter transaction ID"
         isLoading={isSubmitting}
       />
 

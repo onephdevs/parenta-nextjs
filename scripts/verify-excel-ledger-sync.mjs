@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
  * Cross-check APARTMENT-1 / APRTMENT-2 against the Jun 16–Jul 15 Excel ledger.
- * Exit 0 only when occupancy, Aug/Sep invoices, paid allocations, hub Paid
- * filter, unpaid utilities, and leftover Dev Test checks all pass.
+ * Exit 0 only when occupancy, July waterfall / grand total, Aug/Sep invoices,
+ * paid allocations, hub Paid filter, payment-board stages, unpaid utilities,
+ * module coverage (contacts, activity, task cards), and leftover Dev Test
+ * checks all pass.
  *
  * Usage: node scripts/verify-excel-ledger-sync.mjs
  */
@@ -17,8 +19,23 @@ config({ path: join(root, '.env.local') });
 config({ path: join(root, '.env') });
 
 const INVOICE_TAG = 'excel-ledger-rent:2026-08+09';
+const LEDGER_TAG = 'ledger:2026-06-16:2026-07-15';
+const EXP_TAG = 'ledger-exp:2026-06-16:2026-07-15';
 const PERIOD_START = '2026-06-16';
 const PERIOD_END = '2026-07-15';
+
+/** July cycle (Jun 16–Jul 15) Excel waterfall — tenant cash only; vacant meters are expenses. */
+const JULY_WATERFALL = {
+  rent: 149300,
+  advance: 17600,
+  deposit: 32200,
+  utility: 50823,
+  collection: 249923,
+  expenses: 110353,
+  ima: 20000,
+  cheque: 25000,
+  grandTotal: 144570,
+};
 
 const APT1_EXCEL = {
   'Unit 1': { rent: 4800, dueDay: 15, cash: 4800 },
@@ -288,6 +305,112 @@ try {
     `Allocated cash ${s1.paidAmt + s2.paidAmt} vs 166900`
   );
 
+  const APT_BUILDING = `(b.name ILIKE '%apartment-1%' OR b.name ILIKE '%aprtment-2%' OR b.name ILIKE '%villasol%')`;
+  const PAID_CASH = `p.payment_status IN ('paid', 'completed', 'confirmed')
+      AND LOWER(COALESCE(p.payment_method, 'cash')) NOT IN ('cheque', 'check')`;
+  const byType = await client.query(
+    `SELECT p.payment_type, COALESCE(SUM(p.amount), 0)::float AS amt, COUNT(*)::int AS n
+     FROM payments p
+     LEFT JOIN rooms r ON r.id = p.room_id
+     LEFT JOIN buildings b ON b.id = r.building_id
+     WHERE p.payment_date BETWEEN $1::date AND $2::date
+       AND ${PAID_CASH}
+       AND (${APT_BUILDING} OR p.notes ILIKE $3)
+     GROUP BY 1`,
+    [PERIOD_START, PERIOD_END, `%${LEDGER_TAG}%`]
+  );
+  const typeAmt = Object.fromEntries(byType.rows.map((r) => [r.payment_type, r.amt]));
+  check(
+    Math.abs((typeAmt.rent || 0) - JULY_WATERFALL.rent) < 0.01,
+    `July rent cash ${typeAmt.rent || 0} vs ${JULY_WATERFALL.rent}`
+  );
+  check(
+    Math.abs((typeAmt.advance || 0) - JULY_WATERFALL.advance) < 0.01,
+    `July advance ${typeAmt.advance || 0} vs ${JULY_WATERFALL.advance}`
+  );
+  check(
+    Math.abs((typeAmt.deposit || 0) - JULY_WATERFALL.deposit) < 0.01,
+    `July deposit ${typeAmt.deposit || 0} vs ${JULY_WATERFALL.deposit}`
+  );
+  check(
+    Math.abs((typeAmt.utility || 0) - JULY_WATERFALL.utility) < 0.01,
+    `July paid utilities ${typeAmt.utility || 0} vs ${JULY_WATERFALL.utility}`
+  );
+
+  const wf = await client.query(
+    `SELECT
+       (
+         SELECT COALESCE(SUM(p.amount), 0)
+         FROM payments p
+         LEFT JOIN rooms r ON r.id = p.room_id
+         LEFT JOIN buildings b ON b.id = r.building_id
+         WHERE p.payment_date BETWEEN $1::date AND $2::date
+           AND ${PAID_CASH}
+           AND (${APT_BUILDING} OR p.notes ILIKE $3)
+       )::float AS collection,
+       (
+         SELECT COALESCE(SUM(e.amount), 0)
+         FROM expenses e
+         WHERE e.expense_date BETWEEN $1::date AND $2::date
+           AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+           AND COALESCE(e.category, 'other') NOT IN ('cash_allowance', 'owner_draw')
+           AND e.notes ILIKE $4
+       )::float AS expenses,
+       (
+         SELECT COALESCE(SUM(e.amount), 0)
+         FROM expenses e
+         WHERE e.expense_date BETWEEN $1::date AND $2::date
+           AND COALESCE(e.expense_status, 'pending') IS DISTINCT FROM 'cancelled'
+           AND COALESCE(e.category, 'other') IN ('cash_allowance', 'owner_draw')
+       )::float AS ima,
+       (
+         SELECT COALESCE(SUM(p.amount), 0)
+         FROM payments p
+         WHERE p.payment_date BETWEEN $1::date AND $2::date
+           AND p.payment_status IN ('paid', 'completed', 'confirmed')
+           AND LOWER(COALESCE(p.payment_method, '')) IN ('cheque', 'check')
+       )::float AS cheque`,
+    [PERIOD_START, PERIOD_END, `%${LEDGER_TAG}%`, `%${EXP_TAG}%`]
+  );
+  const waterfall = wf.rows[0];
+  const afterExpenses = waterfall.collection - waterfall.expenses;
+  const cashForDeposit = afterExpenses - waterfall.ima;
+  const grandTotal = cashForDeposit + waterfall.cheque;
+  check(
+    Math.abs(waterfall.collection - JULY_WATERFALL.collection) < 0.01,
+    `July collection ${waterfall.collection} vs ${JULY_WATERFALL.collection}`
+  );
+  check(
+    Math.abs(waterfall.expenses - JULY_WATERFALL.expenses) < 0.01,
+    `July expenses ${waterfall.expenses} vs ${JULY_WATERFALL.expenses}`
+  );
+  check(
+    Math.abs(waterfall.ima - JULY_WATERFALL.ima) < 0.01,
+    `July Ima cash allowance ${waterfall.ima} vs ${JULY_WATERFALL.ima}`
+  );
+  check(
+    Math.abs(waterfall.cheque - JULY_WATERFALL.cheque) < 0.01,
+    `July hardware cheque ${waterfall.cheque} vs ${JULY_WATERFALL.cheque}`
+  );
+  check(
+    Math.abs(grandTotal - JULY_WATERFALL.grandTotal) < 0.01,
+    `July grand total ${grandTotal} vs ${JULY_WATERFALL.grandTotal}`
+  );
+
+  const pendingClaims = await client.query(
+    `SELECT COUNT(*)::int AS n
+     FROM payments p
+     LEFT JOIN rooms r ON r.id = p.room_id
+     LEFT JOIN buildings b ON b.id = r.building_id
+     WHERE p.payment_status = 'pending'
+       AND (${APT_BUILDING} OR p.notes ILIKE $1)`,
+    [`%${LEDGER_TAG}%`]
+  );
+  check(
+    pendingClaims.rows[0].n === 0,
+    `Apt 1/2 pending payment claims ${pendingClaims.rows[0].n} vs 0 (ledger cash is already paid; no GCash ref required)`
+  );
+
   const hubPaid = await client.query(`
     WITH unit AS (
       SELECT tra.tenant_id, b.name AS building_name
@@ -384,6 +507,134 @@ try {
     `Non-excel invoices remaining ${extraInv.rows[0].n} (expect 0)`
   );
 
+  const moduleIds = [apt1.id, apt2.id];
+  const occupiedTenants = await client.query(
+    `SELECT COUNT(*)::int AS n
+     FROM tenants t
+     JOIN tenant_room_assignments tra
+       ON tra.tenant_id = t.id AND tra.assignment_status = 'active'
+     JOIN rooms r ON r.id = tra.room_id
+     WHERE r.building_id = ANY($1::uuid[])`,
+    [moduleIds]
+  );
+  const occN = occupiedTenants.rows[0].n;
+  check(occN === 34, `Occupied Apt 1/2 tenants ${occN} vs 34`);
+
+  const portal = await client.query(
+    `SELECT COUNT(*)::int AS n
+     FROM tenants t
+     JOIN tenant_room_assignments tra
+       ON tra.tenant_id = t.id AND tra.assignment_status = 'active'
+     JOIN rooms r ON r.id = tra.room_id
+     WHERE r.building_id = ANY($1::uuid[]) AND t.user_id IS NOT NULL`,
+    [moduleIds]
+  );
+  check(portal.rows[0].n === occN, `Portal users ${portal.rows[0].n} vs occupied ${occN}`);
+
+  const people = await client.query(
+    `SELECT COUNT(DISTINCT c.tenant_id)::int AS n
+     FROM contacts c
+     JOIN contact_roles cr ON cr.contact_id = c.id AND cr.role = 'TENANT'
+     JOIN tenant_room_assignments tra
+       ON tra.tenant_id = c.tenant_id AND tra.assignment_status = 'active'
+     JOIN rooms r ON r.id = tra.room_id
+     WHERE r.building_id = ANY($1::uuid[])`,
+    [moduleIds]
+  );
+  check(people.rows[0].n === occN, `People/contacts ${people.rows[0].n} vs occupied ${occN}`);
+
+  const activity = await client.query(
+    `SELECT COUNT(DISTINCT al.entity_id)::int AS n
+     FROM activity_log al
+     JOIN tenant_room_assignments tra
+       ON tra.tenant_id = al.entity_id AND tra.assignment_status = 'active'
+     JOIN rooms r ON r.id = tra.room_id
+     WHERE r.building_id = ANY($1::uuid[])
+       AND al.entity_type = 'tenant'`,
+    [moduleIds]
+  );
+  check(activity.rows[0].n === occN, `Activity log ${activity.rows[0].n} vs occupied ${occN}`);
+
+  const onboard = await client.query(
+    `SELECT COUNT(DISTINCT c.tenant_id)::int AS n
+     FROM pipeline_cards c
+     JOIN pipeline_boards b ON b.id = c.board_id AND b.slug = 'onboarding'
+     JOIN tenant_room_assignments tra
+       ON tra.tenant_id = c.tenant_id AND tra.assignment_status = 'active'
+     JOIN rooms r ON r.id = tra.room_id
+     WHERE r.building_id = ANY($1::uuid[])`,
+    [moduleIds]
+  );
+  check(onboard.rows[0].n === occN, `Onboarding cards ${onboard.rows[0].n} vs occupied ${occN}`);
+
+  const payCards = await client.query(
+    `SELECT COUNT(DISTINCT c.tenant_id)::int AS n
+     FROM pipeline_cards c
+     JOIN pipeline_boards b ON b.id = c.board_id AND b.slug = 'payments'
+     JOIN tenant_room_assignments tra
+       ON tra.tenant_id = c.tenant_id AND tra.assignment_status = 'active'
+     JOIN rooms r ON r.id = tra.room_id
+     WHERE r.building_id = ANY($1::uuid[])`,
+    [moduleIds]
+  );
+  check(payCards.rows[0].n === occN, `Payments cards ${payCards.rows[0].n} vs occupied ${occN}`);
+
+  const payStages = await client.query(
+    `SELECT s.slug AS stage, r.room_number, trim(b.name) AS building
+     FROM pipeline_cards c
+     JOIN pipeline_boards pb ON pb.id = c.board_id AND pb.slug = 'payments'
+     JOIN pipeline_stages s ON s.id = c.stage_id
+     JOIN rooms r ON r.id = c.room_id
+     JOIN buildings b ON b.id = r.building_id
+     WHERE r.building_id = ANY($1::uuid[])
+       AND c.card_status IN ('open', 'won')
+     ORDER BY s.slug, r.room_number`,
+    [moduleIds]
+  );
+  const paidCards = payStages.rows.filter((r) => r.stage === 'paid');
+  const chaseCards = payStages.rows.filter((r) => r.stage !== 'paid');
+  const pendingVerify = payStages.rows.filter((r) => r.stage === 'pending_verification');
+  check(paidCards.length === 32, `Payments board Paid ${paidCards.length} vs 32`);
+  check(
+    pendingVerify.length === 0,
+    `Payments board pending_verification ${pendingVerify.length} vs 0 (do not chase Sep drafts or ask for GCash refs on synced cash)`
+  );
+  check(chaseCards.length === 2, `Payments board open chase ${chaseCards.length} vs 2`);
+  const chaseRooms = chaseCards.map((r) => r.room_number).sort();
+  check(
+    chaseRooms.join(',') === 'Unit 27,Unit 7',
+    `Payments board open units ${chaseRooms.join(', ') || 'none'} vs Unit 7 + Unit 27`
+  );
+  const unit7 = chaseCards.find((r) => r.room_number === 'Unit 7');
+  const unit27 = chaseCards.find((r) => r.room_number === 'Unit 27');
+  check(
+    !!unit7 && unit7.stage !== 'paid' && unit7.stage !== 'pending_verification',
+    `Unit 7 board stage ${unit7?.stage || 'MISSING'} (partial Aug rent — due/upcoming/overdue, not paid)`
+  );
+  check(
+    !!unit27 && unit27.stage === 'overdue',
+    `Unit 27 board stage ${unit27?.stage || 'MISSING'} vs overdue`
+  );
+
+  const expCards = await client.query(
+    `SELECT COUNT(*)::int AS n
+     FROM pipeline_cards c
+     JOIN expenses e ON e.id = c.expense_id
+     WHERE e.building_id = ANY($1::uuid[])
+       AND e.notes ILIKE '%ledger-exp:2026-06-16:2026-07-15%'`,
+    [moduleIds]
+  );
+  const expRows = await client.query(
+    `SELECT COUNT(*)::int AS n FROM expenses
+     WHERE building_id = ANY($1::uuid[])
+       AND notes ILIKE '%ledger-exp:2026-06-16:2026-07-15%'`,
+    [moduleIds]
+  );
+  check(
+    expCards.rows[0].n === expRows.rows[0].n,
+    `Expense cards ${expCards.rows[0].n} vs tagged expenses ${expRows.rows[0].n}`
+  );
+
   const fail = checks.filter((c) => !c.ok);
   const pass = checks.filter((c) => c.ok);
   console.log(
@@ -395,8 +646,20 @@ try {
         fail: fail.length,
         apt1: s1,
         apt2: s2,
+        julyWaterfall: {
+          ...waterfall,
+          afterExpenses,
+          cashForDeposit,
+          grandTotal,
+          expected: JULY_WATERFALL,
+        },
         hubPaid: hubPaid.rows[0],
         rentDueTenants: rentDue.rows[0].tenants,
+        paymentBoard: {
+          paid: paidCards.length,
+          chase: chaseCards.map((r) => `${r.room_number}:${r.stage}`),
+        },
+        pendingClaims: pendingClaims.rows[0].n,
         unpaidUtils: utils.rows,
         buildings: names,
         failures: fail.map((f) => f.msg),

@@ -383,8 +383,8 @@ export function PaymentFollowUpPanel({
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Recent payments</h3>
           <p className="text-xs text-gray-500">
-            Match the tenant’s transaction ID to the receipt, then confirm or reject pending
-            claims.
+            Match the receipt if one is attached, then confirm or reject pending
+            claims. Reference number is optional for now.
           </p>
         </div>
 
@@ -396,7 +396,7 @@ export function PaymentFollowUpPanel({
                 : `${pendingClaims.length} payments waiting for verification`}
             </p>
             <p className="mt-1 text-amber-900">
-              Open the receipt, re-type the transaction ID, then Confirm payment. Invoice
+              Open the receipt if one is attached, then Confirm payment. Invoice
               balance does not change until you confirm.
             </p>
           </div>
@@ -477,7 +477,7 @@ export function PaymentFollowUpPanel({
                   {(payment.paymentStatus || '').toLowerCase() === 'pending' && (
                     <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/80 p-3">
                       <p className="mb-2 text-xs font-medium text-amber-950">
-                        Verify GCash reference against the receipt photo, then Confirm. Card
+                        Verify the receipt if one is attached, then Confirm. Card
                         moves to Paid when money is confirmed.
                       </p>
                       <ConfirmPaymentActions

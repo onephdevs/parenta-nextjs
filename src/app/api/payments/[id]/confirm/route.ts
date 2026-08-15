@@ -59,30 +59,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .toLowerCase()
         .replace(/\s+/g, '');
 
-      if (!expected) {
+      // Reference is optional for now (ledger imports have none). If both sides
+      // are present, still warn on a mismatch so typed refs are not ignored.
+      if (expected && entered && entered !== expected) {
         return NextResponse.json(
           {
             error:
-              'Payment has no transaction / reference number. Ask the tenant to resubmit with one.',
-          },
-          { status: 400 }
-        );
-      }
-
-      if (!entered || entered !== expected) {
-        return NextResponse.json(
-          {
-            error:
-              'Transaction ID does not match. Re-check the receipt reference number.',
-          },
-          { status: 400 }
-        );
-      }
-
-      if (!payment.receiptFilePath) {
-        return NextResponse.json(
-          {
-            error: 'Payment has no receipt attached. Cannot confirm without proof.',
+              'Transaction ID does not match. Re-check the receipt reference number, or leave it blank.',
           },
           { status: 400 }
         );

@@ -44,15 +44,6 @@ export default function DepositPaymentForm({
       return;
     }
 
-    if (!referenceNumber.trim()) {
-      showNotification({
-        type: 'error',
-        title: 'Reference required',
-        message: 'Enter the transaction / reference number from your receipt',
-      });
-      return;
-    }
-
     if (!selectedFile) {
       showNotification({
         type: 'error',
@@ -90,7 +81,7 @@ export default function DepositPaymentForm({
           title: 'Payment submitted',
           message:
             data.message ||
-            'Receipt uploaded. Balance updates after the office verifies the transaction ID.',
+            'Receipt uploaded. Balance updates after the office confirms it.',
         });
         setSelectedFile(null);
         setReferenceNumber('');
@@ -126,8 +117,8 @@ export default function DepositPaymentForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <Alert variant="info">
-        <strong>Note:</strong> Attach your receipt and transaction ID. The office confirms
-        before deposit/advance balances update.
+        <strong>Note:</strong> Attach your receipt. A transaction ID is optional for now.
+        The office confirms before deposit/advance balances update.
       </Alert>
 
       <FormField label="Payment Type" htmlFor="paymentType-deposit" required>
@@ -211,15 +202,14 @@ export default function DepositPaymentForm({
       <FormField
         label="Reference / transaction number"
         htmlFor="referenceNumber"
-        required
+        hint="Optional for now"
       >
         <Input
           type="text"
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
-          placeholder="e.g. 1234567890"
-          required
+          placeholder="Optional"
         />
       </FormField>
 
@@ -252,8 +242,7 @@ export default function DepositPaymentForm({
           isDisabled={
             !amount ||
             parseFloat(amount) <= 0 ||
-            !selectedFile ||
-            !referenceNumber.trim()
+            !selectedFile
           }
           leftIcon={<DollarSign className="h-5 w-5" />}
         >

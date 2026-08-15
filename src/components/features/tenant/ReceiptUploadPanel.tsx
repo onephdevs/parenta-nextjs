@@ -97,15 +97,6 @@ export function ReceiptUploadPanel({
       return;
     }
 
-    if (!referenceNumber.trim()) {
-      showNotification({
-        type: 'error',
-        title: 'Reference required',
-        message: 'Enter the transaction / reference number from your receipt',
-      });
-      return;
-    }
-
     const needsAmount = selected?.kind !== 'payment';
     const amountValue = parseFloat(amount);
     if (needsAmount && (!amount || amountValue <= 0)) {
@@ -162,7 +153,7 @@ export function ReceiptUploadPanel({
         type: 'success',
         title: 'Receipt uploaded',
         message:
-          'Submitted for verification. Balance updates after the office confirms the transaction ID.',
+          'Submitted for verification. Balance updates after the office confirms the payment.',
       });
       setSelectedFile(null);
       setNotes('');
@@ -231,16 +222,14 @@ export function ReceiptUploadPanel({
         <FormField
           label="Reference / transaction number"
           htmlFor="receipt-reference"
-          required
-          hint="From your GCash, Maya, or bank transfer confirmation"
+          hint="Optional for now"
           className="sm:col-span-2"
         >
           <Input
             id="receipt-reference"
             value={referenceNumber}
             onChange={(e) => setReferenceNumber(e.target.value)}
-            placeholder="e.g. 1234567890"
-            required
+            placeholder="Optional"
           />
         </FormField>
 
@@ -268,7 +257,7 @@ export function ReceiptUploadPanel({
           type="submit"
           variant="success"
           isLoading={isUploading}
-          disabled={isUploading || !selectedFile || !referenceNumber.trim()}
+          disabled={isUploading || !selectedFile}
           leftIcon={<Upload className="h-4 w-4" />}
           className={theme.primaryButton}
         >

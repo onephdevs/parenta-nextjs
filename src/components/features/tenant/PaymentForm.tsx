@@ -162,15 +162,6 @@ export default function PaymentForm({
       return;
     }
 
-    if (!referenceNumber.trim()) {
-      showNotification({
-        type: 'error',
-        title: 'Reference required',
-        message: 'Enter the GCash / transfer reference number from your receipt',
-      });
-      return;
-    }
-
     if (!selectedFile) {
       showNotification({
         type: 'error',
@@ -378,16 +369,14 @@ export default function PaymentForm({
       <FormField
         label="GCash / bank reference"
         htmlFor="referenceNumber"
-        required
-        hint="Copy the reference number from your GCash receipt (not the Parenta txn). Attach the receipt photo below."
+        hint="Optional for now. You can add it later when we start matching receipts."
       >
         <Input
           id="referenceNumber"
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
-          placeholder="e.g. 1234 567 890"
+          placeholder="Optional"
           className={theme.input}
-          required
         />
       </FormField>
 

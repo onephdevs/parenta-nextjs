@@ -18,8 +18,8 @@ const SUPPORTED_FILE_TYPES = CONSTANTS.MODULE.UPLOAD
 
 /**
  * POST /api/tenant/payments/manual
- * Tenant submits a manual payment claim with required receipt + reference number.
- * Status stays pending until an admin confirms the transaction ID.
+ * Tenant submits a manual payment claim with a receipt.
+ * Reference number is optional for now. Status stays pending until an admin confirms.
  */
 export async function POST(request: Request) {
   try {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
         {
           success: false,
           error:
-            'Receipt image is required. Submit payment with a receipt photo and reference number.',
+            'Receipt image is required. Submit payment with a receipt photo.',
         },
         { status: 400 }
       );
@@ -62,16 +62,6 @@ export async function POST(request: Request) {
     if (!isAllowedPaymentType(paymentType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid payment type' },
-        { status: 400 }
-      );
-    }
-
-    if (!referenceNumber) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Reference / transaction number is required',
-        },
         { status: 400 }
       );
     }
@@ -126,7 +116,7 @@ export async function POST(request: Request) {
       notes || null,
       `Parenta txn ${parentaTxnId}`,
       'Status: awaiting office verification — balance not updated yet.',
-      `GCash / bank reference: ${referenceNumber}`,
+      referenceNumber ? `GCash / bank reference: ${referenceNumber}` : null,
     ].filter(Boolean);
 
     const paymentResult = await pool.query(
@@ -159,7 +149,7 @@ export async function POST(request: Request) {
         amount,
         paymentType,
         paymentMethod,
-        referenceNumber,
+        referenceNumber || null,
         parentaTxnId,
         noteParts.join('\n'),
         filePath,
@@ -212,7 +202,7 @@ export async function POST(request: Request) {
         status: 'pending',
       },
       message:
-        'Payment submitted for verification. Your balance updates after the office confirms the GCash / bank reference.',
+        'Payment submitted for verification. Your balance updates after the office confirms it.',
     });
   } catch (error) {
     console.error('Error recording manual payment:', error);
