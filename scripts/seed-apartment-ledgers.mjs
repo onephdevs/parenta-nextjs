@@ -8,6 +8,7 @@
  * - assignment deposit/advance/utility_deposit amounts for new tenants
  *
  * Idempotent: skips if a matching payment / utility bill already exists for the period.
+ * If August rent invoices exist, allocates ledger rent/advance cash onto them.
  *
  * Usage: node scripts/seed-apartment-ledgers.mjs
  */
@@ -15,6 +16,7 @@ import { config } from 'dotenv';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
+import { allocateExcelLedgerToAugustInvoices } from './lib/allocate-excel-ledger-to-aug-invoices.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -498,6 +500,7 @@ try {
       ? 'Hardware rental cheque ₱25000 recorded.'
       : `Hardware rental cheque skipped (${cheque.reason || 'already exists'}).`
   );
+  await allocateExcelLedgerToAugustInvoices(client);
   console.log('\nLedger import complete.');
 } catch (err) {
   console.error(err);

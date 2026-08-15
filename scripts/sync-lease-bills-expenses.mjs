@@ -4,6 +4,7 @@
  * 1) Assignment deposit/advance/utility deposit from lease template + building config
  * 2) Upsert per-unit electricity/water utility_bills for the period
  * 3) Replace tagged period expenses to match spreadsheet Total Expenses = ₱110,353
+ * 4) Allocate Excel ledger rent/advance cash onto August rent invoices
  *
  * Usage: node scripts/sync-lease-bills-expenses.mjs
  */
@@ -11,6 +12,7 @@ import { config } from 'dotenv';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
+import { allocateExcelLedgerToAugustInvoices } from './lib/allocate-excel-ledger-to-aug-invoices.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -435,6 +437,7 @@ try {
   console.log('Period utility_bills:', utilSum.rows);
   console.log('Expenses total:', expTotal);
   console.log('Sheet targets: Bal elec/water expenses 32046/6578, Vil 15435/2752, expenses 110353');
+  await allocateExcelLedgerToAugustInvoices(client);
   console.log('Done.');
 } catch (err) {
   console.error(err);
