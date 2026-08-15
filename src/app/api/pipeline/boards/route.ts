@@ -10,6 +10,7 @@ import {
   reorderPipelineBoards,
   syncActiveLeasesToPipelineCards,
   syncOpenMaintenanceToPipelineCards,
+  syncPendingPaymentClaimsToBoard,
   syncPendingUtilityBillsToPipelineCards,
 } from '@/lib/api/pipeline';
 import type { PipelineBoardSlug } from '@/types/database';
@@ -26,6 +27,15 @@ export async function GET(request: Request) {
     await ensureMaintenanceBoardExists();
     await ensureExpensesBoardExists();
     await ensurePipelineBoardLabels();
+
+    // Pending GCash claims must land on Pending verification even when full lease sync is off.
+    if (slug === 'payments') {
+      try {
+        await syncPendingPaymentClaimsToBoard();
+      } catch (syncErr) {
+        console.error('Pending-claim payments board sync failed:', syncErr);
+      }
+    }
 
     // Opt-in sync only (?sync=1). Never block board loads on lease/maintenance sync —
     // that can take tens of seconds with many active leases.

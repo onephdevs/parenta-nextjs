@@ -17,6 +17,10 @@ export interface Payment {
   /** Internal Parenta id: txn-r-000001-26 */
   parentaTxnId?: string;
   notes?: string;
+  /** Official receipt number (admin process payment) */
+  orNumber?: string;
+  /** Official receipt date */
+  orDate?: Date;
   receiptFilePath?: string;
   receiptFileName?: string;
   createdAt: Date;
@@ -50,13 +54,15 @@ export interface CreatePaymentData {
   roomAssignmentId?: string;
   amount: number;
   paymentType: 'rent' | 'deposit' | 'advance' | 'late_fee' | 'utility' | 'asset_rental' | 'other';
-  paymentMethod?: 'cash' | 'cheque' | 'check' | 'credit_card' | 'bank_transfer' | 'online' | 'gcash' | 'other';
+  paymentMethod?: 'cash' | 'cheque' | 'check' | 'credit_card' | 'bank_transfer' | 'online' | 'gcash' | 'maya' | 'other';
   paymentStatus?: 'pending' | 'completed' | 'failed' | 'refunded';
   paymentDate: Date;
   dueDate?: Date;
   referenceNumber?: string;
   parentaTxnId?: string;
   notes?: string;
+  orNumber?: string;
+  orDate?: Date | null;
 }
 
 export interface UpdatePaymentData {
@@ -67,7 +73,10 @@ export interface UpdatePaymentData {
   paymentDate?: Date;
   dueDate?: Date;
   referenceNumber?: string;
+  parentaTxnId?: string;
   notes?: string;
+  orNumber?: string;
+  orDate?: Date;
 }
 
 export interface PaymentFilters {
@@ -113,8 +122,9 @@ export async function createPayment(
   const query = `
     INSERT INTO payments (
       tenant_id, assignment_id, amount, payment_type, payment_method,
-      payment_date, due_date, reference_number, parenta_txn_id, notes, payment_status
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      payment_date, due_date, reference_number, parenta_txn_id, notes, payment_status,
+      or_number, or_date
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING *
   `;
   
@@ -132,22 +142,39 @@ export async function createPayment(
     ? toCanonicalPaymentMethod(paymentData.paymentMethod)
     : null;
 
+  const { txnTypeFromPaymentType } = await import(
+    '@/lib/constants/transaction-ids'
+  );
+  const txnType = txnTypeFromPaymentType(paymentData.paymentType);
+
   let parentaTxnId = paymentData.parentaTxnId || null;
   if (!parentaTxnId) {
     try {
       const { allocateParentaTxnId } = await import(
         '@/lib/services/transaction-id-service'
       );
-      const { txnTypeFromPaymentType } = await import(
-        '@/lib/constants/transaction-ids'
-      );
-      parentaTxnId = await allocateParentaTxnId(
-        txnTypeFromPaymentType(paymentData.paymentType)
-      );
+      parentaTxnId = await allocateParentaTxnId(txnType);
     } catch (err) {
       console.error('Parenta txn allocate failed (non-fatal):', err);
     }
   }
+
+  let orNumber = paymentData.orNumber?.trim() || null;
+  if (!orNumber) {
+    try {
+      const { allocateParentaOrId } = await import(
+        '@/lib/services/transaction-id-service'
+      );
+      orNumber = await allocateParentaOrId(txnType);
+    } catch (err) {
+      console.error('Parenta OR allocate failed (non-fatal):', err);
+    }
+  }
+
+  const orDate =
+    paymentData.orDate && !Number.isNaN(paymentData.orDate.getTime())
+      ? paymentData.orDate.toISOString().split('T')[0]
+      : paymentData.paymentDate.toISOString().split('T')[0];
   
   const values = [
     paymentData.tenantId,
@@ -156,11 +183,13 @@ export async function createPayment(
     paymentType,
     paymentMethod,
     paymentData.paymentDate.toISOString().split('T')[0],
-    paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0], // Default to payment_date if not provided
+    paymentData.dueDate?.toISOString().split('T')[0] || paymentData.paymentDate.toISOString().split('T')[0],
     paymentData.referenceNumber || null,
     parentaTxnId,
     paymentData.notes || null,
-    paymentStatus
+    paymentStatus,
+    orNumber,
+    orDate,
   ];
 
   try {
@@ -183,6 +212,8 @@ export async function createPayment(
       referenceNumber: row.reference_number,
       parentaTxnId: row.parenta_txn_id || undefined,
       notes: row.notes,
+      orNumber: row.or_number || undefined,
+      orDate: row.or_date ? new Date(row.or_date) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
@@ -322,6 +353,67 @@ export async function getPayments(
   }
 }
 
+/** Tenant receipt claims waiting for office confirmation — not filtered by hub search. */
+export async function getPendingPaymentClaims(): Promise<{
+  payments: PaymentWithDetails[];
+  total: number;
+}> {
+  const result = await pool.query(
+    `SELECT
+       p.*,
+       t.first_name,
+       t.last_name,
+       t.email,
+       COALESCE(r.room_number, current_r.room_number, direct_r.room_number) AS room_number,
+       COALESCE(b.name, current_b.name, direct_b.name) AS building_name
+     FROM payments p
+     INNER JOIN tenants t ON p.tenant_id = t.id
+     LEFT JOIN tenant_room_assignments ra ON p.assignment_id = ra.id
+     LEFT JOIN rooms r ON ra.room_id = r.id
+     LEFT JOIN buildings b ON r.building_id = b.id
+     LEFT JOIN rooms direct_r ON p.room_id = direct_r.id
+     LEFT JOIN buildings direct_b ON direct_r.building_id = direct_b.id
+     LEFT JOIN LATERAL (
+       SELECT tra.room_id
+       FROM tenant_room_assignments tra
+       WHERE tra.tenant_id = p.tenant_id
+         AND tra.assignment_status = 'active'
+       ORDER BY tra.start_date DESC
+       LIMIT 1
+     ) current_ra ON true
+     LEFT JOIN rooms current_r ON current_ra.room_id = current_r.id
+     LEFT JOIN buildings current_b ON current_r.building_id = current_b.id
+     WHERE LOWER(COALESCE(p.payment_status, '')) = 'pending'
+     ORDER BY p.created_at DESC
+     LIMIT 50`
+  );
+
+  const payments: PaymentWithDetails[] = result.rows.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    tenantId: row.tenant_id as string,
+    roomAssignmentId: (row.assignment_id as string) || undefined,
+    amount: parseFloat(String(row.amount)),
+    paymentType: row.payment_type as Payment['paymentType'],
+    paymentMethod: (row.payment_method as Payment['paymentMethod']) || undefined,
+    paymentStatus: 'pending',
+    paymentDate: new Date(row.payment_date as string | Date),
+    dueDate: row.due_date ? new Date(row.due_date as string | Date) : undefined,
+    referenceNumber: (row.reference_number as string) || undefined,
+    parentaTxnId: (row.parenta_txn_id as string) || undefined,
+    notes: (row.notes as string) || undefined,
+    receiptFilePath: (row.receipt_file_path as string) || undefined,
+    receiptFileName: (row.receipt_file_name as string) || undefined,
+    createdAt: new Date(row.created_at as string | Date),
+    updatedAt: new Date(row.updated_at as string | Date),
+    tenantName: `${row.first_name} ${row.last_name}`,
+    tenantEmail: row.email as string,
+    roomNumber: (row.room_number as string) || undefined,
+    buildingName: (row.building_name as string) || undefined,
+  }));
+
+  return { payments, total: payments.length };
+}
+
 // Get payment by ID
 export async function getPaymentById(id: string): Promise<PaymentWithDetails | null> {
   const query = `
@@ -382,6 +474,8 @@ export async function getPaymentById(id: string): Promise<PaymentWithDetails | n
       referenceNumber: row.reference_number,
       parentaTxnId: row.parenta_txn_id || undefined,
       notes: row.notes,
+      orNumber: row.or_number || undefined,
+      orDate: row.or_date ? new Date(row.or_date) : undefined,
       receiptFilePath: row.receipt_file_path || undefined,
       receiptFileName: row.receipt_file_name || undefined,
       createdAt: new Date(row.created_at),
@@ -434,9 +528,21 @@ export async function updatePayment(id: string, updateData: UpdatePaymentData): 
     updateFields.push(`reference_number = $${paramIndex++}`);
     queryParams.push(updateData.referenceNumber);
   }
+  if (updateData.parentaTxnId !== undefined) {
+    updateFields.push(`parenta_txn_id = $${paramIndex++}`);
+    queryParams.push(updateData.parentaTxnId);
+  }
   if (updateData.notes !== undefined) {
     updateFields.push(`notes = $${paramIndex++}`);
     queryParams.push(updateData.notes);
+  }
+  if (updateData.orNumber !== undefined) {
+    updateFields.push(`or_number = $${paramIndex++}`);
+    queryParams.push(updateData.orNumber);
+  }
+  if (updateData.orDate !== undefined) {
+    updateFields.push(`or_date = $${paramIndex++}`);
+    queryParams.push(updateData.orDate.toISOString().split('T')[0]);
   }
 
   updateFields.push(`updated_at = NOW()`);
@@ -470,6 +576,8 @@ export async function updatePayment(id: string, updateData: UpdatePaymentData): 
       referenceNumber: row.reference_number,
       parentaTxnId: row.parenta_txn_id || undefined,
       notes: row.notes,
+      orNumber: row.or_number || undefined,
+      orDate: row.or_date ? new Date(row.or_date) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };

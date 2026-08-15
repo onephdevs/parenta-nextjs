@@ -27,7 +27,7 @@ interface Invoice {
 
 interface PaymentFormProps {
   invoices?: Invoice[];
-  onPaymentComplete?: () => void;
+  onPaymentComplete?: (result?: { paymentId?: string }) => void;
   onCancel?: () => void;
   /** Prefill which invoice to pay */
   initialInvoiceId?: string;
@@ -212,7 +212,7 @@ export default function PaymentForm({
       setSelectedFile(null);
       setReferenceNumber('');
       setNotes('');
-      onPaymentComplete?.();
+      onPaymentComplete?.({ paymentId: data.data?.paymentId });
     } catch (error) {
       console.error('Error submitting payment:', error);
       showNotification({

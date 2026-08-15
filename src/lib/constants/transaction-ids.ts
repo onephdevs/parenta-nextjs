@@ -23,6 +23,9 @@
 
 export const TXN_PREFIX = 'txn' as const;
 
+/** Official Receipt numbers — same shape as txn, different prefix. */
+export const OR_PREFIX = 'or' as const;
+
 /** Single-letter type codes — keep this list as the app reference. */
 export const TXN_TYPE_CODES = {
   /** Tenant rent (GCash / bank claim → admin verify → Paid) */
@@ -98,6 +101,44 @@ export function formatParentaTxnId(
   const seq = Math.max(1, Math.floor(sequence));
   const yy = String(yearYy).padStart(2, '0').slice(-2);
   return `${TXN_PREFIX}-${type}-${String(seq).padStart(6, '0')}-${yy}`;
+}
+
+/**
+ * Official Receipt number — same pattern as txn:
+ * or-{type}-{######}-{YY}  e.g. or-r-000042-26
+ */
+export function formatParentaOrId(
+  type: TxnTypeCode,
+  sequence: number,
+  yearYy: number
+): string {
+  const seq = Math.max(1, Math.floor(sequence));
+  const yy = String(yearYy).padStart(2, '0').slice(-2);
+  return `${OR_PREFIX}-${type}-${String(seq).padStart(6, '0')}-${yy}`;
+}
+
+const OR_ID_RE = /^or-([a-z])-(\d{6})-(\d{2})$/i;
+
+export function parseParentaOrId(value: string | null | undefined): {
+  type: TxnTypeCode;
+  sequence: number;
+  yearYy: number;
+} | null {
+  if (!value) return null;
+  const match = OR_ID_RE.exec(value.trim());
+  if (!match) return null;
+  const type = match[1].toLowerCase();
+  if (!isTxnTypeCode(type)) return null;
+  return {
+    type,
+    sequence: parseInt(match[2], 10),
+    yearYy: parseInt(match[3], 10),
+  };
+}
+
+/** Sequence key for OR numbers in txn_sequences (avoids colliding with txn-* counters). */
+export function orSequenceTypeKey(type: TxnTypeCode): string {
+  return `or_${type}`;
 }
 
 export function parseParentaTxnId(value: string | null | undefined): {

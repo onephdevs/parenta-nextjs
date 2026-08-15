@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
 import PrintInvoiceButton from '@/components/features/PrintInvoiceButton';
@@ -9,12 +9,10 @@ import { InvoiceNegotiationPanel } from '@/components/features/InvoiceNegotiatio
 import { formatPaymentMethodLabel } from '@/lib/constants/payment-methods';
 import {
   Button,
-  Card,
   DetailSection,
   DescriptionItem,
   DescriptionList,
   EmptyState,
-  PageHeader,
   Progress,
   Table,
   TableBody,
@@ -125,37 +123,43 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
       balanceDue > 0.009 && status !== 'cancelled' && status !== 'paid';
 
     return (
-      <div className="space-y-8">
-        <PageHeader
-          title={`Invoice ${invoice.invoice_number}`}
-          description={`${invoice.first_name} ${invoice.last_name}`}
-          backHref="/admin/financial/invoices"
-          backLabel="Back to invoices"
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <InvoiceStatusBadge status={status} />
-              {billStatus && (
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    billStatus === 'PAID'
-                      ? 'bg-green-100 text-green-800'
-                      : billStatus === 'PARTIAL'
-                        ? 'bg-amber-100 text-amber-900'
-                        : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {billStatus === 'PAID'
-                    ? 'Paid'
-                    : billStatus === 'PARTIAL'
-                      ? 'Partial'
-                      : 'Unpaid'}
-                </span>
-              )}
-            </div>
-          }
-        />
+      <div className="mx-auto w-full max-w-5xl space-y-6 p-6 print:max-w-none print:p-0">
+        <div className="flex flex-col gap-4 print:hidden sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <Link
+              href="/admin/financial/invoices"
+              className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Back to invoices
+            </Link>
+            <p className="text-sm text-gray-500">
+              {invoice.first_name} {invoice.last_name}
+            </p>
+            <h1 className="mt-1 text-2xl font-bold text-gray-900">
+              Invoice {invoice.invoice_number}
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {balanceDue > 0 && status !== 'cancelled' ? (
+              <Link
+                href={`/admin/financial/payments/new?tenantId=${encodeURIComponent(invoice.tenant_id)}&invoiceId=${encodeURIComponent(invoice.id)}&amount=${encodeURIComponent(String(balanceDue))}`}
+              >
+                <Button leftIcon={<Plus className="h-4 w-4" />}>Record Payment</Button>
+              </Link>
+            ) : (
+              <Button isDisabled>
+                {status === 'paid' || balanceDue <= 0 ? 'Fully paid' : 'Record Payment'}
+              </Button>
+            )}
+            <Link href={`/admin/tenants/${invoice.tenant_id}`}>
+              <Button variant="outline">View Tenant Profile</Button>
+            </Link>
+            <PrintInvoiceButton />
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 print:block print:space-y-6">
           <div className="space-y-6 lg:col-span-2">
             <DetailSection title="Invoice Details">
               <DescriptionList>
@@ -208,94 +212,124 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
 
             <DetailSection title="Line Items">
               {lineItems.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Unit</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lineItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.description}</TableCell>
-                        <TableCell className="capitalize">{item.item_type}</TableCell>
-                        <TableCell className="text-right">
-                          {Number(item.quantity)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.unit_price)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(item.line_total)}
-                        </TableCell>
+                <div className="border-t border-gray-200">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Unit</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <EmptyState title="No line items on this invoice." />
-              )}
-            </DetailSection>
-
-            <DetailSection
-              title="Payment History"
-              description="All payments that have been allocated to this invoice"
-            >
-              {allocations.length > 0 ? (
-                <div className="space-y-3 border-t border-gray-200 px-4 py-5 sm:px-6">
-                  {allocations.map((allocation) => (
-                    <div
-                      key={allocation.id}
-                      className="rounded-lg border border-gray-200 p-4 hover:bg-gray-50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            Payment allocated:{' '}
-                            {formatCurrency(allocation.allocated_amount)}
-                          </p>
-                          <p className="mt-1 text-xs text-gray-600">
-                            Date:{' '}
-                            {formatDate(
-                              allocation.payment_date || allocation.allocation_date
-                            )}{' '}
-                            · Method:{' '}
-                            {formatPaymentMethodLabel(allocation.payment_method)}{' '}
-                            · Total: {formatCurrency(allocation.payment_amount)}
-                          </p>
-                          {allocation.payment_description && (
-                            <p className="mt-1 text-xs text-gray-600">
-                              {allocation.payment_description}
-                            </p>
-                          )}
-                        </div>
-                        <Link
-                          href={`/admin/financial/payments/${allocation.payment_id}`}
-                          className="shrink-0 text-sm font-medium text-gray-700 hover:text-gray-900"
-                        >
-                          View →
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
+                    </TableHeader>
+                    <TableBody>
+                      {lineItems.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.description}</TableCell>
+                          <TableCell className="capitalize">{item.item_type}</TableCell>
+                          <TableCell className="text-right">
+                            {Number(item.quantity)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(item.unit_price)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency(item.line_total)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (
-                <EmptyState
-                  title="No payments allocated yet"
-                  description="Payments will be automatically allocated when recorded"
-                />
+                <div className="border-t border-gray-200">
+                  <EmptyState title="No line items on this invoice." />
+                </div>
               )}
             </DetailSection>
+
+            <div className="print:hidden">
+              <DetailSection
+                title="Payment History"
+                description="All payments that have been allocated to this invoice"
+              >
+                {allocations.length > 0 ? (
+                  <div className="space-y-3 border-t border-gray-200 px-4 py-5 sm:px-6">
+                    {allocations.map((allocation) => (
+                      <div
+                        key={allocation.id}
+                        className="rounded-lg border border-gray-200 p-4 hover:bg-gray-50"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              Payment allocated:{' '}
+                              {formatCurrency(allocation.allocated_amount)}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-600">
+                              Date:{' '}
+                              {formatDate(
+                                allocation.payment_date || allocation.allocation_date
+                              )}{' '}
+                              · Method:{' '}
+                              {formatPaymentMethodLabel(allocation.payment_method)}{' '}
+                              · Total: {formatCurrency(allocation.payment_amount)}
+                            </p>
+                            {allocation.payment_description && (
+                              <p className="mt-1 text-xs text-gray-600">
+                                {allocation.payment_description}
+                              </p>
+                            )}
+                          </div>
+                          <Link
+                            href={`/admin/financial/payments/${allocation.payment_id}`}
+                            className="shrink-0 text-sm font-medium text-gray-700 hover:text-gray-900"
+                          >
+                            View →
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-200">
+                    <EmptyState
+                      title="No payments allocated yet"
+                      description="Payments will be automatically allocated when recorded"
+                    />
+                  </div>
+                )}
+              </DetailSection>
+            </div>
           </div>
 
-          <div className="space-y-6">
-            <Card>
-              <h3 className="mb-4 text-lg font-medium text-gray-900">Amount Summary</h3>
-              <div className="space-y-3">
+          <div className="space-y-6 print:hidden">
+            <DetailSection title="Status">
+              <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 px-4 py-5 sm:px-6">
+                <InvoiceStatusBadge status={status} />
+                {billStatus && (
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      billStatus === 'PAID'
+                        ? 'bg-green-100 text-green-800'
+                        : billStatus === 'PARTIAL'
+                          ? 'bg-amber-100 text-amber-900'
+                          : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {billStatus === 'PAID'
+                      ? 'Paid'
+                      : billStatus === 'PARTIAL'
+                        ? 'Partial'
+                        : 'Unpaid'}
+                  </span>
+                )}
+              </div>
+            </DetailSection>
+
+            <DetailSection title="Amount Summary">
+              <div className="space-y-3 border-t border-gray-200 px-4 py-5 sm:px-6">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
                   <span>{formatCurrency(invoice.subtotal)}</span>
@@ -350,89 +384,67 @@ export default async function InvoiceDetailPage({ params }: InvoiceDetailPagePro
                   />
                 </div>
               </div>
-            </Card>
+            </DetailSection>
 
-            <InvoiceNegotiationPanel
-              invoiceId={invoice.id}
-              dueDate={
-                invoice.due_date
-                  ? String(invoice.due_date).slice(0, 10)
-                  : null
-              }
-              negotiatedDueDate={
-                invoice.negotiated_due_date
-                  ? String(invoice.negotiated_due_date).slice(0, 10)
-                  : null
-              }
-              negotiatedDueReason={invoice.negotiated_due_reason || null}
-              adjustmentAmount={adjustmentAmount}
-              adjustmentReason={invoice.adjustment_reason || null}
-              balanceDue={balanceDue}
-              canEdit={canNegotiate}
-            />
+            <div className="print:hidden">
+              <InvoiceNegotiationPanel
+                invoiceId={invoice.id}
+                dueDate={
+                  invoice.due_date
+                    ? String(invoice.due_date).slice(0, 10)
+                    : null
+                }
+                negotiatedDueDate={
+                  invoice.negotiated_due_date
+                    ? String(invoice.negotiated_due_date).slice(0, 10)
+                    : null
+                }
+                negotiatedDueReason={invoice.negotiated_due_reason || null}
+                adjustmentAmount={adjustmentAmount}
+                adjustmentReason={invoice.adjustment_reason || null}
+                balanceDue={balanceDue}
+                canEdit={canNegotiate}
+              />
+            </div>
 
-            <Card>
-              <h3 className="mb-4 text-lg font-medium text-gray-900">Quick Actions</h3>
-              <div className="flex flex-col gap-3">
-                {balanceDue > 0 && status !== 'cancelled' ? (
-                  <Link
-                    href={`/admin/financial/payments/new?tenantId=${encodeURIComponent(invoice.tenant_id)}&invoiceId=${encodeURIComponent(invoice.id)}&amount=${encodeURIComponent(String(balanceDue))}`}
-                  >
-                    <Button className="w-full" leftIcon={<Plus className="h-4 w-4" />}>
-                      Record Payment
-                    </Button>
-                  </Link>
-                ) : (
-                  <Button className="w-full" isDisabled>
-                    {status === 'paid' || balanceDue <= 0 ? 'Fully paid' : 'Record Payment'}
-                  </Button>
-                )}
-                <Link href={`/admin/tenants/${invoice.tenant_id}`}>
-                  <Button variant="outline" className="w-full">
-                    View Tenant Profile
-                  </Button>
-                </Link>
-                <PrintInvoiceButton />
-              </div>
-            </Card>
-
-            <Card>
-              <h3 className="mb-4 text-sm font-medium text-gray-900">Invoice Statistics</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Payments Received</span>
-                  <span className="font-semibold">{allocations.length}</span>
+            <div className="print:hidden">
+              <DetailSection title="Invoice Statistics">
+                <div className="space-y-3 border-t border-gray-200 px-4 py-5 text-sm sm:px-6">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Payments Received</span>
+                    <span className="font-semibold">{allocations.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Days Since Issue</span>
+                    <span className="font-semibold">
+                      {Math.floor(
+                        (new Date().getTime() - new Date(invoice.issue_date).getTime()) /
+                          (1000 * 60 * 60 * 24)
+                      )}{' '}
+                      days
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Days Until Due</span>
+                    <span
+                      className={`font-semibold ${
+                        daysToDue != null && daysToDue < 0
+                          ? 'text-red-600'
+                          : 'text-gray-900'
+                      }`}
+                    >
+                      {daysToDue == null
+                        ? '—'
+                        : daysToDue < 0
+                          ? `${Math.abs(daysToDue)} days overdue`
+                          : daysToDue === 0
+                            ? 'Due today'
+                            : `${daysToDue} days`}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Days Since Issue</span>
-                  <span className="font-semibold">
-                    {Math.floor(
-                      (new Date().getTime() - new Date(invoice.issue_date).getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    )}{' '}
-                    days
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Days Until Due</span>
-                  <span
-                    className={`font-semibold ${
-                      daysToDue != null && daysToDue < 0
-                        ? 'text-red-600'
-                        : 'text-gray-900'
-                    }`}
-                  >
-                    {daysToDue == null
-                      ? '—'
-                      : daysToDue < 0
-                        ? `${Math.abs(daysToDue)} days overdue`
-                        : daysToDue === 0
-                          ? 'Due today'
-                          : `${daysToDue} days`}
-                  </span>
-                </div>
-              </div>
-            </Card>
+              </DetailSection>
+            </div>
           </div>
         </div>
       </div>

@@ -32,6 +32,7 @@ interface DisplayEvent extends HistoryEvent {
 
 interface OpportunityHistoryPanelProps {
   cardId: string;
+  boardSlug?: string;
 }
 
 function formatWhen(iso: string): string {
@@ -67,39 +68,39 @@ function displayValue(value: string | string[] | null | undefined): string {
 function parseFieldChanges(metadata?: Record<string, unknown>): HistoryFieldChange[] {
   const raw = metadata?.fields;
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const row = item as Record<string, unknown>;
-      const label = typeof row.label === 'string' ? row.label : null;
-      const field = typeof row.field === 'string' ? row.field : 'field';
-      const summary = typeof row.summary === 'string' ? row.summary : '';
-      if (!label && !summary) return null;
-      const from =
-        Array.isArray(row.from) || typeof row.from === 'string' || row.from === null
-          ? (row.from as string | string[] | null)
-          : null;
-      const to =
-        Array.isArray(row.to) || typeof row.to === 'string' || row.to === null
-          ? (row.to as string | string[] | null)
-          : null;
-      const added = Array.isArray(row.added)
-        ? row.added.filter((t): t is string => typeof t === 'string')
-        : undefined;
-      const removed = Array.isArray(row.removed)
-        ? row.removed.filter((t): t is string => typeof t === 'string')
-        : undefined;
-      return {
-        field,
-        label: label || field,
-        from,
-        to,
-        added,
-        removed,
-        summary: summary || `${label || field} updated`,
-      } satisfies HistoryFieldChange;
-    })
-    .filter((c): c is HistoryFieldChange => Boolean(c));
+  const changes: HistoryFieldChange[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const label = typeof row.label === 'string' ? row.label : null;
+    const field = typeof row.field === 'string' ? row.field : 'field';
+    const summary = typeof row.summary === 'string' ? row.summary : '';
+    if (!label && !summary) continue;
+    const from =
+      Array.isArray(row.from) || typeof row.from === 'string' || row.from === null
+        ? (row.from as string | string[] | null)
+        : null;
+    const to =
+      Array.isArray(row.to) || typeof row.to === 'string' || row.to === null
+        ? (row.to as string | string[] | null)
+        : null;
+    const added = Array.isArray(row.added)
+      ? row.added.filter((t): t is string => typeof t === 'string')
+      : undefined;
+    const removed = Array.isArray(row.removed)
+      ? row.removed.filter((t): t is string => typeof t === 'string')
+      : undefined;
+    changes.push({
+      field,
+      label: label || field,
+      from,
+      to,
+      added,
+      removed,
+      summary: summary || `${label || field} updated`,
+    });
+  }
+  return changes;
 }
 
 function legacyChangeLines(event: HistoryEvent): string[] {
@@ -289,18 +290,32 @@ function eventTitle(event: DisplayEvent, fields: HistoryFieldChange[]): string {
 
   switch (event.eventType) {
     case 'created':
-      return 'Opportunity created';
+      return event.summary || 'Created';
     case 'assignee_changed':
-      return fields[0]?.summary || 'Assignee updated';
+      return fields[0]?.summary || event.summary || 'Assignee updated';
     case 'stage_changed':
       if (event.fromStageName && event.toStageName) {
         return `Moved: ${event.fromStageName} → ${event.toStageName}`;
       }
-      return 'Stage changed';
+      return event.summary || 'Stage changed';
     case 'moved_to_board':
       return fields[0]?.summary || 'Moved to another board';
     case 'lease_generated':
       return 'Lease generated';
+    case 'ticket_reply':
+    case 'ticket_progress':
+    case 'ticket_status':
+    case 'ticket_ack':
+    case 'ticket_feedback':
+    case 'ticket_closed':
+    case 'invoice_issued':
+    case 'payment_recorded':
+    case 'payment_pending':
+    case 'payment_rejected':
+    case 'expense_recorded':
+    case 'expense_status':
+    case 'utility_recorded':
+      return event.summary || event.eventType.replace(/_/g, ' ');
     case 'updated': {
       if (fields.length === 1) {
         const only = fields[0];
@@ -313,8 +328,33 @@ function eventTitle(event: DisplayEvent, fields: HistoryFieldChange[]): string {
         : 'Updated';
     }
     default:
-      return fields[0]?.summary || event.eventType.replace(/_/g, ' ');
+      return event.summary || fields[0]?.summary || event.eventType.replace(/_/g, ' ');
   }
+}
+
+function historyEmptyCopy(boardSlug?: string): { title: string; body: string } {
+  if (boardSlug === 'maintenance') {
+    return {
+      title: 'No ticket history yet',
+      body: 'Replies, assignments, and ticket updates will show here.',
+    };
+  }
+  if (boardSlug === 'payments') {
+    return {
+      title: 'No history yet for this card',
+      body: 'Stage changes and the invoice on this follow-up will show here.',
+    };
+  }
+  if (boardSlug === 'expenses') {
+    return {
+      title: 'No card history yet',
+      body: 'When this bill or expense was added, and later status changes, will show here.',
+    };
+  }
+  return {
+    title: 'No history yet for this opportunity',
+    body: '',
+  };
 }
 
 function FieldChangeDetails({ change }: { change: HistoryFieldChange }) {
@@ -352,7 +392,10 @@ function FieldChangeDetails({ change }: { change: HistoryFieldChange }) {
   );
 }
 
-export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps) {
+export function OpportunityHistoryPanel({
+  cardId,
+  boardSlug,
+}: OpportunityHistoryPanelProps) {
   const [events, setEvents] = useState<HistoryEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -403,10 +446,14 @@ export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps
   }
 
   if (displayEvents.length === 0) {
+    const empty = historyEmptyCopy(boardSlug);
     return (
       <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
         <History className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-        <p className="text-sm text-gray-500">No history yet for this opportunity.</p>
+        <p className="text-sm text-gray-500">{empty.title}</p>
+        {empty.body ? (
+          <p className="mt-1 text-xs text-gray-400">{empty.body}</p>
+        ) : null}
       </div>
     );
   }
@@ -491,6 +538,10 @@ export function OpportunityHistoryPanel({ cardId }: OpportunityHistoryPanelProps
                   />
                 ))}
               </div>
+            ) : event.note && event.note !== title ? (
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {event.note}
+              </p>
             ) : null}
             {event.fromStageName &&
               event.toStageName &&

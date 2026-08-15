@@ -1,38 +1,44 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
+  ArrowRight,
   BarChart3,
   Clock,
-  DollarSign,
+  CreditCard,
+  FileText,
+  LayoutDashboard,
   Plus,
+  Receipt,
+  Settings2,
+  Wallet,
 } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
-import { getPaymentSummary, getPayments } from '@/lib/api/payments';
+import { getPaymentSummary } from '@/lib/api/payments';
+import { getInvoiceSummary } from '@/lib/api/invoices';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Avatar } from '@/components/ui/Avatar';
-import {
-  PaymentStatusBadge,
-  PaymentTypeBadge,
-} from '@/components/domain/StatusBadges';
 
-async function getFinancialData() {
+export const metadata = {
+  title: 'Financial | Parenta',
+  description: 'Payments, invoices, reports, and financial tools',
+};
+
+async function getHubSnapshot() {
   try {
-    const [summary, recentPayments] = await Promise.all([
+    const [payments, invoices] = await Promise.all([
       getPaymentSummary(),
-      getPayments({}, 1, 10),
+      getInvoiceSummary(),
     ]);
-
-    return { summary, recentPayments: recentPayments.payments };
+    return { payments, invoices };
   } catch (error) {
-    console.error('Error fetching financial data:', error);
+    console.error('Error fetching financial hub snapshot:', error);
     return {
-      summary: {
+      payments: {
         totalPayments: 0,
         totalAmount: 0,
         pendingPayments: 0,
@@ -43,176 +49,191 @@ async function getFinancialData() {
         overdueAmount: 0,
         averagePaymentAmount: 0,
       },
-      recentPayments: [],
+      invoices: {
+        totalInvoices: 0,
+        totalAmount: 0,
+        paidInvoices: 0,
+        paidAmount: 0,
+        unpaidInvoices: 0,
+        unpaidAmount: 0,
+        overdueInvoices: 0,
+        overdueAmount: 0,
+      },
     };
   }
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-  }).format(amount);
+interface HubLink {
+  href: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
 }
 
-function formatDate(date: Date) {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+const DAY_TO_DAY: HubLink[] = [
+  {
+    href: '/admin/financial/payments',
+    title: 'Payments',
+    description: 'Record collections, review receipts, and follow up on pending claims.',
+    icon: Wallet,
+  },
+  {
+    href: '/admin/financial/invoices',
+    title: 'Invoices',
+    description: 'Create bills and track what tenants still owe.',
+    icon: FileText,
+  },
+  {
+    href: '/admin/financial/expenses',
+    title: 'Expenses',
+    description: 'Log property costs and keep spend visible beside collections.',
+    icon: Receipt,
+  },
+  {
+    href: '/admin/financial/late-fees/settings',
+    title: 'Late fees',
+    description: 'Set penalty rules and apply charges on overdue rent.',
+    icon: AlertTriangle,
+  },
+];
+
+const INSIGHTS: HubLink[] = [
+  {
+    href: '/admin/financial/dashboard',
+    title: 'Financial dashboard',
+    description: 'Revenue, occupancy, charts, and upcoming due dates.',
+    icon: LayoutDashboard,
+  },
+  {
+    href: '/admin/financial/reports',
+    title: 'Reports',
+    description: 'Period revenue, expenses, and profit & loss.',
+    icon: BarChart3,
+  },
+  {
+    href: '/admin/financial/advanced-analytics',
+    title: 'Advanced analytics',
+    description: 'Portfolio benchmarks and cash-flow deep dives.',
+    icon: BarChart3,
+  },
+  {
+    href: '/admin/financial/payment-gateways',
+    title: 'Payment gateways',
+    description: 'Configure how tenants can pay online.',
+    icon: CreditCard,
+  },
+];
+
+function HubCard({ href, title, description, icon: Icon }: HubLink) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-start gap-4 rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_6px_28px_rgba(15,23,42,0.12)]"
+    >
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-800">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <ArrowRight className="h-4 w-4 flex-shrink-0 text-gray-300 transition-colors group-hover:text-gray-900" />
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-gray-500">{description}</p>
+      </div>
+    </Link>
+  );
 }
 
-export default async function FinancialDashboard() {
+export default async function FinancialHubPage() {
   const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/signin');
   }
 
-  const { summary, recentPayments } = await getFinancialData();
+  const { payments, invoices } = await getHubSnapshot();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-6">
       <PageHeader
-        title="Financial Overview"
-        description="Monitor payments, expenses, and financial performance"
+        title="Financial"
+        description="Day-to-day collections live here. Charts and trends are on the financial dashboard."
         actions={
           <>
             <Link href="/admin/financial/payments/new">
               <Button leftIcon={<Plus className="h-4 w-4" />}>Record Payment</Button>
             </Link>
-            <Link href="/admin/financial/payments">
-              <Button variant="outline">View All Payments</Button>
-            </Link>
-            <Link href="/admin/financial/expenses">
-              <Button variant="outline">Manage Expenses</Button>
-            </Link>
-            <Link href="/admin/financial/invoices">
-              <Button variant="outline">Manage Invoices</Button>
-            </Link>
-            <Link href="/admin/financial/reports">
-              <Button variant="outline">View Reports</Button>
+            <Link href="/admin/financial/dashboard">
+              <Button variant="outline" leftIcon={<LayoutDashboard className="h-4 w-4" />}>
+                Open dashboard
+              </Button>
             </Link>
           </>
         }
       />
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <ListSummaryCard
-          title="Total Revenue"
-          value={formatCurrency(summary.completedAmount)}
-          footer={`${summary.completedPayments} completed payments`}
-          icon={<DollarSign className="h-8 w-8 text-green-600" />}
-        />
-        <ListSummaryCard
-          title="Pending Payments"
-          value={formatCurrency(summary.pendingAmount)}
-          footer={`${summary.pendingPayments} pending payments`}
-          icon={<Clock className="h-8 w-8 text-yellow-600" />}
-        />
-        <ListSummaryCard
-          title="Overdue Payments"
-          value={formatCurrency(summary.overdueAmount)}
-          footer={`${summary.overduePayments} overdue payments`}
-          icon={<AlertTriangle className="h-8 w-8 text-red-600" />}
-        />
-        <ListSummaryCard
-          title="Average Payment"
-          value={formatCurrency(summary.averagePaymentAmount)}
-          footer={`${summary.totalPayments} total payments`}
-          icon={<BarChart3 className="h-8 w-8 text-blue-600" />}
-        />
+        <Link href="/admin/financial/payments" className="block">
+          <ListSummaryCard
+            title="Collected"
+            value={formatCurrency(payments.completedAmount)}
+            footer={`${payments.completedPayments} completed payments`}
+            icon={<Wallet className="h-8 w-8 text-green-600" />}
+          />
+        </Link>
+        <Link href="/admin/financial/payments" className="block">
+          <ListSummaryCard
+            title="Pending payments"
+            value={formatCurrency(payments.pendingAmount)}
+            footer={`${payments.pendingPayments} awaiting confirmation`}
+            icon={<Clock className="h-8 w-8 text-amber-600" />}
+          />
+        </Link>
+        <Link href="/admin/financial/invoices" className="block">
+          <ListSummaryCard
+            title="Unpaid invoices"
+            value={formatCurrency(invoices.unpaidAmount)}
+            footer={`${invoices.unpaidInvoices} open invoices`}
+            icon={<FileText className="h-8 w-8 text-blue-600" />}
+          />
+        </Link>
+        <Link href="/admin/financial/invoices?status=overdue" className="block">
+          <ListSummaryCard
+            title="Overdue invoices"
+            value={formatCurrency(invoices.overdueAmount)}
+            footer={`${invoices.overdueInvoices} past due`}
+            icon={<AlertTriangle className="h-8 w-8 text-red-600" />}
+          />
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Recent Payments</h3>
-            <Link
-              href="/admin/financial/payments"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              View all
-            </Link>
-          </div>
+      <section>
+        <div className="mb-3 flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-gray-400" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Day to day
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {DAY_TO_DAY.map((item) => (
+            <HubCard key={item.href} {...item} />
+          ))}
+        </div>
+      </section>
 
-          {recentPayments.length > 0 ? (
-            <ul className="-my-2 divide-y divide-gray-200">
-              {recentPayments.map((payment) => (
-                <li key={payment.id} className="flex items-center gap-4 py-4">
-                  <Avatar
-                    name={payment.tenantName}
-                    size="sm"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900">
-                      {payment.tenantName}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {payment.roomNumber && `Room ${payment.roomNumber} · `}
-                      {formatDate(payment.paymentDate)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <PaymentTypeBadge type={payment.paymentType} />
-                    <PaymentStatusBadge status={payment.paymentStatus} />
-                  </div>
-                  <div className="flex-shrink-0 text-sm font-medium text-gray-900">
-                    {formatCurrency(payment.amount)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              title="No payments yet"
-              description="Get started by recording your first payment."
-              action={
-                <Link href="/admin/financial/payments/new">
-                  <Button leftIcon={<Plus className="h-4 w-4" />}>Record Payment</Button>
-                </Link>
-              }
-            />
-          )}
-        </Card>
-
-        <Card>
-          <h3 className="mb-4 text-lg font-medium text-gray-900">Quick Actions</h3>
-          <div className="flex flex-col gap-3">
-            <Link href="/admin/financial/payments/new">
-              <Button className="w-full" leftIcon={<Plus className="h-4 w-4" />}>
-                Record New Payment
-              </Button>
-            </Link>
-            <Link href="/admin/financial/payments?status=overdue">
-              <Button variant="outline" className="w-full" leftIcon={<AlertTriangle className="h-4 w-4" />}>
-                View Overdue Payments
-              </Button>
-            </Link>
-            <Link href="/admin/financial/reports">
-              <Button variant="outline" className="w-full" leftIcon={<BarChart3 className="h-4 w-4" />}>
-                Financial Reports
-              </Button>
-            </Link>
-            <Link href="/admin/financial/invoices">
-              <Button variant="outline" className="w-full">
-                Manage Invoices
-              </Button>
-            </Link>
-            <Link href="/admin/financial/payment-gateways">
-              <Button variant="outline" className="w-full">
-                Payment Gateways
-              </Button>
-            </Link>
-            <Link href="/admin/financial/advanced-analytics">
-              <Button variant="outline" className="w-full">
-                Advanced Analytics
-              </Button>
-            </Link>
-          </div>
-        </Card>
-      </div>
+      <section>
+        <div className="mb-3 flex items-center gap-2">
+          <LayoutDashboard className="h-4 w-4 text-gray-400" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Insights & setup
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {INSIGHTS.map((item) => (
+            <HubCard key={item.href} {...item} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

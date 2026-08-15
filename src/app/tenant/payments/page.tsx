@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -13,6 +14,7 @@ import {
   Clock,
   X,
   Printer,
+  MessageSquare,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
@@ -35,6 +37,7 @@ import {
 } from '@/components/domain/StatusBadges';
 import ReceiptUpload from '@/components/features/tenant/ReceiptUpload';
 import { ReceiptUploadPanel, type ReceiptLinkOption } from '@/components/features/tenant/ReceiptUploadPanel';
+import { TenantWaitingForOfficeCard } from '@/components/features/tenant/TenantWaitingForOfficeCard';
 import PaymentForm from '@/components/features/tenant/PaymentForm';
 import DepositPaymentForm from '@/components/features/tenant/DepositPaymentForm';
 import UtilityDepositForm from '@/components/features/tenant/UtilityDepositForm';
@@ -300,10 +303,11 @@ export default function PaymentsPage() {
     setTab('pay');
   };
 
-  const handlePaymentComplete = () => {
+  const handlePaymentComplete = (result?: { paymentId?: string }) => {
     setShowPaymentForm(false);
     setPayDraft(null);
     refreshFinancials();
+    if (result?.paymentId) router.push(`/tenant/payments/${result.paymentId}`);
   };
 
   const fetchDepositData = async () => {
@@ -355,22 +359,25 @@ export default function PaymentsPage() {
     }
   };
 
-  const handleDepositComplete = () => {
+  const handleDepositComplete = (result?: { paymentId?: string }) => {
     setShowDepositForm(false);
     fetchDepositData();
     refreshFinancials();
+    if (result?.paymentId) router.push(`/tenant/payments/${result.paymentId}`);
   };
 
-  const handleUtilityDepositComplete = () => {
+  const handleUtilityDepositComplete = (result?: { paymentId?: string }) => {
     setShowUtilityDepositForm(false);
     fetchUtilityDepositData();
     refreshFinancials();
+    if (result?.paymentId) router.push(`/tenant/payments/${result.paymentId}`);
   };
 
-  const handleManualPaymentComplete = () => {
+  const handleManualPaymentComplete = (result?: { paymentId?: string }) => {
     setShowManualPaymentForm(false);
     refreshFinancials();
     fetchDepositData();
+    if (result?.paymentId) router.push(`/tenant/payments/${result.paymentId}`);
   };
 
   const handleDownloadReceipt = async (paymentId: string, fileName?: string) => {
@@ -411,8 +418,9 @@ export default function PaymentsPage() {
     window.open(`/api/tenant/payments/${paymentId}/print`, '_blank');
   };
 
-  const handleReceiptUploadComplete = () => {
+  const handleReceiptUploadComplete = (result?: { paymentId?: string }) => {
     refreshFinancials();
+    if (result?.paymentId) router.push(`/tenant/payments/${result.paymentId}`);
   };
 
   const formatCurrency = (amount: number | undefined | null) => {
@@ -456,6 +464,23 @@ export default function PaymentsPage() {
     toFormInvoice(item, true)
   );
   const payableInvoices = [...dueNowInvoices, ...payAheadInvoices];
+  const pendingClaims = (paymentData?.recentPayments || []).filter((payment) =>
+    ['pending', 'failed'].includes(payment.status.toLowerCase())
+  );
+
+  const paymentClaimsSection = (
+    <TenantWaitingForOfficeCard
+      claims={pendingClaims.map((payment) => ({
+        id: payment.id,
+        amount: payment.amount,
+        status: payment.status,
+        type: payment.type,
+        paymentDate: payment.paymentDate,
+        method: payment.method,
+        invoiceNumbers: payment.invoiceNumbers,
+      }))}
+    />
+  );
 
   const advanceHint = (() => {
     if (advanceCollected <= 0) return 'No advance on file';
@@ -713,6 +738,16 @@ export default function PaymentsPage() {
                   <TableCell>{formatPaymentNotesLabel(payment.description)}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-3">
+                      <Link
+                        href={`/tenant/payments/${payment.id}`}
+                        className="flex items-center text-emerald-700 hover:text-emerald-900"
+                        title="Open conversation"
+                      >
+                        <MessageSquare className="mr-1 h-4 w-4" />
+                        {['pending', 'failed'].includes(payment.status.toLowerCase())
+                          ? 'Track'
+                          : 'Message'}
+                      </Link>
                       <button
                         onClick={() => handlePrintReceipt(payment.id)}
                         className="flex items-center text-green-600 hover:text-green-900"
@@ -799,6 +834,7 @@ export default function PaymentsPage() {
           {/* Overview: summary cards + balance breakdown + schedule */}
           {activeTab === 'overview' && (
             <>
+              {paymentClaimsSection}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className={cn(summaryCardClass, 'p-4 sm:p-5')}>
                   <div className="flex items-start gap-3">
@@ -958,6 +994,7 @@ export default function PaymentsPage() {
                   !showUtilityDepositForm &&
                   !showManualPaymentForm && (
                     <div className="space-y-5">
+                      {paymentClaimsSection}
                       <div>
                         <h3 className={theme.sectionTitle}>Make a payment</h3>
                         <p className={cn('mt-1', theme.muted)}>

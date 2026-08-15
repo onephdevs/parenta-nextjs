@@ -25,6 +25,7 @@ import {
 } from '@/hooks/useTenantPortalData';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
 import { TenantInboxPreview } from '@/components/features/tenant/TenantInboxPreview';
+import { TenantWaitingForOfficeCard } from '@/components/features/tenant/TenantWaitingForOfficeCard';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 
@@ -211,6 +212,25 @@ function mapRecentPayments(paymentsData: Record<string, unknown>): RecentPayment
   }));
 }
 
+function mapWaitingClaims(paymentsData: Record<string, unknown>) {
+  const history = Array.isArray(paymentsData.history) ? paymentsData.history : [];
+  return history
+    .filter((p: Record<string, unknown>) =>
+      ['pending', 'failed'].includes(
+        String(p.status || p.paymentStatus || p.payment_status || '').toLowerCase()
+      )
+    )
+    .map((p: Record<string, unknown>) => ({
+      id: String(p.id),
+      amount: Number(p.amount) || 0,
+      status: String(p.status || p.paymentStatus || p.payment_status || 'pending'),
+      type: String(p.paymentType || p.payment_type || ''),
+      paymentDate: String(p.paymentDate || p.payment_date || ''),
+      method: (p.paymentMethod || p.payment_method || null) as string | null,
+      invoiceNumbers: (p.invoiceNumbers || p.invoice_numbers || null) as string | null,
+    }));
+}
+
 function mapMaintenancePreview(data: { requests: unknown[] }): MaintenanceItem[] {
   return (data.requests || []).slice(0, 2).map((r) => {
     const row = r as Record<string, unknown>;
@@ -253,6 +273,10 @@ export default function TenantDashboard() {
     const payments = getCached<Record<string, unknown>>('payments');
     return payments ? mapRecentPayments(payments) : [];
   });
+  const [waitingClaims, setWaitingClaims] = useState(() => {
+    const payments = getCached<Record<string, unknown>>('payments');
+    return payments ? mapWaitingClaims(payments) : [];
+  });
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceItem[]>(() => {
     const maint = getCached<{ requests: unknown[] }>('maintenance');
     return maint ? mapMaintenancePreview(maint) : [];
@@ -281,7 +305,10 @@ export default function TenantDashboard() {
         .catch((err) => console.error('Error fetching balance:', err));
 
       void load('payments', fetchTenantPayments)
-        .then((data) => setRecentPayments(mapRecentPayments(data)))
+        .then((data) => {
+          setRecentPayments(mapRecentPayments(data));
+          setWaitingClaims(mapWaitingClaims(data));
+        })
         .catch((err) => console.error('Error fetching payment history:', err));
 
       void load('maintenance', fetchTenantMaintenance)
@@ -437,6 +464,8 @@ export default function TenantDashboard() {
           </Link>
         </section>
 
+        <TenantWaitingForOfficeCard claims={waitingClaims} />
+
         <TenantInboxPreview />
 
         {/* Unit + rent — shown once */}
@@ -557,7 +586,7 @@ export default function TenantDashboard() {
 
           <div className={theme.cardPad}>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className={theme.sectionTitle}>Maintenance requests</h2>
+              <h2 className={theme.sectionTitle}>Your tickets</h2>
               <Link
                 href="/tenant/maintenance"
                 className="text-xs text-emerald-400 hover:text-emerald-300"
@@ -580,7 +609,7 @@ export default function TenantDashboard() {
                 ))}
               </ul>
             ) : (
-              <EmptyState className="py-6" title="No open requests" />
+              <EmptyState className="py-6" title="No open tickets" />
             )}
             <Link href="/tenant/maintenance" className="mt-4 block">
               <Button
@@ -588,7 +617,7 @@ export default function TenantDashboard() {
                 size="sm"
                 className={cn('w-full', theme.outlineButton)}
               >
-                {isPreview ? 'View requests' : 'Submit request'}
+                {isPreview ? 'View tickets' : 'Open a ticket'}
               </Button>
             </Link>
           </div>

@@ -10,8 +10,11 @@ import { useNotifications } from '@/hooks/useNotifications';
 interface ConfirmPaymentActionsProps {
   paymentId: string;
   referenceNumber?: string | null;
+  invoiceNumber?: string | null;
+  parentaTxnId?: string | null;
   amountLabel: string;
-  onDone?: () => void;
+  onDone?: (action: 'confirm' | 'reject') => void;
+  compact?: boolean;
 }
 
 function normalizeTxn(value: string | null | undefined): string {
@@ -21,11 +24,45 @@ function normalizeTxn(value: string | null | undefined): string {
     .replace(/\s+/g, '');
 }
 
-export default function ConfirmPaymentActions({
+function claimDecisionMessage({
+  action,
+  amountLabel,
+  invoiceNumber,
+  parentaTxnId,
+  referenceNumber,
+}: {
+  action: 'confirm' | 'reject';
+  amountLabel: string;
+  invoiceNumber?: string | null;
+  parentaTxnId?: string | null;
+  referenceNumber?: string | null;
+}): string {
+  const intro =
+    action === 'confirm'
+      ? `Confirm this payment claim of ${amountLabel} was received?`
+      : `Reject this payment claim of ${amountLabel}?`;
+  const details = [
+    invoiceNumber?.trim() ? `Invoice: ${invoiceNumber.trim()}` : null,
+    parentaTxnId?.trim() ? `Transaction: ${parentaTxnId.trim()}` : null,
+    referenceNumber?.trim()
+      ? `GCash / bank reference: ${referenceNumber.trim()}`
+      : null,
+  ].filter(Boolean);
+  const extra =
+    action === 'confirm'
+      ? 'You can enter a GCash or bank reference below if you want it on the record.'
+      : null;
+  return [intro, details.join('\n'), extra].filter(Boolean).join('\n\n');
+}
+
+function ConfirmPaymentActions({
   paymentId,
   referenceNumber,
+  invoiceNumber,
+  parentaTxnId,
   amountLabel,
   onDone,
+  compact = false,
 }: ConfirmPaymentActionsProps) {
   const router = useRouter();
   const { showNotification } = useNotifications();
@@ -43,9 +80,9 @@ export default function ConfirmPaymentActions({
       if (expected && entered && entered !== expected) {
         showNotification({
           type: 'error',
-          title: 'Transaction ID mismatch',
+          title: 'Reference mismatch',
           message:
-            'Entered reference does not match the one on file. Leave it blank to confirm without a match.',
+            'Entered GCash / bank reference does not match the one on file. Leave it blank to confirm without a match.',
         });
         return;
       }
@@ -78,7 +115,7 @@ export default function ConfirmPaymentActions({
       });
       setConfirmOpen(false);
       setRejectOpen(false);
-      onDone?.();
+      onDone?.(action);
       router.refresh();
     } catch (error) {
       showNotification({
@@ -95,14 +132,16 @@ export default function ConfirmPaymentActions({
     <div className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
+        size={compact ? 'sm' : 'md'}
         onClick={() => setConfirmOpen(true)}
         isLoading={isSubmitting}
         leftIcon={<CheckCircle2 className="h-4 w-4" />}
       >
-        Confirm payment
+        {compact ? 'Confirm' : 'Confirm payment'}
       </Button>
       <Button
         type="button"
+        size={compact ? 'sm' : 'md'}
         variant="outline"
         onClick={() => setRejectOpen(true)}
         isDisabled={isSubmitting}
@@ -114,14 +153,20 @@ export default function ConfirmPaymentActions({
       <ConfirmDialog
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={() => void runAction('confirm')}
+        onConfirm={(value) => void runAction('confirm', value)}
         title="Confirm payment received"
-        message={`Confirm ${amountLabel} was received? Reference number is optional for now${
-          referenceNumber ? ` (on file: ${referenceNumber})` : ''
-        }.`}
+        message={claimDecisionMessage({
+          action: 'confirm',
+          amountLabel,
+          invoiceNumber,
+          parentaTxnId,
+          referenceNumber,
+        })}
         confirmText="Confirm received"
         cancelText="Cancel"
         variant="success"
+        mode="prompt"
+        promptPlaceholder="GCash / bank reference (optional)"
         isLoading={isSubmitting}
       />
 
@@ -130,9 +175,13 @@ export default function ConfirmPaymentActions({
         onClose={() => setRejectOpen(false)}
         onConfirm={() => void runAction('reject')}
         title="Reject payment claim"
-        message={`Reject this payment claim of ${amountLabel}?\n\nTransaction ID: ${
-          referenceNumber || 'N/A'
-        }`}
+        message={claimDecisionMessage({
+          action: 'reject',
+          amountLabel,
+          invoiceNumber,
+          parentaTxnId,
+          referenceNumber,
+        })}
         confirmText="Reject"
         cancelText="Cancel"
         variant="danger"
@@ -141,3 +190,6 @@ export default function ConfirmPaymentActions({
     </div>
   );
 }
+
+export { ConfirmPaymentActions };
+export default ConfirmPaymentActions;

@@ -3,26 +3,43 @@
 import { ReactNode } from 'react';
 import {
   ArrowUp,
+  Camera,
   Paperclip,
   Star,
+  User,
   Wrench,
   X,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { LightboxImage } from '@/components/ui/ImageLightbox';
 import { MaintenanceReactionBar } from '@/components/features/maintenance/MaintenanceReactionBar';
+import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 import { cn } from '@/lib/utils';
+import { getImageUrl } from '@/lib/format/image-url';
 
 export interface DiscussionPhoto {
   url: string;
   fileName?: string;
 }
 
+export interface DiscussionDetailRow {
+  label: string;
+  value: string;
+}
+
 export interface DiscussionMessage {
   id: string;
   authorName: string;
   authorRole: string;
+  /** Name used for avatar initials. Falls back to authorName. */
+  avatarName?: string;
+  /** Profile photo for tenant messages. */
+  avatarUrl?: string | null;
   body: string;
+  /** Labeled rows rendered as a card instead of a plain text dump. */
+  details?: DiscussionDetailRow[];
+  /** Overrides the default seed/comment action in the header. */
+  actionLabel?: string;
   createdAt: string;
   updateType?: string;
   rating?: number;
@@ -81,6 +98,27 @@ export function discussionStatusLabel(status?: string | null): {
       textClass: 'text-sky-700',
     };
   }
+  if (key === 'pending') {
+    return {
+      label: 'Awaiting verification',
+      dotClass: 'bg-orange-500',
+      textClass: 'text-orange-600',
+    };
+  }
+  if (key === 'failed') {
+    return {
+      label: 'Rejected',
+      dotClass: 'bg-red-500',
+      textClass: 'text-red-700',
+    };
+  }
+  if (key === 'paid') {
+    return {
+      label: 'Confirmed',
+      dotClass: 'bg-emerald-500',
+      textClass: 'text-emerald-700',
+    };
+  }
   if (key === 'completed' || key === 'closed') {
     return {
       label: 'Resolved',
@@ -106,12 +144,15 @@ function roleBadge(authorRole: string): { label: string; className: string } | n
   const role = authorRole.toLowerCase();
   if (role === 'admin' || role === 'staff') {
     return {
-      label: role === 'admin' ? 'ADMIN' : 'STAFF',
+      label: role === 'admin' ? 'OFFICE' : 'STAFF',
       className: 'bg-slate-100 text-slate-700',
     };
   }
   if (role === 'system') {
     return { label: 'SYSTEM', className: 'bg-slate-100 text-slate-600' };
+  }
+  if (role === 'tenant') {
+    return { label: 'CUSTOMER', className: 'bg-emerald-100 text-emerald-800' };
   }
   return null;
 }
@@ -181,14 +222,19 @@ export function MaintenanceDiscussionMessage({
     reaction: 'like' | 'heart'
   ) => void;
 }) {
-  const badge = roleBadge(message.authorRole);
-  const action = message.isSeed
-    ? 'requested'
-    : updateTypeHint(message.updateType) || 'commented';
+  const isSelfLabel = /^(you|me)$/i.test((message.authorName || '').trim());
+  const badge = isSelfLabel ? null : roleBadge(message.authorRole);
+  const action =
+    message.actionLabel ||
+    (message.isSeed
+      ? 'opened this ticket'
+      : updateTypeHint(message.updateType) || 'commented');
   const isOffice =
     message.authorRole === 'admin' ||
     message.authorRole === 'staff' ||
     message.authorRole === 'system';
+  const avatarLabel = (message.avatarName || message.authorName || '').trim();
+  const avatarIsPlaceholder = /^(you|me)$/i.test(avatarLabel);
 
   const photos: DiscussionPhoto[] = [
     ...(message.photos || []),
@@ -218,9 +264,23 @@ export function MaintenanceDiscussionMessage({
           >
             <Wrench className="h-3.5 w-3.5" />
           </div>
+        ) : message.avatarUrl ? (
+          <Avatar
+            name={avatarLabel || message.authorName}
+            src={getImageUrl(message.avatarUrl)}
+            size="sm"
+            className="h-8 w-8"
+          />
+        ) : avatarIsPlaceholder ? (
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white"
+            aria-label={message.authorName}
+          >
+            <User className="h-4 w-4" />
+          </div>
         ) : (
           <Avatar
-            name={message.authorName}
+            name={avatarLabel}
             size="sm"
             className="h-8 w-8 bg-emerald-600 text-[10px]"
           />
@@ -247,11 +307,27 @@ export function MaintenanceDiscussionMessage({
           </span>
         </div>
 
-        {message.body && (
+        {message.details && message.details.length > 0 ? (
+          <div className="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <dl className="divide-y divide-gray-100">
+              {message.details.map((row) => (
+                <div
+                  key={`${row.label}-${row.value}`}
+                  className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3 px-3 py-2.5 sm:grid-cols-[8.5rem_minmax(0,1fr)]"
+                >
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {row.label}
+                  </dt>
+                  <dd className="min-w-0 text-sm font-medium text-gray-900">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : message.body ? (
           <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-gray-900">
             {message.body}
           </p>
-        )}
+        ) : null}
 
         {message.rating != null && (
           <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
@@ -360,26 +436,48 @@ export function MaintenanceDiscussionComposer({
         />
         <div className="flex shrink-0 items-center gap-1 pb-0.5">
           {onAttach && (
-            <label
-              className={cn(
-                'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800',
-                (disabled || saving) && 'pointer-events-none opacity-50'
-              )}
-              title="Attach photo"
-            >
-              <Paperclip className="h-4 w-4" />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
+            <>
+              <TakePhotoButton
                 disabled={disabled || saving}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onAttach(file);
-                  e.target.value = '';
-                }}
+                onCapture={onAttach}
+                fileNamePrefix="ticket-reply"
+                renderTrigger={(open) => (
+                  <button
+                    type="button"
+                    title="Take photo"
+                    aria-label="Take photo"
+                    disabled={disabled || saving}
+                    onClick={open}
+                    className={cn(
+                      'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800',
+                      (disabled || saving) && 'pointer-events-none opacity-50'
+                    )}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                )}
               />
-            </label>
+              <label
+                className={cn(
+                  'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800',
+                  (disabled || saving) && 'pointer-events-none opacity-50'
+                )}
+                title="Upload photo"
+              >
+                <Paperclip className="h-4 w-4" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={disabled || saving}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onAttach(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </>
           )}
           {!hideSendButton && (
             <button

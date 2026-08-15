@@ -141,7 +141,7 @@ export async function POST(request: Request) {
     const noteParts = [
       notes || null,
       invoiceNote,
-      `Parenta txn ${parentaTxnId}`,
+      `Transaction ${parentaTxnId}`,
       'Status: awaiting office verification — balance not updated yet.',
       referenceNumber ? `GCash / bank reference: ${referenceNumber}` : null,
     ].filter(Boolean);

@@ -6,6 +6,21 @@
 const LEDGER_TAG_RE = /\[ledger(?:-exp)?:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})\]/i;
 const LEDGER_TAG_STRIP_RE = /\s*\[ledger(?:-exp)?:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}\]\s*/gi;
 const LEDGER_TAG_CAPTURE_RE = /(\[ledger(?:-exp)?:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}\])/i;
+const INTERNAL_INVOICE_ID_RE = /\s*\(invoice_id=[0-9a-f-]{36}\)\s*/gi;
+
+/** Hide internal invoice UUIDs stored in payment notes for allocation. */
+export function stripInternalInvoiceId(raw: string): string {
+  return raw.replace(INTERNAL_INVOICE_ID_RE, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
+/** Internal invoice UUID stored in claim notes — for lookups only, never display. */
+export function extractInvoiceIdFromNotes(notes?: string | null): string | null {
+  if (!notes) return null;
+  const match = notes.match(
+    /invoice_id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+  );
+  return match?.[1] || null;
+}
 
 export interface ParsedPaymentNotes {
   /** Human-facing description without the ledger tag */
@@ -29,7 +44,7 @@ function formatPeriodDate(isoDate: string): string {
 }
 
 export function parsePaymentNotes(raw?: string | null): ParsedPaymentNotes {
-  const notes = raw?.trim() || '';
+  const notes = stripInternalInvoiceId(raw?.trim() || '');
   if (!notes) return { label: '' };
 
   const match = notes.match(LEDGER_TAG_RE);

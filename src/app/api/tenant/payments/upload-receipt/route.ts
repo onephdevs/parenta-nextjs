@@ -90,10 +90,11 @@ export async function POST(request: NextRequest) {
     let paymentId = paymentIdRaw || null;
     let linkedInvoiceId: string | null = null;
     let paymentAmount = amountRaw ? parseFloat(amountRaw) : NaN;
+    let reopenedFailedClaim = false;
 
     if (paymentId) {
       const paymentCheck = await pool.query(
-        `SELECT id, tenant_id, receipt_file_path, amount
+        `SELECT id, tenant_id, receipt_file_path, amount, payment_status
          FROM payments
          WHERE id = $1`,
         [paymentId]
@@ -104,6 +105,8 @@ export async function POST(request: NextRequest) {
       if (paymentCheck.rows[0].tenant_id !== tenant.id) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
       }
+      reopenedFailedClaim =
+        String(paymentCheck.rows[0].payment_status || '').toLowerCase() === 'failed';
       if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
         paymentAmount = parseFloat(paymentCheck.rows[0].amount) || 0;
       }
@@ -155,7 +158,7 @@ export async function POST(request: NextRequest) {
           referenceNumberRaw || null,
           parentaTxnId,
           [
-            `Parenta txn ${parentaTxnId}`,
+            `Transaction ${parentaTxnId}`,
             `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})${
               invoice.invoice_status === 'draft' ? ' — pay ahead' : ''
             }`,
@@ -199,7 +202,7 @@ export async function POST(request: NextRequest) {
           referenceNumberRaw || null,
           parentaTxnId,
           [
-            `Parenta txn ${parentaTxnId}`,
+            `Transaction ${parentaTxnId}`,
             referenceNumberRaw ? `GCash / bank reference: ${referenceNumberRaw}` : null,
             notesRaw || `Receipt uploaded for payment dated ${paymentDateRaw}`,
             'Status: awaiting office verification — balance not updated yet.',
@@ -275,6 +278,25 @@ export async function POST(request: NextRequest) {
 
     const paymentRow = updateResult.rows[0];
     const amountValue = parseFloat(paymentRow.amount);
+
+    if (reopenedFailedClaim) {
+      try {
+        const { createPaymentUpdate } = await import('@/lib/api/payment-updates');
+        await createPaymentUpdate({
+          paymentId: String(paymentRow.id),
+          authorRole: 'tenant',
+          authorUserId: access.userId,
+          authorName:
+            `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() ||
+            tenant.email ||
+            'Tenant',
+          body: 'Sent a new receipt screenshot.',
+          updateType: 'status_change',
+        });
+      } catch (threadErr) {
+        console.error('Payment claim thread after new screenshot failed:', threadErr);
+      }
+    }
 
     try {
       await syncPaymentCardForTenant(tenant.id);

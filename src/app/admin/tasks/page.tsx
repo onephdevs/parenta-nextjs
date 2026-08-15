@@ -2,7 +2,7 @@ import { TasksBoard } from '@/components/features/tasks/TasksBoard';
 import type { PipelineBoardSlug } from '@/types/database';
 
 interface AdminTasksPageProps {
-  searchParams: Promise<{ board?: string }>;
+  searchParams: Promise<{ board?: string; request?: string; card?: string }>;
 }
 
 export default async function AdminTasksPage({ searchParams }: AdminTasksPageProps) {
@@ -11,7 +11,11 @@ export default async function AdminTasksPage({ searchParams }: AdminTasksPagePro
 
   return (
     <div className="px-4 py-6 sm:px-6 lg:px-8">
-      <TasksBoard initialSlug={board} />
+      <TasksBoard
+        initialSlug={board}
+        openRequestId={query.request?.trim() || undefined}
+        openCardId={query.card?.trim() || undefined}
+      />
     </div>
   );
 }

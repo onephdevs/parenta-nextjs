@@ -4,13 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
   Calendar,
-  ChevronDown,
   CircleX,
   ExternalLink,
   FileCheck2,
   FileText,
   History,
-  Info,
   Plus,
   ShieldCheck,
   Tag,
@@ -55,8 +53,12 @@ import { OpportunityTagsField } from './OpportunityTagsField';
 import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 import { OpportunityDocumentsPanel } from './OpportunityDocumentsPanel';
 import { OpportunityHistoryPanel } from './OpportunityHistoryPanel';
+import { OpportunityTenantProfilePanel, OpportunityRoomProfilePanel } from './OpportunityLinkedRecordPanels';
 import { PaymentFollowUpPanel } from './PaymentFollowUpPanel';
-import { MaintenanceFollowUpPanel } from './MaintenanceFollowUpPanel';
+import {
+  MaintenanceFollowUpPanel,
+  type MaintenanceFollowUpHandle,
+} from './MaintenanceFollowUpPanel';
 import {
   contactDisplayName,
   inferContactUtilityTypes,
@@ -136,11 +138,14 @@ interface AddOpportunityModalProps {
   onSaved?: (updatedCard?: PipelineCard) => void;
   /** Called after moving to another board (receives that board's slug) */
   onMoved?: (boardSlug: string) => void;
+  /** Confirm/reject a tenant receipt — close the drawer and refresh the board. */
+  onClaimSettled?: (action: 'confirm' | 'reject') => void;
 }
 
 type FormSection =
   | 'contact'
   | 'property'
+  | 'room'
   | 'schedule'
   | 'documents'
   | 'screening'
@@ -150,6 +155,19 @@ type FormSection =
   | 'tags'
   | 'notes'
   | 'history';
+
+function asTagList(tags: unknown): string[] {
+  if (Array.isArray(tags)) {
+    return tags.map((t) => String(t)).filter(Boolean);
+  }
+  if (typeof tags === 'string' && tags.trim()) {
+    return tags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
 
 function toDatetimeLocal(iso?: string): string {
   if (!iso) return '';
@@ -256,7 +274,14 @@ const paymentsSections: SectionedFormSection<FormSection>[] = [
     icon: <Wallet className="h-4 w-4" />,
     title: 'Rent payment',
     subtitle:
-      'Tenant, unit, due date, amount, and GCash receipt verification.',
+      'Receipt claim, invoice, and follow-up details for this rent cycle.',
+  },
+  {
+    id: 'contact',
+    label: 'Tenant',
+    icon: <User className="h-4 w-4" />,
+    title: 'Tenant',
+    subtitle: 'Profile, current room, and property.',
   },
   {
     id: 'notes',
@@ -310,29 +335,8 @@ const maintenanceSections: SectionedFormSection<FormSection>[] = [
     id: 'contact',
     label: 'Tenant',
     icon: <User className="h-4 w-4" />,
-    title: 'Tenant contact',
-    subtitle: 'Who reported the issue and how to reach them.',
-  },
-  {
-    id: 'property',
-    label: 'Location',
-    icon: <Building2 className="h-4 w-4" />,
-    title: 'Building & unit',
-    subtitle: 'Where the work needs to happen.',
-  },
-  {
-    id: 'schedule',
-    label: 'Schedule',
-    icon: <Calendar className="h-4 w-4" />,
-    title: 'Visit / due date',
-    subtitle: 'When this should be attended to.',
-  },
-  {
-    id: 'notes',
-    label: 'Follow-up',
-    icon: <FileText className="h-4 w-4" />,
-    title: 'Follow-up notes',
-    subtitle: 'Technician notes or next steps for this card.',
+    title: 'Tenant information',
+    subtitle: 'Full tenant profile, contact, lease, and assignment history.',
   },
   {
     id: 'tags',
@@ -396,6 +400,31 @@ const historySection: SectionedFormSection<FormSection> = {
   title: 'Opportunity history',
   subtitle: 'What changed on this card — assignments, stage moves, and updates.',
 };
+
+function historySectionFor(slug: string): SectionedFormSection<FormSection> {
+  if (slug === 'maintenance') {
+    return {
+      ...historySection,
+      title: 'Ticket history',
+      subtitle: 'When this ticket was opened, assigned, and what the customer and office said.',
+    };
+  }
+  if (slug === 'payments') {
+    return {
+      ...historySection,
+      title: 'Invoice history',
+      subtitle: 'When this card was created, stage changes, and the invoice on this follow-up.',
+    };
+  }
+  if (slug === 'expenses') {
+    return {
+      ...historySection,
+      title: 'Card history',
+      subtitle: 'When this bill or expense was added and how it changed.',
+    };
+  }
+  return historySection;
+}
 
 type OnboardingSectionMeta = {
   status: SectionNavStatus;
@@ -508,7 +537,7 @@ function sectionsForBoard(
 ): SectionedFormSection<FormSection>[] {
   if (board.slug === 'onboarding') {
     const base = onboardingSections;
-    return isEditing ? [...base, historySection] : base;
+    return isEditing ? [...base, historySectionFor(board.slug)] : base;
   }
 
   const base =
@@ -524,13 +553,17 @@ function sectionsForBoard(
     return base;
   }
 
+  if (board.slug === 'maintenance') {
+    return [...base, historySectionFor(board.slug)];
+  }
+
   const withBoardMove = (() => {
     const tagsIdx = base.findIndex((s) => s.id === 'tags');
     if (tagsIdx < 0) return [...base, boardMoveSection];
     return [...base.slice(0, tagsIdx), boardMoveSection, ...base.slice(tagsIdx)];
   })();
 
-  return [...withBoardMove, historySection];
+  return [...withBoardMove, historySectionFor(board.slug)];
 }
 
 export function AddOpportunityModal({
@@ -542,6 +575,7 @@ export function AddOpportunityModal({
   onCreated,
   onSaved,
   onMoved,
+  onClaimSettled,
 }: AddOpportunityModalProps) {
   const isEditing = Boolean(card?.id);
   const isOnboarding = board.slug === 'onboarding';
@@ -640,6 +674,7 @@ export function AddOpportunityModal({
   const [moveInTransactionId, setMoveInTransactionId] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
   const moveInAmountsManualRef = useRef(false);
+  const maintenanceFollowUpRef = useRef<MaintenanceFollowUpHandle>(null);
   const [moveBoardId, setMoveBoardId] = useState('');
   const [moveStageId, setMoveStageId] = useState('');
   const [movingBoard, setMovingBoard] = useState(false);
@@ -696,20 +731,20 @@ export function AddOpportunityModal({
           : toDatetimeLocal(card.dueAt)
       );
       setNextActionAt(toDatetimeLocal(card.nextActionAt));
-      setTags(card.tags || []);
+      setTags(asTagList(card.tags));
       setMarkAsLost(
         card.cardStatus === 'lost' ||
           card.stageSlug === 'lost' ||
-          (card.tags || []).some((t) => t.toLowerCase() === 'lost')
+          asTagList(card.tags).some((t) => t.toLowerCase() === 'lost')
       );
       setLostReason(card.lostReason || '');
       setViewingStatus(card.viewingStatus || '');
       setBackgroundCheckStatus(card.backgroundCheckStatus || 'not_started');
       setBackgroundCheckNotes(card.backgroundCheckNotes || '');
       setLeaseStatus(card.leaseStatus || 'not_started');
-      setLeaseStartDate(card.leaseStartDate?.slice(0, 10) || '');
-      setLeaseEndDate(card.leaseEndDate?.slice(0, 10) || '');
-      setMoveInDate(card.moveInDate?.slice(0, 10) || card.leaseStartDate?.slice(0, 10) || '');
+      setLeaseStartDate(toDateInput(card.leaseStartDate));
+      setLeaseEndDate(toDateInput(card.leaseEndDate));
+      setMoveInDate(toDateInput(card.moveInDate) || toDateInput(card.leaseStartDate));
       setLeaseDurationMonths(12);
       setCustomLeaseMonths('');
       setLeasePackageTemplateId(card.leasePackageTemplateId || '');
@@ -754,13 +789,11 @@ export function AddOpportunityModal({
       );
       setMoveInPaymentType('rent');
       setMoveInPaymentDate(
-        card.moveInPaidAt
-          ? card.moveInPaidAt.slice(0, 10)
-          : todayLocalISO()
+        card.moveInPaidAt ? toDateInput(card.moveInPaidAt) : todayLocalISO()
       );
       if (board.slug === 'expenses') {
         const inferred = expenseUtilityTypeFromCard(
-          card.tags || [],
+          asTagList(card.tags),
           card.source
         );
         setExpenseKind(card.expenseId && !card.utilityBillId ? 'expense' : 'utility');
@@ -1799,6 +1832,9 @@ export function AddOpportunityModal({
       }
 
       if (isEditing && card) {
+        if (isMaintenance) {
+          await maintenanceFollowUpRef.current?.persist();
+        }
         if (isExpenses && card.utilityBillId) {
           const billUpdates: Record<string, unknown> = {
             provider: firstName.trim(),
@@ -2219,7 +2255,7 @@ export function AddOpportunityModal({
   return (
     <>
     <SectionedFormShell
-      mode="dialog"
+      mode="modal"
       isOpen={isOpen}
       onCancel={onClose}
       eyebrow={
@@ -2280,6 +2316,20 @@ export function AddOpportunityModal({
         ) : undefined
       }
     >
+      {activeSection === 'payment' && isPayments && isEditing && card?.id ? (
+        <div className="mb-6 space-y-6">
+          <PaymentFollowUpPanel
+            cardId={card.id}
+            tenantId={card.tenantId}
+            tenantName={`${firstName} ${lastName}`.trim() || undefined}
+            invoiceId={card.invoiceId}
+            buildingId={buildingId || undefined}
+            roomId={roomId || undefined}
+            balanceAmount={card.amount}
+            onClaimSettled={onClaimSettled}
+          />
+        </div>
+      ) : null}
       <form id="add-opportunity-form" onSubmit={handleSubmit} className="space-y-5">
         {isOnboarding ? (
           <>
@@ -2868,7 +2918,7 @@ export function AddOpportunityModal({
                     label="GCash / bank reference"
                     htmlFor="opp-txn-id"
                     className="col-span-6 sm:col-span-3"
-                    hint="Optional receipt number from GCash/bank (not the Parenta txn)"
+                    hint="Optional receipt number from GCash/bank (not the internal transaction ID)"
                   >
                     <Input
                       id="opp-txn-id"
@@ -3279,12 +3329,30 @@ export function AddOpportunityModal({
             )}
 
             {activeSection === 'history' && card?.id && (
-              <OpportunityHistoryPanel cardId={card.id} />
+              <OpportunityHistoryPanel cardId={card.id} boardSlug={board.slug} />
             )}
           </>
         ) : (
           <>
+            {activeSection === 'contact' && isPayments && (
+              card?.tenantId ? (
+                <div className="space-y-8">
+                  <OpportunityTenantProfilePanel tenantId={card.tenantId} />
+                  {card.roomId ? (
+                    <OpportunityRoomProfilePanel roomId={card.roomId} />
+                  ) : null}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
+                  No tenant is linked to this card yet.
+                </p>
+              )
+            )}
+
             {activeSection === 'contact' && !isExpenses && !isPayments && (
+              isMaintenance && card?.tenantId ? (
+                <OpportunityTenantProfilePanel tenantId={card.tenantId} />
+              ) : (
               <>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <FormField label="First name" htmlFor="opp-first-name" required>
@@ -3326,9 +3394,10 @@ export function AddOpportunityModal({
                   </FormField>
                 </div>
               </>
+              )
             )}
 
-            {activeSection === 'property' && !isPayments && (
+            {activeSection === 'property' && !isPayments && !isMaintenance && (
               <>
                 <FormField label="Building" htmlFor="opp-building">
                   <Select
@@ -3401,7 +3470,7 @@ export function AddOpportunityModal({
               </>
             )}
 
-            {activeSection === 'schedule' && !isPayments && (
+            {activeSection === 'schedule' && !isPayments && !isMaintenance && (
               <>
                 <FormField
                   label={
@@ -3434,48 +3503,8 @@ export function AddOpportunityModal({
 
             {activeSection === 'payment' && isPayments && (
               <>
-                {isEditing && card?.id ? (
-                  <details className="group rounded-lg border border-indigo-100 bg-indigo-50/70 text-sm text-indigo-900">
-                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-medium [&::-webkit-details-marker]:hidden">
-                      <Info className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
-                      <span>How to use Rent Payment cards</span>
-                      <ChevronDown
-                        className="ml-auto h-4 w-4 shrink-0 text-indigo-500 transition-transform group-open:rotate-180"
-                        aria-hidden
-                      />
-                    </summary>
-                    <div className="space-y-1.5 border-t border-indigo-100/80 px-3 pb-2.5 pt-2 text-xs leading-relaxed text-indigo-800">
-                      <p>
-                        Drag stages: Upcoming → Due → Reminder sent → Overdue →{' '}
-                        <strong>Pending verification</strong> → Paid → Refund (or Escalation).
-                      </p>
-                      <p>
-                        Tenant pays via GCash and uploads receipt + reference → Pending
-                        verification.
-                      </p>
-                      <p>
-                        Match GCash ref to the receipt below, then Confirm (Paid) or Reject (Due /
-                        Overdue).
-                      </p>
-                      <p>
-                        <span className="font-mono">txn-r-######-YY</span> = Parenta id; GCash ref =
-                        what you verify.
-                      </p>
-                      {card.tenantId ? (
-                        <a
-                          href={`/admin/tenants/${card.tenantId}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 pt-0.5 font-medium text-indigo-700 underline"
-                        >
-                          Open tenant profile
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : null}
-                    </div>
-                  </details>
-                ) : null}
-
+                {!isEditing ? (
+                <div className="contents">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <FormField label="First name" htmlFor="opp-pay-first-name" required>
                     <Input
@@ -3609,15 +3638,7 @@ export function AddOpportunityModal({
                   />
                 </FormField>
 
-                {isEditing && card?.id ? (
-                  <PaymentFollowUpPanel
-                    cardId={card.id}
-                    tenantId={card.tenantId}
-                    invoiceId={card.invoiceId}
-                    buildingId={buildingId || undefined}
-                    roomId={roomId || undefined}
-                    balanceAmount={card.amount}
-                  />
+                </div>
                 ) : null}
               </>
             )}
@@ -3963,6 +3984,7 @@ export function AddOpportunityModal({
             {activeSection === 'payment' && isMaintenance && (
               card?.id ? (
               <MaintenanceFollowUpPanel
+                ref={maintenanceFollowUpRef}
                 cardId={card.id}
                 maintenanceRequestId={card.maintenanceRequestId}
                 buildingId={buildingId || undefined}
@@ -4018,6 +4040,48 @@ export function AddOpportunityModal({
                         ))}
                       </Select>
                     </FormField>
+                    <FormField label="Building" htmlFor="opp-maint-building">
+                      <Select
+                        id="opp-maint-building"
+                        value={buildingId}
+                        onChange={(e) => setBuildingId(e.target.value)}
+                      >
+                        <option value="">Optional</option>
+                        {buildings.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField label="Room / unit" htmlFor="opp-maint-room">
+                      <Select
+                        id="opp-maint-room"
+                        value={roomId}
+                        onChange={(e) => setRoomId(e.target.value)}
+                        disabled={!buildingId}
+                      >
+                        <option value="">Select room</option>
+                        {rooms.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.roomNumber}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField
+                      label="Scheduled / due"
+                      htmlFor="opp-maint-due"
+                      className="sm:col-span-2"
+                      hint="Optional target date for the repair visit."
+                    >
+                      <Input
+                        id="opp-maint-due"
+                        type="datetime-local"
+                        value={dueAt}
+                        onChange={(e) => setDueAt(e.target.value)}
+                      />
+                    </FormField>
                   </div>
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                     Photos and status updates are available after you create this follow-up
@@ -4030,7 +4094,7 @@ export function AddOpportunityModal({
             {activeSection === 'notes' && (
               <FormField
                 label={
-                  isPayments || isExpenses || isMaintenance
+                  isPayments || isExpenses
                     ? 'Follow-up notes'
                     : 'Notes'
                 }
@@ -4040,9 +4104,7 @@ export function AddOpportunityModal({
                     ? 'Approval notes, payment schedule, or vendor follow-ups. Billing period is shown in plain language when available.'
                     : isPayments
                       ? 'Example: Called 8/4 — promised to pay Friday. Reminder SMS sent.'
-                      : isMaintenance
-                        ? 'Card-level follow-up (tenant description lives under Request).'
-                        : undefined
+                      : undefined
                 }
               >
                 <Textarea
@@ -4055,15 +4117,13 @@ export function AddOpportunityModal({
                       ? 'Log calls, promises, partial payments…'
                       : isExpenses
                         ? 'e.g. Waiting on Angeles Electric confirmation…'
-                        : isMaintenance
-                          ? 'e.g. Vendor confirmed visit tomorrow…'
-                          : 'Follow-up context'
+                        : 'Follow-up context'
                   }
                 />
               </FormField>
             )}
 
-            {activeSection === 'status' && isEditing && card && (
+            {activeSection === 'status' && isEditing && card && !isMaintenance && (
               <div className="rounded-lg border border-gray-200 p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Move to another board</h3>
@@ -4127,7 +4187,7 @@ export function AddOpportunityModal({
             )}
 
             {activeSection === 'history' && card?.id && (
-              <OpportunityHistoryPanel cardId={card.id} />
+              <OpportunityHistoryPanel cardId={card.id} boardSlug={board.slug} />
             )}
           </>
         )}

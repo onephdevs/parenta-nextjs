@@ -37,7 +37,8 @@ export async function allocatePaymentToInvoices(
       tenantId,
       paymentAmount,
       depositAmount = 0,
-      useDeposit = false
+      useDeposit = false,
+      preferredInvoiceId,
     } = request;
 
     // Validate input
@@ -92,7 +93,17 @@ export async function allocatePaymentToInvoices(
     // Get unpaid invoices (sorted by due date, oldest first)
     // Prioritize rent invoices, but include all invoice types for manual payments
     // Note: Advance only applies to rent invoices, but manual payments can apply to any invoice
-    const unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId);
+    let unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId);
+
+    if (preferredInvoiceId) {
+      const preferred = unpaidInvoices.find((inv) => inv.id === preferredInvoiceId);
+      if (preferred) {
+        unpaidInvoices = [
+          preferred,
+          ...unpaidInvoices.filter((inv) => inv.id !== preferredInvoiceId),
+        ];
+      }
+    }
 
     if (unpaidInvoices.length === 0) {
       // No unpaid invoices - create advance for entire cash amount (do not auto-apply deposit)

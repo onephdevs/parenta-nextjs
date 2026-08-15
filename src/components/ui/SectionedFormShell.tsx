@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 
@@ -46,6 +46,8 @@ interface SectionedFormShellBaseProps<T extends string> {
   navFooter?: ReactNode;
   /** Extra actions beside Cancel / primary (desktop header) */
   headerExtra?: ReactNode;
+  /** Modal drawer: show a hide control that tucks the panel to the right. */
+  onHidePanel?: () => void;
   cancelLabel?: string;
   onCancel: () => void;
   primaryLabel: string;
@@ -162,6 +164,7 @@ function SectionedFormLayout<T extends string>({
   sectionSubtitle,
   navFooter,
   headerExtra,
+  onHidePanel,
   cancelLabel = 'Cancel',
   onCancel,
   primaryLabel,
@@ -265,11 +268,16 @@ function SectionedFormLayout<T extends string>({
             <div className="mb-3 flex items-center gap-2 md:hidden">
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={onHidePanel || onCancel}
                 className="rounded-md p-1 text-gray-400 hover:text-gray-900"
-                aria-label="Close"
+                title={onHidePanel ? 'Hide panel' : 'Close'}
+                aria-label={onHidePanel ? 'Hide panel' : 'Close'}
               >
-                <X className="h-5 w-5" />
+                {onHidePanel ? (
+                  <PanelRightClose className="h-5 w-5" />
+                ) : (
+                  <X className="h-5 w-5" />
+                )}
               </button>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                 {eyebrow}
@@ -298,11 +306,16 @@ function SectionedFormLayout<T extends string>({
             </Button>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={onHidePanel || onCancel}
               className="hidden rounded-md p-1 text-gray-400 hover:text-gray-900 md:inline-flex"
-              aria-label="Close"
+              title={onHidePanel ? 'Hide panel' : 'Close'}
+              aria-label={onHidePanel ? 'Hide panel' : 'Close'}
             >
-              <X className="h-5 w-5" />
+              {onHidePanel ? (
+                <PanelRightClose className="h-5 w-5" />
+              ) : (
+                <X className="h-5 w-5" />
+              )}
             </button>
           </div>
         </div>
@@ -335,7 +348,13 @@ function SectionedFormLayout<T extends string>({
           )}
         >
           {errorBanner}
-          <div className={compact ? 'max-w-none' : 'max-w-2xl'}>{children}</div>
+          <div
+            className={
+              compact ? 'max-w-none' : fillViewport ? 'mx-auto w-full max-w-6xl' : 'max-w-2xl'
+            }
+          >
+            {children}
+          </div>
           {navFooter && (
             <div className="mt-8 max-w-2xl border-t border-gray-200 pt-4 md:hidden">
               {navFooter}
@@ -349,7 +368,7 @@ function SectionedFormLayout<T extends string>({
 
 /**
  * Shared CRUD form chrome: left section nav + content header with Cancel/Save.
- * - mode="modal" (default): full-height right panel at 70% of main content width
+ * - mode="modal" (default): full-height right drawer over the board
  * - mode="dialog": centered floating panel (not fullscreen)
  * - mode="page": fills the admin main content area (no portal)
  */
@@ -358,27 +377,31 @@ export default function SectionedFormShell<T extends string>(
 ) {
   const mode = props.mode ?? 'modal';
   const [mounted, setMounted] = useState(false);
+  const [panelHidden, setPanelHidden] = useState(false);
+  const isOpen = 'isOpen' in props && props.isOpen;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    if (!isOpen) setPanelHidden(false);
+  }, [isOpen]);
+
+  useEffect(() => {
     if (mode !== 'modal' && mode !== 'dialog') return;
-    const isOpen = 'isOpen' in props && props.isOpen;
-    if (!isOpen) return;
+    if (!isOpen || panelHidden) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [mode, props]);
+  }, [mode, isOpen, panelHidden]);
 
   if (mode === 'page') {
     return <SectionedFormLayout {...props} fillViewport={false} />;
   }
 
-  const isOpen = 'isOpen' in props && props.isOpen;
   if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
   if (mode === 'dialog') {
@@ -404,17 +427,40 @@ export default function SectionedFormShell<T extends string>(
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[100] h-[100dvh] w-screen overflow-hidden">
       <div
-        className="pointer-events-auto absolute inset-0 bg-gray-900/50 lg:left-64"
-        onClick={props.onCancel}
+        className={cn(
+          'absolute inset-0 bg-gray-900/40 transition-opacity duration-300 lg:left-64',
+          panelHidden
+            ? 'pointer-events-none opacity-0'
+            : 'pointer-events-auto opacity-100'
+        )}
+        onClick={panelHidden ? undefined : props.onCancel}
         aria-hidden="true"
       />
       <div
         role="dialog"
-        aria-modal="true"
-        className="pointer-events-auto absolute inset-y-0 right-0 w-[70%] bg-white shadow-xl lg:w-[calc(0.7*(100%-16rem))]"
+        aria-modal={!panelHidden}
+        className={cn(
+          'pointer-events-auto absolute inset-y-0 right-0 flex w-[min(100%,74rem)] flex-col bg-white shadow-2xl ring-1 ring-black/5 transition-transform duration-300 ease-out sm:w-[min(77vw,74rem)] lg:w-[min(74rem,calc((100%-16rem)*0.81))]',
+          panelHidden && 'translate-x-full'
+        )}
       >
-        <SectionedFormLayout {...props} fillViewport />
+        <SectionedFormLayout
+          {...props}
+          fillViewport
+          onHidePanel={() => setPanelHidden(true)}
+        />
       </div>
+      {panelHidden && (
+        <button
+          type="button"
+          onClick={() => setPanelHidden(false)}
+          className="pointer-events-auto absolute right-0 top-24 z-[101] inline-flex h-12 w-10 items-center justify-center rounded-l-lg border border-r-0 border-gray-200 bg-white text-gray-700 shadow-lg hover:bg-gray-50"
+          title="Show panel"
+          aria-label="Show panel"
+        >
+          <PanelRightOpen className="h-5 w-5" />
+        </button>
+      )}
     </div>,
     document.body
   );

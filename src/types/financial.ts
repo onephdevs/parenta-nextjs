@@ -387,6 +387,8 @@ export interface PaymentAllocationRequest {
   paymentAmount: number;
   depositAmount?: number;
   useDeposit?: boolean;
+  /** When set, allocate to this invoice first, then FIFO across remaining unpaid invoices. */
+  preferredInvoiceId?: string;
 }
 
 export interface PaymentAllocationResult {

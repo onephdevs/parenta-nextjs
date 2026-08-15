@@ -7,7 +7,7 @@ import { FormField } from '@/components/forms/FormField';
 import { Select } from '@/components/ui/Select';
 import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from '@/types/document';
 import { TakePhotoButton } from '@/components/features/TakePhotoButton';
-import { looksLikeImage, useImageLightbox } from '@/components/ui/ImageLightbox';
+import { looksLikeImage, useImageLightboxOptional } from '@/components/ui/ImageLightbox';
 
 interface CardDocument {
   id: string;
@@ -62,7 +62,7 @@ export function OpportunityDocumentsPanel({
     defaultDocType || docTypeOptions[0]?.value || 'other'
   );
   const [error, setError] = useState<string | null>(null);
-  const { open: openLightbox } = useImageLightbox();
+  const { open: openLightbox } = useImageLightboxOptional();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,7 +73,7 @@ export function OpportunityDocumentsPanel({
       );
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load documents');
-      setDocs(json.data || []);
+      setDocs(Array.isArray(json.data) ? json.data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load documents');
     } finally {

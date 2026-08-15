@@ -25,7 +25,7 @@ export interface ReceiptLinkOption {
 
 interface ReceiptUploadPanelProps {
   options: ReceiptLinkOption[];
-  onUploadComplete?: () => void;
+  onUploadComplete?: (result?: { paymentId?: string }) => void;
   className?: string;
 }
 
@@ -158,7 +158,7 @@ export function ReceiptUploadPanel({
       setSelectedFile(null);
       setNotes('');
       setReferenceNumber('');
-      onUploadComplete?.();
+      onUploadComplete?.({ paymentId: data.data?.paymentId });
     } catch (error) {
       console.error('Receipt upload error:', error);
       showNotification({

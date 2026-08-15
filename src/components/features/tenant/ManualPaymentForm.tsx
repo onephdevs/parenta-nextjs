@@ -23,7 +23,7 @@ interface ManualInvoice {
 
 interface ManualPaymentFormProps {
   invoices?: ManualInvoice[];
-  onPaymentComplete?: () => void;
+  onPaymentComplete?: (result?: { paymentId?: string }) => void;
   onCancel?: () => void;
 }
 
@@ -125,7 +125,7 @@ export default function ManualPaymentForm({
         setReferenceNumber('');
         setNotes('');
         setAmount('');
-        onPaymentComplete?.();
+        onPaymentComplete?.({ paymentId: data.data?.paymentId || data.paymentId });
       } else {
         showNotification({
           type: 'error',

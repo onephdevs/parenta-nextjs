@@ -147,10 +147,13 @@ export async function POST(request: Request) {
       paymentDate,
       dueDate,
       paymentMethod: paymentMethod || paymentData.paymentMethod,
+      orNumber: paymentData.orNumber ? String(paymentData.orNumber).trim() : undefined,
+      orDate: paymentData.orDate ? new Date(paymentData.orDate) : null,
     };
 
     const shouldAllocate =
-      paymentData.autoAllocate !== false && paymentData.paymentType === 'rent';
+      paymentData.autoAllocate !== false &&
+      (paymentData.paymentType === 'rent' || Boolean(paymentData.invoiceId));
 
     const client = await pool.connect();
     let payment;
@@ -171,6 +174,9 @@ export async function POST(request: Request) {
             paymentAmount: payment.amount,
             depositAmount: paymentData.depositAmount || 0,
             useDeposit: paymentData.useDeposit !== false,
+            preferredInvoiceId: paymentData.invoiceId
+              ? String(paymentData.invoiceId)
+              : undefined,
           },
           client
         );
@@ -184,6 +190,7 @@ export async function POST(request: Request) {
       client.release();
     }
 
+    // Optional proof-of-payment path is handled by a follow-up multipart upload from the client.
     invalidateDashboardCache();
     
     // Create detailed response message

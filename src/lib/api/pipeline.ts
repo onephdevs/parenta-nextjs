@@ -1,6 +1,7 @@
 import pool from '@/lib/db';
 import { ensureTenantForLease, DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
-import { buildMaintenancePipelineTags } from '@/lib/constants/maintenance';
+import { buildMaintenancePipelineTags, formatMaintenanceCategory } from '@/lib/constants/maintenance';
+import { extractInvoiceIdFromNotes } from '@/lib/format-payment-notes';
 import type {
   CreatePipelineCardData,
   PipelineBackgroundCheckStatus,
@@ -12,6 +13,22 @@ import type {
   PipelineViewingStatus,
   PipelineStage,
 } from '@/types/database';
+
+const pipelineEnsureCache = globalThis as typeof globalThis & {
+  __parentaPipelineEnsure?: Map<string, Promise<void>>;
+};
+
+function ensureOnce(key: string, run: () => Promise<void>): Promise<void> {
+  const cache = (pipelineEnsureCache.__parentaPipelineEnsure ??= new Map());
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const pending = run().catch((error) => {
+    cache.delete(key);
+    throw error;
+  });
+  cache.set(key, pending);
+  return pending;
+}
 
 interface DbBoard {
   id: string;
@@ -436,10 +453,28 @@ export async function createPipelineCard(
   );
 
   const card = insert.rows[0];
+  const createdNote =
+    data.boardSlug === 'maintenance'
+      ? 'Ticket opened'
+      : data.boardSlug === 'payments'
+        ? 'Rent invoice follow-up created'
+        : data.boardSlug === 'expenses'
+          ? data.source === 'Utility bill'
+            ? 'Utility bill card created'
+            : 'Expense card created'
+          : 'Opportunity created';
   await pool.query(
-    `INSERT INTO pipeline_card_events (card_id, event_type, to_stage_id, to_board_id, created_by)
-     VALUES ($1, 'created', $2, $3, $4)`,
-    [card.id, stage.id, board.id, createdBy || null]
+    `INSERT INTO pipeline_card_events (
+       card_id, event_type, to_stage_id, to_board_id, note, metadata, created_by
+     ) VALUES ($1, 'created', $2, $3, $4, $5::jsonb, $6)`,
+    [
+      card.id,
+      stage.id,
+      board.id,
+      createdNote,
+      JSON.stringify({ boardSlug: data.boardSlug, source: data.source || null }),
+      createdBy || null,
+    ]
   );
 
   const cards = await getCardsForBoard(data.boardSlug);
@@ -1082,6 +1117,7 @@ type PaymentStageSlug =
   | 'reminder_sent'
   | 'overdue'
   | 'pending_verification'
+  | 'rejected'
   | 'paid'
   | 'refund'
   | 'escalation';
@@ -1098,12 +1134,14 @@ function calendarDaysUntil(dueDateIso: string, today = new Date()): number {
  * Map lease + invoice state → Rent Payment board stage.
  * Preserves manual stages (reminder_sent, escalation, refund) while still unpaid / after paid.
  * pending_verification wins while a tenant GCash claim awaits admin review.
+ * rejected keeps the same card/thread after office rejects a screenshot.
  */
 export function resolvePaymentStageFromInvoice(input: {
   invoice: TenantInvoiceFocus | null;
   currentStageSlug?: string | null;
   dueSoonDays?: number;
   hasPendingClaim?: boolean;
+  hasRejectedClaim?: boolean;
 }): PaymentStageSlug {
   const current = input.currentStageSlug || null;
   const dueSoonDays = input.dueSoonDays ?? PAYMENT_DUE_SOON_DAYS;
@@ -1115,6 +1153,10 @@ export function resolvePaymentStageFromInvoice(input: {
   // Manual refund stays put (e.g. after a paid collection)
   if (current === 'refund') return 'refund';
 
+  // Tenant uploaded a receipt — stay here even for pay-ahead / already-paid invoices
+  if (input.hasPendingClaim) return 'pending_verification';
+  if (input.hasRejectedClaim) return 'rejected';
+
   if (
     !invoice ||
     balance <= 0 ||
@@ -1125,9 +1167,6 @@ export function resolvePaymentStageFromInvoice(input: {
   ) {
     return 'paid';
   }
-
-  // Tenant uploaded receipt — stay here until admin confirms/rejects
-  if (input.hasPendingClaim) return 'pending_verification';
 
   if (current === 'escalation') return 'escalation';
 
@@ -1273,14 +1312,24 @@ export async function ensurePaymentFollowUpCard(input: {
   await ensureMaintenanceBoardExists();
 
   const invoice = await getFocusInvoiceForTenant(input.tenantId);
-  const pendingClaim = await pool.query<{ id: string }>(
-    `SELECT id FROM payments
+  const openClaim = await pool.query<{
+    id: string;
+    amount: string;
+    payment_status: string;
+  }>(
+    `SELECT id, amount::text AS amount, payment_status
+     FROM payments
      WHERE tenant_id = $1
-       AND payment_status = 'pending'
-     ORDER BY created_at DESC
+       AND LOWER(COALESCE(payment_status, '')) IN ('pending', 'failed')
+     ORDER BY
+       CASE WHEN LOWER(COALESCE(payment_status, '')) = 'pending' THEN 0 ELSE 1 END,
+       created_at DESC
      LIMIT 1`,
     [input.tenantId]
   );
+  const claimStatus = (openClaim.rows[0]?.payment_status || '').toLowerCase();
+  const hasPendingClaim = claimStatus === 'pending';
+  const hasRejectedClaim = claimStatus === 'failed';
   const existing = await pool.query<{ id: string; stage_slug: string }>(
     `SELECT c.id, s.slug AS stage_slug
      FROM pipeline_cards c
@@ -1299,11 +1348,13 @@ export async function ensurePaymentFollowUpCard(input: {
   const targetStage = resolvePaymentStageFromInvoice({
     invoice,
     currentStageSlug: existing.rows[0]?.stage_slug || null,
-    hasPendingClaim: Boolean(pendingClaim.rows[0]),
+    hasPendingClaim,
+    hasRejectedClaim,
   });
 
-  const displayAmount =
-    invoice && Number(invoice.balance_due || 0) > 0
+  const displayAmount = openClaim.rows[0]
+    ? Number(openClaim.rows[0].amount)
+    : invoice && Number(invoice.balance_due || 0) > 0
       ? Number(invoice.balance_due)
       : invoice
         ? Number(invoice.total_amount || input.amount)
@@ -1316,19 +1367,24 @@ export async function ensurePaymentFollowUpCard(input: {
     : null;
 
   if (existing.rows[0]) {
-    const { card: updated } = await updatePipelineCard(existing.rows[0].id, {
-      assignmentId: input.assignmentId,
-      buildingId: input.buildingId,
-      roomId: input.roomId,
-      amount: displayAmount,
-      contactFirstName: input.contactFirstName,
-      contactLastName: input.contactLastName,
-      contactEmail: input.contactEmail || null,
-      contactPhone: input.contactPhone || null,
-      title: `${input.contactFirstName} ${input.contactLastName}`.trim(),
-      dueAt,
-      source: input.source || 'Lease',
-    });
+    const { card: updated } = await updatePipelineCard(
+      existing.rows[0].id,
+      {
+        assignmentId: input.assignmentId,
+        buildingId: input.buildingId,
+        roomId: input.roomId,
+        amount: displayAmount,
+        contactFirstName: input.contactFirstName,
+        contactLastName: input.contactLastName,
+        contactEmail: input.contactEmail || null,
+        contactPhone: input.contactPhone || null,
+        title: `${input.contactFirstName} ${input.contactLastName}`.trim(),
+        dueAt,
+        source: input.source || 'Lease',
+      },
+      undefined,
+      { historyMode: 'none' }
+    );
 
     // Link invoice + stage (updatePipelineCard does not yet touch invoice_id)
     const stageMoved = await applyPaymentCardStage(existing.rows[0].id, targetStage, {
@@ -1466,6 +1522,10 @@ export async function syncActiveLeasesToPipelineCards(): Promise<SyncLeasesResul
 
 /** Soft-ensure maintenance board + stages exist (idempotent). */
 export async function ensureMaintenanceBoardExists(): Promise<void> {
+  return ensureOnce('maintenance-board', ensureMaintenanceBoardExistsOnce);
+}
+
+async function ensureMaintenanceBoardExistsOnce(): Promise<void> {
   await pool.query(
     `INSERT INTO pipeline_boards (slug, name, description, sort_order)
      VALUES ('maintenance', 'Maintenance', 'Tenant work orders from portal submissions', 5)
@@ -1525,18 +1585,43 @@ export async function ensureMaintenanceBoardExists(): Promise<void> {
        )`
   );
   await pool.query(
+    `INSERT INTO pipeline_stages (board_id, slug, name, color, sort_order, is_won, is_lost, is_terminal)
+     SELECT b.id, 'rejected', 'Rejected', '#e11d48', 6, false, false, false
+     FROM pipeline_boards b
+     WHERE b.slug = 'payments'
+       AND NOT EXISTS (
+         SELECT 1 FROM pipeline_stages ps
+         WHERE ps.board_id = b.id AND ps.slug = 'rejected'
+       )`
+  );
+  await pool.query(
     `UPDATE pipeline_stages ps
      SET sort_order = CASE ps.slug
-           WHEN 'paid' THEN 6
-           WHEN 'refund' THEN 7
-           WHEN 'escalation' THEN 8
+           WHEN 'pending_verification' THEN 5
+           WHEN 'rejected' THEN 6
+           WHEN 'paid' THEN 7
+           WHEN 'refund' THEN 8
+           WHEN 'escalation' THEN 9
            ELSE ps.sort_order
          END,
          updated_at = CURRENT_TIMESTAMP
      FROM pipeline_boards pb
      WHERE ps.board_id = pb.id
        AND pb.slug = 'payments'
-       AND ps.slug IN ('paid', 'refund', 'escalation')`
+       AND ps.slug IN ('pending_verification', 'rejected', 'paid', 'refund', 'escalation')`
+  );
+  await pool.query(
+    `UPDATE pipeline_stages ps
+     SET name = 'Rejected',
+         color = '#e11d48',
+         is_won = false,
+         is_lost = false,
+         is_terminal = false,
+         updated_at = CURRENT_TIMESTAMP
+     FROM pipeline_boards pb
+     WHERE ps.board_id = pb.id
+       AND pb.slug = 'payments'
+       AND ps.slug = 'rejected'`
   );
   await pool.query(
     `UPDATE pipeline_stages ps
@@ -1591,6 +1676,7 @@ export function maintenanceStatusToStageSlug(status: string | null | undefined):
     case 'completed':
     case 'cancelled':
     case 'closed':
+    case 'resolved':
       return 'resolved';
     case 'open':
     case 'submitted':
@@ -1666,56 +1752,51 @@ export async function ensureMaintenancePipelineCard(input: {
       resolvedAssignee = resolvedAssignee || null;
     }
 
-    await updatePipelineCard(existing.rows[0].id, {
-      title: input.title,
-      notes: input.description || null,
-      buildingId: input.buildingId || null,
-      roomId: input.roomId || null,
-      contactFirstName: input.contactFirstName || null,
-      contactLastName: input.contactLastName || null,
-      contactEmail: input.contactEmail || null,
-      contactPhone: input.contactPhone || null,
-      tags,
-      source: 'Maintenance request',
-      assignedTo: resolvedAssignee,
-    });
-
     const board = await getBoardBySlug('maintenance');
-    const stage = board?.stages.find((s) => s.slug === stageSlug);
+    const stage =
+      board?.stages.find((s) => s.slug === stageSlug) ||
+      (stageSlug === 'resolved' ? board?.stages.find((s) => s.isWon) : undefined);
     if (stage) {
-      const cardRow = await pool.query<{ stage_id: string; board_id: string }>(
-        `SELECT stage_id, board_id FROM pipeline_cards WHERE id = $1`,
+      const cardRow = await pool.query<{ stage_id: string }>(
+        `SELECT stage_id FROM pipeline_cards WHERE id = $1`,
         [existing.rows[0].id]
       );
       if (cardRow.rows[0] && cardRow.rows[0].stage_id !== stage.id) {
-        const isResolved = stageSlug === 'resolved';
-        await pool.query(
-          `UPDATE pipeline_cards SET
-             stage_id = $1,
-             card_status = $2,
-             won_at = CASE WHEN $3 THEN COALESCE(won_at, CURRENT_TIMESTAMP) ELSE won_at END,
-             updated_at = CURRENT_TIMESTAMP
-           WHERE id = $4`,
-          [
-            stage.id,
-            isResolved ? 'won' : 'open',
-            isResolved,
-            existing.rows[0].id,
-          ]
-        );
-        await pool.query(
-          `INSERT INTO pipeline_card_events (
-             card_id, event_type, from_stage_id, to_stage_id, from_board_id, to_board_id, note
-           ) VALUES ($1, 'stage_changed', $2, $3, $4, $4, $5)`,
-          [
-            existing.rows[0].id,
-            cardRow.rows[0].stage_id,
-            stage.id,
-            cardRow.rows[0].board_id,
-            'Synced from maintenance request status',
-          ]
-        );
+        await movePipelineCard(existing.rows[0].id, stage.id, {
+          note: 'Synced from maintenance request status',
+        });
       }
+    }
+
+    try {
+      await updatePipelineCard(
+        existing.rows[0].id,
+        {
+          title: input.title,
+          notes: input.description || null,
+          buildingId: input.buildingId || null,
+          roomId: input.roomId || null,
+          ...(input.contactFirstName !== undefined
+            ? { contactFirstName: input.contactFirstName || null }
+            : {}),
+          ...(input.contactLastName !== undefined
+            ? { contactLastName: input.contactLastName || null }
+            : {}),
+          ...(input.contactEmail !== undefined
+            ? { contactEmail: input.contactEmail || null }
+            : {}),
+          ...(input.contactPhone !== undefined
+            ? { contactPhone: input.contactPhone || null }
+            : {}),
+          tags,
+          source: 'Maintenance request',
+          assignedTo: resolvedAssignee,
+        },
+        undefined,
+        { historyMode: 'assignee' }
+      );
+    } catch (err) {
+      console.error('Maintenance card field sync failed:', err);
     }
 
     const card = await getPipelineCardById(existing.rows[0].id);
@@ -1788,6 +1869,10 @@ export function utilityBillStatusToStageSlug(status: string | null | undefined):
 
 /** Keep built-in board display names in sync (slugs stay payments / expenses). */
 export async function ensurePipelineBoardLabels(): Promise<void> {
+  return ensureOnce('pipeline-board-labels', ensurePipelineBoardLabelsOnce);
+}
+
+async function ensurePipelineBoardLabelsOnce(): Promise<void> {
   await pool.query(
     `UPDATE pipeline_boards
      SET name = 'Rent Payment',
@@ -1810,6 +1895,10 @@ export async function ensurePipelineBoardLabels(): Promise<void> {
 
 /** Soft-ensure expenses board exists (seeded by migrations; idempotent). */
 export async function ensureExpensesBoardExists(): Promise<void> {
+  return ensureOnce('expenses-board', ensureExpensesBoardExistsOnce);
+}
+
+async function ensureExpensesBoardExistsOnce(): Promise<void> {
   await pool.query(
     `INSERT INTO pipeline_boards (slug, name, description, sort_order)
      VALUES (
@@ -1909,17 +1998,22 @@ export async function ensureUtilityBillPipelineCard(input: {
   );
 
   if (existing.rows[0]) {
-    await updatePipelineCard(existing.rows[0].id, {
-      title,
-      contactFirstName: provider,
-      buildingId: input.buildingId || null,
-      roomId: input.roomId || null,
-      amount: input.amount,
-      dueAt,
-      notes: input.notes || null,
-      tags,
-      source: 'Utility bill',
-    });
+    await updatePipelineCard(
+      existing.rows[0].id,
+      {
+        title,
+        contactFirstName: provider,
+        buildingId: input.buildingId || null,
+        roomId: input.roomId || null,
+        amount: input.amount,
+        dueAt,
+        notes: input.notes || null,
+        tags,
+        source: 'Utility bill',
+      },
+      undefined,
+      { historyMode: 'none' }
+    );
 
     const board = await getBoardBySlug('expenses');
     const stage = board?.stages.find((s) => s.slug === stageSlug);
@@ -2125,17 +2219,22 @@ export async function ensureExpensePipelineCard(input: {
   );
 
   if (existing.rows[0]) {
-    await updatePipelineCard(existing.rows[0].id, {
-      title,
-      contactFirstName: vendor,
-      buildingId: input.buildingId || null,
-      roomId: input.roomId || null,
-      amount: input.amount,
-      dueAt,
-      notes: input.notes || input.description || null,
-      tags,
-      source: 'Expense',
-    });
+    await updatePipelineCard(
+      existing.rows[0].id,
+      {
+        title,
+        contactFirstName: vendor,
+        buildingId: input.buildingId || null,
+        roomId: input.roomId || null,
+        amount: input.amount,
+        dueAt,
+        notes: input.notes || input.description || null,
+        tags,
+        source: 'Expense',
+      },
+      undefined,
+      { historyMode: 'none' }
+    );
 
     const board = await getBoardBySlug('expenses');
     const stage = board?.stages.find((s) => s.slug === stageSlug);
@@ -2373,20 +2472,97 @@ export async function syncPaymentCardForTenant(tenantId: string): Promise<void> 
     [tenantId]
   );
 
-  if (!lease.rows[0]) return;
   const row = lease.rows[0];
+  if (row) {
+    await ensurePaymentFollowUpCard({
+      tenantId: row.tenant_id,
+      assignmentId: row.assignment_id,
+      buildingId: row.building_id,
+      roomId: row.room_id,
+      amount: Number(row.monthly_rate) || 0,
+      contactFirstName: (row.first_name || '').trim() || 'Tenant',
+      contactLastName: (row.last_name || '').trim() || 'Lease',
+      contactEmail: row.email || undefined,
+      contactPhone: row.phone || undefined,
+      source: 'Invoice sync',
+    });
+    return;
+  }
+
+  const fallback = await pool.query<{
+    tenant_id: string;
+    assignment_id: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    building_id: string | null;
+    room_id: string | null;
+    amount: string | null;
+  }>(
+    `SELECT
+       t.id AS tenant_id,
+       COALESCE(p.assignment_id, tra.id) AS assignment_id,
+       t.first_name,
+       t.last_name,
+       t.email,
+       t.phone,
+       COALESCE(pr.building_id, r.building_id) AS building_id,
+       COALESCE(p.room_id, tra.room_id) AS room_id,
+       p.amount::text AS amount
+     FROM tenants t
+     LEFT JOIN LATERAL (
+       SELECT id, room_id, assignment_id, amount
+       FROM payments
+       WHERE tenant_id = t.id
+         AND LOWER(COALESCE(payment_status, '')) = 'pending'
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) p ON true
+     LEFT JOIN rooms pr ON pr.id = p.room_id
+     LEFT JOIN LATERAL (
+       SELECT id, room_id
+       FROM tenant_room_assignments
+       WHERE tenant_id = t.id
+       ORDER BY start_date DESC
+       LIMIT 1
+     ) tra ON true
+     LEFT JOIN rooms r ON r.id = tra.room_id
+     WHERE t.id = $1
+     LIMIT 1`,
+    [tenantId]
+  );
+  const fb = fallback.rows[0];
+  if (!fb?.room_id || !fb.building_id || !fb.assignment_id) return;
+
   await ensurePaymentFollowUpCard({
-    tenantId: row.tenant_id,
-    assignmentId: row.assignment_id,
-    buildingId: row.building_id,
-    roomId: row.room_id,
-    amount: Number(row.monthly_rate) || 0,
-    contactFirstName: (row.first_name || '').trim() || 'Tenant',
-    contactLastName: (row.last_name || '').trim() || 'Lease',
-    contactEmail: row.email || undefined,
-    contactPhone: row.phone || undefined,
-    source: 'Invoice sync',
+    tenantId: fb.tenant_id,
+    assignmentId: fb.assignment_id,
+    buildingId: fb.building_id,
+    roomId: fb.room_id,
+    amount: Number(fb.amount || 0),
+    contactFirstName: (fb.first_name || '').trim() || 'Tenant',
+    contactLastName: (fb.last_name || '').trim() || 'Lease',
+    contactEmail: fb.email || undefined,
+    contactPhone: fb.phone || undefined,
+    source: 'Payment claim',
   });
+}
+
+/** Move cards for unverified or rejected receipts onto the matching stage. */
+export async function syncPendingPaymentClaimsToBoard(): Promise<void> {
+  const pending = await pool.query<{ tenant_id: string }>(
+    `SELECT DISTINCT tenant_id
+     FROM payments
+     WHERE LOWER(COALESCE(payment_status, '')) IN ('pending', 'failed')`
+  );
+  for (const row of pending.rows) {
+    try {
+      await syncPaymentCardForTenant(row.tenant_id);
+    } catch (err) {
+      console.error('Pending-claim board sync failed for tenant', row.tenant_id, err);
+    }
+  }
 }
 
 export async function transferCardToBoard(
@@ -2598,51 +2774,6 @@ export interface PipelineCardEvent {
   summary: string;
 }
 
-function summarizePipelineEvent(row: {
-  event_type: string;
-  note: string | null;
-  metadata: Record<string, unknown> | null;
-  from_stage_name: string | null;
-  to_stage_name: string | null;
-}): string {
-  const metaChanges = Array.isArray(row.metadata?.changes)
-    ? (row.metadata.changes as unknown[]).filter(
-        (c): c is string => typeof c === 'string' && c.trim().length > 0
-      )
-    : [];
-
-  const note = row.note?.trim();
-  const noteIsGeneric =
-    !note ||
-    note === 'Opportunity updated' ||
-    note.toLowerCase() === 'updated';
-
-  if (note && !noteIsGeneric) return note;
-  if (metaChanges.length > 0) return metaChanges.join('; ');
-
-  switch (row.event_type) {
-    case 'created':
-      return 'Opportunity created';
-    case 'assignee_changed':
-      return 'Assignee updated';
-    case 'stage_changed':
-      if (row.from_stage_name && row.to_stage_name) {
-        return `Moved from ${row.from_stage_name} to ${row.to_stage_name}`;
-      }
-      return 'Stage changed';
-    case 'moved_to_board':
-      return 'Moved to another board';
-    case 'lease_generated':
-      return 'Lease generated';
-    case 'updated':
-      return noteIsGeneric
-        ? 'Updated (details not recorded)'
-        : note || 'Opportunity updated';
-    default:
-      return row.event_type.replace(/_/g, ' ');
-  }
-}
-
 function formatHistoryDate(iso?: string | null): string {
   if (!iso) return '(cleared)';
   const d = new Date(iso);
@@ -2762,6 +2893,9 @@ export async function getPipelineCardEvents(
   cardId: string,
   limit = 50
 ): Promise<PipelineCardEvent[]> {
+  const card = await getPipelineCardById(cardId);
+  const boardSlug = card?.boardSlug;
+
   const result = await pool.query<{
     id: string;
     card_id: string;
@@ -2795,21 +2929,520 @@ export async function getPipelineCardEvents(
     [cardId, limit]
   );
 
-  return result.rows.map((row) => {
-    const actorName = [row.actor_first_name, row.actor_last_name].filter(Boolean).join(' ').trim();
+  const pipelineEvents = result.rows
+    .map((row) => {
+      const actorName = [row.actor_first_name, row.actor_last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      const event: PipelineCardEvent = {
+        id: row.id,
+        cardId: row.card_id,
+        eventType: row.event_type,
+        note: row.note || undefined,
+        metadata: row.metadata || undefined,
+        fromStageName: row.from_stage_name || undefined,
+        toStageName: row.to_stage_name || undefined,
+        actorName: actorName || undefined,
+        createdAt: row.created_at.toISOString(),
+        summary: summarizePipelineEvent(row, boardSlug),
+      };
+      return scrubTenantProfileHistory(event, boardSlug);
+    })
+    .filter((e): e is PipelineCardEvent => Boolean(e));
+
+  const sourceEvents = card
+    ? await loadSourceHistoryEvents(card)
+    : [];
+
+  const hasSourceCreated = sourceEvents.some((event) =>
+    ['created', 'invoice_issued', 'expense_recorded', 'utility_recorded'].includes(
+      event.eventType
+    )
+  );
+  const boardEvents = hasSourceCreated
+    ? pipelineEvents.filter((event) => event.eventType !== 'created')
+    : pipelineEvents;
+
+  const merged = [...boardEvents, ...sourceEvents].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  return merged.slice(0, limit);
+}
+
+function createdEventLabel(boardSlug?: string): string {
+  switch (boardSlug) {
+    case 'maintenance':
+      return 'Ticket opened';
+    case 'payments':
+      return 'Invoice follow-up created';
+    case 'expenses':
+      return 'Card created';
+    default:
+      return 'Opportunity created';
+  }
+}
+
+function summarizePipelineEvent(
+  row: {
+    event_type: string;
+    note: string | null;
+    metadata: Record<string, unknown> | null;
+    from_stage_name: string | null;
+    to_stage_name: string | null;
+  },
+  boardSlug?: string
+): string {
+  const metaChanges = Array.isArray(row.metadata?.changes)
+    ? (row.metadata.changes as unknown[]).filter(
+        (c): c is string => typeof c === 'string' && c.trim().length > 0
+      )
+    : [];
+
+  const note = row.note?.trim();
+  const noteIsGeneric =
+    !note ||
+    note === 'Opportunity updated' ||
+    note === 'Opportunity created' ||
+    note.toLowerCase() === 'updated';
+
+  if (row.event_type === 'created') {
+    if (note && !noteIsGeneric) return note;
+    return createdEventLabel(boardSlug);
+  }
+
+  if (note && !noteIsGeneric) return note;
+  if (metaChanges.length > 0) return metaChanges.join('; ');
+
+  switch (row.event_type) {
+    case 'assignee_changed':
+      return 'Assignee updated';
+    case 'stage_changed':
+      if (row.from_stage_name && row.to_stage_name) {
+        return `Moved from ${row.from_stage_name} to ${row.to_stage_name}`;
+      }
+      return 'Stage changed';
+    case 'moved_to_board':
+      return 'Moved to another board';
+    case 'lease_generated':
+      return 'Lease generated';
+    case 'updated':
+      return noteIsGeneric
+        ? 'Updated (details not recorded)'
+        : note || 'Updated';
+    default:
+      return row.event_type.replace(/_/g, ' ');
+  }
+}
+
+const CONTACT_HISTORY_FIELDS = new Set([
+  'contactname',
+  'contactemail',
+  'contactphone',
+  'contact',
+  'email',
+  'phone',
+]);
+
+function isContactHistoryField(field?: string): boolean {
+  return CONTACT_HISTORY_FIELDS.has(String(field || '').replace(/[_\s-]/g, '').toLowerCase());
+}
+
+function isContactOnlyNote(text?: string): boolean {
+  const value = String(text || '').trim();
+  if (!value) return false;
+  return /^(contact (set to|renamed)|email:|phone:|first name|last name)/i.test(value);
+}
+
+function scrubTenantProfileHistory(
+  event: PipelineCardEvent,
+  boardSlug?: string
+): PipelineCardEvent | null {
+  if (!boardSlug || boardSlug === 'onboarding') return event;
+  if (event.eventType === 'lease_generated') return null;
+
+  if (event.eventType !== 'updated' && event.eventType !== 'assignee_changed') {
+    return event;
+  }
+
+  const fields = Array.isArray(event.metadata?.fields)
+    ? (event.metadata!.fields as Array<Record<string, unknown>>)
+    : [];
+  if (fields.length > 0) {
+    const kept = fields.filter((f) => !isContactHistoryField(String(f.field || '')));
+    if (kept.length === 0) return null;
+    if (kept.length === fields.length) return event;
     return {
-      id: row.id,
-      cardId: row.card_id,
-      eventType: row.event_type,
-      note: row.note || undefined,
-      metadata: row.metadata || undefined,
-      fromStageName: row.from_stage_name || undefined,
-      toStageName: row.to_stage_name || undefined,
-      actorName: actorName || undefined,
-      createdAt: row.created_at.toISOString(),
-      summary: summarizePipelineEvent(row),
+      ...event,
+      metadata: { ...event.metadata, fields: kept, changes: kept.map((f) => String(f.summary || '')) },
+      note: kept.map((f) => String(f.summary || '')).filter(Boolean).join('; ') || event.note,
+      summary: kept.map((f) => String(f.summary || '')).filter(Boolean).join('; ') || event.summary,
     };
-  });
+  }
+
+  if (event.eventType === 'updated' && isContactOnlyNote(event.note || event.summary)) {
+    return null;
+  }
+  return event;
+}
+
+function isoFromUnknown(value: unknown): string {
+  if (!value) return new Date().toISOString();
+  const d = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+async function loadSourceHistoryEvents(card: PipelineCard): Promise<PipelineCardEvent[]> {
+  if (card.boardSlug === 'maintenance' && card.maintenanceRequestId) {
+    return loadTicketHistoryEvents(card);
+  }
+  if (card.boardSlug === 'payments') {
+    return loadInvoiceHistoryEvents(card);
+  }
+  if (card.boardSlug === 'expenses') {
+    return loadExpenseItemHistoryEvents(card);
+  }
+  return [];
+}
+
+async function loadTicketHistoryEvents(card: PipelineCard): Promise<PipelineCardEvent[]> {
+  const requestId = card.maintenanceRequestId;
+  if (!requestId) return [];
+
+  const events: PipelineCardEvent[] = [];
+  const request = await pool.query<{
+    title: string;
+    description: string | null;
+    category: string | null;
+    priority: string | null;
+    created_at: Date;
+    first_name: string | null;
+    last_name: string | null;
+  }>(
+    `SELECT
+       mr.title,
+       mr.description,
+       mr.category,
+       mr.priority,
+       mr.created_at,
+       t.first_name,
+       t.last_name
+     FROM maintenance_requests mr
+     LEFT JOIN tenants t ON t.id = mr.tenant_id
+     WHERE mr.id = $1
+     LIMIT 1`,
+    [requestId]
+  );
+  const row = request.rows[0];
+  const customer = [row?.first_name, row?.last_name].filter(Boolean).join(' ').trim();
+
+  if (row) {
+    const details = [
+      row.category ? formatMaintenanceCategory(row.category) : null,
+      row.priority ? `${row.priority} priority` : null,
+      row.description?.trim() || null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    events.push({
+      id: `ticket-opened-${requestId}`,
+      cardId: card.id,
+      eventType: 'created',
+      note: details || undefined,
+      actorName: customer || 'Customer',
+      createdAt: isoFromUnknown(row.created_at),
+      summary: 'Ticket opened',
+      metadata: { source: 'ticket', title: row.title },
+    });
+  }
+
+  const { listMaintenanceUpdates } = await import('@/lib/api/maintenance-updates');
+  const updates = await listMaintenanceUpdates(requestId);
+  for (const update of updates) {
+    const role = String(update.authorRole || '').toLowerCase();
+    const fromCustomer = role === 'tenant';
+    let summary = 'Ticket updated';
+    let eventType = 'ticket_update';
+    switch (update.updateType) {
+      case 'reply':
+        summary = fromCustomer ? 'Customer replied' : 'Office replied';
+        eventType = 'ticket_reply';
+        break;
+      case 'progress':
+        summary = 'Progress update';
+        eventType = 'ticket_progress';
+        break;
+      case 'status_change':
+        summary = 'Ticket status updated';
+        eventType = 'ticket_status';
+        break;
+      case 'acknowledgement':
+        summary = 'Customer confirmed the fix';
+        eventType = 'ticket_ack';
+        break;
+      case 'feedback':
+        summary = update.rating
+          ? `Customer rated ${update.rating}/5`
+          : 'Customer left feedback';
+        eventType = 'ticket_feedback';
+        break;
+      case 'closed':
+        summary = 'Ticket closed';
+        eventType = 'ticket_closed';
+        break;
+      default:
+        break;
+    }
+    events.push({
+      id: `ticket-update-${update.id}`,
+      cardId: card.id,
+      eventType,
+      note: update.body || undefined,
+      actorName:
+        update.authorName ||
+        (fromCustomer ? customer || 'Customer' : 'Office'),
+      createdAt: update.createdAt,
+      summary,
+      metadata: {
+        source: 'ticket',
+        updateType: update.updateType,
+        rating: update.rating ?? null,
+      },
+    });
+  }
+
+  return events;
+}
+
+async function resolvePaymentCardInvoiceId(card: PipelineCard): Promise<string | null> {
+  if (card.tenantId) {
+    const claim = await pool.query<{ notes: string | null }>(
+      `SELECT notes
+       FROM payments
+       WHERE tenant_id = $1
+         AND LOWER(COALESCE(payment_status, '')) IN ('pending', 'failed')
+       ORDER BY
+         CASE WHEN LOWER(COALESCE(payment_status, '')) = 'pending' THEN 0 ELSE 1 END,
+         created_at DESC
+       LIMIT 1`,
+      [card.tenantId]
+    );
+    const fromClaim = extractInvoiceIdFromNotes(claim.rows[0]?.notes);
+    if (fromClaim) return fromClaim;
+  }
+  if (card.invoiceId) return card.invoiceId;
+  if (card.tenantId) {
+    const focus = await getFocusInvoiceForTenant(card.tenantId);
+    if (focus?.id) return focus.id;
+  }
+  return null;
+}
+
+async function loadInvoiceHistoryEvents(card: PipelineCard): Promise<PipelineCardEvent[]> {
+  const events: PipelineCardEvent[] = [];
+  const tenantId = card.tenantId || null;
+  const invoiceId = await resolvePaymentCardInvoiceId(card);
+
+  if (invoiceId) {
+    const invoices = await pool.query<{
+      id: string;
+      invoice_number: string | null;
+      issue_date: Date | string | null;
+      due_date: Date | string | null;
+      invoice_status: string | null;
+      total_amount: string | number | null;
+      created_at: Date;
+    }>(
+      `SELECT id, invoice_number, issue_date, due_date, invoice_status, total_amount, created_at
+       FROM invoices WHERE id = $1 LIMIT 1`,
+      [invoiceId]
+    );
+
+    for (const invoice of invoices.rows) {
+      const number = invoice.invoice_number || 'Invoice';
+      const amount = formatHistoryMoney(
+        invoice.total_amount != null ? Number(invoice.total_amount) : null
+      );
+      const due = invoice.due_date
+        ? String(invoice.due_date).slice(0, 10)
+        : null;
+      events.push({
+        id: `invoice-issued-${invoice.id}`,
+        cardId: card.id,
+        eventType: 'invoice_issued',
+        note: [number, amount !== '(cleared)' ? amount : null, due ? `due ${due}` : null]
+          .filter(Boolean)
+          .join(' · '),
+        createdAt: isoFromUnknown(invoice.issue_date || invoice.created_at),
+        summary: `Invoice issued${invoice.invoice_number ? ` (${invoice.invoice_number})` : ''}`,
+        metadata: { source: 'invoice', invoiceId: invoice.id, status: invoice.invoice_status },
+      });
+    }
+  }
+
+  if (!tenantId) return events;
+
+  const payments = invoiceId
+    ? await pool.query<{
+        id: string;
+        amount: string | number | null;
+        payment_status: string | null;
+        payment_date: Date | string | null;
+        payment_method: string | null;
+        created_at: Date;
+      }>(
+        `SELECT p.id, p.amount, p.payment_status, p.payment_date, p.payment_method, p.created_at
+         FROM payments p
+         WHERE p.tenant_id = $1
+           AND (
+             EXISTS (
+               SELECT 1 FROM payment_allocations pa
+               WHERE pa.payment_id = p.id AND pa.invoice_id = $2
+             )
+             OR strpos(COALESCE(p.notes, ''), $3) > 0
+           )
+         ORDER BY p.created_at DESC
+         LIMIT 15`,
+        [tenantId, invoiceId, `invoice_id=${invoiceId}`]
+      )
+    : await pool.query<{
+        id: string;
+        amount: string | number | null;
+        payment_status: string | null;
+        payment_date: Date | string | null;
+        payment_method: string | null;
+        created_at: Date;
+      }>(
+        `SELECT id, amount, payment_status, payment_date, payment_method, created_at
+         FROM payments
+         WHERE tenant_id = $1
+           AND LOWER(COALESCE(payment_status, '')) IN ('pending', 'failed')
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [tenantId]
+      );
+
+  for (const payment of payments.rows) {
+    const status = String(payment.payment_status || '').toLowerCase();
+    const amount = formatHistoryMoney(
+      payment.amount != null ? Number(payment.amount) : null
+    );
+    const pending = status === 'pending' || status === 'submitted';
+    const rejected = status === 'failed';
+    events.push({
+      id: `payment-${payment.id}`,
+      cardId: card.id,
+      eventType: pending
+        ? 'payment_pending'
+        : rejected
+          ? 'payment_rejected'
+          : 'payment_recorded',
+      note: [amount !== '(cleared)' ? amount : null, payment.payment_method]
+        .filter(Boolean)
+        .join(' · ') || undefined,
+      createdAt: isoFromUnknown(payment.payment_date || payment.created_at),
+      summary: pending
+        ? 'Payment claim submitted'
+        : rejected
+          ? 'Payment claim rejected'
+          : 'Payment recorded',
+      metadata: { source: 'payment', status: payment.payment_status },
+    });
+  }
+
+  return events;
+}
+
+async function loadExpenseItemHistoryEvents(
+  card: PipelineCard
+): Promise<PipelineCardEvent[]> {
+  const events: PipelineCardEvent[] = [];
+
+  if (card.expenseId) {
+    const result = await pool.query<{
+      category: string | null;
+      amount: string | number | null;
+      expense_status: string | null;
+      vendor_name: string | null;
+      description: string | null;
+      created_at: Date;
+      updated_at: Date | null;
+    }>(
+      `SELECT category, amount, expense_status, vendor_name, description, created_at, updated_at
+       FROM expenses WHERE id = $1 LIMIT 1`,
+      [card.expenseId]
+    );
+    const row = result.rows[0];
+    if (row) {
+      const amount = formatHistoryMoney(row.amount != null ? Number(row.amount) : null);
+      events.push({
+        id: `expense-recorded-${card.expenseId}`,
+        cardId: card.id,
+        eventType: 'expense_recorded',
+        note: [row.vendor_name, row.category, amount !== '(cleared)' ? amount : null, row.description]
+          .filter(Boolean)
+          .join(' · ') || undefined,
+        createdAt: isoFromUnknown(row.created_at),
+        summary: 'Expense recorded',
+        metadata: { source: 'expense', status: row.expense_status },
+      });
+      if (
+        row.expense_status &&
+        row.updated_at &&
+        new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 60_000
+      ) {
+        events.push({
+          id: `expense-status-${card.expenseId}`,
+          cardId: card.id,
+          eventType: 'expense_status',
+          note: String(row.expense_status),
+          createdAt: isoFromUnknown(row.updated_at),
+          summary: `Expense ${String(row.expense_status).replace(/_/g, ' ')}`,
+          metadata: { source: 'expense', status: row.expense_status },
+        });
+      }
+    }
+  }
+
+  if (card.utilityBillId) {
+    const result = await pool.query<{
+      utility_type: string | null;
+      amount: string | number | null;
+      bill_status: string | null;
+      due_date: Date | string | null;
+      provider_name: string | null;
+      created_at: Date;
+      updated_at: Date | null;
+    }>(
+      `SELECT utility_type, amount, bill_status, due_date, provider_name, created_at, updated_at
+       FROM utility_bills WHERE id = $1 LIMIT 1`,
+      [card.utilityBillId]
+    );
+    const row = result.rows[0];
+    if (row) {
+      const amount = formatHistoryMoney(row.amount != null ? Number(row.amount) : null);
+      const due = row.due_date ? String(row.due_date).slice(0, 10) : null;
+      events.push({
+        id: `utility-recorded-${card.utilityBillId}`,
+        cardId: card.id,
+        eventType: 'utility_recorded',
+        note: [
+          row.provider_name,
+          row.utility_type,
+          amount !== '(cleared)' ? amount : null,
+          due ? `due ${due}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined,
+        createdAt: isoFromUnknown(row.created_at),
+        summary: 'Utility bill recorded',
+        metadata: { source: 'utility_bill', status: row.bill_status },
+      });
+    }
+  }
+
+  return events;
 }
 
 /** Release a reserved room when no other open paid onboarding card still holds it. */
@@ -2918,7 +3551,8 @@ export interface UpdatePipelineCardResult {
 export async function updatePipelineCard(
   cardId: string,
   data: UpdatePipelineCardData,
-  userId?: string | null
+  userId?: string | null,
+  options?: { historyMode?: 'all' | 'assignee' | 'none' }
 ): Promise<UpdatePipelineCardResult> {
   const existing = await getPipelineCardById(cardId);
   if (!existing) throw new Error('Card not found');
@@ -3612,17 +4246,28 @@ export async function updatePipelineCard(
       ? 'assignee_changed'
       : 'updated';
 
-  if (changeNotes.length > 0) {
+  const historyMode = options?.historyMode ?? 'all';
+  const fieldsToStore =
+    historyMode === 'none'
+      ? []
+      : historyMode === 'assignee'
+        ? fieldChanges.filter((f) => f.field === 'assignedTo')
+        : fieldChanges;
+  const notesToStore = fieldsToStore.map((f) => f.summary);
+
+  if (notesToStore.length > 0) {
     await pool.query(
       `INSERT INTO pipeline_card_events (
          card_id, event_type, from_board_id, to_board_id, note, metadata, created_by
        ) VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6)`,
       [
         cardId,
-        eventType,
+        fieldsToStore.length === 1 && fieldsToStore[0].field === 'assignedTo'
+          ? 'assignee_changed'
+          : eventType,
         existing.boardId,
-        changeNotes.join('; '),
-        JSON.stringify({ changes: changeNotes, fields: fieldChanges }),
+        notesToStore.join('; '),
+        JSON.stringify({ changes: notesToStore, fields: fieldsToStore }),
         userId || null,
       ]
     );

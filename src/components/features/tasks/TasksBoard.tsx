@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import AppLoader from '@/components/ui/AppLoader';
+import { RouteAwareLoader } from '@/components/layout/route-loader';
 import type {
   PipelineBoard,
   PipelineBoardSlug,
@@ -57,15 +57,21 @@ function formatPeso(amount: number | undefined): string {
 
 interface TasksBoardProps {
   initialSlug?: PipelineBoardSlug;
+  openRequestId?: string;
+  openCardId?: string;
 }
 
-export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
+export function TasksBoard({
+  initialSlug = 'onboarding',
+  openRequestId,
+  openCardId,
+}: TasksBoardProps) {
   const router = useRouter();
   const [boards, setBoards] = useState<PipelineBoard[]>([]);
   const [activeSlug, setActiveSlug] = useState<PipelineBoardSlug>(initialSlug);
   const [cards, setCards] = useState<PipelineCard[]>([]);
+  const [assignees, setAssignees] = useState<PipelineAssigneeOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [assigneesReady, setAssigneesReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOpportunity, setShowOpportunity] = useState(false);
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null);
@@ -89,7 +95,6 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const [fieldPair, setFieldPair] = useState<CardFieldPair>(() =>
     defaultFieldsForBoard(initialSlug)
   );
-  const [assignees, setAssignees] = useState<PipelineAssigneeOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStageId, setBulkStageId] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -107,6 +112,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
   const loadSeqRef = useRef(0);
   /** Last slug we intentionally loaded (user click or URL sync). */
   const lastRequestedSlugRef = useRef<PipelineBoardSlug | null>(null);
+  const openedFromUrlRef = useRef(false);
 
   const activeBoard = useMemo(
     () => boards.find((b) => b.slug === activeSlug) || null,
@@ -133,9 +139,21 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
       setCreatingBoard(false);
       if (!quiet) setLoading(true);
       setError(null);
-      router.replace(`/admin/tasks?board=${encodeURIComponent(slug)}`, {
-        scroll: false,
-      });
+      const nextParams = new URLSearchParams();
+      nextParams.set('board', slug);
+      if (slug === 'maintenance' && openRequestId) {
+        nextParams.set('request', openRequestId);
+      }
+      if (openCardId) {
+        nextParams.set('card', openCardId);
+      }
+      const nextUrl = `/admin/tasks?${nextParams.toString()}`;
+      if (typeof window !== 'undefined') {
+        const current = `${window.location.pathname}${window.location.search}`;
+        if (current !== nextUrl) {
+          router.replace(nextUrl, { scroll: false });
+        }
+      }
 
       try {
         // sync=0: board UI must not wait on lease/maintenance sync (can take 30–60s+)
@@ -199,8 +217,22 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         if (seq === loadSeqRef.current) setLoading(false);
       }
     },
-    [router]
+    [router, openRequestId, openCardId]
   );
+
+  useEffect(() => {
+    if (openedFromUrlRef.current || loading) return;
+    if (!openRequestId && !openCardId) return;
+    const match = cards.find(
+      (c) =>
+        (openCardId && c.id === openCardId) ||
+        (openRequestId && c.maintenanceRequestId === openRequestId)
+    );
+    if (!match) return;
+    openedFromUrlRef.current = true;
+    setSelectedCard(match);
+    setShowOpportunity(true);
+  }, [cards, loading, openRequestId, openCardId]);
 
   // Sync from URL only when it differs from what we already requested (avoids
   // racing a user switch with a stale reload of the previous board).
@@ -221,8 +253,6 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         }
       } catch {
         /* non-fatal */
-      } finally {
-        setAssigneesReady(true);
       }
     })();
   }, []);
@@ -688,19 +718,14 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
     setShowOpportunity(true);
   }
 
-  const isReady = !loading && assigneesReady;
-
-  if (!isReady) {
-    return (
-      <AppLoader
-        variant="inline"
-        label="Loading pipeline…"
-        className="min-h-[calc(100vh-8rem)]"
-      />
-    );
-  }
+  const isReady = !loading;
 
   return (
+    <RouteAwareLoader
+      ready={isReady}
+      label="Loading pipeline…"
+      className="min-h-[calc(100vh-8rem)]"
+    >
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* Pipeline board tabs + toolbar (keep below header/notifications z-40) */}
       <div className="relative z-10 space-y-3">
@@ -1367,6 +1392,11 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
             setSelectedCard(null);
             void loadBoard(slug);
           }}
+          onClaimSettled={() => {
+            setShowOpportunity(false);
+            setSelectedCard(null);
+            void loadBoard(activeSlug);
+          }}
         />
       )}
 
@@ -1399,6 +1429,7 @@ export function TasksBoard({ initialSlug = 'onboarding' }: TasksBoardProps) {
         isLoading={deletingBoard}
       />
     </div>
+    </RouteAwareLoader>
   );
 }
 

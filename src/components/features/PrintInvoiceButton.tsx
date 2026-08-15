@@ -1,13 +1,18 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
 
-export default function PrintInvoiceButton() {
+interface PrintInvoiceButtonProps {
+  className?: string;
+}
+
+export default function PrintInvoiceButton({ className }: PrintInvoiceButtonProps) {
   return (
     <Button
       type="button"
       variant="outline"
-      className="w-full"
+      className={cn(className)}
       onClick={() => window.print()}
       leftIcon={
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

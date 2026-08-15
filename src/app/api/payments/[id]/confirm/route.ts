@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { getPaymentById, updatePayment } from '@/lib/api/payments';
+import { getPaymentById, updatePayment, type UpdatePaymentData } from '@/lib/api/payments';
 import { allocatePaymentToInvoices } from '@/lib/services/payment-allocator';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 import { syncPaymentCardForTenant } from '@/lib/api/pipeline';
+import { txnTypeFromPaymentType } from '@/lib/constants/transaction-ids';
+import {
+  allocateParentaOrId,
+  allocateParentaTxnId,
+} from '@/lib/services/transaction-id-service';
 import pool from '@/lib/db';
 
 interface RouteParams {
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json(
           {
             error:
-              'Transaction ID does not match. Re-check the receipt reference number, or leave it blank.',
+              'GCash / bank reference does not match. Re-check the receipt, or leave it blank.',
           },
           { status: 400 }
         );
@@ -81,6 +86,37 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         paymentStatus: 'failed',
         notes: noteParts.join('\n'),
       });
+
+      try {
+        const {
+          createPaymentUpdate,
+          getPaymentTenantNotifyUserId,
+          notifyTenantPaymentChange,
+        } = await import('@/lib/api/payment-updates');
+        await createPaymentUpdate({
+          paymentId: id,
+          authorRole: 'system',
+          authorUserId: session.user.id,
+          authorName: 'Office',
+          body: adminNote
+            ? `This payment was not confirmed. ${adminNote}`
+            : 'This payment was not confirmed. Reply on this request or send a new screenshot — the conversation stays open.',
+          updateType: 'status_change',
+        });
+        const notify = await getPaymentTenantNotifyUserId(id);
+        notifyTenantPaymentChange({
+          actorUserId: session.user.id || null,
+          actorRole: 'admin',
+          actionType: 'payment.rejected',
+          paymentId: id,
+          title: `Payment of ₱${Number(payment.amount).toLocaleString()} was not confirmed`,
+          tenantUserId: notify.userId,
+          afterData: { status: 'failed', note: adminNote || null },
+          summary: adminNote || 'Payment claim rejected',
+        });
+      } catch (threadErr) {
+        console.error('Payment claim thread after reject failed:', threadErr);
+      }
 
       logActivitySafe({
         actorUserId: session.user.id || null,
@@ -109,24 +145,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({
         success: true,
         data: updated,
-        message: 'Payment claim rejected — card returns to Due / Overdue',
+        message: 'Payment claim rejected — card moved to Rejected. Tenant can reply or send a new screenshot.',
       });
     }
 
-    // Confirm: mark paid, then allocate to invoices
+    // Confirm: mark paid, issue OR, then allocate to invoices.
+    // Parenta txn is minted when the tenant submits the claim; fill it in
+    // only if an older row is missing one. OR is issued here (not at submit).
+    const confirmRef = confirmedReference || payment.referenceNumber || '';
     const confirmNotes = [
       payment.notes,
-      `Confirmed by office after verifying transaction ID${
-        payment.referenceNumber ? ` (${payment.referenceNumber})` : ''
-      }${adminNote ? `: ${adminNote}` : ''}`,
+      `Confirmed by office${confirmRef ? ` (ref ${confirmRef})` : ''}${
+        adminNote ? `: ${adminNote}` : ''
+      }`,
     ]
       .filter(Boolean)
       .join('\n');
 
-    const updated = await updatePayment(id, {
+    const confirmUpdate: UpdatePaymentData = {
       paymentStatus: 'completed',
       notes: confirmNotes,
-    });
+    };
+    if (confirmedReference) {
+      confirmUpdate.referenceNumber = confirmedReference;
+    }
+
+    const txnType = txnTypeFromPaymentType(payment.paymentType);
+    if (!payment.parentaTxnId) {
+      try {
+        confirmUpdate.parentaTxnId = await allocateParentaTxnId(txnType);
+      } catch (txnErr) {
+        console.error('Parenta txn allocate on confirm failed (non-fatal):', txnErr);
+      }
+    }
+    if (!payment.orNumber) {
+      try {
+        confirmUpdate.orNumber = await allocateParentaOrId(txnType);
+        confirmUpdate.orDate = new Date();
+      } catch (orErr) {
+        console.error('Parenta OR allocate on confirm failed (non-fatal):', orErr);
+      }
+    }
+
+    const updated = await updatePayment(id, confirmUpdate);
 
     // Apply deposit / advance side-effects only after confirmation
     try {
@@ -214,6 +275,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         'Payment confirmed, but automatic invoice allocation failed — allocate manually if needed.';
     }
 
+    const issuedOr = updated.orNumber || confirmUpdate.orNumber;
+    if (issuedOr) {
+      allocationMessage = `${allocationMessage}. Official receipt ${issuedOr}.`;
+    }
+
     logActivitySafe({
       actorUserId: session.user.id || null,
       actorRole: 'admin',
@@ -232,6 +298,37 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         invoiceId,
       },
     });
+
+    try {
+      const {
+        createPaymentUpdate,
+        getPaymentTenantNotifyUserId,
+        notifyTenantPaymentChange,
+      } = await import('@/lib/api/payment-updates');
+      await createPaymentUpdate({
+        paymentId: id,
+        authorRole: 'system',
+        authorUserId: session.user.id,
+        authorName: 'Office',
+        body: adminNote
+          ? `Payment confirmed. ${adminNote}`
+          : 'Payment confirmed. Your balance has been updated.',
+        updateType: 'status_change',
+      });
+      const notify = await getPaymentTenantNotifyUserId(id);
+      notifyTenantPaymentChange({
+        actorUserId: session.user.id || null,
+        actorRole: 'admin',
+        actionType: 'payment.confirmed',
+        paymentId: id,
+        title: `Payment of ₱${Number(payment.amount).toLocaleString()} confirmed`,
+        tenantUserId: notify.userId,
+        afterData: { status: 'completed', note: adminNote || null },
+        summary: allocationMessage,
+      });
+    } catch (threadErr) {
+      console.error('Payment claim thread after confirm failed:', threadErr);
+    }
 
     try {
       await syncPaymentCardForTenant(payment.tenantId);

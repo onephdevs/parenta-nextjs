@@ -98,6 +98,14 @@ MIGRATIONS=(
   add-maintenance-assignee-user-id.sql
   add-building-coordinates.sql
   add-building-nearby-snapshots.sql
+  add-building-show-on-landing-nearby.sql
+  add-payment-or-fields.sql
+  add-payment-updates.sql
+  add-lease-package-templates.sql
+  optional-lease-package-penalties.sql
+  add-lease-template-cms.sql
+  one-active-assignment-per-room.sql
+  add-pipeline-payments-rejected-stage.sql
 )
 
 for m in "${MIGRATIONS[@]}"; do

@@ -135,6 +135,8 @@ model buildings {
   latitude                 Float?
   longitude                Float?
   geocoded_at              DateTime?                  @db.Timestamptz(6)
+  /// When true, listed in the public landing nearby / commute property picker.
+  show_on_landing_nearby   Boolean                    @default(true)
   created_at               DateTime?                  @default(now()) @db.Timestamp(6)
   updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
   assets                   assets[]
@@ -475,6 +477,8 @@ model payments {
   due_date                DateTime                 @db.Date
   payment_status          String?                  @default("pending") @db.VarChar(20)
   reference_number        String?                  @db.VarChar(100)
+  or_number               String?                  @db.VarChar(100)
+  or_date                 DateTime?                @db.Date
   notes                   String?
   created_at              DateTime?                @default(now()) @db.Timestamp(6)
   updated_at              DateTime?                @default(now()) @db.Timestamp(6)

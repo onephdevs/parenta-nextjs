@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
 });
 
-interface ReceiptData {
+export interface ReceiptData {
   receiptNumber: string;
   paymentDate: string;
   paymentAmount: number;
