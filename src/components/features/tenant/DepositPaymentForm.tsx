@@ -16,12 +16,20 @@ import { cn } from '@/lib/utils';
 interface DepositPaymentFormProps {
   onPaymentComplete?: () => void;
   onCancel?: () => void;
+  depositHeld?: number;
+  advanceCollected?: number;
+  advanceHint?: string;
 }
 
 export default function DepositPaymentForm({
   onPaymentComplete,
   onCancel,
+  depositHeld = 0,
+  advanceCollected = 0,
+  advanceHint,
 }: DepositPaymentFormProps) {
+  const alreadyOnFile = depositHeld > 0 || advanceCollected > 0;
+  const [showAddMore, setShowAddMore] = useState(!alreadyOnFile);
   const [paymentType, setPaymentType] = useState<'deposit' | 'advance'>('deposit');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('gcash');
@@ -115,6 +123,31 @@ export default function DepositPaymentForm({
   };
 
   return (
+    <div className="space-y-6 text-gray-900">
+      {alreadyOnFile && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2">
+          <p className="font-medium text-gray-900">Already on file</p>
+          {depositHeld > 0 && (
+            <p className="text-sm text-gray-700">
+              Security deposit {formatCurrency(depositHeld)} — held
+            </p>
+          )}
+          {advanceCollected > 0 && (
+            <p className="text-sm text-gray-700">
+              Advance {formatCurrency(advanceCollected)}
+              {advanceHint ? ` — ${advanceHint}` : ''}
+            </p>
+          )}
+          <p className="text-sm text-gray-600">You do not need to pay these again.</p>
+          {!showAddMore && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowAddMore(true)}>
+              Add more
+            </Button>
+          )}
+        </div>
+      )}
+
+      {showAddMore && (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <Alert variant="info">
         <strong>Note:</strong> Attach your receipt. A transaction ID is optional for now.
@@ -250,5 +283,7 @@ export default function DepositPaymentForm({
         </Button>
       </div>
     </form>
+      )}
+    </div>
   );
 }

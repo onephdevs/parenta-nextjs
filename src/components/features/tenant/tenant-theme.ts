@@ -76,7 +76,7 @@ export interface TenantThemeTokens {
 
 const dark: TenantThemeTokens = {
   page: 'bg-black text-zinc-100',
-  pagePad: 'space-y-6 bg-black p-4 text-zinc-100 sm:p-6',
+  pagePad: 'mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6',
   main: 'bg-black',
 
   shell: 'bg-black text-zinc-100',
@@ -136,7 +136,7 @@ const dark: TenantThemeTokens = {
 
 const light: TenantThemeTokens = {
   page: 'bg-zinc-50 text-zinc-900',
-  pagePad: 'space-y-6 bg-zinc-50 p-4 text-zinc-900 sm:p-6',
+  pagePad: 'mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6',
   main: 'bg-zinc-50',
 
   shell: 'bg-white text-zinc-900',

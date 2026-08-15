@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CreditCard } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/Button';
@@ -12,16 +12,28 @@ import { FormField } from '@/components/forms/FormField';
 import { PAYMENT_METHOD_SELECT_OPTIONS } from '@/lib/constants/payment-methods';
 import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 
+interface ManualInvoice {
+  id: string;
+  invoiceNumber: string;
+  dueDate: string;
+  balanceDue: number;
+  periodLabel?: string;
+  payAhead?: boolean;
+}
+
 interface ManualPaymentFormProps {
+  invoices?: ManualInvoice[];
   onPaymentComplete?: () => void;
   onCancel?: () => void;
 }
 
 export default function ManualPaymentForm({
+  invoices = [],
   onPaymentComplete,
   onCancel,
 }: ManualPaymentFormProps) {
   const [paymentType, setPaymentType] = useState<string>('rent');
+  const [invoiceId, setInvoiceId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('gcash');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
@@ -29,6 +41,23 @@ export default function ManualPaymentForm({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { showNotification } = useNotifications();
+
+  const selectedInvoice = invoices.find((invoice) => invoice.id === invoiceId);
+  const showInvoicePicker = paymentType === 'rent' && invoices.length > 0;
+
+  useEffect(() => {
+    if (!showInvoicePicker) return;
+    if (!invoiceId && invoices[0]) {
+      setInvoiceId(invoices[0].id);
+      setAmount(String(invoices[0].balanceDue));
+    }
+  }, [showInvoicePicker, invoiceId, invoices]);
+
+  const handleInvoiceChange = (id: string) => {
+    setInvoiceId(id);
+    const next = invoices.find((invoice) => invoice.id === id);
+    if (next) setAmount(String(next.balanceDue));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +68,15 @@ export default function ManualPaymentForm({
         type: 'error',
         title: 'Validation Error',
         message: 'Please enter a valid payment amount',
+      });
+      return;
+    }
+
+    if (showInvoicePicker && !invoiceId) {
+      showNotification({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Select an invoice to apply this payment to',
       });
       return;
     }
@@ -61,7 +99,12 @@ export default function ManualPaymentForm({
       formData.append('paymentType', paymentType);
       formData.append('paymentMethod', paymentMethod);
       formData.append('referenceNumber', referenceNumber.trim());
-      if (notes.trim()) formData.append('notes', notes.trim());
+      if (invoiceId && paymentType === 'rent') formData.append('invoiceId', invoiceId);
+      const noteParts = [
+        notes.trim() || null,
+        selectedInvoice?.payAhead ? 'Pay ahead' : null,
+      ].filter(Boolean);
+      if (noteParts.length > 0) formData.append('notes', noteParts.join('\n'));
 
       const response = await fetch('/api/tenant/payments/manual', {
         method: 'POST',
@@ -144,6 +187,54 @@ export default function ManualPaymentForm({
         </Select>
       </FormField>
 
+      {showInvoicePicker && (
+        <FormField
+          label="Invoice"
+          htmlFor="invoiceId"
+          required
+          hint={
+            selectedInvoice?.payAhead
+              ? 'This bill is not due yet. Paying now is paying ahead.'
+              : undefined
+          }
+        >
+          <Select
+            id="invoiceId"
+            value={invoiceId}
+            onChange={(e) => handleInvoiceChange(e.target.value)}
+            required
+          >
+            <option value="">Select an invoice</option>
+            {invoices.some((invoice) => !invoice.payAhead) && (
+              <optgroup label="Due now">
+                {invoices
+                  .filter((invoice) => !invoice.payAhead)
+                  .map((invoice) => (
+                    <option key={invoice.id} value={invoice.id}>
+                      {invoice.periodLabel ? `${invoice.periodLabel} · ` : ''}
+                      {formatCurrency(invoice.balanceDue)} due{' '}
+                      {new Date(invoice.dueDate).toLocaleDateString()}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {invoices.some((invoice) => invoice.payAhead) && (
+              <optgroup label="Pay ahead">
+                {invoices
+                  .filter((invoice) => invoice.payAhead)
+                  .map((invoice) => (
+                    <option key={invoice.id} value={invoice.id}>
+                      {invoice.periodLabel ? `${invoice.periodLabel} · ` : ''}
+                      {formatCurrency(invoice.balanceDue)} due{' '}
+                      {new Date(invoice.dueDate).toLocaleDateString()}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </Select>
+        </FormField>
+      )}
+
       <FormField
         label="Payment Amount (₱)"
         htmlFor="amount"
@@ -218,6 +309,15 @@ export default function ManualPaymentForm({
               <span>Payment Type:</span>
               <span className="font-medium">{getPaymentTypeLabel(paymentType)}</span>
             </div>
+            {selectedInvoice && paymentType === 'rent' && (
+              <div className="flex justify-between gap-3">
+                <span>Invoice:</span>
+                <span className="font-medium text-right">
+                  {selectedInvoice.periodLabel || selectedInvoice.invoiceNumber}
+                  {selectedInvoice.payAhead ? ' (pay ahead)' : ''}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Amount:</span>
               <span className="font-medium">{formatCurrency(parseFloat(amount))}</span>

@@ -17,6 +17,10 @@ export async function GET() {
     // Check if deposit_ledger table exists, if not return empty data
     let balance = 0;
     let advanceBalance = 0;
+    let advanceCollected = 0;
+    let advanceApplied = 0;
+    let advanceRemaining = 0;
+    let advanceAppliedPeriod: string | null = null;
     let transactionCount = 0;
     let history: any[] = [];
     
@@ -43,12 +47,52 @@ export async function GET() {
       transactionCount = parseInt(balanceResult.rows[0]?.transaction_count || 0);
 
       const advanceResult = await pool.query(
-        `SELECT COALESCE(SUM(amount), 0) as balance
+        `SELECT
+           COALESCE(SUM(amount) FILTER (WHERE status IN ('available', 'applied')), 0) AS collected,
+           COALESCE(SUM(amount) FILTER (WHERE status = 'available'), 0) AS remaining,
+           COALESCE(SUM(amount) FILTER (WHERE status = 'applied'), 0) AS applied
          FROM tenant_credits
-         WHERE tenant_id = $1 AND status = 'available'`,
+         WHERE tenant_id = $1`,
         [tenant.id]
       );
-      advanceBalance = parseFloat(advanceResult.rows[0]?.balance || 0);
+      advanceCollected = parseFloat(advanceResult.rows[0]?.collected || 0);
+      advanceRemaining = parseFloat(advanceResult.rows[0]?.remaining || 0);
+      advanceApplied = parseFloat(advanceResult.rows[0]?.applied || 0);
+      advanceBalance = advanceRemaining;
+
+      if (advanceCollected <= 0) {
+        const paidAdvance = await pool.query(
+          `SELECT COALESCE(SUM(amount), 0) AS collected
+           FROM payments
+           WHERE tenant_id = $1
+             AND payment_status = 'paid'
+             AND payment_type ILIKE '%advance%'`,
+          [tenant.id]
+        );
+        advanceCollected = parseFloat(paidAdvance.rows[0]?.collected || 0);
+      }
+
+      if (advanceApplied > 0) {
+        const appliedInvoice = await pool.query(
+          `SELECT i.billing_period_start, i.due_date
+           FROM tenant_credits tc
+           JOIN invoices i ON i.id = tc.applied_to_invoice_id
+           WHERE tc.tenant_id = $1
+             AND tc.status = 'applied'
+             AND tc.applied_to_invoice_id IS NOT NULL
+           ORDER BY COALESCE(i.billing_period_start, i.due_date) DESC
+           LIMIT 1`,
+          [tenant.id]
+        );
+        const periodDate =
+          appliedInvoice.rows[0]?.billing_period_start || appliedInvoice.rows[0]?.due_date;
+        if (periodDate) {
+          advanceAppliedPeriod = new Date(periodDate).toLocaleDateString('en-US', {
+            month: 'long',
+            year: 'numeric',
+          });
+        }
+      }
       
       // Get transaction history (note: deposit_ledger doesn't have reference_number column)
       // Join with payments to get reference_number if payment_id exists
@@ -87,6 +131,10 @@ export async function GET() {
       // Return empty data - this is not critical for the page to function
       balance = 0;
       advanceBalance = 0;
+      advanceCollected = 0;
+      advanceApplied = 0;
+      advanceRemaining = 0;
+      advanceAppliedPeriod = null;
       transactionCount = 0;
       history = [];
     }
@@ -96,6 +144,10 @@ export async function GET() {
       data: {
         balance,
         advanceBalance,
+        advanceCollected,
+        advanceApplied,
+        advanceRemaining,
+        advanceAppliedPeriod,
         transactionCount,
         history,
       },

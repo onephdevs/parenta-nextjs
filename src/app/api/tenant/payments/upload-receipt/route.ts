@@ -156,7 +156,9 @@ export async function POST(request: NextRequest) {
           parentaTxnId,
           [
             `Parenta txn ${parentaTxnId}`,
-            `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})`,
+            `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})${
+              invoice.invoice_status === 'draft' ? ' — pay ahead' : ''
+            }`,
             'Status: awaiting office verification — invoice balance not updated yet.',
             referenceNumberRaw ? `GCash / bank reference: ${referenceNumberRaw}` : null,
             notesRaw ? `Tenant notes: ${notesRaw}` : null,

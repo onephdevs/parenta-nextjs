@@ -21,8 +21,8 @@ export async function GET() {
       console.warn('Invoice release skipped:', releaseError);
     }
     
-    // Fetch upcoming invoices (payment schedule)
-    // Status: sent, partial, or overdue (not paid) — drafts stay hidden until issued
+    // Issued invoices (sent/partial/overdue) are due now.
+    // Drafts with a remaining balance are pay-ahead options (capped below).
     const scheduleQuery = `
       SELECT 
         i.id,
@@ -53,6 +53,36 @@ export async function GET() {
     `;
     
     const scheduleResult = await pool.query(scheduleQuery, [tenant.id]);
+
+    const upcomingQuery = `
+      SELECT
+        i.id,
+        i.invoice_number,
+        i.issue_date,
+        i.due_date,
+        i.billing_period_start,
+        i.billing_period_end,
+        i.total_amount,
+        i.amount_paid,
+        i.balance_due,
+        i.invoice_status,
+        i.notes,
+        r.room_number,
+        b.name as building_name,
+        b.address_line1,
+        b.city
+      FROM invoices i
+      INNER JOIN tenants t ON i.tenant_id = t.id
+      LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id AND tra.assignment_status = 'active'
+      LEFT JOIN rooms r ON tra.room_id = r.id
+      LEFT JOIN buildings b ON r.building_id = b.id
+      WHERE i.tenant_id = $1
+        AND i.invoice_status = 'draft'
+        AND i.balance_due > 0
+      ORDER BY i.due_date ASC
+      LIMIT 6
+    `;
+    const upcomingResult = await pool.query(upcomingQuery, [tenant.id]);
     
     // Fetch payment history (only completed/paid payments, not pending invoices)
     // Join through assignment_id to get room information, with fallback to room_id
@@ -94,18 +124,32 @@ export async function GET() {
     
     const historyResult = await pool.query(historyQuery, [tenant.id]);
     
-    // Calculate summary
+    // Aggregate payments and invoices separately — a join on tenant_id
+    // cartesian-products every payment with every invoice (e.g. ₱8,000 × 13 = ₱104,000).
     const summaryQuery = `
-      SELECT 
-        COUNT(DISTINCT CASE WHEN p.payment_status = 'paid' THEN p.id END) as total_payments,
-        COALESCE(SUM(CASE WHEN p.payment_status = 'paid' THEN p.amount ELSE 0 END), 0) as total_paid,
-        COALESCE(SUM(CASE WHEN p.payment_status = 'pending' THEN p.amount ELSE 0 END), 0) as total_pending,
-        COALESCE(SUM(CASE WHEN p.payment_status = 'overdue' THEN p.amount ELSE 0 END), 0) as total_overdue,
-        COUNT(DISTINCT CASE WHEN i.invoice_status IN ('sent', 'partial', 'overdue') THEN i.id END) as upcoming_invoices,
-        COALESCE(SUM(CASE WHEN i.invoice_status IN ('sent', 'partial', 'overdue') THEN i.balance_due ELSE 0 END), 0) as outstanding_balance
-      FROM payments p
-      FULL OUTER JOIN invoices i ON i.tenant_id = p.tenant_id
-      WHERE (p.tenant_id = $1 OR i.tenant_id = $1)
+      SELECT
+        (SELECT COUNT(*)::int
+           FROM payments p
+          WHERE p.tenant_id = $1 AND p.payment_status = 'paid') AS total_payments,
+        (SELECT COALESCE(SUM(p.amount), 0)
+           FROM payments p
+          WHERE p.tenant_id = $1 AND p.payment_status = 'paid') AS total_paid,
+        (SELECT COALESCE(SUM(p.amount), 0)
+           FROM payments p
+          WHERE p.tenant_id = $1 AND p.payment_status = 'pending') AS total_pending,
+        (SELECT COALESCE(SUM(p.amount), 0)
+           FROM payments p
+          WHERE p.tenant_id = $1 AND p.payment_status = 'overdue') AS total_overdue,
+        (SELECT COUNT(*)::int
+           FROM invoices i
+          WHERE i.tenant_id = $1
+            AND i.invoice_status IN ('sent', 'partial', 'overdue')
+            AND i.balance_due > 0) AS upcoming_invoices,
+        (SELECT COALESCE(SUM(i.balance_due), 0)
+           FROM invoices i
+          WHERE i.tenant_id = $1
+            AND i.invoice_status IN ('sent', 'partial', 'overdue')
+            AND i.balance_due > 0) AS outstanding_balance
     `;
     
     const summaryResult = await pool.query(summaryQuery, [tenant.id]);
@@ -152,8 +196,7 @@ export async function GET() {
       buildingName: row.building_name,
     }));
     
-    // Format schedule items
-    const schedule = scheduleResult.rows.map(row => ({
+    const mapInvoiceRow = (row: (typeof scheduleResult.rows)[number]) => ({
       id: row.id,
       invoiceNumber: row.invoice_number,
       issueDate: row.issue_date,
@@ -168,7 +211,10 @@ export async function GET() {
       roomNumber: row.room_number,
       buildingName: row.building_name,
       address: row.address_line1 ? `${row.address_line1}, ${row.city || ''}`.trim() : null,
-    }));
+    });
+
+    const schedule = scheduleResult.rows.map(mapInvoiceRow);
+    const upcoming = upcomingResult.rows.map(mapInvoiceRow);
     
     // Format history items - ensure all fields are properly extracted
     const history = historyResult.rows.map(row => ({
@@ -190,6 +236,7 @@ export async function GET() {
       success: true,
       data: {
         schedule,
+        upcoming,
         history,
         utilityBills,
         summary: {

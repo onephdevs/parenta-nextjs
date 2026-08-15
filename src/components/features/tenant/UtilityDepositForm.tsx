@@ -16,12 +16,16 @@ import { cn } from '@/lib/utils';
 interface UtilityDepositFormProps {
   onPaymentComplete?: () => void;
   onCancel?: () => void;
+  amountPaid?: number;
 }
 
 export default function UtilityDepositForm({
   onPaymentComplete,
   onCancel,
+  amountPaid = 0,
 }: UtilityDepositFormProps) {
+  const alreadyOnFile = amountPaid > 0;
+  const [showAddMore, setShowAddMore] = useState(!alreadyOnFile);
   const [utilityType, setUtilityType] = useState<string>('electricity');
   const [amount, setAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('gcash');
@@ -114,6 +118,23 @@ export default function UtilityDepositForm({
   };
 
   return (
+    <div className="space-y-6 text-gray-900">
+      {alreadyOnFile && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2">
+          <p className="font-medium text-gray-900">Already on file</p>
+          <p className="text-sm text-gray-700">
+            Utility deposit {formatCurrency(amountPaid)} — held
+          </p>
+          <p className="text-sm text-gray-600">You do not need to pay this again.</p>
+          {!showAddMore && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowAddMore(true)}>
+              Add more
+            </Button>
+          )}
+        </div>
+      )}
+
+      {showAddMore && (
     <form onSubmit={handleSubmit} className="space-y-6 text-gray-900">
       <Alert variant="warning">
         <strong>Note:</strong> Attach your receipt. A transaction ID is optional for now.
@@ -255,5 +276,7 @@ export default function UtilityDepositForm({
         </Button>
       </div>
     </form>
+      )}
+    </div>
   );
 }

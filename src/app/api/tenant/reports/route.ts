@@ -167,20 +167,31 @@ export async function GET(request: NextRequest) {
         
       case 'summary':
       default:
-        // Financial summary report
+        const payDateFrom = dateFrom ? 'AND p.payment_date >= $2' : '';
+        const payDateTo = dateTo
+          ? `AND p.payment_date <= $${dateFrom ? '3' : '2'}`
+          : '';
+        const invDateFrom = dateFrom ? 'AND i.issue_date >= $2' : '';
+        const invDateTo = dateTo
+          ? `AND i.issue_date <= $${dateFrom ? '3' : '2'}`
+          : '';
+
         const summaryQuery = `
-          SELECT 
-            COUNT(DISTINCT p.id) as total_payments,
-            COALESCE(SUM(CASE WHEN p.payment_status = 'paid' THEN p.amount ELSE 0 END), 0) as total_paid,
-            COUNT(DISTINCT i.id) as total_invoices,
-            COALESCE(SUM(i.total_amount), 0) as total_invoiced,
-            COALESCE(SUM(i.amount_paid), 0) as total_invoice_paid,
-            COALESCE(SUM(i.balance_due), 0) as total_outstanding
-          FROM payments p
-          FULL OUTER JOIN invoices i ON i.tenant_id = p.tenant_id
-          WHERE (p.tenant_id = $1 OR i.tenant_id = $1)
-            ${dateFrom ? 'AND (p.payment_date >= $2 OR i.issue_date >= $2)' : ''}
-            ${dateTo ? `AND (p.payment_date <= $${dateFrom ? '3' : '2'} OR i.issue_date <= $${dateFrom ? '3' : '2'})` : ''}
+          SELECT
+            (SELECT COUNT(*)::int FROM payments p
+              WHERE p.tenant_id = $1 ${payDateFrom} ${payDateTo}) AS total_payments,
+            (SELECT COALESCE(SUM(p.amount), 0) FROM payments p
+              WHERE p.tenant_id = $1 AND p.payment_status = 'paid' ${payDateFrom} ${payDateTo}) AS total_paid,
+            (SELECT COUNT(*)::int FROM invoices i
+              WHERE i.tenant_id = $1 ${invDateFrom} ${invDateTo}) AS total_invoices,
+            (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i
+              WHERE i.tenant_id = $1 ${invDateFrom} ${invDateTo}) AS total_invoiced,
+            (SELECT COALESCE(SUM(i.amount_paid), 0) FROM invoices i
+              WHERE i.tenant_id = $1 ${invDateFrom} ${invDateTo}) AS total_invoice_paid,
+            (SELECT COALESCE(SUM(i.balance_due), 0) FROM invoices i
+              WHERE i.tenant_id = $1
+                AND i.invoice_status IN ('sent', 'partial', 'overdue')
+                ${invDateFrom} ${invDateTo}) AS total_outstanding
         `;
         
         const summaryParams: any[] = [tenant.id];

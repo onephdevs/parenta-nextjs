@@ -21,6 +21,8 @@ interface Invoice {
   balanceDue: number;
   totalAmount: number;
   status: string;
+  periodLabel?: string;
+  payAhead?: boolean;
 }
 
 interface PaymentFormProps {
@@ -180,7 +182,11 @@ export default function PaymentForm({
       formData.append('paymentMethod', paymentMethod);
       formData.append('referenceNumber', referenceNumber.trim());
       formData.append('paymentDate', new Date().toISOString().slice(0, 10));
-      if (notes.trim()) formData.append('notes', notes.trim());
+      const noteParts = [
+        notes.trim() || null,
+        selectedInvoice?.payAhead ? 'Pay ahead' : null,
+      ].filter(Boolean);
+      if (noteParts.length > 0) formData.append('notes', noteParts.join('\n'));
 
       const response = await fetch('/api/tenant/payments/upload-receipt', {
         method: 'POST',
@@ -297,7 +303,16 @@ export default function PaymentForm({
         )}
       </div>
 
-      <FormField label="Select invoice to pay" htmlFor="invoiceId" required>
+      <FormField
+        label="Select invoice to pay"
+        htmlFor="invoiceId"
+        required
+        hint={
+          selectedInvoice?.payAhead
+            ? 'This bill is not due yet. Paying now is paying ahead.'
+            : undefined
+        }
+      >
         <Select
           id="invoiceId"
           value={selectedInvoiceId}
@@ -306,19 +321,38 @@ export default function PaymentForm({
           className={theme.input}
         >
           <option value="">
-            {invoices.length === 0 ? 'No invoices due' : 'Select an invoice'}
+            {invoices.length === 0 ? 'No invoices available' : 'Select an invoice'}
           </option>
-          {invoices.map((invoice) => (
-            <option key={invoice.id} value={invoice.id}>
-              {invoice.invoiceNumber} - {formatCurrency(invoice.balanceDue)} due{' '}
-              {new Date(invoice.dueDate).toLocaleDateString()}
-            </option>
-          ))}
+          {invoices.some((invoice) => !invoice.payAhead) && (
+            <optgroup label="Due now">
+              {invoices
+                .filter((invoice) => !invoice.payAhead)
+                .map((invoice) => (
+                  <option key={invoice.id} value={invoice.id}>
+                    {invoice.periodLabel ? `${invoice.periodLabel} · ` : ''}
+                    {formatCurrency(invoice.balanceDue)} due{' '}
+                    {new Date(invoice.dueDate).toLocaleDateString()}
+                  </option>
+                ))}
+            </optgroup>
+          )}
+          {invoices.some((invoice) => invoice.payAhead) && (
+            <optgroup label="Pay ahead">
+              {invoices
+                .filter((invoice) => invoice.payAhead)
+                .map((invoice) => (
+                  <option key={invoice.id} value={invoice.id}>
+                    {invoice.periodLabel ? `${invoice.periodLabel} · ` : ''}
+                    {formatCurrency(invoice.balanceDue)} due{' '}
+                    {new Date(invoice.dueDate).toLocaleDateString()}
+                  </option>
+                ))}
+            </optgroup>
+          )}
         </Select>
         {invoices.length === 0 && (
           <p className="mt-1 text-sm text-amber-700">
-            No invoices with a balance due. Use Manual Entry or Upload receipt for other
-            payments.
+            No invoices are available to pay right now.
           </p>
         )}
       </FormField>

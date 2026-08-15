@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       .toLowerCase();
     const referenceNumber = String(formData.get('referenceNumber') || '').trim();
     const notes = String(formData.get('notes') || '').trim();
+    const invoiceIdRaw = String(formData.get('invoiceId') || '').trim();
 
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json(
@@ -103,6 +104,31 @@ export async function POST(request: Request) {
     );
     const assignment = assignmentResult.rows[0];
 
+    let invoiceDueDate: Date | string | null = null;
+    let invoiceNote: string | null = null;
+    if (invoiceIdRaw) {
+      const invoiceCheck = await pool.query(
+        `SELECT id, tenant_id, invoice_number, due_date, invoice_status
+         FROM invoices
+         WHERE id = $1`,
+        [invoiceIdRaw]
+      );
+      if (invoiceCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Invoice not found' },
+          { status: 404 }
+        );
+      }
+      const invoice = invoiceCheck.rows[0];
+      if (invoice.tenant_id !== tenant.id) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
+      }
+      invoiceDueDate = invoice.due_date;
+      invoiceNote = `Tenant payment claim for invoice ${invoice.invoice_number || invoice.id} (invoice_id=${invoice.id})${
+        invoice.invoice_status === 'draft' ? ' — pay ahead' : ''
+      }`;
+    }
+
     const { fileName, filePath, fileSize } = await saveUploadedFile(
       file,
       'uploads/receipts'
@@ -114,6 +140,7 @@ export async function POST(request: Request) {
 
     const noteParts = [
       notes || null,
+      invoiceNote,
       `Parenta txn ${parentaTxnId}`,
       'Status: awaiting office verification — balance not updated yet.',
       referenceNumber ? `GCash / bank reference: ${referenceNumber}` : null,
@@ -138,7 +165,7 @@ export async function POST(request: Request) {
          receipt_file_size,
          receipt_uploaded_at
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, CURRENT_DATE, CURRENT_DATE, 'pending', $7, $8, $9,
+         $1, $2, $3, $4, $5, $6, CURRENT_DATE, $13, 'pending', $7, $8, $9,
          $10, $11, $12, CURRENT_TIMESTAMP
        )
        RETURNING id, payment_type, amount, payment_date, reference_number, parenta_txn_id`,
@@ -155,6 +182,7 @@ export async function POST(request: Request) {
         filePath,
         fileName,
         fileSize,
+        invoiceDueDate || new Date(),
       ]
     );
 

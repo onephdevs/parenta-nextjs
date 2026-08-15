@@ -120,6 +120,7 @@ interface PaymentSummary {
   upcomingInvoices: number;
   recentPayments: Payment[];
   schedule: PaymentScheduleItem[];
+  upcoming: PaymentScheduleItem[];
   utilityBills: UtilityBillItem[];
 }
 
@@ -145,6 +146,7 @@ interface BalanceData {
 function mapPaymentSummary(paymentsData: Record<string, unknown>): PaymentSummary {
   const summary = (paymentsData.summary || {}) as Record<string, unknown>;
   const schedule = (paymentsData.schedule || []) as PaymentScheduleItem[];
+  const upcoming = (paymentsData.upcoming || []) as PaymentScheduleItem[];
   const history = (paymentsData.history || []) as Record<string, unknown>[];
   const utilityBillsRaw = (paymentsData.utilityBills || []) as Record<string, unknown>[];
 
@@ -186,6 +188,7 @@ function mapPaymentSummary(paymentsData: Record<string, unknown>): PaymentSummar
     upcomingInvoices: Number(summary.upcomingInvoices) || 0,
     recentPayments,
     schedule,
+    upcoming,
     utilityBills,
   };
 }
@@ -221,7 +224,10 @@ export default function PaymentsPage() {
   const [showUtilityDepositForm, setShowUtilityDepositForm] = useState(false);
   const [showManualPaymentForm, setShowManualPaymentForm] = useState(false);
   const [depositBalance, setDepositBalance] = useState<number | null>(null);
-  const [advanceBalance, setAdvanceBalance] = useState<number | null>(null);
+  const [advanceCollected, setAdvanceCollected] = useState<number>(0);
+  const [advanceRemaining, setAdvanceRemaining] = useState<number>(0);
+  const [advanceApplied, setAdvanceApplied] = useState<number>(0);
+  const [advanceAppliedPeriod, setAdvanceAppliedPeriod] = useState<string | null>(null);
   const [utilityDepositData, setUtilityDepositData] = useState<any>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [payDraft, setPayDraft] = useState<{
@@ -306,18 +312,28 @@ export default function PaymentsPage() {
       const data = await response.json();
       if (data.success) {
         setDepositBalance(data.data.balance || 0);
-        setAdvanceBalance(data.data.advanceBalance || 0);
+        setAdvanceCollected(Number(data.data.advanceCollected) || 0);
+        setAdvanceRemaining(
+          Number(data.data.advanceRemaining ?? data.data.advanceBalance) || 0
+        );
+        setAdvanceApplied(Number(data.data.advanceApplied) || 0);
+        setAdvanceAppliedPeriod(data.data.advanceAppliedPeriod || null);
       } else {
-        // If API fails, set balance to 0 (non-critical)
         console.warn('Failed to fetch deposit data:', data.error);
         setDepositBalance(0);
-        setAdvanceBalance(0);
+        setAdvanceCollected(0);
+        setAdvanceRemaining(0);
+        setAdvanceApplied(0);
+        setAdvanceAppliedPeriod(null);
       }
     } catch (error) {
       // Non-critical error - page can still function without deposit data
       console.warn('Error fetching deposit data (non-critical):', error);
       setDepositBalance(0);
-      setAdvanceBalance(0);
+      setAdvanceCollected(0);
+      setAdvanceRemaining(0);
+      setAdvanceApplied(0);
+      setAdvanceAppliedPeriod(null);
     }
   };
 
@@ -412,9 +428,62 @@ export default function PaymentsPage() {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
+
+  const formatPeriod = (item: PaymentScheduleItem) => {
+    const raw = item.billingPeriodStart || item.dueDate;
+    if (!raw) return 'Rent';
+    return new Date(raw).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const toFormInvoice = (item: PaymentScheduleItem, payAhead: boolean) => ({
+    id: item.id,
+    invoiceNumber: item.invoiceNumber,
+    dueDate: item.dueDate,
+    balanceDue: item.balanceDue,
+    totalAmount: item.totalAmount,
+    status: item.status,
+    periodLabel: formatPeriod(item),
+    payAhead,
+  });
+
+  const dueNowInvoices = (paymentData?.schedule || []).map((item) =>
+    toFormInvoice(item, false)
+  );
+  const payAheadInvoices = (paymentData?.upcoming || []).map((item) =>
+    toFormInvoice(item, true)
+  );
+  const payableInvoices = [...dueNowInvoices, ...payAheadInvoices];
+
+  const advanceHint = (() => {
+    if (advanceCollected <= 0) return 'No advance on file';
+    if (advanceRemaining > 0 && advanceApplied > 0) {
+      const period = advanceAppliedPeriod ? ` to ${advanceAppliedPeriod} rent` : '';
+      return `${formatCurrency(advanceRemaining)} left · ${formatCurrency(advanceApplied)} applied${period}`;
+    }
+    if (advanceRemaining > 0) return 'Available for upcoming rent';
+    if (advanceApplied > 0) {
+      return advanceAppliedPeriod
+        ? `Applied to ${advanceAppliedPeriod} rent`
+        : 'Applied to rent';
+    }
+    return 'On file';
+  })();
+
+  const nextDueHint = paymentData?.nextDueDate
+    ? `Due ${formatDate(paymentData.nextDueDate)}`
+    : 'No invoice issued yet';
+  const nextDueValue =
+    paymentData?.nextAmount && paymentData.nextAmount > 0
+      ? formatCurrency(paymentData.nextAmount)
+      : 'None';
+  const pastDueAmount =
+    balanceData?.pastDueTotal ?? balanceData?.total ?? paymentData?.totalOverdue ?? 0;
+  const paidHistoryCount = (paymentData?.recentPayments || []).filter(
+    (payment) => payment.status === 'paid' || payment.status === 'partial'
+  ).length;
 
   // Filter payment history - only show completed payments (paid/partial)
   const filteredPayments = (paymentData?.recentPayments || [])
@@ -442,17 +511,15 @@ export default function PaymentsPage() {
   const panelClass = cn(theme.formPanel, 'overflow-hidden');
 
   const receiptLinkOptions: ReceiptLinkOption[] = [];
-  if (paymentData?.schedule?.length) {
-    for (const item of paymentData.schedule) {
-      receiptLinkOptions.push({
-        value: `invoice:${item.id}`,
-        label: `Invoice due ${formatDate(item.dueDate)} · ${formatCurrency(item.balanceDue)} (${item.invoiceNumber || 'invoice'})`,
-        kind: 'invoice',
-        invoiceId: item.id,
-        defaultAmount: item.balanceDue,
-        defaultDate: item.dueDate,
-      });
-    }
+  for (const item of payableInvoices) {
+    receiptLinkOptions.push({
+      value: `invoice:${item.id}`,
+      label: `${item.payAhead ? 'Pay ahead' : 'Due'} ${item.periodLabel} · ${formatCurrency(item.balanceDue)} (${item.invoiceNumber || 'invoice'})`,
+      kind: 'invoice',
+      invoiceId: item.id,
+      defaultAmount: item.balanceDue,
+      defaultDate: item.dueDate,
+    });
   }
   if (paymentData?.recentPayments?.length) {
     for (const payment of paymentData.recentPayments) {
@@ -697,7 +764,20 @@ export default function PaymentsPage() {
 
   return (
     <div className={theme.pagePad}>
-      <h1 className={theme.title}>Payments</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className={theme.title}>Payments</h1>
+        {!isPreview && activeTab === 'overview' && (
+          <Button
+            variant="success"
+            size="lg"
+            onClick={() => setTab('pay')}
+            leftIcon={<CreditCard className="h-5 w-5" />}
+            className={theme.primaryButton}
+          >
+            Pay now
+          </Button>
+        )}
+      </div>
 
       <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Payment sections">
         {PAYMENT_TABS.map((tab) => (
@@ -719,121 +799,79 @@ export default function PaymentsPage() {
           {/* Overview: summary cards + balance breakdown + schedule */}
           {activeTab === 'overview' && (
             <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:grid-cols-5">
-                <div className={summaryCardClass}>
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <DollarSign className="h-6 w-6 text-emerald-400" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className={theme.label}>Total Paid</dt>
-                          <dd className={theme.value}>
-                            {formatCurrency(paymentData?.totalPaid)}
-                          </dd>
-                        </dl>
-                      </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className={cn(summaryCardClass, 'p-4 sm:p-5')}>
+                  <div className="flex items-start gap-3">
+                    <DollarSign className={cn('h-5 w-5 shrink-0', theme.iconMoney)} />
+                    <div className="min-w-0">
+                      <p className={theme.label}>Total paid</p>
+                      <p className={theme.value}>{formatCurrency(paymentData?.totalPaid)}</p>
+                      <p className={theme.subtle}>
+                        {paidHistoryCount === 1
+                          ? '1 payment in history'
+                          : `${paidHistoryCount} payments in history`}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                <div className={summaryCardClass}>
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <Calendar className="h-6 w-6 text-sky-400" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className={theme.label}>Next Due</dt>
-                          <dd className={theme.value}>
-                            {formatCurrency(paymentData?.nextAmount)}
-                          </dd>
-                          <dd className={theme.subtle}>
-                            Due: {formatDate(paymentData?.nextDueDate)}
-                          </dd>
-                        </dl>
-                      </div>
+                <div className={cn(summaryCardClass, 'p-4 sm:p-5')}>
+                  <div className="flex items-start gap-3">
+                    <Calendar className={cn('h-5 w-5 shrink-0', theme.iconInfo)} />
+                    <div className="min-w-0">
+                      <p className={theme.label}>Next due</p>
+                      <p className={theme.value}>{nextDueValue}</p>
+                      <p className={theme.subtle}>{nextDueHint}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className={summaryCardClass}>
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <AlertCircle
-                          className={`h-6 w-6 ${(balanceData?.pastDueTotal ?? balanceData?.total ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'}`}
-                        />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className={theme.label}>Past due</dt>
-                          <dd className={theme.value}>
-                            {formatCurrency(
-                              balanceData?.pastDueTotal ??
-                                balanceData?.total ??
-                                paymentData?.totalOverdue ??
-                                0
-                            )}
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={summaryCardClass}>
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className={theme.label}>Deposit</dt>
-                          <dd className={theme.value}>
-                            {formatCurrency(depositBalance || 0)}
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={summaryCardClass}>
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <Clock className="h-6 w-6 text-amber-400" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className={theme.label}>Advance</dt>
-                          <dd className={theme.value}>
-                            {formatCurrency(advanceBalance || 0)}
-                          </dd>
-                        </dl>
-                      </div>
+                <div className={cn(summaryCardClass, 'p-4 sm:p-5')}>
+                  <div className="flex items-start gap-3">
+                    <AlertCircle
+                      className={cn(
+                        'h-5 w-5 shrink-0',
+                        pastDueAmount > 0 ? theme.iconDanger : theme.iconSuccess
+                      )}
+                    />
+                    <div className="min-w-0">
+                      <p className={theme.label}>Past due</p>
+                      <p className={theme.value}>{formatCurrency(pastDueAmount)}</p>
+                      <p className={theme.subtle}>
+                        {pastDueAmount > 0 ? 'Please pay as soon as you can' : "You're up to date"}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {!isPreview && (
-                <div className="flex justify-end">
-                  <Button
-                    variant="success"
-                    size="lg"
-                    onClick={() => setTab('pay')}
-                    leftIcon={<CreditCard className="h-5 w-5" />}
-                    className={theme.primaryButton}
-                  >
-                    Pay now
-                  </Button>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className={cn(summaryCardClass, 'p-4 sm:p-5')}>
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className={cn('h-5 w-5 shrink-0', theme.iconSuccess)} />
+                    <div className="min-w-0">
+                      <p className={theme.label}>Deposit held</p>
+                      <p className={theme.value}>{formatCurrency(depositBalance || 0)}</p>
+                      <p className={theme.subtle}>
+                        {(depositBalance || 0) > 0
+                          ? 'Security deposit on file'
+                          : 'No deposit on file'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <div className={cn(summaryCardClass, 'p-4 sm:p-5')}>
+                  <div className="flex items-start gap-3">
+                    <Clock className={cn('h-5 w-5 shrink-0', theme.iconPending)} />
+                    <div className="min-w-0">
+                      <p className={theme.label}>Advance paid</p>
+                      <p className={theme.value}>{formatCurrency(advanceCollected)}</p>
+                      <p className={theme.subtle}>{advanceHint}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {paymentScheduleSection}
             </>
@@ -919,39 +957,115 @@ export default function PaymentsPage() {
                   !showDepositForm &&
                   !showUtilityDepositForm &&
                   !showManualPaymentForm && (
-                    <div>
-                      <div className="mb-6 flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">Make a Payment</h3>
-                          <p className="text-sm text-gray-900">
-                            Send via GCash or bank transfer using the office number, then upload
-                            your receipt screenshot
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className={theme.sectionTitle}>Make a payment</h3>
+                        <p className={cn('mt-1', theme.muted)}>
+                          Send via GCash or bank transfer using the office number, then upload
+                          your receipt screenshot.
+                        </p>
+                      </div>
+
+                      {dueNowInvoices.length === 0 && payAheadInvoices.length === 0 ? (
+                        <div className={cn(theme.card, 'p-5')}>
+                          <p className={theme.sectionTitle}>Nothing to pay right now</p>
+                          <p className={cn('mt-2', theme.muted)}>
+                            You have no open rent invoices.
                           </p>
                         </div>
-                        <div className="text-right">
-                          <div className="mb-2 text-2xl font-bold text-gray-900">
-                            {formatCurrency(
-                              balanceData?.nextAmount || paymentData?.nextAmount || 0
-                            )}
-                          </div>
-                          <div className="mb-4 text-sm text-gray-900">
-                            Due:{' '}
-                            {formatDate(
-                              balanceData?.nextDueDate || paymentData?.nextDueDate || ''
-                            )}
-                          </div>
-                          {!isPreview && (
-                            <Button
-                              variant="success"
-                              size="lg"
-                              onClick={() => handleMakePayment()}
-                              leftIcon={<CreditCard className="h-5 w-5" />}
-                            >
-                              Pay Now
-                            </Button>
+                      ) : (
+                        <div className="space-y-6">
+                          {dueNowInvoices.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className={theme.sectionTitle}>Due now</h4>
+                              <ul className="space-y-3">
+                                {dueNowInvoices.map((item) => (
+                                  <li
+                                    key={item.id}
+                                    className={cn(
+                                      theme.card,
+                                      'flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between'
+                                    )}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className={theme.value}>
+                                        {formatCurrency(item.balanceDue)}
+                                      </p>
+                                      <p className={theme.muted}>
+                                        {item.periodLabel} rent · due {formatDate(item.dueDate)}
+                                      </p>
+                                      <p className={theme.subtle}>{item.invoiceNumber}</p>
+                                    </div>
+                                    {!isPreview && (
+                                      <Button
+                                        variant="success"
+                                        onClick={() =>
+                                          handleMakePayment({
+                                            invoiceId: item.id,
+                                            amount: item.balanceDue,
+                                          })
+                                        }
+                                        leftIcon={<CreditCard className="h-5 w-5" />}
+                                        className={theme.primaryButton}
+                                      >
+                                        Pay this bill
+                                      </Button>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {payAheadInvoices.length > 0 && (
+                            <div className="space-y-3">
+                              <div>
+                                <h4 className={theme.sectionTitle}>Pay ahead</h4>
+                                <p className={cn('mt-1', theme.muted)}>
+                                  {dueNowInvoices.length === 0
+                                    ? "You're current. You can pay upcoming rent now if you want."
+                                    : 'Pay the next month before the invoice is issued. The office still confirms your receipt.'}
+                                </p>
+                              </div>
+                              <ul className="space-y-3">
+                                {payAheadInvoices.map((item) => (
+                                  <li
+                                    key={item.id}
+                                    className={cn(
+                                      theme.card,
+                                      'flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between'
+                                    )}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className={theme.value}>
+                                        {formatCurrency(item.balanceDue)}
+                                      </p>
+                                      <p className={theme.muted}>
+                                        {item.periodLabel} rent · due {formatDate(item.dueDate)}
+                                      </p>
+                                      <p className={theme.subtle}>{item.invoiceNumber}</p>
+                                    </div>
+                                    {!isPreview && (
+                                      <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                          handleMakePayment({
+                                            invoiceId: item.id,
+                                            amount: item.balanceDue,
+                                          })
+                                        }
+                                        leftIcon={<CreditCard className="h-5 w-5" />}
+                                      >
+                                        Pay ahead
+                                      </Button>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -968,16 +1082,7 @@ export default function PaymentsPage() {
                     </div>
                     <PaymentForm
                       key={`${payDraft?.invoiceId || 'any'}-${payDraft?.preferPartial ? 'partial' : 'full'}`}
-                      invoices={
-                        paymentData?.schedule?.map((item) => ({
-                          id: item.id,
-                          invoiceNumber: item.invoiceNumber,
-                          dueDate: item.dueDate,
-                          balanceDue: item.balanceDue,
-                          totalAmount: item.totalAmount,
-                          status: item.status,
-                        })) || []
-                      }
+                      invoices={payableInvoices}
                       initialInvoiceId={payDraft?.invoiceId}
                       initialAmount={payDraft?.amount}
                       preferPartial={payDraft?.preferPartial}
@@ -995,7 +1100,9 @@ export default function PaymentsPage() {
                     <div className="mb-6 flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-medium text-gray-900">
-                          Add Deposit or Advance
+                          {(depositBalance || 0) > 0 || advanceCollected > 0
+                            ? 'Deposit & Advance'
+                            : 'Add Deposit or Advance'}
                         </h3>
                       </div>
                       <button
@@ -1008,6 +1115,9 @@ export default function PaymentsPage() {
                     <DepositPaymentForm
                       onPaymentComplete={handleDepositComplete}
                       onCancel={() => setShowDepositForm(false)}
+                      depositHeld={depositBalance || 0}
+                      advanceCollected={advanceCollected}
+                      advanceHint={advanceHint}
                     />
                   </div>
                 )}
@@ -1016,7 +1126,11 @@ export default function PaymentsPage() {
                   <div>
                     <div className="mb-6 flex items-center justify-between">
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900">Add Utility Deposit</h3>
+                        <h3 className="text-lg font-medium text-gray-900">
+                          {Number(utilityDepositData?.utilityDepositPaid) > 0
+                            ? 'Utility Deposit'
+                            : 'Add Utility Deposit'}
+                        </h3>
                         {utilityDepositData && utilityDepositData.hasAssignment && (
                           <p className="mt-1 text-sm text-gray-600">
                             Current Utility Deposit:{' '}
@@ -1044,6 +1158,7 @@ export default function PaymentsPage() {
                       <UtilityDepositForm
                         onPaymentComplete={handleUtilityDepositComplete}
                         onCancel={() => setShowUtilityDepositForm(false)}
+                        amountPaid={Number(utilityDepositData?.utilityDepositPaid) || 0}
                       />
                     )}
                   </div>
@@ -1057,7 +1172,8 @@ export default function PaymentsPage() {
                           Manual Payment Entry
                         </h3>
                         <p className="mt-1 text-sm text-gray-600">
-                          Enter payment amount you have paid manually
+                          Choose the invoice this payment applies to, then enter the amount
+                          and receipt.
                         </p>
                       </div>
                       <button
@@ -1068,6 +1184,7 @@ export default function PaymentsPage() {
                       </button>
                     </div>
                     <ManualPaymentForm
+                      invoices={payableInvoices}
                       onPaymentComplete={handleManualPaymentComplete}
                       onCancel={() => setShowManualPaymentForm(false)}
                     />

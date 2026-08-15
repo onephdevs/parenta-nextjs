@@ -87,9 +87,14 @@ export function TenantPageSkeleton({
             <TenantBone key={i} className="h-8 w-28 rounded-full" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
             <MetricCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <MetricCardSkeleton key={`hold-${i}`} />
           ))}
         </div>
         <div className={cn(theme.cardPad, 'space-y-3')}>
@@ -98,7 +103,7 @@ export function TenantPageSkeleton({
           <TenantBone className="h-4 w-full" />
           <TenantBone className="h-4 w-3/4" />
           <div className="flex justify-end pt-2">
-            <TenantBone className="h-12 w-32 rounded-md" />
+            <TenantBone className="h-10 w-28 rounded-md" />
           </div>
         </div>
       </div>
