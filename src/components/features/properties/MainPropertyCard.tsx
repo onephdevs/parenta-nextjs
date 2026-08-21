@@ -20,6 +20,7 @@ import {
   formatBuildingAddress,
   googleMapsUrl,
 } from './property-utils';
+import { Switch } from '@/components/ui/Switch';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 const TEAL = '#39CCCC';
@@ -47,6 +48,7 @@ export default function MainPropertyCard({
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(building.name);
   const [savingName, setSavingName] = useState(false);
+  const [savingNearbyToggle, setSavingNearbyToggle] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -110,6 +112,39 @@ export default function MainPropertyCard({
       setNameDraft(building.name);
     } finally {
       setSavingName(false);
+    }
+  };
+
+  const toggleShowOnLandingNearby = async (checked: boolean) => {
+    setSavingNearbyToggle(true);
+    try {
+      const response = await fetch(`/api/buildings/${building.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ showOnLandingNearby: checked }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(json.error || 'Failed to update nearby visibility');
+      }
+      showNotification({
+        type: 'success',
+        title: 'Property updated',
+        message: checked
+          ? 'Property will show in landing “What’s nearby”.'
+          : 'Property hidden from landing “What’s nearby”.',
+      });
+      onBuildingUpdated();
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'Update failed',
+        message:
+          err instanceof Error ? err.message : 'Failed to update nearby visibility',
+      });
+    } finally {
+      setSavingNearbyToggle(false);
     }
   };
 
@@ -211,6 +246,18 @@ export default function MainPropertyCard({
                 <Users className="h-4 w-4" style={{ color: TEAL }} />
                 {detail.tenantCount || 0} Tenants
               </span>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5">
+              <Switch
+                checked={building.showOnLandingNearby !== false}
+                onCheckedChange={(checked) => {
+                  void toggleShowOnLandingNearby(checked);
+                }}
+                isDisabled={savingNearbyToggle}
+                label="Show in What’s nearby"
+                description="Landing page nearby / commute property picker"
+              />
             </div>
           </div>
 

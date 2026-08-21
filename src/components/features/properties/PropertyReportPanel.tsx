@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/Button';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import { AddNotesButton } from '@/components/features/notes/EntityNotesModal';
 import { LightboxImage } from '@/components/ui/ImageLightbox';
+import AppLoader from '@/components/ui/AppLoader';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 
@@ -233,6 +234,7 @@ export default function PropertyReportPanel({
             leftIcon={<UserPlus className="h-4 w-4" />}
             className="relative"
             lockHousing={false}
+            redirectAfterCreate={false}
             onCreated={() => onTenantCreated?.()}
           >
             {vacantCount > 0 ? (
@@ -293,9 +295,12 @@ export default function PropertyReportPanel({
         </div>
 
         {loading && (
-          <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-            Loading collection…
-          </div>
+          <AppLoader
+            variant="inline"
+            label="Loading…"
+            size={72}
+            className="min-h-[10rem] bg-transparent"
+          />
         )}
         {error && !loading && (
           <p className="text-sm text-red-600">{error}</p>
@@ -604,6 +609,7 @@ export default function PropertyReportPanel({
                         buildingId={buildingId}
                         roomId={unit.roomId}
                         lockHousing
+                        redirectAfterCreate={false}
                         refreshOnCreated={false}
                         onCreated={() => onTenantCreated?.()}
                         renderTrigger={(open) => (

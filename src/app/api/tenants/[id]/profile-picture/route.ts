@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import { del } from '@vercel/blob';
 import pool from '@/lib/db';
 import { saveUploadedFile } from '@/lib/api/documents';
+import { syncUserAvatarForTenant } from '@/lib/api/user-profile-extras';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       'UPDATE tenants SET profile_picture_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [publicUrl, tenantId]
     );
+    await syncUserAvatarForTenant(tenantId, publicUrl);
 
     // Best-effort cleanup of previous file after successful save
     await deleteStoredFile(oldPictureUrl);
@@ -172,6 +174,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       'UPDATE tenants SET profile_picture_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [tenantId]
     );
+    await syncUserAvatarForTenant(tenantId, null);
 
     return NextResponse.json(
       {

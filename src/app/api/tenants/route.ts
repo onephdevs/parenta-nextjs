@@ -14,12 +14,16 @@ export async function GET(request: Request) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
     const limit = Math.min(1000, Math.max(1, parseInt(searchParams.get('limit') || '1000', 10) || 1000));
     const status = searchParams.get('status') || undefined;
+    const buildingId = searchParams.get('buildingId')?.trim() || undefined;
+    const roomId = searchParams.get('roomId')?.trim() || undefined;
 
     const tenantsData = await getAllTenants({
       page,
       limit,
       search,
       status: status as 'active' | 'pending' | 'inactive' | 'terminated' | undefined,
+      buildingId,
+      roomId,
     });
     
     return NextResponse.json({

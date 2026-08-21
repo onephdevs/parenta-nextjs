@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import RoomDetailsContent, {
   formatUnitLabel,
 } from '@/components/features/rooms/RoomDetailsContent';
+import RoomHeroCard from '@/components/features/rooms/RoomHeroCard';
 import EditRoomForm from '@/components/features/EditRoomForm';
 import DeleteRoomModal from '@/components/features/DeleteRoomModal';
 import TenantAssignmentManager from '@/components/features/TenantAssignmentManager';
@@ -114,6 +115,9 @@ export default function RoomUnitDetailClient({
     start_date: String(item.startDate),
     end_date: item.endDate ? String(item.endDate) : undefined,
     monthly_rate: item.monthlyRate,
+    deposit_paid: item.depositPaid,
+    advance_paid: item.advancePaid,
+    utility_deposit_paid: item.utilityDepositPaid,
     assignment_status: item.assignmentStatus,
     first_name: item.tenantName.split(' ')[0] || item.tenantName,
     last_name: item.tenantName.split(' ').slice(1).join(' ') || '',
@@ -158,6 +162,8 @@ export default function RoomUnitDetailClient({
           </Button>
         </div>
       </div>
+
+      <RoomHeroCard detail={detail} />
 
       <RoomDetailsContent
         detail={detail}

@@ -57,10 +57,12 @@ export default function PropertiesMasterDetail({
     [router, searchParams]
   );
 
-  const loadDetail = useCallback(async (buildingId: string) => {
+  const loadDetail = useCallback(async (buildingId: string, opts?: { silent?: boolean }) => {
     const gen = ++detailLoadGen.current;
-    setDetailLoading(true);
-    setDetailError(null);
+    if (!opts?.silent) {
+      setDetailLoading(true);
+      setDetailError(null);
+    }
     setRoomsLoadingId(buildingId);
 
     try {
@@ -77,14 +79,17 @@ export default function PropertiesMasterDetail({
 
       const data = json.data as PropertyBuildingDetail;
       setDetail(data);
+      setDetailError(null);
       setRoomsByBuilding((prev) => ({
         ...prev,
         [buildingId]: data.rooms,
       }));
     } catch (err) {
       if (gen !== detailLoadGen.current) return;
-      setDetail(null);
-      setDetailError(err instanceof Error ? err.message : 'Failed to load property');
+      if (!opts?.silent) {
+        setDetail(null);
+        setDetailError(err instanceof Error ? err.message : 'Failed to load property');
+      }
     } finally {
       if (gen === detailLoadGen.current) {
         setDetailLoading(false);
@@ -224,7 +229,9 @@ export default function PropertiesMasterDetail({
   };
 
   const handleBuildingUpdated = () => {
-    void loadDetail(selectedBuildingId!);
+    if (selectedBuildingId) {
+      void loadDetail(selectedBuildingId, { silent: true });
+    }
     void refreshBuildingsList();
     router.refresh();
   };

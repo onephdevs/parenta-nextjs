@@ -49,6 +49,48 @@ export function formatMaintenanceStatus(value: string | null | undefined): strin
   return MAINTENANCE_STATUS_LABELS[key] || titleCaseWords(value);
 }
 
+/** Short customer-facing ticket id, e.g. #T-A1B2C3 */
+export function formatMaintenanceTicketNumber(id: string | null | undefined): string {
+  if (!id?.trim()) return '#T-------';
+  const compact = id.replace(/-/g, '').slice(-6).toUpperCase();
+  return `#T-${compact}`;
+}
+
+export type MaintenanceTicketQueue = 'open' | 'in_progress' | 'resolved' | 'cancelled';
+
+export function maintenanceTicketQueue(
+  status: string | null | undefined
+): MaintenanceTicketQueue {
+  const key = String(status || '').toLowerCase();
+  if (key === 'in_progress') return 'in_progress';
+  if (key === 'completed' || key === 'closed' || key === 'resolved') return 'resolved';
+  if (key === 'cancelled') return 'cancelled';
+  return 'open';
+}
+
+function normalizeMaintenanceStatus(value: string | null | undefined): string {
+  const key = String(value || '').trim().toLowerCase();
+  if (key === 'closed' || key === 'resolved') return 'completed';
+  return key || 'open';
+}
+
+/**
+ * Office reply on an open ticket moves it to in_progress (and the pipeline
+ * In Progress stage). Explicit completed/cancelled from the form is kept.
+ */
+export function maintenanceStatusAfterOfficeReply(
+  currentStatus: string | null | undefined,
+  requestedStatus?: string | null
+): string {
+  const requested = normalizeMaintenanceStatus(requestedStatus);
+  const current = normalizeMaintenanceStatus(currentStatus);
+  const chosen = requestedStatus != null && String(requestedStatus).trim()
+    ? requested
+    : current;
+  if (chosen === 'completed' || chosen === 'cancelled') return chosen;
+  return 'in_progress';
+}
+
 /** Format a pipeline tag that may be raw category or "Priority: medium". */
 export function formatMaintenanceTag(tag: string): string {
   const trimmed = tag.trim();

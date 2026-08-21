@@ -9,6 +9,7 @@ import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { cn } from '@/lib/utils';
+import { getImageUrl } from '@/lib/format/image-url';
 import type { TenantProfileData } from './types';
 import { derivePersonBadge, formatProfileDate, formatUnitDisplay, fullName } from './utils';
 
@@ -189,7 +190,7 @@ export function TenantSummaryCard({
         <div className="relative">
           <Avatar
             name={name}
-            src={photoUrl}
+            src={photoUrl ? getImageUrl(photoUrl) : null}
             size="lg"
             className="h-[88px] w-[88px] text-2xl"
           />

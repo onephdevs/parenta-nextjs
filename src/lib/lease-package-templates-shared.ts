@@ -19,6 +19,29 @@ export interface LeasePackageTemplate {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Active/pending assignments currently using this package */
+  appliedUnitCount?: number;
+  appliedBuildingCount?: number;
+}
+
+export interface LeasePackageAppliedRoom {
+  roomId: string;
+  roomNumber: string;
+  roomStatus: string;
+  tenantId: string | null;
+  tenantName: string | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export interface LeasePackageAppliedBuilding {
+  buildingId: string;
+  buildingName: string;
+  rooms: LeasePackageAppliedRoom[];
+}
+
+export interface LeasePackageTemplateDetail extends LeasePackageTemplate {
+  appliedBuildings: LeasePackageAppliedBuilding[];
 }
 
 export interface LeasePackageTemplateInput {

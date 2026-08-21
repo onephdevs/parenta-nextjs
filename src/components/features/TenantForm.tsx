@@ -875,6 +875,10 @@ export default function TenantForm({
           email: formData.email,
           temporaryPassword,
         });
+        // Close the form and refresh the parent now so the new tenant appears
+        // behind the password dialog. TenantForm stays mounted until Continue.
+        onCreated?.(tenantId);
+        onClose?.();
       } else {
         setTimeout(() => {
           finishAfterCreate(tenantId);
@@ -1017,7 +1021,13 @@ export default function TenantForm({
     if (!credentialsModal) return;
     const { tenantId } = credentialsModal;
     setCredentialsModal(null);
-    finishAfterCreate(tenantId);
+    // Form already closed and parent already refreshed when the password dialog opened.
+    if (!redirectAfterCreate) return;
+    if (resolvedReturnTo) {
+      router.push(resolvedReturnTo);
+      return;
+    }
+    router.push(`/admin/tenants/${tenantId}`);
   };
 
   const errorBanner = draftRestored ? (
@@ -1070,14 +1080,16 @@ export default function TenantForm({
     router.push('/admin/tenants');
   };
 
-  if (mode === 'modal' && !isOpen) return null;
+  // Keep mounted while the one-time password dialog is open so closing the
+  // form shell (isOpen=false) does not unmount credentials before Continue.
+  if (mode === 'modal' && !isOpen && !credentialsModal) return null;
 
   return (
     <div className="text-gray-900">
       {dialog}
       <SectionedFormShell
         {...(mode === 'modal'
-          ? { mode: 'modal' as const, isOpen }
+          ? { mode: 'modal' as const, isOpen: isOpen && !credentialsModal }
           : { mode: 'page' as const })}
         eyebrow="Create tenant"
         sections={SECTIONS}
@@ -1607,7 +1619,7 @@ export default function TenantForm({
         size="sm"
         footer={
           <Button type="button" onClick={handleCredentialsModalContinue}>
-            Continue to tenant
+            {redirectAfterCreate ? 'Continue to tenant' : 'Continue'}
           </Button>
         }
       >

@@ -65,7 +65,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('POST /api/lease-package-templates error:', err);
     const message = err instanceof Error ? err.message : 'Failed to create lease template';
-    const status = message.includes('required') || message.includes('negative') ? 400 : 500;
+    const status =
+      message.includes('required') ||
+      message.includes('negative') ||
+      message.includes('already exists')
+        ? 400
+        : 500;
     return NextResponse.json({ success: false, error: message }, { status });
   }
 }

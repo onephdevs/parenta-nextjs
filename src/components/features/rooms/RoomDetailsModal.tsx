@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, UserPlus, X } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, UserPlus, Wallet, X } from 'lucide-react';
 import type { RoomPageDetail } from '@/lib/api/properties';
 import TenantForm from '@/components/features/TenantForm';
 import AppLoader from '@/components/ui/AppLoader';
@@ -29,9 +30,11 @@ export default function RoomDetailsModal({
   const [slidIn, setSlidIn] = useState(false);
   const [addTenantOpen, setAddTenantOpen] = useState(false);
 
-  const loadDetail = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
+  const loadDetail = useCallback(async (id: string, opts?: { keepVisible?: boolean }) => {
+    if (!opts?.keepVisible) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const response = await fetch(`/api/rooms/${id}/properties`, {
         credentials: 'include',
@@ -41,9 +44,12 @@ export default function RoomDetailsModal({
         throw new Error(json.error || 'Failed to load room');
       }
       setDetail(json.data as RoomPageDetail);
+      setError(null);
     } catch (err) {
-      setDetail(null);
-      setError(err instanceof Error ? err.message : 'Failed to load room');
+      if (!opts?.keepVisible) {
+        setDetail(null);
+        setError(err instanceof Error ? err.message : 'Failed to load room');
+      }
     } finally {
       setLoading(false);
     }
@@ -141,6 +147,15 @@ export default function RoomDetailsModal({
                     Add Tenant
                   </button>
                 )}
+                {detail?.room.tenant && (
+                  <Link
+                    href={`/admin/financial/payments/new?tenantId=${encodeURIComponent(detail.room.tenant.tenantId)}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#111827] px-3 py-2 text-sm font-semibold text-white hover:bg-black"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    Make Payment
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={onClose}
@@ -154,7 +169,7 @@ export default function RoomDetailsModal({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50">
-            <div className="mx-auto max-w-5xl p-4 sm:p-6">
+            <div className="mx-auto max-w-4xl p-4 sm:p-5">
               {loading && (
                 <AppLoader
                   variant="inline"
@@ -198,9 +213,10 @@ export default function RoomDetailsModal({
           initialBuildingId={detail.building.id}
           initialRoomId={detail.room.id}
           lockHousing
+          redirectAfterCreate={false}
           onCreated={() => {
             setAddTenantOpen(false);
-            void loadDetail(detail.room.id);
+            void loadDetail(detail.room.id, { keepVisible: true });
             onRoomUpdated?.();
           }}
         />

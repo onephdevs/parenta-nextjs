@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
 import { PageHeader } from '@/components/ui/PageHeader';
 import AppLoader from '@/components/ui/AppLoader';
+import { RouteLoadingFallback, useRouteReady } from '@/components/layout/route-loader';
 
 interface AssetFilters {
   buildingId?: string;
@@ -235,7 +236,10 @@ export function AssetsDashboard() {
       .join('\n');
   };
 
+  const { covering } = useRouteReady(!loading);
+
   if (loading) {
+    if (covering) return <RouteLoadingFallback className="min-h-[50vh]" />;
     return <AppLoader variant="inline" className="min-h-[50vh]" />;
   }
 

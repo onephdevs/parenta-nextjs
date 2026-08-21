@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -125,10 +125,30 @@ function defaultExpandedFor(activeParentId: string): Record<string, boolean> {
   return next;
 }
 
+/** Keep chrome mounted while search params resolve — never replace the whole shell. */
 export function TenantPortalShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  return (
+    <Suspense fallback={<TenantPortalChrome search="">{children}</TenantPortalChrome>}>
+      <TenantPortalChromeWithSearch>{children}</TenantPortalChromeWithSearch>
+    </Suspense>
+  );
+}
+
+function TenantPortalChromeWithSearch({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
-  const search = searchParams?.toString() ?? '';
+  return (
+    <TenantPortalChrome search={searchParams.toString()}>{children}</TenantPortalChrome>
+  );
+}
+
+function TenantPortalChrome({
+  children,
+  search,
+}: {
+  children: ReactNode;
+  search: string;
+}) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { canAccess, isPreview, exitPreview } = useTenantPortalGate();
   const { load } = useTenantData();
@@ -314,7 +334,7 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className={cn('flex min-h-screen', theme.page)}>
+    <div className={cn('flex h-dvh min-h-0', theme.page)}>
       <TenantCompleteProfileGate />
       {/* Desktop sidebar */}
       <aside
@@ -390,8 +410,13 @@ export function TenantPortalShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className={cn('flex min-w-0 flex-1 flex-col pt-14 md:pt-0', theme.main)}>
-        {children}
+      <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col pt-14 md:pt-0', theme.main)}>
+        <main
+          data-app-main
+          className={cn('relative flex min-h-0 flex-1 flex-col overflow-y-auto', theme.main)}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

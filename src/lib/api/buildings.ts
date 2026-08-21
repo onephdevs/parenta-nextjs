@@ -25,6 +25,7 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
     amenities: dbBuilding.amenities,
     isActive: dbBuilding.is_active,
     autoLateFee: dbBuilding.auto_late_fee !== false,
+    showOnLandingNearby: dbBuilding.show_on_landing_nearby !== false,
     createdAt: dbBuilding.created_at,
     updatedAt: dbBuilding.updated_at,
   };
@@ -249,6 +250,7 @@ export async function updateBuilding(id: string, buildingData: Partial<CreateBui
                      key === 'yearBuilt' ? 'year_built' :
                      key === 'totalFloors' ? 'total_floors' :
                      key === 'autoLateFee' ? 'auto_late_fee' :
+                     key === 'showOnLandingNearby' ? 'show_on_landing_nearby' :
                      key;
         updates.push(`${dbKey} = $${paramCount}`);
         values.push(value);

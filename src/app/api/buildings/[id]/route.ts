@@ -74,6 +74,11 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
     const building = await updateBuilding(id, buildingData);
 
+    if (Object.prototype.hasOwnProperty.call(buildingData, 'showOnLandingNearby')) {
+      const { invalidatePublicPortfolioCache } = await import('@/lib/cache/memory-cache');
+      invalidatePublicPortfolioCache();
+    }
+
     logActivitySafe({
       actorUserId: session?.user?.id || null,
       actorRole: 'admin',

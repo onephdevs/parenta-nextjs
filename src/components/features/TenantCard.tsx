@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { TenantStatusBadge } from '@/components/domain/StatusBadges';
 import { cn } from '@/lib/utils';
+import { getImageUrl } from '@/lib/format/image-url';
 
 interface TenantCardProps {
   tenant: Tenant;
@@ -91,6 +92,11 @@ export default function TenantCard({ tenant }: TenantCardProps) {
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <Avatar
                 name={fullName}
+                src={
+                  tenant.profilePictureUrl
+                    ? getImageUrl(tenant.profilePictureUrl)
+                    : null
+                }
                 size="md"
                 className="mt-0.5 h-10 w-10 flex-shrink-0 text-sm"
               />

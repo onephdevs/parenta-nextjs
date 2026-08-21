@@ -238,7 +238,7 @@ export default function DocumentsPage() {
             <div className="space-y-6">
               {/* Document Categories Overview */}
               {documentsData.categories && (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {Object.entries(documentsData.categories).map(([category, count]) => (
                     <div key={category} className={theme.card}>
                       <div className="p-4">

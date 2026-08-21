@@ -35,8 +35,8 @@ export default function UnifiedSignInForm() {
         password,
       });
 
-      if (result?.error) {
-        setError('Invalid username or password');
+        if (result?.error) {
+        setError('Invalid email, username, or password');
         return;
       }
 
@@ -71,15 +71,15 @@ export default function UnifiedSignInForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <AuthField
-            id="username"
-            name="username"
+            id="login"
+            name="login"
             type="text"
             autoComplete="username"
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username or email"
-            aria-label="Username or email"
+            placeholder="Email or username"
+            aria-label="Email or username"
           />
 
           <AuthPasswordField

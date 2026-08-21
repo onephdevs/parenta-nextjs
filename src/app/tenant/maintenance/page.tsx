@@ -5,29 +5,18 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Wrench,
   Plus,
-  ArrowLeft,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
   X,
   ImagePlus,
   ChevronRight,
   MessageSquare,
+  Paperclip,
+  Ticket,
+  Search,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TakePhotoButton } from '@/components/features/TakePhotoButton';
-import {
-  Button,
-  EmptyState,
-  Input,
-  PageHeader,
-  SearchInput,
-  Select,
-  StatCard,
-  Textarea,
-} from '@/components/ui';
+import { Button, Input, Select, Textarea } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import { IconButton } from '@/components/ui/IconButton';
 import { FileDropzone } from '@/components/ui/FileDropzone';
@@ -36,6 +25,7 @@ import {
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
 import { TenantPageSkeleton } from '@/components/features/tenant/TenantPageSkeleton';
+import { formatRelativeTime } from '@/components/features/maintenance/MaintenanceDiscussion';
 import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData, fetchTenantMaintenance } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
@@ -45,7 +35,15 @@ import {
   MAINTENANCE_CATEGORIES,
   MAINTENANCE_CATEGORY_LABELS,
   formatMaintenanceCategory,
+  formatMaintenanceTicketNumber,
+  maintenanceTicketQueue,
 } from '@/lib/constants/maintenance';
+
+interface TicketUpdate {
+  authorRole?: string;
+  body?: string;
+  createdAt?: string;
+}
 
 interface MaintenanceRequest {
   id: string;
@@ -57,7 +55,7 @@ interface MaintenanceRequest {
   createdAt: string;
   updatedAt: string;
   attachmentCount?: number;
-  updates?: unknown[];
+  updates?: TicketUpdate[];
 }
 
 interface MaintenanceData {
@@ -72,8 +70,17 @@ interface PendingPhoto {
   preview: string;
 }
 
+type QueueFilter = 'all' | 'open' | 'in_progress' | 'resolved';
+
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+const QUEUE_TABS: { id: QueueFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open' },
+  { id: 'in_progress', label: 'In progress' },
+  { id: 'resolved', label: 'Resolved' },
+];
 
 function mapMaintenance(raw: { requests: unknown[] } | Record<string, unknown>): MaintenanceData {
   const requests = Array.isArray((raw as { requests?: unknown[] }).requests)
@@ -95,17 +102,42 @@ function mapMaintenance(raw: { requests: unknown[] } | Record<string, unknown>):
   };
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+function matchesQueue(status: string, filter: QueueFilter): boolean {
+  if (filter === 'all') return true;
+  const queue = maintenanceTicketQueue(status);
+  if (filter === 'resolved') return queue === 'resolved' || queue === 'cancelled';
+  return queue === filter;
+}
+
+function ticketActivityLabel(request: MaintenanceRequest): string {
+  const queue = maintenanceTicketQueue(request.status);
+  if (queue === 'resolved') return 'Resolved';
+  if (queue === 'cancelled') return 'Cancelled';
+
+  const updates = request.updates || [];
+  if (updates.length === 0) return 'Waiting for office';
+
+  const last = updates[updates.length - 1];
+  const role = String(last?.authorRole || '').toLowerCase();
+  if (role === 'tenant') return 'Waiting for office';
+  if (queue === 'in_progress') return 'Office is working on it';
+  return 'Office replied';
+}
+
+function lastMessagePreview(request: MaintenanceRequest): string {
+  const updates = request.updates || [];
+  for (let i = updates.length - 1; i >= 0; i -= 1) {
+    const body = updates[i]?.body?.trim();
+    if (body) return body;
+  }
+  return request.description || '';
+}
+
+function queueCount(
+  requests: MaintenanceRequest[],
+  filter: QueueFilter
+): number {
+  return requests.filter((r) => matchesQueue(r.status, filter)).length;
 }
 
 export default function MaintenancePage() {
@@ -123,7 +155,7 @@ export default function MaintenancePage() {
   });
   const [showNewRequestForm, setShowNewRequestForm] = useState(false);
   const [requestPanelIn, setRequestPanelIn] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterQueue, setFilterQueue] = useState<QueueFilter>('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,7 +251,7 @@ export default function MaintenancePage() {
           message:
             error instanceof Error
               ? error.message
-              : 'Failed to load maintenance requests',
+              : 'Failed to load maintenance tickets',
         });
       }
     }
@@ -275,10 +307,10 @@ export default function MaintenancePage() {
       if (data.success) {
         showNotification({
           type: data.warning ? 'warning' : 'success',
-          title: 'Request Submitted',
+          title: 'Ticket opened',
           message:
             data.message ||
-            'Your maintenance request has been submitted successfully!',
+            'Your ticket was submitted. The office will reply here.',
         });
         setNewRequest({
           title: '',
@@ -298,8 +330,8 @@ export default function MaintenancePage() {
       } else {
         showNotification({
           type: 'error',
-          title: 'Submission Failed',
-          message: data.error || data.details || 'Failed to submit maintenance request',
+          title: 'Could not open ticket',
+          message: data.error || data.details || 'Failed to submit ticket',
         });
       }
     } catch (error) {
@@ -308,7 +340,7 @@ export default function MaintenancePage() {
         type: 'error',
         title: 'Error',
         message:
-          error instanceof Error ? error.message : 'Failed to submit request',
+          error instanceof Error ? error.message : 'Failed to submit ticket',
       });
     } finally {
       setIsSubmitting(false);
@@ -316,210 +348,197 @@ export default function MaintenancePage() {
   };
 
   const categories = MAINTENANCE_CATEGORIES;
-  const filteredRequests = (maintenanceData?.requests || []).filter((request) => {
-    const matchesSearch =
-      request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      filterStatus === 'all' || request.status === filterStatus;
+  const allRequests = maintenanceData?.requests || [];
+  const filteredRequests = allRequests.filter((request) => {
+    const haystack = `${request.title} ${request.description} ${formatMaintenanceTicketNumber(request.id)}`.toLowerCase();
+    const matchesSearch = haystack.includes(searchTerm.toLowerCase());
+    const matchesQueueFilter = matchesQueue(request.status, filterQueue);
     const matchesPriority =
       filterPriority === 'all' || request.priority === filterPriority;
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesQueueFilter && matchesPriority;
   });
+  const hasActiveFilters =
+    Boolean(searchTerm) || filterQueue !== 'all' || filterPriority !== 'all';
 
   return (
     <div className={theme.page}>
-      <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6">
-        <Link
-          href="/tenant"
-          className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-500"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to home
-        </Link>
-        <div>
-          <h1 className={theme.title}>Maintenance</h1>
-          <p className={cn('mt-1', theme.muted)}>
-            Browse your requests, then open one to view updates and reply
-          </p>
-        </div>
-        <div className={cn(theme.formPanel, 'overflow-hidden')}>
-          <div className="p-4 sm:p-6">
-            <PageHeader
-              title="Maintenance Requests"
-              description="Select a request to view details and conversation"
-              actions={
-                isPreview ? undefined : (
-                  <Button
-                    variant="success"
-                    leftIcon={<Plus className="h-4 w-4" />}
-                    onClick={() => setShowNewRequestForm(true)}
-                    className={theme.primaryButton}
-                  >
-                    New Request
-                  </Button>
-                )
-              }
-            />
-            {maintenanceData && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-4">
-                  <StatCard
-                    title="Active Requests"
-                    value={maintenanceData?.active || 0}
-                    icon={<Clock className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    title="In Progress"
-                    value={
-                      filteredRequests.filter((r) => r.status === 'in_progress')
-                        .length
-                    }
-                    tone="blue"
-                    icon={<Wrench className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    title="Completed"
-                    value={
-                      filteredRequests.filter((r) => r.status === 'completed')
-                        .length
-                    }
-                    tone="green"
-                    icon={<CheckCircle2 className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    title="High Priority"
-                    value={
-                      filteredRequests.filter((r) => r.priority === 'high').length
-                    }
-                    tone="red"
-                    icon={<AlertCircle className="h-5 w-5" />}
-                  />
-                </div>
-
-                <div className="rounded-lg bg-white shadow">
-                  <div className="px-4 py-5 sm:p-6">
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">
-                        Your requests ({maintenanceData?.requests?.length || 0})
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <SearchInput
-                          placeholder="Search requests..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          aria-label="Search requests"
-                          className="w-56"
-                        />
-                        <Select
-                          value={filterStatus}
-                          onChange={(e) => setFilterStatus(e.target.value)}
-                          aria-label="Filter by status"
-                        >
-                          <option value="all">All Status</option>
-                          <option value="open">Open</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Resolved</option>
-                          <option value="closed">Closed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </Select>
-                        <Select
-                          value={filterPriority}
-                          onChange={(e) => setFilterPriority(e.target.value)}
-                          aria-label="Filter by priority"
-                        >
-                          <option value="all">All Priority</option>
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {filteredRequests.length > 0 ? (
-                      <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-                        {filteredRequests.map((request) => {
-                          const updateCount = request.updates?.length || 0;
-                          return (
-                            <li key={request.id}>
-                              <Link
-                                href={`/tenant/maintenance/${request.id}`}
-                                className="flex items-start gap-3 px-4 py-4 transition hover:bg-gray-50"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <h4 className="truncate text-base font-medium text-gray-900">
-                                      {request.title}
-                                    </h4>
-                                    <MaintenanceStatusBadge status={request.status} />
-                                    <MaintenancePriorityBadge
-                                      priority={request.priority}
-                                    />
-                                  </div>
-                                  <p className="mt-1 line-clamp-2 text-sm text-gray-600">
-                                    {request.description}
-                                  </p>
-                                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                                    <span>
-                                      {formatMaintenanceCategory(request.category)}
-                                    </span>
-                                    <span>Updated {formatDate(request.updatedAt)}</span>
-                                    {updateCount > 0 && (
-                                      <span className="inline-flex items-center gap-1">
-                                        <MessageSquare className="h-3.5 w-3.5" />
-                                        {updateCount} update
-                                        {updateCount === 1 ? '' : 's'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-gray-400" />
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <EmptyState
-                        icon={<Wrench className="h-12 w-12" />}
-                        title={
-                          searchTerm ||
-                          filterStatus !== 'all' ||
-                          filterPriority !== 'all'
-                            ? 'No matching requests'
-                            : 'No maintenance requests yet'
-                        }
-                        description={
-                          searchTerm ||
-                          filterStatus !== 'all' ||
-                          filterPriority !== 'all'
-                            ? 'No maintenance requests found matching your criteria.'
-                            : 'Submit a new request if you need assistance.'
-                        }
-                        action={
-                          searchTerm ||
-                          filterStatus !== 'all' ||
-                          filterPriority !== 'all' ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onClick={() => {
-                                setSearchTerm('');
-                                setFilterStatus('all');
-                                setFilterPriority('all');
-                              }}
-                            >
-                              Clear filters
-                            </Button>
-                          ) : undefined
-                        }
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+      <div className={theme.pagePad}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className={theme.title}>Tickets</h1>
+            <p className={cn('mt-1', theme.muted)}>
+              You&apos;re the customer. Open a ticket for repairs and the office
+              replies here.
+            </p>
           </div>
+          {!isPreview && (
+            <Button
+              variant="success"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => setShowNewRequestForm(true)}
+              className={theme.primaryButton}
+            >
+              New ticket
+            </Button>
+          )}
+        </div>
+
+        <nav
+          className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+          aria-label="Ticket queues"
+        >
+          {QUEUE_TABS.map((tab) => {
+            const count = queueCount(allRequests, tab.id);
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilterQueue(tab.id)}
+                className={theme.tabClass(filterQueue === tab.id)}
+              >
+                {tab.label}
+                <span className="ml-1.5 tabular-nums opacity-70">{count}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className={cn(theme.panel, 'overflow-hidden')}>
+          <div className={cn('flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center', theme.divider)}>
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search tickets by subject or number…"
+                aria-label="Search tickets"
+                className={cn('pl-10', theme.input)}
+              />
+            </div>
+            <Select
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              aria-label="Filter by priority"
+              className={cn('sm:w-40', theme.input)}
+            >
+              <option value="all">All priority</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </Select>
+          </div>
+
+          {filteredRequests.length > 0 ? (
+            <ul>
+              {filteredRequests.map((request, index) => {
+                const updateCount = request.updates?.length || 0;
+                const preview = lastMessagePreview(request);
+                return (
+                  <li key={request.id}>
+                    <Link
+                      href={`/tenant/maintenance/${request.id}`}
+                      className={cn(
+                        'flex items-start gap-3 px-4 py-4 transition',
+                        index > 0 && 'border-t',
+                        theme.divider,
+                        theme.mode === 'dark'
+                          ? 'hover:bg-zinc-800/60'
+                          : 'hover:bg-zinc-50'
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                          theme.mode === 'dark'
+                            ? 'bg-zinc-800 text-zinc-300'
+                            : 'bg-zinc-100 text-zinc-600'
+                        )}
+                        aria-hidden
+                      >
+                        <Ticket className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className={cn('font-mono text-xs', theme.subtle)}>
+                            {formatMaintenanceTicketNumber(request.id)}
+                          </span>
+                          <MaintenanceStatusBadge status={request.status} />
+                          <MaintenancePriorityBadge priority={request.priority} />
+                        </div>
+                        <h2 className={cn('mt-1 truncate text-sm font-semibold', theme.listValue)}>
+                          {request.title}
+                        </h2>
+                        {preview && (
+                          <p className={cn('mt-0.5 line-clamp-1 text-sm', theme.muted)}>
+                            {preview}
+                          </p>
+                        )}
+                        <div className={cn('mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs', theme.subtle)}>
+                          <span>{formatMaintenanceCategory(request.category)}</span>
+                          <span>{ticketActivityLabel(request)}</span>
+                          <span>
+                            {formatRelativeTime(request.updatedAt || request.createdAt)}
+                          </span>
+                          {updateCount > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              {updateCount}
+                            </span>
+                          )}
+                          {(request.attachmentCount || 0) > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                              <Paperclip className="h-3.5 w-3.5" />
+                              {request.attachmentCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight className={cn('mt-2 h-5 w-5 shrink-0', theme.subtle)} />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="px-4 py-14 text-center">
+              <Ticket className={cn('mx-auto h-10 w-10', theme.subtle)} />
+              <h3 className={cn('mt-3 text-sm font-semibold', theme.listValue)}>
+                {hasActiveFilters ? 'No matching tickets' : 'No tickets yet'}
+              </h3>
+              <p className={cn('mx-auto mt-1 max-w-sm text-sm', theme.muted)}>
+                {hasActiveFilters
+                  ? 'Try a different queue, priority, or search.'
+                  : 'Open a ticket to report a leak, appliance issue, or anything else that needs fixing.'}
+              </p>
+              <div className="mt-5 flex justify-center gap-2">
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterQueue('all');
+                      setFilterPriority('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : (
+                  !isPreview && (
+                    <Button
+                      type="button"
+                      leftIcon={<Plus className="h-4 w-4" />}
+                      onClick={() => setShowNewRequestForm(true)}
+                      className={theme.primaryButton}
+                    >
+                      New ticket
+                    </Button>
+                  )
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -562,10 +581,10 @@ export default function MaintenancePage() {
                     id="tenant-maintenance-request-title"
                     className={cn('text-lg font-semibold', theme.shellHeader)}
                   >
-                    Submit maintenance request
+                    New ticket
                   </h3>
                   <p className={cn('mt-1 text-sm', theme.muted)}>
-                    Describe the issue and attach photos if helpful.
+                    Describe the issue. You can attach photos so the office can assess it.
                   </p>
                 </div>
                 <IconButton
@@ -585,7 +604,7 @@ export default function MaintenancePage() {
                 className="flex min-h-0 flex-1 flex-col"
               >
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-                  <FormField label="Title" htmlFor="title" required>
+                  <FormField label="Subject" htmlFor="title" required>
                     <Input
                       type="text"
                       id="title"
@@ -594,7 +613,7 @@ export default function MaintenancePage() {
                       onChange={(e) =>
                         setNewRequest({ ...newRequest, title: e.target.value })
                       }
-                      placeholder="Brief description of the issue"
+                      placeholder="Brief summary, e.g. Leaking kitchen faucet"
                     />
                   </FormField>
 
@@ -624,13 +643,13 @@ export default function MaintenancePage() {
                         setNewRequest({ ...newRequest, priority: e.target.value })
                       }
                     >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
+                      <option value="low">Low — can wait</option>
+                      <option value="medium">Medium — soon</option>
+                      <option value="high">High — needs attention now</option>
                     </Select>
                   </FormField>
 
-                  <FormField label="Description" htmlFor="description" required>
+                  <FormField label="Details" htmlFor="description" required>
                     <Textarea
                       id="description"
                       required
@@ -642,14 +661,14 @@ export default function MaintenancePage() {
                           description: e.target.value,
                         })
                       }
-                      placeholder="Please provide detailed information about the issue, location, and any relevant details"
+                      placeholder="What happened, where it is, and anything else the office should know"
                     />
                   </FormField>
 
                   <FormField
-                    label="Photos of the issue"
+                    label="Photos"
                     htmlFor="maintenance-photos"
-                    hint={`Optional — up to ${MAX_PHOTOS} photos so the office can assess what needs fixing.`}
+                    hint={`Optional — up to ${MAX_PHOTOS} photos so the office can see the issue.`}
                   >
                     <div className="space-y-3">
                       <FileDropzone
@@ -671,6 +690,27 @@ export default function MaintenancePage() {
                           description="Allow camera access if prompted, then capture the issue."
                           fileNamePrefix="maintenance"
                         />
+                        <label
+                          className={cn(
+                            'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50',
+                            (isSubmitting || photos.length >= MAX_PHOTOS) &&
+                              'pointer-events-none opacity-50'
+                          )}
+                        >
+                          <Paperclip className="h-4 w-4" />
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/*"
+                            multiple
+                            className="hidden"
+                            disabled={isSubmitting || photos.length >= MAX_PHOTOS}
+                            onChange={(e) => {
+                              addPhotoFiles(Array.from(e.target.files || []));
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
                       </div>
                       {photos.length > 0 && (
                         <ul className="grid grid-cols-3 gap-2">
@@ -727,7 +767,7 @@ export default function MaintenancePage() {
                     isLoading={isSubmitting}
                     className={theme.primaryButton}
                   >
-                    Submit request
+                    Submit ticket
                   </Button>
                 </div>
               </form>

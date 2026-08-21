@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, ReactNode } from 'react';
+import { useEffect, useRef, useState, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +34,11 @@ export function Dialog({
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Lock scroll + Escape while open. Keep onClose in the listener without
   // re-running focus on every parent re-render (inline onClose identities change).
@@ -63,10 +69,10 @@ export function Dialog({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[110] overflow-hidden">
       <div
         className="absolute inset-0 lg:left-64 bg-gray-900/50"
         onClick={onClose}
@@ -111,6 +117,7 @@ export function Dialog({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import {
   deleteLeasePackageTemplate,
-  getLeasePackageTemplate,
+  getLeasePackageTemplateDetail,
   updateLeasePackageTemplate,
   type LeasePackagePenaltyType,
 } from '@/lib/api/lease-package-templates';
@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (error) return error;
 
     const { id } = await params;
-    const template = await getLeasePackageTemplate(id);
+    const template = await getLeasePackageTemplateDetail(id);
     if (!template) {
       return NextResponse.json(
         { success: false, error: 'Lease template not found' },
@@ -81,7 +81,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const status =
       message === 'Lease template not found'
         ? 404
-        : message.includes('required') || message.includes('negative')
+        : message.includes('required') ||
+            message.includes('negative') ||
+            message.includes('already exists')
           ? 400
           : 500;
     return NextResponse.json({ success: false, error: message }, { status });

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3030",
-    "build": "next build",
+    "build": "NODE_ENV=production next build",
     "start": "next start -p 3030",
     "lint": "next lint",
     "clean": "rm -rf .next && echo '✅ Cleared .next cache'",
@@ -14,6 +14,10 @@
     "seed:apartment2-tenants": "node scripts/seed-apartment2-tenants.mjs",
     "seed:apartment-ledgers": "node scripts/seed-apartment-ledgers.mjs",
     "seed:apartment-expenses": "node scripts/seed-apartment-expenses.mjs",
+    "verify:excel-ledger": "node scripts/verify-excel-ledger-sync.mjs",
+    "sync:excel-modules": "node scripts/sync-excel-ledger-modules.mjs",
+    "sync:apartment1-occupancy-history": "node scripts/sync-apartment1-occupancy-history.mjs",
+    "purge:tenants": "node scripts/purge-tenants.mjs",
     "test:occupancy": "node scripts/test-occupancy-reconcile.mjs"
   },
   "dependencies": {

@@ -1,18 +1,36 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, MoreVertical, Plus, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import {
+  AlertTriangle,
+  Building2,
+  Eye,
+  FileText,
+  Home,
+  MoreVertical,
+  Plus,
+  X,
+} from 'lucide-react';
+import {
+  Button,
+  ListSummaryCard,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCard,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { LeasePackageTemplate } from '@/lib/lease-package-templates-shared';
 import {
   formatAdvanceLabel,
   formatDepositLabel,
-  formatGraceLabel,
-  formatPenaltyFeeLabel,
-  formatPenaltyTypeLabel,
   formatTermLabel,
 } from '@/lib/lease-package-templates-shared';
 
@@ -31,6 +49,7 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
   const [blockedMessage, setBlockedMessage] = useState('');
   const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const toastShownRef = useRef(false);
 
   useEffect(() => {
     setTemplates(initialTemplates);
@@ -39,7 +58,8 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
   useEffect(() => {
     const created = searchParams.get('created') === '1';
     const updated = searchParams.get('updated') === '1';
-    if (!created && !updated) return;
+    if ((!created && !updated) || toastShownRef.current) return;
+    toastShownRef.current = true;
     if (created) {
       showNotification({
         type: 'success',
@@ -53,11 +73,8 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
         message: 'Changes applied to all tenants using the updated template.',
       });
     }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('created');
-    url.searchParams.delete('updated');
-    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
-  }, [searchParams, showNotification]);
+    router.replace('/admin/leasing', { scroll: false });
+  }, [searchParams, showNotification, router]);
 
   useEffect(() => {
     if (!menuId) return;
@@ -67,6 +84,12 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [menuId]);
+
+  const stats = useMemo(() => {
+    const units = templates.reduce((sum, t) => sum + (t.appliedUnitCount || 0), 0);
+    const buildings = templates.reduce((sum, t) => sum + (t.appliedBuildingCount || 0), 0);
+    return { templates: templates.length, units, buildings };
+  }, [templates]);
 
   const refresh = async () => {
     const res = await fetch('/api/lease-package-templates', { credentials: 'include' });
@@ -111,61 +134,87 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-white px-6 py-8 sm:px-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Leasing</h1>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Leasing"
+        description="Create lease packages and see which buildings and units they apply to."
+        actions={
           <Link href="/admin/leasing/new">
-            <Button className="h-11 rounded-lg bg-gray-900 px-4 text-sm font-semibold hover:bg-black">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Create Lease Template
-            </Button>
+            <Button leftIcon={<Plus className="h-4 w-4" />}>Create Lease Template</Button>
           </Link>
-        </div>
+        }
+      />
 
-        <div className="mt-8 overflow-hidden rounded-xl border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50/80 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-5 py-3.5">Template Name</th>
-                  <th className="px-5 py-3.5">Lease Term</th>
-                  <th className="px-5 py-3.5">Deposit Period</th>
-                  <th className="px-5 py-3.5">Advance Period</th>
-                  <th className="px-5 py-3.5">Grace Period</th>
-                  <th className="px-5 py-3.5">Penalty Type</th>
-                  <th className="px-5 py-3.5">Penalty Fee</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {templates.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-gray-500">
-                      No lease templates yet. Create one to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  templates.map((t) => (
-                    <tr key={t.id} className="hover:bg-gray-50/60">
-                      <td className="px-5 py-4 font-semibold text-gray-900">{t.name}</td>
-                      <td className="px-5 py-4 text-gray-700">{formatTermLabel(t.termMonths)}</td>
-                      <td className="px-5 py-4 text-gray-700">
-                        {formatDepositLabel(t.depositMonths)}
-                      </td>
-                      <td className="px-5 py-4 text-gray-700">
-                        {formatAdvanceLabel(t.advanceMonths)}
-                      </td>
-                      <td className="px-5 py-4 text-gray-700">
-                        {formatGraceLabel(t.gracePeriodDays)}
-                      </td>
-                      <td className="px-5 py-4 text-gray-700">
-                        {formatPenaltyTypeLabel(t.penaltyType)}
-                      </td>
-                      <td className="px-5 py-4 font-medium tabular-nums text-gray-900">
-                        {formatPenaltyFeeLabel(t.penaltyType, t.penaltyFee)}
-                      </td>
-                      <td className="relative px-5 py-4 text-right">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <ListSummaryCard
+          title="Templates"
+          value={stats.templates}
+          footer="active lease packages"
+          icon={<FileText className="h-8 w-8 text-gray-700" />}
+        />
+        <ListSummaryCard
+          title="Units applied"
+          value={stats.units}
+          footer="current leases using a template"
+          icon={<Home className="h-8 w-8 text-gray-700" />}
+        />
+        <ListSummaryCard
+          title="Buildings"
+          value={stats.buildings}
+          footer="properties with these packages"
+          icon={<Building2 className="h-8 w-8 text-gray-700" />}
+        />
+      </div>
+
+      <TableCard
+        title="Lease templates"
+        description="Preview terms and see assigned units from the View page."
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Template</TableHead>
+              <TableHead>Lease term</TableHead>
+              <TableHead>Deposit</TableHead>
+              <TableHead>Advance</TableHead>
+              <TableHead>Applied to</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {templates.length === 0 ? (
+              <TableEmpty colSpan={6}>
+                No lease templates yet. Create one to get started.
+              </TableEmpty>
+            ) : (
+              templates.map((t) => {
+                const units = t.appliedUnitCount || 0;
+                const buildings = t.appliedBuildingCount || 0;
+                return (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-semibold text-gray-900">{t.name}</TableCell>
+                    <TableCell>{formatTermLabel(t.termMonths)}</TableCell>
+                    <TableCell>{formatDepositLabel(t.depositMonths)}</TableCell>
+                    <TableCell>{formatAdvanceLabel(t.advanceMonths)}</TableCell>
+                    <TableCell className="text-gray-700">
+                      {units > 0
+                        ? `${units} ${units === 1 ? 'unit' : 'units'} · ${buildings} ${
+                            buildings === 1 ? 'building' : 'buildings'
+                          }`
+                        : 'Not assigned'}
+                    </TableCell>
+                    <TableCell className="relative text-right">
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <Link href={`/admin/leasing/${t.id}`}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<Eye className="h-3.5 w-3.5" />}
+                          >
+                            View
+                          </Button>
+                        </Link>
                         <button
                           type="button"
                           className="inline-flex rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
@@ -174,39 +223,46 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
                         >
                           <MoreVertical className="h-4 w-4" />
                         </button>
-                        {menuId === t.id && (
-                          <div
-                            ref={menuRef}
-                            className="absolute right-5 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                      </div>
+                      {menuId === t.id && (
+                        <div
+                          ref={menuRef}
+                          className="absolute right-6 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-left shadow-lg"
+                        >
+                          <Link
+                            href={`/admin/leasing/${t.id}`}
+                            className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                            onClick={() => setMenuId(null)}
                           >
-                            <Link
-                              href={`/admin/leasing/${t.id}/edit`}
-                              className="block px-3.5 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-50"
-                              onClick={() => setMenuId(null)}
-                            >
-                              Edit
-                            </Link>
-                            <button
-                              type="button"
-                              className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                              onClick={() => {
-                                setMenuId(null);
-                                setDeleteTarget(t);
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+                            View
+                          </Link>
+                          <Link
+                            href={`/admin/leasing/${t.id}/edit`}
+                            className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                            onClick={() => setMenuId(null)}
+                          >
+                            Edit
+                          </Link>
+                          <button
+                            type="button"
+                            className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              setMenuId(null);
+                              setDeleteTarget(t);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </TableCard>
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -233,7 +289,6 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 rounded-lg border-gray-300 px-4 font-semibold"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
               >
@@ -241,7 +296,7 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
               </Button>
               <Button
                 type="button"
-                className="h-10 rounded-lg bg-red-600 px-4 font-semibold text-white hover:bg-red-700"
+                variant="danger"
                 onClick={() => void confirmDelete()}
                 disabled={deleting}
               >
@@ -271,11 +326,7 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
             <h3 className="mt-4 text-lg font-bold text-gray-900">Unable to Delete</h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">{blockedMessage}</p>
             <div className="mt-6 flex justify-end">
-              <Button
-                type="button"
-                className="h-10 rounded-lg bg-red-600 px-4 font-semibold text-white hover:bg-red-700"
-                onClick={() => setBlockedOpen(false)}
-              >
+              <Button type="button" variant="danger" onClick={() => setBlockedOpen(false)}>
                 OK
               </Button>
             </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { requireRole } from '@/lib/api-auth';
 import { getInvoiceById, updateInvoice, deleteInvoice } from '@/lib/api/invoices';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 
@@ -16,11 +17,8 @@ function isValidInvoiceId(id: string): boolean {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { error } = await requireRole(['admin', 'staff', 'caretaker']);
+    if (error) return error;
 
     const { id } = await params;
     

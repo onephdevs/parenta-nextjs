@@ -28,7 +28,7 @@ export function PageHeader({
       {backHref && (
         <Link
           href={backHref}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 print:hidden"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           {backLabel}
@@ -39,7 +39,9 @@ export function PageHeader({
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">{title}</h1>
           {description && <p className="mt-1 text-sm text-gray-600">{description}</p>}
         </div>
-        {actions && <div className="mt-4 flex flex-shrink-0 gap-2 md:mt-0">{actions}</div>}
+        {actions && (
+          <div className="mt-4 flex flex-shrink-0 gap-2 md:mt-0">{actions}</div>
+        )}
       </div>
     </div>
   );

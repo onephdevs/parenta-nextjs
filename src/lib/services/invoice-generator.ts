@@ -549,34 +549,54 @@ export async function getUnpaidInvoicesForTenant(tenantId: string): Promise<Arra
   amountPaid: number;
   balanceDue: number;
   status: string;
+  typeLabel: string;
 }>> {
   try {
     const result = await pool.query(
       `SELECT 
-        id,
-        invoice_number,
-        due_date,
-        total_amount,
-        amount_paid,
-        balance_due,
-        invoice_status as status
-       FROM invoices
-       WHERE tenant_id = $1 
-       AND invoice_status IN ('sent', 'partial', 'overdue')
-       AND balance_due > 0
-       ORDER BY due_date ASC`,
+        i.id,
+        i.invoice_number,
+        i.due_date,
+        i.total_amount,
+        i.amount_paid,
+        i.balance_due,
+        i.invoice_status as status,
+        (
+          SELECT ili.item_type
+          FROM invoice_line_items ili
+          WHERE ili.invoice_id = i.id
+          ORDER BY ili.created_at ASC, ili.id ASC
+          LIMIT 1
+        ) AS primary_item_type
+       FROM invoices i
+       WHERE i.tenant_id = $1 
+       AND i.invoice_status IN ('draft', 'sent', 'issued', 'partial', 'overdue', 'due')
+       AND COALESCE(i.balance_due, i.total_amount - COALESCE(i.amount_paid, 0)) > 0.009
+       ORDER BY i.due_date ASC NULLS LAST, i.created_at ASC`,
       [tenantId]
     );
 
-    return result.rows.map(row => ({
-      id: row.id,
-      invoiceNumber: row.invoice_number,
-      dueDate: row.due_date,
-      totalAmount: parseFloat(row.total_amount),
-      amountPaid: parseFloat(row.amount_paid),
-      balanceDue: parseFloat(row.balance_due),
-      status: row.status
-    }));
+    return result.rows.map(row => {
+      const itemType = String(row.primary_item_type || 'rent').toLowerCase();
+      const typeLabel =
+        itemType.includes('util') || itemType === 'electricity' || itemType === 'water'
+          ? 'Utilities'
+          : itemType === 'deposit'
+            ? 'Deposit'
+            : itemType === 'late_fee' || itemType === 'penalty'
+              ? 'Penalty'
+              : 'Rent';
+      return {
+        id: row.id,
+        invoiceNumber: row.invoice_number,
+        dueDate: row.due_date,
+        totalAmount: parseFloat(row.total_amount),
+        amountPaid: parseFloat(row.amount_paid),
+        balanceDue: parseFloat(row.balance_due),
+        status: row.status,
+        typeLabel,
+      };
+    });
   } catch (error) {
     console.error('Error getting unpaid invoices:', error);
     throw error;

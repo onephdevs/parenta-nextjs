@@ -39,6 +39,7 @@ interface FeaturedProperty {
   imageUrl: string | null;
   latitude: number | null;
   longitude: number | null;
+  showOnLandingNearby?: boolean;
 }
 
 interface LandingPageClientProps {
@@ -507,16 +508,18 @@ export default function LandingPageClient({
       </section>
 
       <NearbyAmenitiesSection
-        properties={properties.map((p) => ({
-          id: p.id,
-          name: p.name,
-          city: p.city,
-          state: p.state,
-          address: p.address,
-          availableUnits: p.availableUnits,
-          latitude: p.latitude ?? null,
-          longitude: p.longitude ?? null,
-        }))}
+        properties={properties
+          .filter((p) => p.showOnLandingNearby !== false)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            city: p.city,
+            state: p.state,
+            address: p.address,
+            availableUnits: p.availableUnits,
+            latitude: p.latitude ?? null,
+            longitude: p.longitude ?? null,
+          }))}
       />
 
       <section id="reviews" className="bg-white px-4 py-20 sm:px-6 lg:px-8">

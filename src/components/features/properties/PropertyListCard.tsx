@@ -3,6 +3,7 @@
 import { Building2, Home, Users } from 'lucide-react';
 import { getImageUrl } from '@/lib/format/image-url';
 import { cn } from '@/lib/utils';
+import HomeTraceLoader from '@/components/ui/HomeTraceLoader';
 import type { PropertyListBuilding } from '@/lib/api/properties';
 import type { PropertyRoomDetail } from '@/lib/api/properties';
 import {
@@ -136,7 +137,9 @@ export default function PropertyListCard({
       {isExpanded && (
         <div className="border-t border-gray-100 bg-white">
           {roomsLoading && (
-            <p className="py-3 text-center text-xs text-gray-500">Loading rooms…</p>
+            <div className="flex items-center justify-center py-4" role="status" aria-label="Loading">
+              <HomeTraceLoader size={36} />
+            </div>
           )}
           {!roomsLoading && rooms && rooms.length === 0 && (
             <p className="py-3 text-center text-xs text-gray-500">No rooms yet</p>

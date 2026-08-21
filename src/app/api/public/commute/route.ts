@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import pool from '@/lib/db';
 import { ensureBuildingCoordinates } from '@/lib/maps/geocode';
 import { estimateCommute } from '@/lib/maps/commute';
 
@@ -24,6 +25,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'workplace address is required' },
         { status: 400 }
+      );
+    }
+
+    const visibility = await pool.query<{ show_on_landing_nearby: boolean }>(
+      `
+      SELECT COALESCE(show_on_landing_nearby, true) AS show_on_landing_nearby
+      FROM buildings
+      WHERE id = $1 AND is_active = true
+      LIMIT 1
+      `,
+      [buildingId]
+    );
+    if (
+      visibility.rows.length === 0 ||
+      visibility.rows[0].show_on_landing_nearby === false
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Property is not available on the nearby map' },
+        { status: 404 }
       );
     }
 

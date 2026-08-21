@@ -650,6 +650,21 @@ export default function TenantAssignmentManager({
                     <div className="mt-1 font-medium text-gray-900">
                       ₱{parseFloat(String(assignment.monthly_rate || 0)).toLocaleString()}/month
                     </div>
+                    {(Number(assignment.deposit_paid || 0) > 0 ||
+                      Number(assignment.advance_paid || 0) > 0 ||
+                      Number(assignment.utility_deposit_paid || 0) > 0) && (
+                      <div className="mt-1 text-sm text-gray-600">
+                        Total deposited: ₱
+                        {(
+                          Number(assignment.deposit_paid || 0) +
+                          Number(assignment.advance_paid || 0) +
+                          Number(assignment.utility_deposit_paid || 0)
+                        ).toLocaleString()}
+                        {Number(assignment.utility_deposit_paid || 0) > 0
+                          ? ` · Utility ₱${Number(assignment.utility_deposit_paid).toLocaleString()}`
+                          : ''}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

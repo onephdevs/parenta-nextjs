@@ -1,8 +1,19 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { StickyNote, UserPlus, Wallet, Wrench } from 'lucide-react';
 import type { RoomPageDetail } from '@/lib/api/properties';
 import AppLoader from '@/components/ui/AppLoader';
-import RoomDetailsContent from './RoomDetailsContent';
+import { Button } from '@/components/ui/Button';
+import TenantForm from '@/components/features/TenantForm';
+import PaymentForm from '@/components/features/PaymentForm';
+import CreateMaintenanceRequestModal from '@/components/features/CreateMaintenanceRequestModal';
+import { AddNotesButton } from '@/components/features/notes/EntityNotesModal';
+import RoomHeroCard from './RoomHeroCard';
+import RoomDetailsContent, { formatUnitLabel } from './RoomDetailsContent';
+
+const LATO = 'var(--font-lato), Lato, sans-serif';
 
 interface RoomDetailPaneProps {
   detail: RoomPageDetail | null;
@@ -17,8 +28,24 @@ export default function RoomDetailPane({
   error,
   onDocumentsChanged,
 }: RoomDetailPaneProps) {
+  const [addTenantOpen, setAddTenantOpen] = useState(false);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+
+  useEffect(() => {
+    setAddTenantOpen(false);
+    setRecordPaymentOpen(false);
+    setMaintenanceOpen(false);
+    setNotesRefreshKey(0);
+  }, [detail?.room.id]);
+
+  const refresh = () => {
+    onDocumentsChanged?.();
+  };
+
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-[#E2E5F7]">
+    <section className="flex min-h-0 flex-1 flex-col bg-[#E2E5F7]" style={{ fontFamily: LATO }}>
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {loading && (
           <AppLoader
@@ -45,10 +72,99 @@ export default function RoomDetailPane({
         )}
 
         {!loading && detail && (
-          <div className="mx-auto max-w-[920px]">
+          <div className="mx-auto max-w-[880px] space-y-8">
+            <RoomHeroCard detail={detail} notesRefreshKey={notesRefreshKey} />
+
+            <div className="flex flex-wrap items-center gap-2">
+              {detail.room.tenant ? (
+                <Button
+                  type="button"
+                  leftIcon={<Wallet className="h-4 w-4" />}
+                  onClick={() => setRecordPaymentOpen(true)}
+                >
+                  Record Payment
+                </Button>
+              ) : (
+                <Link href="/admin/financial/payments/new">
+                  <Button leftIcon={<Wallet className="h-4 w-4" />}>Record Payment</Button>
+                </Link>
+              )}
+              <AddNotesButton
+                entityType="room"
+                entityId={detail.room.id}
+                entityLabel={formatUnitLabel(detail.room.roomNumber)}
+                label="Add note"
+                variant="outline"
+                size="md"
+                leftIcon={<StickyNote className="h-4 w-4" />}
+                onSaved={() => {
+                  setNotesRefreshKey((k) => k + 1);
+                  refresh();
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                leftIcon={<UserPlus className="h-4 w-4" />}
+                onClick={() => setAddTenantOpen(true)}
+                isDisabled={Boolean(detail.room.tenant)}
+              >
+                Add Tenant
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                leftIcon={<Wrench className="h-4 w-4" />}
+                onClick={() => setMaintenanceOpen(true)}
+              >
+                Maintenance
+              </Button>
+            </div>
+
             <RoomDetailsContent
               detail={detail}
-              onDocumentsChanged={onDocumentsChanged}
+              onDocumentsChanged={refresh}
+              onTenantCreated={refresh}
+            />
+
+            <TenantForm
+              mode="modal"
+              isOpen={addTenantOpen}
+              initialBuildingId={detail.building.id}
+              initialRoomId={detail.room.id}
+              lockHousing
+              redirectAfterCreate={false}
+              onClose={() => setAddTenantOpen(false)}
+              onCreated={() => {
+                setAddTenantOpen(false);
+                refresh();
+              }}
+            />
+
+            <PaymentForm
+              mode="modal"
+              isOpen={recordPaymentOpen}
+              buildingId={detail.building.id}
+              initialData={
+                detail.room.tenant ? { tenantId: detail.room.tenant.tenantId } : undefined
+              }
+              onCancel={() => setRecordPaymentOpen(false)}
+              onSuccess={() => {
+                setRecordPaymentOpen(false);
+                refresh();
+              }}
+            />
+
+            <CreateMaintenanceRequestModal
+              isOpen={maintenanceOpen}
+              buildingId={detail.building.id}
+              buildingName={detail.building.name}
+              rooms={[{ id: detail.room.id, roomNumber: detail.room.roomNumber }]}
+              onClose={() => setMaintenanceOpen(false)}
+              onCreated={() => {
+                setMaintenanceOpen(false);
+                refresh();
+              }}
             />
           </div>
         )}

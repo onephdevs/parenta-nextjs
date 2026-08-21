@@ -17,6 +17,7 @@ import {
   notifyTenantMaintenanceChange,
 } from '@/lib/api/maintenance-updates';
 import { ensureMaintenancePipelineCard } from '@/lib/api/pipeline';
+import { maintenanceStatusAfterOfficeReply } from '@/lib/constants/maintenance';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -104,22 +105,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       'Staff';
     const authorRole = session.user.role === 'staff' ? 'staff' : 'admin';
 
-    const statusChanged =
-      status !== undefined && String(existing.status) !== status;
+    const effectiveStatus = maintenanceStatusAfterOfficeReply(
+      String(existing.status || 'open'),
+      status
+    );
+    const statusChanged = String(existing.status || '') !== effectiveStatus;
 
     const resolvedCompletedDate =
       completedDate !== undefined
         ? completedDate
-        : status === 'completed' && !existing.completed_date
+        : effectiveStatus === 'completed' && !existing.completed_date
           ? new Date().toISOString().slice(0, 10)
           : undefined;
 
     // Persist all request fields in the same action as the conversation post.
     const fieldResult = await updateMaintenanceRequest({
       id,
-      ...(status !== undefined && status
-        ? { status }
-        : {}),
+      status: effectiveStatus,
       ...(priority !== undefined && priority
         ? { priority }
         : {}),
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             : existing.description != null
               ? String(existing.description)
               : null,
-        status: updated.status != null ? String(updated.status) : status,
+        status: updated.status != null ? String(updated.status) : effectiveStatus,
         priority:
           updated.priority != null ? String(updated.priority) : priority,
         category:
@@ -167,8 +169,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const noteParts: string[] = [];
-    if (statusChanged && status) {
-      noteParts.push(`Status set to ${status}`);
+    if (statusChanged) {
+      noteParts.push(`Status set to ${effectiveStatus}`);
     }
     if (body) noteParts.push(body);
 
@@ -194,7 +196,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       tenantUserId: notify.userId,
       afterData: {
         body: update.body,
-        status: status || existing.status,
+        status: effectiveStatus,
         assignedTo:
           assignedTo !== undefined ? assignedTo : existing.assigned_to,
         hasPhoto: Boolean(update.photoUrl),

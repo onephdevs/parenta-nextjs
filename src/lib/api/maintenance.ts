@@ -1,4 +1,6 @@
 import pool from '../db';
+import { getImageUrl } from '@/lib/format/image-url';
+import { fillTenantAvatarUrls } from '@/lib/api/user-profile-extras';
 
 export interface MaintenanceFilters {
   status?: string | null;
@@ -77,6 +79,8 @@ export async function listMaintenanceRequests(
       t.first_name || ' ' || t.last_name as tenant_name,
       t.email as tenant_email,
       t.phone as tenant_phone,
+      t.user_id as tenant_user_id,
+      t.profile_picture_url as tenant_avatar_url,
       r.room_number,
       b.name as building_name,
       COALESCE(
@@ -150,8 +154,17 @@ export async function listMaintenanceRequests(
     attachmentCount: (attachmentMap.get(String(r.id)) || []).length,
   }));
 
+  const withAvatars = await fillTenantAvatarUrls(withAttachments);
+  const requestsOut = withAvatars.map((row) => {
+    const url = String(row.tenant_avatar_url || '').trim();
+    return {
+      ...row,
+      tenant_avatar_url: url ? getImageUrl(url) : null,
+    };
+  });
+
   return {
-    requests: withAttachments,
+    requests: requestsOut,
     stats: calculateMaintenanceStats(requests),
   };
 }
@@ -228,6 +241,8 @@ export async function getMaintenanceRequestDetail(
        t.first_name || ' ' || t.last_name AS tenant_name,
        t.email AS tenant_email,
        t.phone AS tenant_phone,
+       t.user_id AS tenant_user_id,
+       t.profile_picture_url AS tenant_avatar_url,
        r.room_number,
        b.name AS building_name,
        NULLIF(TRIM(CONCAT_WS(' ', au.first_name, au.last_name)), '') AS assigned_to_name
@@ -255,11 +270,18 @@ export async function getMaintenanceRequestDetail(
   const attachments = attachmentMap.get(id) || [];
   const updates = await listMaintenanceUpdates(id, viewerUserId);
 
+  const [withAvatar] = await fillTenantAvatarUrls([
+    {
+      ...result.rows[0],
+      attachments,
+      attachmentCount: attachments.length,
+      updates,
+    },
+  ]);
+  const url = String(withAvatar.tenant_avatar_url || '').trim();
   return {
-    ...result.rows[0],
-    attachments,
-    attachmentCount: attachments.length,
-    updates,
+    ...withAvatar,
+    tenant_avatar_url: url ? getImageUrl(url) : null,
   };
 }
 

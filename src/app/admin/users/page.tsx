@@ -13,6 +13,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { RouteLoadingFallback, useRouteReady } from '@/components/layout/route-loader';
 import {
   AppLoader,
   Button,
@@ -150,7 +151,14 @@ export default function AdminUsersPage() {
   const safePage = Math.min(currentPage, totalPages);
   const pageUsers = filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  if (status === 'loading' || (status === 'authenticated' && isLoading && users.length === 0)) {
+  const pageReady = !(
+    status === 'loading' ||
+    (status === 'authenticated' && isLoading && users.length === 0)
+  );
+  const { covering } = useRouteReady(pageReady);
+
+  if (!pageReady) {
+    if (covering) return <RouteLoadingFallback className="min-h-[50vh]" />;
     return <AppLoader variant="inline" className="min-h-[50vh]" />;
   }
 

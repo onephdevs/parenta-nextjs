@@ -188,7 +188,7 @@ export default function TenantCompleteProfileGate() {
             label="Username"
             htmlFor="username"
             required
-            hint="You can keep the current username or choose a new one."
+            hint="You can keep signing in with this username or with your email."
           >
             <Input
               id="username"

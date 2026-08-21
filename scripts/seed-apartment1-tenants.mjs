@@ -65,6 +65,16 @@ function rentForRoom(roomNumber) {
   return /^store$/i.test(roomNumber) ? STORE_RENT : UNIT_RENT;
 }
 
+/** Move-in dates from Apt 1 Start & End Date draft. Occupied units only. */
+const MOVE_IN = {
+  'Unit 1': '2026-02-15',
+  'Unit 2': '2023-11-08',
+  'Unit 3': '2026-07-13',
+  'Unit 4': '2026-04-28',
+  'Unit 6': '2023-12-07',
+  'Unit 7': '2023-05-22',
+};
+
 const url = (process.env.DIRECT_URL || process.env.DATABASE_URL || '').replace(
   /[?&]pgbouncer=true/g,
   ''
@@ -161,11 +171,11 @@ try {
       const tenantRes = await client.query(
         `INSERT INTO tenants (
            user_id, first_name, last_name, email, phone,
-           tenant_status, is_active, notes
+           tenant_status, is_active, notes, move_in_date, lease_start_date
          )
-         VALUES ($1, $2, $3, NULL, NULL, 'active', true, NULL)
+         VALUES ($1, $2, $3, NULL, NULL, 'active', true, NULL, $4::date, $4::date)
          RETURNING id`,
-        [userId, 'Tenant', roomNumber]
+        [userId, 'Tenant', roomNumber, MOVE_IN[roomNumber] || null]
       );
       const tenantId = tenantRes.rows[0].id;
 
@@ -174,8 +184,8 @@ try {
            tenant_id, room_id, start_date, monthly_rate, deposit_paid, notes,
            assignment_status, tenant_name_snapshot
          )
-         VALUES ($1, $2, CURRENT_DATE, $3, 0, NULL, 'active', $4)`,
-        [tenantId, room.id, rent, `Tenant ${roomNumber}`]
+         VALUES ($1, $2, COALESCE($3::date, CURRENT_DATE), $4, 0, NULL, 'active', $5)`,
+        [tenantId, room.id, MOVE_IN[roomNumber] || null, rent, `Tenant ${roomNumber}`]
       );
 
       await client.query(

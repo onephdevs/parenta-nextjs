@@ -47,8 +47,13 @@ function isTransientDbError(error: unknown): boolean {
     code === '08003' ||
     /connection terminated/i.test(message) ||
     /Client has encountered a connection error/i.test(message) ||
-    /timeout exceeded when trying to connect/i.test(message)
+    /timeout exceeded when trying to connect/i.test(message) ||
+    /Cannot use a pool after calling end/i.test(message)
   );
+}
+
+function isPoolEnded(p: Pool | undefined): boolean {
+  return Boolean(p && (p as Pool & { ended?: boolean }).ended);
 }
 
 function attachPoolGuards(p: Pool): Pool {
@@ -66,12 +71,20 @@ function attachPoolGuards(p: Pool): Pool {
     const result = (originalQuery as (...a: unknown[]) => unknown)(...args);
     if (result && typeof (result as Promise<unknown>).then === 'function') {
       return (result as Promise<unknown>).catch(async (error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : String((error as { message?: string })?.message || '');
+        if (/Cannot use a pool after calling end/i.test(message)) {
+          console.warn('[db] pool was ended; retrying on a fresh pool');
+          const live = getLivePool();
+          return (live.query as Pool['query']).apply(live, args as never);
+        }
         if (!isTransientDbError(error)) throw error;
         console.warn(
           '[db] transient connection error, retrying once:',
           (error as { code?: string; message?: string }).code ||
             (error as Error).message
         );
+        await new Promise((resolve) => setTimeout(resolve, 750));
         return (originalQuery as (...a: unknown[]) => unknown)(...args);
       });
     }
@@ -81,7 +94,7 @@ function attachPoolGuards(p: Pool): Pool {
   return p;
 }
 
-const POOL_GUARD_VERSION = 1;
+const POOL_GUARD_VERSION = 3;
 
 const globalForPg = globalThis as typeof globalThis & {
   __parentaPgPool?: Pool;
@@ -104,19 +117,33 @@ function createPool(): Pool {
   );
 }
 
-if (
-  !globalForPg.__parentaPgPool ||
-  globalForPg.__parentaPgPoolGuardVersion !== POOL_GUARD_VERSION
-) {
-  const previous = globalForPg.__parentaPgPool;
-  if (previous) {
-    void previous.end().catch(() => undefined);
+function getLivePool(): Pool {
+  const existing = globalForPg.__parentaPgPool;
+  if (existing && !isPoolEnded(existing)) {
+    globalForPg.__parentaPgPoolGuardVersion = POOL_GUARD_VERSION;
+    return existing;
   }
-  globalForPg.__parentaPgPool = createPool();
+  // Never end() a live pool on HMR — in-flight queries still hold that instance.
+  const next = createPool();
+  globalForPg.__parentaPgPool = next;
   globalForPg.__parentaPgPoolGuardVersion = POOL_GUARD_VERSION;
+  return next;
 }
 
-const pool = globalForPg.__parentaPgPool;
+/**
+ * Always resolve the current singleton. A Proxy so HMR'd modules that imported
+ * `pool` once still hit a live pool after a previous instance was replaced.
+ */
+const pool = new Proxy({} as Pool, {
+  get(_target, prop) {
+    const live = getLivePool();
+    const value = Reflect.get(live, prop, live) as unknown;
+    if (typeof value === 'function') {
+      return (value as (...args: unknown[]) => unknown).bind(live);
+    }
+    return value;
+  },
+}) as Pool;
 
 // Convert database user to app user format
 function mapDatabaseUserToUser(dbUser: DatabaseUser): User {
@@ -222,6 +249,8 @@ export async function findUserById(id: string): Promise<User | null> {
 
 /**
  * Verify password using email OR username as the login identifier.
+ * Setting a username does not disable email login — both stay valid.
+ * Also accepts the email on the linked tenant profile.
  * When role is omitted, any active account matching the identifier is accepted.
  */
 export async function verifyPassword(
@@ -232,37 +261,37 @@ export async function verifyPassword(
   const identifier = String(loginId || '').trim();
   if (!identifier) return null;
 
-  const query = role
-    ? `
-    SELECT * FROM users 
-    WHERE role = $2
-      AND is_active = true
+  const result = await pool.query(
+    `
+    SELECT u.*
+    FROM users u
+    LEFT JOIN tenants t
+      ON t.user_id = u.id
+     AND t.is_active = true
+    WHERE u.is_active = true
       AND (
-        (email IS NOT NULL AND lower(email) = lower($1))
-        OR (username IS NOT NULL AND lower(username) = lower($1))
+        (u.email IS NOT NULL AND lower(u.email) = lower($1))
+        OR (u.username IS NOT NULL AND lower(u.username) = lower($1))
+        OR (t.email IS NOT NULL AND lower(t.email) = lower($1))
       )
+      AND ($2::text IS NULL OR u.role = $2)
+    ORDER BY
+      CASE
+        WHEN u.email IS NOT NULL AND lower(u.email) = lower($1) THEN 0
+        WHEN t.email IS NOT NULL AND lower(t.email) = lower($1) THEN 1
+        ELSE 2
+      END,
+      CASE u.role
+        WHEN 'admin' THEN 0
+        WHEN 'caretaker' THEN 1
+        WHEN 'staff' THEN 2
+        WHEN 'tenant' THEN 3
+        ELSE 4
+      END
     LIMIT 1
-  `
-    : `
-    SELECT * FROM users 
-    WHERE is_active = true
-      AND (
-        (email IS NOT NULL AND lower(email) = lower($1))
-        OR (username IS NOT NULL AND lower(username) = lower($1))
-      )
-    ORDER BY CASE role
-      WHEN 'admin' THEN 0
-      WHEN 'caretaker' THEN 1
-      WHEN 'staff' THEN 2
-      WHEN 'tenant' THEN 3
-      ELSE 4
-    END
-    LIMIT 1
-  `;
-
-  const result = role
-    ? await pool.query(query, [identifier, role])
-    : await pool.query(query, [identifier]);
+    `,
+    [identifier, role || null]
+  );
 
   if (result.rows.length === 0) {
     return null;
@@ -311,6 +340,6 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-export { pool };
+export { pool, isTransientDbError };
 export default pool;
  

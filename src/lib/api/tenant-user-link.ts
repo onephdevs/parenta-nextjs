@@ -351,7 +351,7 @@ export async function getTenantByUserId(userId: string) {
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
     console.error('Error fetching tenant by user ID:', error);
-    throw new Error(`Failed to fetch tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 }
 

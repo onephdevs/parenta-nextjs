@@ -6,6 +6,7 @@ import AddRoomModal from '@/components/features/AddRoomModal';
 import TenantForm from '@/components/features/TenantForm';
 import PaymentForm from '@/components/features/PaymentForm';
 import CreateMaintenanceRequestModal from '@/components/features/CreateMaintenanceRequestModal';
+import AppLoader from '@/components/ui/AppLoader';
 import MainPropertyCard from './MainPropertyCard';
 import PropertyRoomCard from './PropertyRoomCard';
 import PropertyReportPanel from './PropertyReportPanel';
@@ -66,9 +67,12 @@ export default function PropertyDetailPane({
     <section className="flex min-h-0 flex-1 flex-col bg-[#E2E5F7]" style={{ fontFamily: LATO }}>
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {loading && (
-          <div className="flex h-48 items-center justify-center text-sm text-gray-500">
-            Loading property…
-          </div>
+          <AppLoader
+            variant="inline"
+            label="Loading…"
+            size={96}
+            className="min-h-[50vh] bg-transparent"
+          />
         )}
 
         {!loading && error && (
@@ -142,6 +146,7 @@ export default function PropertyDetailPane({
               isOpen={addTenantOpen}
               initialBuildingId={detail.building.id}
               lockHousing={false}
+              redirectAfterCreate={false}
               onClose={() => setAddTenantOpen(false)}
               onCreated={() => {
                 setAddTenantOpen(false);

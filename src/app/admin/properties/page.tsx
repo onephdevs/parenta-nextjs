@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { getBuildingsForPropertiesPage } from '@/lib/api/properties';
 import PropertiesMasterDetail from '@/components/features/properties/PropertiesMasterDetail';
 import { Alert } from '@/components/ui/Alert';
+import AppLoader from '@/components/ui/AppLoader';
 
 export const revalidate = 60;
 
@@ -34,9 +35,11 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
   return (
     <Suspense
       fallback={
-        <div className="flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-gray-500">
-          Loading properties…
-        </div>
+        <AppLoader
+          variant="inline"
+          label="Loading…"
+          className="h-[calc(100vh-4rem)]"
+        />
       }
     >
       <PropertiesMasterDetail

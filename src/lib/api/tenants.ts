@@ -1,5 +1,65 @@
 import pool from '@/lib/db';
 
+async function applyPortalAvatarFallback<
+  T extends { userId?: string; email?: string; profilePictureUrl?: string | null },
+>(tenants: T[]): Promise<T[]> {
+  const missing = tenants.filter((tenant) => !tenant.profilePictureUrl);
+  if (missing.length === 0) return tenants;
+
+  const userIds = new Set(
+    missing.map((tenant) => tenant.userId).filter((id): id is string => Boolean(id))
+  );
+  const emails = [
+    ...new Set(
+      missing
+        .filter((tenant) => !tenant.userId && tenant.email)
+        .map((tenant) => String(tenant.email).toLowerCase())
+    ),
+  ];
+
+  const emailToUserId = new Map<string, string>();
+  if (emails.length > 0) {
+    const users = await pool.query<{ id: string; email: string | null }>(
+      `SELECT id, email FROM users WHERE email IS NOT NULL AND lower(email) = ANY($1::text[])`,
+      [emails]
+    );
+    for (const user of users.rows) {
+      if (!user.email) continue;
+      emailToUserId.set(user.email.toLowerCase(), String(user.id));
+      userIds.add(String(user.id));
+    }
+  }
+
+  if (userIds.size === 0) return tenants;
+
+  const keys = [...userIds].map((id) => `user_profile:${id}`);
+  const result = await pool.query<{ key: string; value: string }>(
+    `SELECT key, value FROM app_settings WHERE key = ANY($1::text[])`,
+    [keys]
+  );
+  const avatars = new Map<string, string>();
+  for (const row of result.rows) {
+    try {
+      const extras = JSON.parse(row.value) as { avatarUrl?: string };
+      const url = String(extras.avatarUrl || '').trim();
+      if (!url) continue;
+      avatars.set(row.key.replace(/^user_profile:/, ''), url);
+    } catch {
+      /* ignore malformed extras */
+    }
+  }
+  if (avatars.size === 0) return tenants;
+
+  return tenants.map((tenant) => {
+    if (tenant.profilePictureUrl) return tenant;
+    const userId =
+      tenant.userId ||
+      (tenant.email ? emailToUserId.get(String(tenant.email).toLowerCase()) : undefined);
+    const fallback = userId ? avatars.get(userId) : undefined;
+    return fallback ? { ...tenant, profilePictureUrl: fallback } : tenant;
+  });
+}
+
 export interface Tenant {
   id: string;
   firstName: string;
@@ -24,6 +84,8 @@ export interface Tenant {
   leaseEndDate?: Date;
   notes?: string;
   profilePictureUrl?: string | null;
+  userId?: string;
+  isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +146,8 @@ export async function getAllTenants(options?: {
   limit?: number;
   search?: string;
   status?: string;
+  buildingId?: string;
+  roomId?: string;
 }): Promise<PaginatedTenantsResponse> {
   try {
     const page = options?.page || 1;
@@ -119,8 +183,24 @@ export async function getAllTenants(options?: {
       values.push(`%${options.search}%`);
     }
 
-    // Get total count — join rooms/buildings when search may reference them
-    const needsPropertyJoin = Boolean(options?.search);
+    if (options?.buildingId) {
+      paramCount++;
+      whereClause += whereClause ? ' AND' : ' WHERE';
+      whereClause += ` b.id = $${paramCount}`;
+      values.push(options.buildingId);
+    }
+
+    if (options?.roomId) {
+      paramCount++;
+      whereClause += whereClause ? ' AND' : ' WHERE';
+      whereClause += ` r.id = $${paramCount}`;
+      values.push(options.roomId);
+    }
+
+    // Join rooms/buildings when search or housing filters need them
+    const needsPropertyJoin = Boolean(
+      options?.search || options?.buildingId || options?.roomId
+    );
     const countFrom = needsPropertyJoin
       ? ` FROM tenants t
       LEFT JOIN tenant_room_assignments tra ON t.id = tra.tenant_id
@@ -161,7 +241,7 @@ export async function getAllTenants(options?: {
     
     values.push(limit, offset);
     const result = await pool.query(query, values);
-    const tenants = result.rows.map(mapRowToTenant);
+    const tenants = await applyPortalAvatarFallback(result.rows.map(mapRowToTenant));
 
     const totalPages = Math.ceil(total / limit);
 
@@ -222,7 +302,7 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
     }
 
     const row = tenantResult.rows[0];
-    const tenant = mapRowToTenant(row);
+    const [tenant] = await applyPortalAvatarFallback([mapRowToTenant(row)]);
 
     // Get current assignment
     const currentAssignmentQuery = `
@@ -372,6 +452,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
 } {
   return {
     id: row.id as string,
+    userId: row.user_id ? String(row.user_id) : undefined,
     firstName: (row.first_name as string) || '',
     lastName: (row.last_name as string) || '',
     email: (row.email as string) || '',
@@ -379,6 +460,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
     dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth as string) : undefined,
     tenantStatus: row.tenant_status as 'active' | 'pending' | 'inactive' | 'terminated',
     isTenant: Boolean(row.is_tenant),
+    isActive: row.is_active !== false,
     moveInDate: row.move_in_date ? new Date(row.move_in_date as string) : undefined,
     moveOutDate: row.move_out_date ? new Date(row.move_out_date as string) : undefined,
     previousAddress: row.previous_address as string,
@@ -392,7 +474,7 @@ function mapRowToTenant(row: Record<string, unknown>): Tenant & {
     leaseStartDate: row.lease_start_date ? new Date(row.lease_start_date as string) : undefined,
     leaseEndDate: row.lease_end_date ? new Date(row.lease_end_date as string) : undefined,
     notes: row.notes as string,
-    profilePictureUrl: row.profile_picture_url as string | null | undefined,
+    profilePictureUrl: (row.profile_picture_url as string | null | undefined) || null,
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
     // Add current monthly rent from active assignment

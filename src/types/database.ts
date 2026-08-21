@@ -25,6 +25,8 @@ export interface Building {
   isActive: boolean;
   /** When false, skip automatic late fees; use negotiated due-date workflow. */
   autoLateFee: boolean;
+  /** When false, hide from landing-page nearby / commute property picker. */
+  showOnLandingNearby: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +49,7 @@ export interface DatabaseBuilding {
   amenities: string[];
   is_active: boolean;
   auto_late_fee?: boolean;
+  show_on_landing_nearby?: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -124,6 +127,7 @@ export interface Tenant {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  profilePictureUrl?: string | null;
   /** Present on list queries with active assignment join */
   currentMonthlyRent?: number;
   currentRoomId?: string;
@@ -710,6 +714,7 @@ export interface CreateBuildingData {
   totalFloors?: number;
   amenities?: string;
   autoLateFee?: boolean;
+  showOnLandingNearby?: boolean;
 }
 
 export interface CreateRoomData {

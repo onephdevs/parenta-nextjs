@@ -21,6 +21,8 @@ interface AdminLayoutClientProps {
 
 function defaultUuidLabel(parent: string | undefined): string {
   switch (parent) {
+    case 'leasing':
+      return 'Template';
     case 'lease-management':
       return 'Lease';
     case 'tenants':
@@ -148,6 +150,16 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
         return;
       }
 
+      if (parent === 'leasing') {
+        fetch(`/api/lease-package-templates/${segment}`, { credentials: 'include' })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.success && data?.data?.name) applyLabel(data.data.name);
+          })
+          .catch(() => {});
+        return;
+      }
+
       if (parent === 'utility-bills') {
         fetch(`/api/utility-bills/room?id=${segment}`, { credentials: 'include' })
           .then((res) => (res.ok ? res.json() : null))
@@ -189,10 +201,10 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 print:block print:h-auto print:overflow-visible">
       {/* Desktop Sidebar — collapses to icon rail, never fully hidden */}
       <div
-        className={`relative z-[60] hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${
+        className={`relative z-[60] hidden print:hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ${
           sidebarOpen ? 'lg:w-64' : 'lg:w-16'
         }`}
       >
@@ -205,10 +217,10 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
       {mobileMenuOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-gray-900 bg-opacity-50 lg:hidden"
+            className="fixed inset-0 z-40 bg-gray-900 bg-opacity-50 print:hidden lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-black shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out">
+          <div className="fixed inset-y-0 left-0 z-50 w-64 bg-black shadow-xl print:hidden lg:hidden transform transition-transform duration-300 ease-in-out">
             <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
               <span className="text-lg font-bold text-white">Menu</span>
               <button
@@ -224,8 +236,8 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
       )}
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="relative z-40 flex-shrink-0 border-b border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col flex-1 overflow-hidden print:block print:overflow-visible">
+        <header className="relative z-40 flex-shrink-0 border-b border-gray-200 bg-white shadow-sm print:hidden">
           <div className="flex items-center justify-between h-16 px-4 lg:px-6">
             <div className="flex min-w-0 flex-1 items-center space-x-2">
               <button
@@ -351,7 +363,10 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
           </div>
         </header>
 
-        <main data-app-main className="relative flex-1 overflow-y-auto bg-gray-50">
+        <main
+          data-app-main
+          className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 print:overflow-visible print:bg-white"
+        >
           {children}
         </main>
       </div>

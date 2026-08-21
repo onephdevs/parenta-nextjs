@@ -7,6 +7,9 @@ import {
   FileText,
   Home,
   MapPin,
+  Paperclip,
+  Phone,
+  Mail,
   User,
   Users,
   Wallet,
@@ -15,6 +18,7 @@ import {
 import type {
   PropertyRoomAsset,
   PropertyRoomDocument,
+  PropertyRoomTenant,
   RoomPageDetail,
 } from '@/lib/api/properties';
 import { getImageUrl } from '@/lib/format/image-url';
@@ -23,16 +27,19 @@ import { Button } from '@/components/ui/Button';
 import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 import {
   displayStatusLabel,
+  formatArea,
   formatBuildingAddress,
   formatShortDate,
+  getRoomTypeStats,
   googleMapsUrl,
   toDisplayRoomStatus,
 } from '@/components/features/properties/property-utils';
+import { formatAmenityLabel } from '@/lib/format/amenities';
 import { useNotifications } from '@/hooks/useNotifications';
 import { MAX_FILE_SIZE, SUPPORTED_FILE_TYPES } from '@/types/document';
 import TenantProfileModal from '@/components/features/tenants/TenantProfileModal';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
-import { AddNotesButton, EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
+import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import RoomShowcaseGallery from '@/components/features/rooms/RoomShowcaseGallery';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
@@ -89,6 +96,21 @@ function Field({
       </p>
     </div>
   );
+}
+
+function InlineStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+        {label}
+      </span>
+      <span className="text-sm font-semibold text-gray-900">{value}</span>
+    </span>
+  );
+}
+
+function hasValue(value?: string | null) {
+  return Boolean(value && value.trim() && value.trim() !== '—');
 }
 
 function isApplianceType(type: string) {
@@ -183,6 +205,12 @@ export default function RoomDetailsContent({
     0;
   const advance = tenant?.advancePaid ?? 0;
   const utilityDeposit = tenant?.utilityDepositPaid ?? 0;
+  const history = detail.assignmentHistory || [];
+  const showPayments = !isModal || Boolean(tenant);
+  const showHistory = !isModal || history.length > 0;
+  const { bedroomsLabel } = getRoomTypeStats(room.roomType);
+  const areaLabel = formatArea(room.squareFootage);
+  const amenityChips = room.amenities.slice(0, 8);
 
   const handleLeaseAttach = async (file: File) => {
     if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
@@ -275,79 +303,146 @@ export default function RoomDetailsContent({
     }
   };
 
-  return (
-    <>
-    <div className="space-y-5" style={{ fontFamily: LATO }}>
-      {/* Unit summary */}
-      <div className={`${cardClassName()} p-5`}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{unitLabel}</h2>
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              <div>
-                <span className="text-gray-500">Status: </span>
-                <span className="font-semibold text-gray-900">{statusLabel(room.roomStatus)}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Rent Amount: </span>
-                <span className="font-semibold text-gray-900">
-                  {formatCurrency(tenant?.monthlyRate || room.monthlyRate)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-800"
-              defaultValue=""
-              aria-label="Appliances"
+  const leasePanel = (
+    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3.5">
+      <input
+        ref={leaseInputRef}
+        type="file"
+        className="hidden"
+        accept={[...SUPPORTED_FILE_TYPES, 'image/*'].join(',')}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleLeaseAttach(file);
+        }}
+      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+            Lease contract
+          </p>
+          {leaseDoc ? (
+            <a
+              href={`/api/documents/${leaseDoc.id}/download`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex min-w-0 max-w-full items-center gap-1.5 text-sm font-semibold text-indigo-700 hover:underline"
             >
-              <option value="" disabled>
-                Appliances
-              </option>
-              {(appliances.length ? appliances : [{ id: 'none', assetName: 'None listed' } as PropertyRoomAsset]).map(
-                (a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.assetName}
-                  </option>
-                )
-              )}
-            </select>
-            <select
-              className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-800"
-              defaultValue=""
-              aria-label="Furnitures"
-            >
-              <option value="" disabled>
-                Furnitures
-              </option>
-              {(furniture.length ? furniture : [{ id: 'none', assetName: 'None listed' } as PropertyRoomAsset]).map(
-                (a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.assetName}
-                  </option>
-                )
-              )}
-            </select>
-            <AddNotesButton
-              entityType="room"
-              entityId={room.id}
-              entityLabel={unitLabel}
-              label="Add note"
-              onSaved={() => onDocumentsChanged?.()}
-            />
-          </div>
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{leaseDoc.documentName || leaseDoc.fileName}</span>
+            </a>
+          ) : (
+            <p className="mt-1 text-sm text-gray-600">No lease attached</p>
+          )}
+          <p className="mt-1 text-[11px] leading-snug text-gray-400">
+            PDF or photo of the signed lease.
+          </p>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Paperclip className="h-4 w-4" />}
+            isLoading={uploadingLease}
+            isDisabled={uploadingLease}
+            onClick={() => leaseInputRef.current?.click()}
+          >
+            {leaseDoc ? 'Replace' : 'Attach'}
+          </Button>
+          <TakePhotoButton
+            size="sm"
+            disabled={uploadingLease}
+            onCapture={(file) => void handleLeaseAttach(file)}
+            title="Take lease photo"
+            description="Allow camera access if prompted, then capture the lease document."
+            fileNamePrefix="lease"
+          />
         </div>
       </div>
+    </div>
+  );
 
-      {/* Tenant Information */}
-      <section>
-        <div className="mb-2 rounded-t-xl bg-rose-50 px-4 py-2">
-          <p className="text-sm font-bold text-rose-900">Tenant Information</p>
+  const photosSection = (
+    <div>
+      <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Photos</p>
+      <div className={`${cardClassName()} p-4 sm:p-5`}>
+        <RoomShowcaseGallery
+          roomId={room.id}
+          unitLabel={unitLabel}
+          amenities={room.amenities}
+          hideHeading={isModal}
+          compact={isModal}
+          onImagesChanged={() => onDocumentsChanged?.()}
+        />
+      </div>
+    </div>
+  );
+
+  const displayStatus = toDisplayRoomStatus(room.roomStatus);
+
+  return (
+    <>
+    <div className={isModal ? 'space-y-5' : 'space-y-8'} style={{ fontFamily: LATO }}>
+      {isModal && (
+        <div className={`${cardClassName()} px-5 py-4`}>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                displayStatus === 'occupied'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : displayStatus === 'pending'
+                    ? 'bg-amber-50 text-amber-800'
+                    : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {statusLabel(room.roomStatus)}
+            </span>
+            <InlineStat
+              label="Rent"
+              value={formatCurrency(tenant?.monthlyRate || room.monthlyRate)}
+            />
+            <InlineStat label="Type" value={bedroomsLabel} />
+            {areaLabel && <InlineStat label="Area" value={areaLabel} />}
+            {room.floorNumber != null && (
+              <InlineStat label="Floor" value={String(room.floorNumber)} />
+            )}
+          </div>
+          {amenityChips.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {amenityChips.map((amenity) => (
+                <span
+                  key={amenity}
+                  className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700"
+                >
+                  {formatAmenityLabel(amenity)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        <div className={`${cardClassName()} rounded-t-none p-5`}>
-          {tenant ? (
+      )}
+
+      {isModal && !tenant && photosSection}
+
+      <section>
+        <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Tenant</p>
+        <div className={`${cardClassName()} p-5`}>
+          {tenant && isModal ? (
+            <ModalOccupiedTenant
+              tenant={tenant}
+              accountNo={accountNoFromTenantId(tenant.tenantId)}
+              dueDate={dueDate}
+              amountDue={amountDue}
+              isSettled={isSettled}
+              isPastDue={isPastDue}
+              applianceItems={[
+                ...appliances,
+                ...other.filter((a) => !furniture.includes(a)),
+              ].map(formatAssetLabel)}
+              furnitureItems={furniture.map(formatAssetLabel)}
+              onViewProfile={() => setProfileTenantId(tenant.tenantId)}
+            />
+          ) : tenant ? (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1fr_auto]">
               <div className="space-y-4">
                 <Field label="Account No." value={accountNoFromTenantId(tenant.tenantId)} />
@@ -376,6 +471,10 @@ export default function RoomDetailsContent({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Start Date" value={formatShortDate(tenant.startDate)} />
+                  <Field
+                    label="End Date"
+                    value={tenant.endDate ? formatShortDate(tenant.endDate) : 'Present'}
+                  />
                   <Field label="Due Date" value={formatShortDate(dueDate)} />
                 </div>
 
@@ -471,31 +570,43 @@ export default function RoomDetailsContent({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              className={
+                isModal
+                  ? 'py-1'
+                  : 'flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between'
+              }
+            >
               <p className="text-sm text-gray-500">No tenant assigned to this unit.</p>
-              <AddTenantButton
-                buildingId={building.id}
-                roomId={room.id}
-                lockHousing
-                refreshOnCreated={false}
-                onCreated={() => {
-                  onTenantCreated?.();
-                  onDocumentsChanged?.();
-                }}
-              />
+              {!isModal && (
+                <AddTenantButton
+                  buildingId={building.id}
+                  roomId={room.id}
+                  lockHousing
+                  redirectAfterCreate={false}
+                  refreshOnCreated={false}
+                  onCreated={() => {
+                    onTenantCreated?.();
+                    onDocumentsChanged?.();
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
       </section>
 
-      {/* Payment / Advance / Remarks */}
-      <section
-        className={`${cardClassName()} border p-5 ${
-          isSettled ? 'border-emerald-100' : 'border-rose-100'
-        }`}
-      >
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Payment Information */}
+      {showPayments && (
+      <section>
+        <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Payments</p>
+        <div className={`${cardClassName()} space-y-6 p-5`}>
+          <div
+            className={
+              isModal
+                ? 'grid grid-cols-1 gap-6 sm:grid-cols-2'
+                : 'grid grid-cols-1 gap-6 lg:grid-cols-3'
+            }
+          >
           <div className="space-y-3">
             <p className="text-sm font-bold text-gray-900">Payment Information</p>
             <div>
@@ -543,101 +654,81 @@ export default function RoomDetailsContent({
               </div>
             )}
 
-            <div className="pt-1">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                Document (Lease Contract)
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                {leaseDoc ? (
-                  <a
-                    href={`/api/documents/${leaseDoc.id}/download`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 hover:underline"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {leaseDoc.documentName || leaseDoc.fileName}
-                  </a>
-                ) : (
-                  <span className="text-sm text-gray-500">No lease attached</span>
-                )}
-                <input
-                  ref={leaseInputRef}
-                  type="file"
-                  className="hidden"
-                  accept={[...SUPPORTED_FILE_TYPES, 'image/*'].join(',')}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void handleLeaseAttach(file);
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  isLoading={uploadingLease}
-                  isDisabled={uploadingLease}
-                  onClick={() => leaseInputRef.current?.click()}
-                >
-                  {leaseDoc ? 'Replace' : 'Attach'}
-                </Button>
-                <TakePhotoButton
-                  size="sm"
-                  disabled={uploadingLease}
-                  onCapture={(file) => void handleLeaseAttach(file)}
-                  title="Take lease photo"
-                  description="Allow camera access if prompted, then capture the lease document."
-                  fileNamePrefix="lease"
-                />
-              </div>
-              <p className="mt-2 text-[11px] leading-snug text-gray-400">
-                Lease contract agreement for this tenant. Attach a PDF or photo here — no need to leave this page.
-              </p>
-            </div>
+            {!isModal && leasePanel}
           </div>
 
-          {/* Advance Payment */}
           <div className="space-y-3">
             <p className="text-sm font-bold text-gray-900">Advance Payment</p>
+            <Field
+              label="Total Amount Deposited"
+              value={formatCurrency((deposit || 0) + (advance || 0) + (utilityDeposit || 0))}
+            />
             <Field label="1 Month Deposit" value={formatCurrency(deposit)} />
             <Field label="1 Month Advance" value={formatCurrency(advance)} />
             <Field label="Utility Deposit" value={formatCurrency(utilityDeposit)} />
+            <Field label="Monthly Rental Fee" value={formatCurrency(tenant?.monthlyRate || room.monthlyRate || 0)} />
           </div>
 
-          {/* Historical notes — room + tenant (if assigned) */}
-          <div className="space-y-4 lg:col-span-1">
+          {!isModal && tenant && (
+            <EntityNotesPanel
+              entityType="tenant"
+              entityId={tenant.tenantId}
+              entityLabel={`${tenant.firstName} ${tenant.lastName}`.trim()}
+              title="Tenant notes"
+              compact
+            />
+          )}
+          </div>
+
+          {isModal && leasePanel}
+
+          {isModal && (
+            <div className="grid grid-cols-1 gap-4 border-t border-gray-100 pt-5 sm:grid-cols-2">
+              <EntityNotesPanel
+                entityType="room"
+                entityId={room.id}
+                entityLabel={unitLabel}
+                title="Room notes"
+                compact
+                dense
+              />
+              {tenant && (
+                <EntityNotesPanel
+                  entityType="tenant"
+                  entityId={tenant.tenantId}
+                  entityLabel={`${tenant.firstName} ${tenant.lastName}`.trim()}
+                  title="Tenant notes"
+                  compact
+                  dense
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+      )}
+
+      {isModal && tenant && photosSection}
+
+      {isModal && !tenant && (
+        <section>
+          <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Notes</p>
+          <div className={`${cardClassName()} p-5`}>
             <EntityNotesPanel
               entityType="room"
               entityId={room.id}
               entityLabel={unitLabel}
               title="Room notes"
               compact
+              dense
             />
-            {tenant && (
-              <EntityNotesPanel
-                entityType="tenant"
-                entityId={tenant.tenantId}
-                entityLabel={`${tenant.firstName} ${tenant.lastName}`.trim()}
-                title="Tenant notes"
-                compact
-              />
-            )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <AssignmentHistoryCard detail={detail} />
+      {showHistory && <AssignmentHistoryCard detail={detail} hideWhenEmpty={isModal} />}
       {!isModal && <BuildingSummaryCard detail={detail} />}
-
-      {/* Showcase gallery — Airbnb-style collage + photo tour */}
-      <div className={`${cardClassName()} p-4 sm:p-5`}>
-        <RoomShowcaseGallery
-          roomId={room.id}
-          unitLabel={unitLabel}
-          amenities={room.amenities}
-          onImagesChanged={() => onDocumentsChanged?.()}
-        />
-      </div>
+      {!isModal && photosSection}
     </div>
 
     <TenantProfileModal
@@ -649,8 +740,141 @@ export default function RoomDetailsContent({
   );
 }
 
-function AssignmentHistoryCard({ detail }: { detail: RoomPageDetail }) {
+function ModalOccupiedTenant({
+  tenant,
+  accountNo,
+  dueDate,
+  amountDue,
+  isSettled,
+  isPastDue,
+  applianceItems,
+  furnitureItems,
+  onViewProfile,
+}: {
+  tenant: PropertyRoomTenant;
+  accountNo: string;
+  dueDate?: string | Date | null;
+  amountDue: number;
+  isSettled: boolean;
+  isPastDue: boolean;
+  applianceItems: string[];
+  furnitureItems: string[];
+  onViewProfile: () => void;
+}) {
+  const fullName = `${tenant.firstName} ${tenant.lastName}`.trim();
+  const contacts = [
+    hasValue(tenant.phone) && { icon: Phone, label: 'Mobile', value: tenant.phone as string },
+    hasValue(tenant.email) && { icon: Mail, label: 'Email', value: tenant.email as string },
+    (hasValue(tenant.emergencyContactName) || hasValue(tenant.emergencyContactPhone)) && {
+      icon: User,
+      label: 'Emergency',
+      value: [tenant.emergencyContactName, tenant.emergencyContactPhone]
+        .filter((part) => hasValue(part))
+        .join(' · '),
+    },
+  ].filter(Boolean) as { icon: typeof Phone; label: string; value: string }[];
+  const inventory = [
+    ...applianceItems.map((item) => ({ item, kind: 'Appliance' })),
+    ...furnitureItems.map((item) => ({ item, kind: 'Furniture' })),
+  ].filter((entry) => hasValue(entry.item));
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
+        {tenant.profileImagePath ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={getImageUrl(tenant.profileImagePath)}
+            alt={fullName}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <User className="h-6 w-6 text-gray-400" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-lg font-bold leading-tight text-gray-900">{fullName}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Account {accountNo}
+              {' · '}
+              Started {formatShortDate(tenant.startDate)}
+              {dueDate ? ` · Due ${formatShortDate(dueDate)}` : ''}
+            </p>
+            <button
+              type="button"
+              onClick={onViewProfile}
+              className="mt-1 text-xs font-semibold text-gray-700 hover:text-gray-900 hover:underline"
+            >
+              View profile
+            </button>
+          </div>
+
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                isSettled
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : isPastDue
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-amber-50 text-amber-800'
+              }`}
+            >
+              {isSettled
+                ? 'Settled'
+                : `${isPastDue ? 'Past due' : 'Due'} ${formatCurrency(amountDue)}`}
+            </span>
+          </div>
+        </div>
+
+        {contacts.length > 0 && (
+          <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+            {contacts.map((contact) => (
+              <div key={contact.label} className="flex min-w-0 items-start gap-2 text-sm">
+                <contact.icon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                    {contact.label}
+                  </p>
+                  <p className="truncate font-medium text-gray-900">{contact.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasValue(tenant.previousAddress) && (
+          <p className="mt-3 text-sm leading-snug text-gray-600">{tenant.previousAddress}</p>
+        )}
+
+        {inventory.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {inventory.map((entry) => (
+              <span
+                key={`${entry.kind}-${entry.item}`}
+                className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700"
+              >
+                {entry.item}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AssignmentHistoryCard({
+  detail,
+  hideWhenEmpty = false,
+}: {
+  detail: RoomPageDetail;
+  hideWhenEmpty?: boolean;
+}) {
   const history = detail.assignmentHistory || [];
+  if (hideWhenEmpty && history.length === 0) return null;
 
   return (
     <div>
@@ -691,9 +915,31 @@ function AssignmentHistoryCard({ detail }: { detail: RoomPageDetail }) {
                     <p className="mt-1.5 text-[11px] font-normal leading-none text-gray-500">
                       {formatShortDate(item.startDate)}
                       {' – '}
-                      {item.endDate ? formatShortDate(item.endDate) : 'Present'}
+                      {item.endDate
+                        ? formatShortDate(item.endDate)
+                        : isCurrent
+                          ? 'Present'
+                          : '—'}
                     </p>
                     <div className="mt-2 space-y-1 text-[11px] text-gray-600">
+                      {(item.depositPaid != null ||
+                        item.advancePaid != null ||
+                        item.utilityDepositPaid != null) && (
+                        <p>
+                          <span className="text-gray-400">Total deposited: </span>
+                          {formatCurrency(
+                            (item.depositPaid || 0) +
+                              (item.advancePaid || 0) +
+                              (item.utilityDepositPaid || 0)
+                          )}
+                        </p>
+                      )}
+                      {item.utilityDepositPaid != null && item.utilityDepositPaid > 0 && (
+                        <p>
+                          <span className="text-gray-400">Utility deposit: </span>
+                          {formatCurrency(item.utilityDepositPaid)}
+                        </p>
+                      )}
                       {item.tenantPhone && (
                         <p className="truncate">
                           <span className="text-gray-400">Phone: </span>
@@ -728,6 +974,7 @@ function AssignmentHistoryCard({ detail }: { detail: RoomPageDetail }) {
                     </span>
                     <span className="text-[12px] font-medium leading-none text-gray-900">
                       {formatCurrency(item.monthlyRate)}
+                      <span className="ml-0.5 text-[10px] font-normal text-gray-500">/mo</span>
                     </span>
                   </div>
                 </li>

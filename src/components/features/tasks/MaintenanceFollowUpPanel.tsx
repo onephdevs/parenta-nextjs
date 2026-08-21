@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from 'react';
 import { Save, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/forms/FormField';
@@ -36,6 +42,8 @@ interface MaintenanceDetail {
   tenant_name?: string;
   tenant_email?: string;
   tenant_phone?: string;
+  tenant_avatar_url?: string | null;
+  tenantAvatarUrl?: string | null;
   room_number?: string;
   building_name?: string;
   request_date?: string | Date;
@@ -58,6 +66,10 @@ interface MaintenanceFollowUpPanelProps {
   onUpdated?: () => void;
 }
 
+export interface MaintenanceFollowUpHandle {
+  persist: () => Promise<void>;
+}
+
 function formatDate(value?: string | Date | null) {
   if (!value) return '—';
   const d = new Date(value);
@@ -78,10 +90,16 @@ function toIso(value?: string | Date | null): string {
   return d.toISOString();
 }
 
-export function MaintenanceFollowUpPanel({
-  maintenanceRequestId,
-  onUpdated,
-}: MaintenanceFollowUpPanelProps) {
+export const MaintenanceFollowUpPanel = forwardRef<
+  MaintenanceFollowUpHandle,
+  MaintenanceFollowUpPanelProps
+>(function MaintenanceFollowUpPanel(
+  {
+    maintenanceRequestId,
+    onUpdated,
+  },
+  ref
+) {
   const [request, setRequest] = useState<MaintenanceDetail | null>(null);
   const [loading, setLoading] = useState(Boolean(maintenanceRequestId));
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +152,7 @@ export function MaintenanceFollowUpPanel({
       .catch(() => undefined);
   }, []);
 
-  const saveFieldsOnly = async () => {
+  const persist = useCallback(async () => {
     if (!maintenanceRequestId) return;
     setSavingFields(true);
     setError(null);
@@ -155,11 +173,16 @@ export function MaintenanceFollowUpPanel({
       }
       onUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update request');
+      const message =
+        err instanceof Error ? err.message : 'Failed to update request';
+      setError(message);
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setSavingFields(false);
     }
-  };
+  }, [assignedTo, maintenanceRequestId, onUpdated, priority, status]);
+
+  useImperativeHandle(ref, () => ({ persist }), [persist]);
 
   if (!maintenanceRequestId) {
     return (
@@ -314,7 +337,7 @@ export function MaintenanceFollowUpPanel({
               leftIcon={<Save className="h-4 w-4" />}
               isLoading={savingFields}
               isDisabled={savingFields}
-              onClick={() => void saveFieldsOnly()}
+              onClick={() => void persist().catch(() => undefined)}
             >
               Save status
             </Button>
@@ -341,7 +364,9 @@ export function MaintenanceFollowUpPanel({
             url: a.url,
             fileName: a.fileName,
           })),
+          avatarUrl: request.tenant_avatar_url || request.tenantAvatarUrl,
         }}
+        tenantAvatarUrl={request.tenant_avatar_url || request.tenantAvatarUrl}
         onPosted={(result) => {
           if (result.request?.status) setStatus(String(result.request.status));
           if (result.request?.priority) setPriority(String(result.request.priority));
@@ -357,4 +382,4 @@ export function MaintenanceFollowUpPanel({
       />
     </div>
   );
-}
+});

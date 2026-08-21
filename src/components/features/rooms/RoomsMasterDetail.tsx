@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Building } from '@/types/database';
 import type { RoomPageDetail, RoomsPageListItem } from '@/lib/api/properties';
@@ -22,12 +22,17 @@ export default function RoomsMasterDetail({
   const searchParams = useSearchParams();
 
   const [rooms, setRooms] = useState(initialRooms);
+
+  useEffect(() => {
+    setRooms(initialRooms);
+  }, [initialRooms]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
     initialRoomId || initialRooms[0]?.id || null
   );
   const [detail, setDetail] = useState<RoomPageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const detailLoadGen = useRef(0);
 
   const syncUrl = useCallback(
     (roomId: string | null) => {
@@ -44,6 +49,7 @@ export default function RoomsMasterDetail({
   );
 
   const loadDetail = useCallback(async (roomId: string) => {
+    const gen = ++detailLoadGen.current;
     setDetailLoading(true);
     setDetailError(null);
     try {
@@ -51,15 +57,19 @@ export default function RoomsMasterDetail({
         credentials: 'include',
       });
       const json = await response.json();
+      if (gen !== detailLoadGen.current) return;
       if (!response.ok || !json.success) {
         throw new Error(json.error || 'Failed to load room');
       }
       setDetail(json.data as RoomPageDetail);
     } catch (err) {
+      if (gen !== detailLoadGen.current) return;
       setDetail(null);
       setDetailError(err instanceof Error ? err.message : 'Failed to load room');
     } finally {
-      setDetailLoading(false);
+      if (gen === detailLoadGen.current) {
+        setDetailLoading(false);
+      }
     }
   }, []);
 
@@ -94,6 +104,7 @@ export default function RoomsMasterDetail({
               squareFootage: r.squareFootage,
               monthlyRate: r.monthlyRate,
               tenantName: existing?.tenantName ?? null,
+              primaryImagePath: existing?.primaryImagePath ?? null,
             };
           });
         });
@@ -120,7 +131,12 @@ export default function RoomsMasterDetail({
   }, [selectedRoomId, loadDetail]);
 
   const handleSelectRoom = (roomId: string) => {
+    if (roomId === selectedRoomId) return;
+    detailLoadGen.current += 1;
     setSelectedRoomId(roomId);
+    setDetail(null);
+    setDetailLoading(true);
+    setDetailError(null);
     syncUrl(roomId);
   };
 
@@ -145,8 +161,13 @@ export default function RoomsMasterDetail({
       </div>
 
       <RoomDetailPane
-        detail={detail}
-        loading={detailLoading}
+        detail={
+          detail && selectedRoomId && detail.room.id === selectedRoomId ? detail : null
+        }
+        loading={
+          detailLoading ||
+          Boolean(selectedRoomId && detail && detail.room.id !== selectedRoomId)
+        }
         error={detailError}
         onDocumentsChanged={() => {
           if (selectedRoomId) void loadDetail(selectedRoomId);

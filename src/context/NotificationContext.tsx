@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info' | 'loading';
 
@@ -91,13 +91,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setNotifications([]);
   }, []);
 
-  const value: NotificationContextType = {
-    notifications,
-    showNotification,
-    removeNotification,
-    updateNotification,
-    clearAll,
-  };
+  const value = useMemo<NotificationContextType>(
+    () => ({
+      notifications,
+      showNotification,
+      removeNotification,
+      updateNotification,
+      clearAll,
+    }),
+    [notifications, showNotification, removeNotification, updateNotification, clearAll]
+  );
 
   return (
     <NotificationContext.Provider value={value}>

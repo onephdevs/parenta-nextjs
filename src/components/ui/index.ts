@@ -96,6 +96,12 @@ export { default as ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogMode, ConfirmDialogVariant } from './ConfirmDialog';
 export { default as FullScreenModal } from './FullScreenModal';
 export { default as HomeTraceLoader } from './HomeTraceLoader';
+export {
+  RouteAwareLoader,
+  RouteLoadingFallback,
+  useRouteLoader,
+  useRouteReady,
+} from '@/components/layout/route-loader';
 export { default as Pagination } from './Pagination';
 export { default as SectionedFormShell, SectionCard } from './SectionedFormShell';
 export type {

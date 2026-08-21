@@ -27,6 +27,8 @@ export interface PublicFeaturedProperty {
   imageUrl: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** When false, omit from landing nearby / commute picker. */
+  showOnLandingNearby: boolean;
 }
 
 export interface PublicPortfolioPayload {
@@ -59,6 +61,7 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
       postal_code: string | null;
       latitude: string | null;
       longitude: string | null;
+      show_on_landing_nearby: boolean;
       total_units: string;
       vacant_units: string;
       starting_rent: string | null;
@@ -73,6 +76,7 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
         b.postal_code,
         b.latitude::text,
         b.longitude::text,
+        COALESCE(b.show_on_landing_nearby, true) AS show_on_landing_nearby,
         COUNT(r.id)::text AS total_units,
         COUNT(r.id) FILTER (WHERE r.room_status = 'vacant')::text AS vacant_units,
         MIN(r.monthly_rate) FILTER (
@@ -116,6 +120,7 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
       imageUrl: imagePath ? getImageUrl(imagePath) : null,
       latitude: Number.isFinite(lat) ? lat : null,
       longitude: Number.isFinite(lng) ? lng : null,
+      showOnLandingNearby: row.show_on_landing_nearby !== false,
     };
   });
 

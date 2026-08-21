@@ -173,21 +173,33 @@ export function TenantPageSkeleton({
 
   return (
     <div className={theme.pagePad}>
-      <div className="space-y-2">
-        <TenantBone className="h-8 w-40" />
-        <TenantBone className="h-4 w-56" />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2">
+          <TenantBone className="h-8 w-32" />
+          <TenantBone className="h-4 w-64" />
+        </div>
+        <TenantBone className="h-10 w-28 rounded-md" />
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <MetricCardSkeleton key={i} />
+      <div className="flex flex-wrap gap-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <TenantBone key={i} className="h-8 w-24 rounded-full" />
         ))}
       </div>
-      <div className={cn(theme.panel, 'space-y-4 p-5')}>
-        <TenantBone className="h-10 w-full" />
+      <div className={cn(theme.panel, 'overflow-hidden')}>
+        <div className={cn('border-b p-4', theme.divider)}>
+          <TenantBone className="h-10 w-full" />
+        </div>
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className={cn('space-y-2 border-b pb-4 last:border-0', theme.divider)}>
-            <TenantBone className="h-4 w-2/3" />
-            <TenantBone className="h-3 w-1/3" />
+          <div
+            key={i}
+            className={cn('flex items-start gap-3 px-4 py-4', i > 0 && `border-t ${theme.divider}`)}
+          >
+            <TenantBone className="h-9 w-9 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <TenantBone className="h-3 w-20" />
+              <TenantBone className="h-4 w-2/3" />
+              <TenantBone className="h-3 w-1/2" />
+            </div>
           </div>
         ))}
       </div>

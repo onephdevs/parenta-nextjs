@@ -48,6 +48,10 @@ interface RoomShowcaseGalleryProps {
   amenities?: string[];
   className?: string;
   onImagesChanged?: () => void;
+  /** Hide the duplicate unit title when the parent already shows one (e.g. room modal). */
+  hideHeading?: boolean;
+  /** Collage-only layout without the long area-by-area tour (room modal). */
+  compact?: boolean;
 }
 
 function normalizeArea(caption?: string | null): string {
@@ -96,6 +100,8 @@ export default function RoomShowcaseGallery({
   amenities = [],
   className,
   onImagesChanged,
+  hideHeading = false,
+  compact = false,
 }: RoomShowcaseGalleryProps) {
   const { showSuccess, showError } = useNotifications();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -210,13 +216,15 @@ export default function RoomShowcaseGallery({
   return (
     <section className={cn('space-y-4', className)} id="photos">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">{unitLabel}</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Showcase this unit with photos by area — living room, kitchen, and more.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+        {!hideHeading && (
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">{unitLabel}</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Showcase this unit with photos by area — living room, kitchen, and more.
+            </p>
+          </div>
+        )}
+        <div className={cn('flex flex-wrap items-center gap-2', hideHeading && 'ml-auto')}>
           <select
             value={uploadArea}
             onChange={(e) => setUploadArea(e.target.value)}
@@ -275,7 +283,10 @@ export default function RoomShowcaseGallery({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-56 w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 text-center transition-colors hover:border-gray-900 hover:bg-white"
+          className={cn(
+            'flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 text-center transition-colors hover:border-gray-900 hover:bg-white',
+            compact ? 'h-40' : 'h-56'
+          )}
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
             <ImagePlus className="h-6 w-6 text-gray-700" />
@@ -289,7 +300,10 @@ export default function RoomShowcaseGallery({
         </button>
       ) : (
         <div className="relative overflow-hidden rounded-2xl">
-          <div className="grid h-[280px] grid-cols-4 grid-rows-2 gap-1 sm:h-[320px] md:h-[380px]">
+          <div className={cn(
+            'grid grid-cols-4 grid-rows-2 gap-1',
+            compact ? 'h-[220px] sm:h-[260px]' : 'h-[280px] sm:h-[320px] md:h-[380px]'
+          )}>
             <button
               type="button"
               onClick={() => openTour(normalizeArea(hero?.caption))}
@@ -343,7 +357,7 @@ export default function RoomShowcaseGallery({
         </div>
       )}
 
-      {!loading && ordered.length > 0 && (
+      {!loading && ordered.length > 0 && !compact && (
         <div className="space-y-10 pt-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
             <LayoutGrid className="h-4 w-4" />

@@ -3,35 +3,10 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import pool from '@/lib/db';
 import { getImageUrl } from '@/lib/format/image-url';
-
-async function getProfileExtras(userId: string) {
-  const result = await pool.query(
-    `SELECT value FROM app_settings WHERE key = $1 LIMIT 1`,
-    [`user_profile:${userId}`]
-  );
-  if (result.rows.length === 0) {
-    return { phone: '', address: '', city: '', state: '', zipCode: '', bio: '', avatarUrl: '' };
-  }
-  try {
-    return JSON.parse(result.rows[0].value);
-  } catch {
-    return { phone: '', address: '', city: '', state: '', zipCode: '', bio: '', avatarUrl: '' };
-  }
-}
-
-async function saveProfileExtras(userId: string, extras: Record<string, string>) {
-  await pool.query(
-    `INSERT INTO app_settings (key, value, description)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (key) DO UPDATE
-     SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
-    [
-      `user_profile:${userId}`,
-      JSON.stringify(extras),
-      'Optional profile fields for user',
-    ]
-  );
-}
+import {
+  getUserProfileExtras,
+  saveUserProfileExtras,
+} from '@/lib/api/user-profile-extras';
 
 export async function GET() {
   try {
@@ -50,7 +25,15 @@ export async function GET() {
     }
 
     const user = userResult.rows[0];
-    const extras = await getProfileExtras(session.user.id);
+    const extras = await getUserProfileExtras(session.user.id);
+    if (!extras.avatarUrl) {
+      const tenantPic = await pool.query<{ profile_picture_url: string | null }>(
+        `SELECT profile_picture_url FROM tenants WHERE user_id = $1 LIMIT 1`,
+        [session.user.id]
+      );
+      const fallback = tenantPic.rows[0]?.profile_picture_url;
+      if (fallback) extras.avatarUrl = fallback;
+    }
     if (extras.avatarUrl) {
       extras.avatarUrl = getImageUrl(String(extras.avatarUrl));
     }
@@ -64,7 +47,13 @@ export async function GET() {
         username: user.username,
         role: user.role,
         profileCompleted: user.profile_completed !== false,
-        ...extras,
+        phone: extras.phone || '',
+        address: extras.address || '',
+        city: extras.city || '',
+        state: extras.state || '',
+        zipCode: extras.zipCode || '',
+        bio: extras.bio || '',
+        avatarUrl: extras.avatarUrl || '',
       },
     });
   } catch (error) {
@@ -104,7 +93,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
-    const extras = {
+    const extras: Record<string, string> = {
       phone: String(body.phone || '').trim(),
       address: String(body.address || '').trim(),
       city: String(body.city || '').trim(),
@@ -112,11 +101,9 @@ export async function PUT(request: NextRequest) {
       zipCode: String(body.zipCode || '').trim(),
       bio: String(body.bio || '').trim(),
     };
-    const existing = await getProfileExtras(session.user.id);
-    if (existing.avatarUrl && !extras.avatarUrl) {
-      (extras as Record<string, string>).avatarUrl = existing.avatarUrl;
-    }
-    await saveProfileExtras(session.user.id, extras);
+    const existing = await getUserProfileExtras(session.user.id);
+    if (existing.avatarUrl) extras.avatarUrl = existing.avatarUrl;
+    await saveUserProfileExtras(session.user.id, extras);
 
     const user = updated.rows[0];
     return NextResponse.json({

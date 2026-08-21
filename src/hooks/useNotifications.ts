@@ -18,19 +18,25 @@ export type { NotificationType, Notification };
 type ShowArg = string | Omit<Notification, 'id'>;
 
 export function useNotifications() {
-  const ctx = useNotificationContext();
+  const {
+    notifications,
+    showNotification: ctxShow,
+    removeNotification,
+    updateNotification,
+    clearAll,
+  } = useNotificationContext();
 
   const showNotification = useCallback(
     (messageOrNotification: ShowArg, type: NotificationType = 'info') => {
       if (typeof messageOrNotification === 'string') {
-        return ctx.showNotification({
+        return ctxShow({
           type,
           title: messageOrNotification,
         });
       }
 
       const n = messageOrNotification;
-      return ctx.showNotification({
+      return ctxShow({
         type: n.type,
         title: n.title || n.message || 'Notification',
         message: n.title ? n.message : undefined,
@@ -39,7 +45,7 @@ export function useNotifications() {
         isLoading: n.type === 'loading' || n.isLoading,
       });
     },
-    [ctx]
+    [ctxShow]
   );
 
   const addNotification = useCallback(
@@ -66,19 +72,19 @@ export function useNotifications() {
 
   const showLoading = useCallback(
     (message: string = 'Loading...') =>
-      ctx.showNotification({ type: 'loading', title: message }),
-    [ctx]
+      ctxShow({ type: 'loading', title: message }),
+    [ctxShow]
   );
 
   const dismissToast = useCallback(
-    (id: string) => ctx.removeNotification(id),
-    [ctx]
+    (id: string) => removeNotification(id),
+    [removeNotification]
   );
 
-  const dismissAll = useCallback(() => ctx.clearAll(), [ctx]);
+  const dismissAll = useCallback(() => clearAll(), [clearAll]);
 
   return {
-    notifications: ctx.notifications,
+    notifications,
     showNotification,
     addNotification,
     showSuccess,
@@ -88,8 +94,8 @@ export function useNotifications() {
     showLoading,
     dismissToast,
     dismissAll,
-    removeNotification: ctx.removeNotification,
-    updateNotification: ctx.updateNotification,
-    clearAll: ctx.clearAll,
+    removeNotification,
+    updateNotification,
+    clearAll,
   };
 }

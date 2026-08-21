@@ -1,6 +1,7 @@
 'use client';
 
 import HomeTraceLoader from '@/components/ui/HomeTraceLoader';
+import { cn } from '@/lib/utils';
 
 interface AppLoaderProps {
   variant?: 'overlay' | 'inline';
@@ -27,7 +28,10 @@ export default function AppLoader({
   if (variant === 'overlay') {
     return (
       <div
-        className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white/80 backdrop-blur-sm ${className}`}
+        className={cn(
+          'fixed inset-0 z-[9999] flex h-dvh min-h-dvh w-full items-center justify-center bg-white',
+          className
+        )}
         role="status"
         aria-live="polite"
         aria-busy="true"
@@ -40,7 +44,10 @@ export default function AppLoader({
 
   return (
     <div
-      className={`flex min-h-[50vh] w-full items-center justify-center bg-white/80 ${className}`}
+      className={cn(
+        'flex h-full min-h-full w-full flex-1 items-center justify-center bg-white',
+        className
+      )}
       role="status"
       aria-live="polite"
       aria-busy="true"

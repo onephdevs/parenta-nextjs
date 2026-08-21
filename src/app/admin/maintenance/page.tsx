@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import {
@@ -8,19 +9,23 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Building,
-  User,
   Save,
-  Pencil,
   Camera,
+  ArrowLeft,
+  X,
+  ChevronRight,
+  LayoutGrid,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { formatMaintenanceCategory } from '@/lib/constants/maintenance';
+import {
+  formatMaintenanceCategory,
+  formatMaintenanceTicketNumber,
+} from '@/lib/constants/maintenance';
+import { RouteLoadingFallback, useRouteReady } from '@/components/layout/route-loader';
 import {
   AppLoader,
+  Avatar,
   Button,
-  Card,
-  Dialog,
   EmptyState,
   FilterBar,
   Input,
@@ -29,12 +34,6 @@ import {
   Pagination,
   SearchInput,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Textarea,
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
@@ -66,6 +65,7 @@ interface MaintenanceRequest {
   tenant_name?: string;
   tenant_email?: string;
   tenant_phone?: string;
+  tenant_avatar_url?: string | null;
   room_number?: string;
   building_name?: string;
   building_address?: string;
@@ -113,6 +113,7 @@ export default function AdminMaintenancePage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [sliderIn, setSliderIn] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
@@ -181,6 +182,15 @@ export default function AdminMaintenancePage() {
     setCurrentPage(1);
   }, [searchTerm, filterStatus, filterPriority, filterCategory]);
 
+  useEffect(() => {
+    if (!showUpdateModal) {
+      setSliderIn(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setSliderIn(true));
+    return () => cancelAnimationFrame(frame);
+  }, [showUpdateModal]);
+
   const filteredRequests = useMemo(() => {
     let filtered = [...requests];
 
@@ -195,14 +205,17 @@ export default function AdminMaintenancePage() {
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
+      filtered = filtered.filter((r) => {
+        const ticket = formatMaintenanceTicketNumber(r.id).toLowerCase();
+        return (
           r.title?.toLowerCase().includes(term) ||
           r.description?.toLowerCase().includes(term) ||
           r.tenant_name?.toLowerCase().includes(term) ||
           r.building_name?.toLowerCase().includes(term) ||
-          r.room_number?.toLowerCase().includes(term)
-      );
+          r.room_number?.toLowerCase().includes(term) ||
+          ticket.includes(term)
+        );
+      });
     }
     return filtered;
   }, [requests, filterStatus, filterPriority, filterCategory, searchTerm]);
@@ -214,7 +227,11 @@ export default function AdminMaintenancePage() {
     safePage * PAGE_SIZE
   );
 
-  if (status === 'loading' || (isLoading && requests.length === 0)) {
+  const pageReady = !(status === 'loading' || (isLoading && requests.length === 0));
+  const { covering } = useRouteReady(pageReady);
+
+  if (!pageReady) {
+    if (covering) return <RouteLoadingFallback className="min-h-[50vh]" />;
     return <AppLoader variant="inline" className="min-h-[50vh]" />;
   }
 
@@ -402,9 +419,16 @@ export default function AdminMaintenancePage() {
       <PageHeader
         title="Maintenance Requests"
         description="Synced with the Maintenance pipeline — Open, In Progress, and Resolved match board stages"
+        actions={
+          <Link href="/admin/tasks?board=maintenance">
+            <Button variant="outline" leftIcon={<LayoutGrid className="h-4 w-4" />}>
+              Open pipeline
+            </Button>
+          </Link>
+        }
       />
 
-      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <ListSummaryCard
           title="Total Requests"
           value={stats.total}
@@ -431,11 +455,11 @@ export default function AdminMaintenancePage() {
         />
       </div>
 
-      <FilterBar columns={4}>
+      <FilterBar columns={4} className="mb-0">
         <FormField label="Search" htmlFor="maintenance-search">
           <SearchInput
             id="maintenance-search"
-            placeholder="Title, tenant, building..."
+            placeholder="Ticket, title, tenant, building…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -494,79 +518,66 @@ export default function AdminMaintenancePage() {
           />
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Request</TableHead>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Assigned</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageRequests.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">{request.title}</div>
-                      <div className="line-clamp-1 text-sm text-gray-600">
-                        {request.description}
-                      </div>
-                      {(request.attachmentCount || request.attachments?.length || 0) > 0 && (
-                        <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
-                          <Camera className="h-3.5 w-3.5" />
-                          {request.attachmentCount || request.attachments?.length} photo
-                          {(request.attachmentCount || request.attachments?.length || 0) === 1
-                            ? ''
-                            : 's'}
+            <ul className="divide-y divide-gray-100">
+              {pageRequests.map((request) => {
+                const photoCount =
+                  request.attachmentCount || request.attachments?.length || 0;
+                const location = [
+                  request.building_name,
+                  request.room_number ? `Room ${request.room_number}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+
+                return (
+                  <li key={request.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateRequest(request)}
+                      className="flex w-full items-start gap-3 px-4 py-4 text-left transition hover:bg-gray-50 sm:px-5"
+                    >
+                      <Avatar
+                        name={request.tenant_name || 'Tenant'}
+                        src={request.tenant_avatar_url}
+                        size="sm"
+                        className="mt-0.5 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="font-mono text-xs text-gray-500">
+                            {formatMaintenanceTicketNumber(request.id)}
+                          </span>
+                          <MaintenanceStatusBadge status={request.status} />
+                          <MaintenancePriorityBadge priority={request.priority} />
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">
-                        {request.building_name || '—'}
+                        <p className="mt-1 truncate text-sm font-semibold text-gray-900">
+                          {request.title}
+                        </p>
+                        {request.description ? (
+                          <p className="mt-0.5 line-clamp-1 text-sm text-gray-500">
+                            {request.description}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                          <span>{request.tenant_name || 'No tenant'}</span>
+                          {location ? <span>{location}</span> : null}
+                          <span>{formatMaintenanceCategory(request.category)}</span>
+                          <span>{request.assigned_to_name || 'Unassigned'}</span>
+                          <span>{formatDate(request.request_date)}</span>
+                          {photoCount > 0 ? (
+                            <span className="inline-flex items-center gap-1 font-medium text-indigo-600">
+                              <Camera className="h-3.5 w-3.5" />
+                              {photoCount} photo{photoCount === 1 ? '' : 's'}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {request.room_number ? `Room ${request.room_number}` : 'No room'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">{request.tenant_name || '—'}</div>
-                      <div className="text-xs text-gray-500">{request.tenant_email || ''}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">
-                        {request.assigned_to_name || 'Unassigned'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {formatMaintenanceCategory(request.category)}
-                    </TableCell>
-                    <TableCell>
-                      <MaintenancePriorityBadge priority={request.priority} />
-                    </TableCell>
-                    <TableCell>
-                      <MaintenanceStatusBadge status={request.status} />
-                    </TableCell>
-                    <TableCell>{formatDate(request.request_date)}</TableCell>
-                    <TableCell className="text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateRequest(request)}
-                        className="inline-flex text-gray-500 hover:text-gray-900"
-                        title="Update"
-                      >
-                        <Pencil className="h-5 w-5" />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <ChevronRight className="mt-2 h-5 w-5 shrink-0 text-gray-400" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}
@@ -578,151 +589,233 @@ export default function AdminMaintenancePage() {
         )}
       </div>
 
-      <Dialog
-        isOpen={showUpdateModal && !!selectedRequest}
-        onClose={() => setShowUpdateModal(false)}
-        title="Update Maintenance Request"
-        size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setShowUpdateModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              leftIcon={<Save className="h-4 w-4" />}
-              onClick={submitUpdate}
-              isLoading={isSaving}
-              isDisabled={isSaving}
+      {showUpdateModal && selectedRequest && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            className={`absolute inset-0 bg-gray-900/50 transition-opacity duration-300 lg:left-[var(--admin-sidebar-width,16rem)] ${
+              sliderIn ? 'opacity-100' : 'opacity-0'
+            }`}
+            onClick={() => setShowUpdateModal(false)}
+            aria-hidden="true"
+          />
+          <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex justify-end lg:left-[var(--admin-sidebar-width,16rem)]">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="maintenance-request-slider-title"
+              className={`pointer-events-auto flex h-full w-full flex-col overflow-hidden bg-white text-gray-900 shadow-2xl transition-transform duration-300 ease-out lg:w-[min(96%,52rem)] lg:rounded-l-2xl ${
+                sliderIn ? 'translate-x-0' : 'translate-x-full'
+              }`}
             >
-              Save Changes
-            </Button>
-          </>
-        }
-      >
-        {selectedRequest && (
-          <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
-            <Card padding="sm" className="bg-gray-50">
-              <h4 className="mb-2 font-medium text-gray-900">{selectedRequest.title}</h4>
-              <div className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                <Building className="h-4 w-4" />
-                {selectedRequest.building_name} — {selectedRequest.room_number}
+              <div className="flex-shrink-0 border-b border-gray-200 bg-white px-5 py-4 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowUpdateModal(false)}
+                      className="mt-0.5 flex-shrink-0 text-gray-400 transition-colors hover:text-gray-900"
+                      aria-label="Back"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <Avatar
+                      name={selectedRequest.tenant_name || 'Tenant'}
+                      src={selectedRequest.tenant_avatar_url}
+                      size="md"
+                      className="mt-0.5 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs text-gray-500">
+                        {formatMaintenanceTicketNumber(selectedRequest.id)}
+                      </p>
+                      <h1
+                        id="maintenance-request-slider-title"
+                        className="mt-0.5 truncate text-lg font-semibold text-gray-900 sm:text-xl"
+                      >
+                        {selectedRequest.title}
+                      </h1>
+                      <p className="mt-0.5 truncate text-sm text-gray-500">
+                        {selectedRequest.tenant_name || 'No tenant'}
+                        {selectedRequest.building_name
+                          ? ` · ${selectedRequest.building_name}`
+                          : ''}
+                        {selectedRequest.room_number
+                          ? ` · Room ${selectedRequest.room_number}`
+                          : ''}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <MaintenanceStatusBadge
+                          status={updateData.status || selectedRequest.status}
+                        />
+                        <MaintenancePriorityBadge
+                          priority={updateData.priority || selectedRequest.priority}
+                        />
+                        <span className="text-xs text-gray-500">
+                          {formatMaintenanceCategory(selectedRequest.category)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowUpdateModal(false)}
+                    className="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-900"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-sm text-gray-700">
-                <User className="h-4 w-4" />
-                {selectedRequest.tenant_name}
+
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-gray-50 p-4 sm:p-5">
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField label="Status" htmlFor="update-status">
+                      <Select
+                        id="update-status"
+                        value={updateData.status}
+                        onChange={(e) =>
+                          setUpdateData({ ...updateData, status: e.target.value })
+                        }
+                      >
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Resolved</option>
+                        <option value="cancelled">Cancelled</option>
+                      </Select>
+                    </FormField>
+
+                    <FormField label="Priority" htmlFor="update-priority">
+                      <Select
+                        id="update-priority"
+                        value={updateData.priority}
+                        onChange={(e) =>
+                          setUpdateData({ ...updateData, priority: e.target.value })
+                        }
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </Select>
+                    </FormField>
+
+                    <FormField label="Scheduled Date" htmlFor="update-scheduledDate">
+                      <Input
+                        type="date"
+                        id="update-scheduledDate"
+                        value={updateData.scheduledDate}
+                        onChange={(e) =>
+                          setUpdateData({
+                            ...updateData,
+                            scheduledDate: e.target.value,
+                          })
+                        }
+                      />
+                    </FormField>
+
+                    <FormField label="Completed Date" htmlFor="update-completedDate">
+                      <Input
+                        type="date"
+                        id="update-completedDate"
+                        value={updateData.completedDate}
+                        onChange={(e) =>
+                          setUpdateData({
+                            ...updateData,
+                            completedDate: e.target.value,
+                          })
+                        }
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Assigned To"
+                      htmlFor="update-assignedTo"
+                      className="sm:col-span-2"
+                    >
+                      <Select
+                        id="update-assignedTo"
+                        value={updateData.assignedTo}
+                        onChange={(e) =>
+                          setUpdateData({ ...updateData, assignedTo: e.target.value })
+                        }
+                      >
+                        <option value="">Unassigned</option>
+                        {assignees.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {`${user.firstName} ${user.lastName}`.trim() || user.initials}
+                          </option>
+                        ))}
+                      </Select>
+                      {assignees.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-700">
+                          No admin/staff users available to assign yet.
+                        </p>
+                      )}
+                    </FormField>
+
+                    <FormField
+                      label="Internal notes"
+                      htmlFor="update-notes"
+                      className="sm:col-span-2"
+                    >
+                      <Textarea
+                        id="update-notes"
+                        value={updateData.notes}
+                        onChange={(e) =>
+                          setUpdateData({ ...updateData, notes: e.target.value })
+                        }
+                        rows={2}
+                        placeholder="Office-only notes (not shown as a tenant conversation message)…"
+                      />
+                    </FormField>
+                  </div>
+                </div>
+
+                <MaintenanceThreadPanel
+                  ref={threadRef}
+                  requestId={selectedRequest.id}
+                  hideSubmitButton
+                  status={updateData.status || selectedRequest.status}
+                  title="Discussion"
+                  conversationClassName="max-h-[min(50vh,28rem)]"
+                  seedMessage={{
+                    authorName: selectedRequest.tenant_name || 'Tenant',
+                    authorRole: 'tenant',
+                    body: [selectedRequest.title, selectedRequest.description]
+                      .filter(Boolean)
+                      .join('\n\n'),
+                    createdAt: selectedRequest.request_date,
+                    photos: (selectedRequest.attachments || []).map((a) => ({
+                      url: a.url,
+                      fileName: a.fileName,
+                    })),
+                    avatarUrl: selectedRequest.tenant_avatar_url,
+                  }}
+                  tenantAvatarUrl={selectedRequest.tenant_avatar_url}
+                  disabled={['closed', 'cancelled'].includes(
+                    String(updateData.status || selectedRequest.status).toLowerCase()
+                  )}
+                />
               </div>
-            </Card>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField label="Status" htmlFor="update-status">
-                <Select
-                  id="update-status"
-                  value={updateData.status}
-                  onChange={(e) => setUpdateData({ ...updateData, status: e.target.value })}
+              <div className="flex flex-shrink-0 justify-end gap-2 border-t border-gray-200 bg-white px-5 py-3 sm:px-6">
+                <Button variant="outline" onClick={() => setShowUpdateModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  leftIcon={<Save className="h-4 w-4" />}
+                  onClick={submitUpdate}
+                  isLoading={isSaving}
+                  isDisabled={isSaving}
                 >
-                  <option value="open">Open</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Resolved</option>
-                  <option value="cancelled">Cancelled</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Priority" htmlFor="update-priority">
-                <Select
-                  id="update-priority"
-                  value={updateData.priority}
-                  onChange={(e) => setUpdateData({ ...updateData, priority: e.target.value })}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Scheduled Date" htmlFor="update-scheduledDate">
-                <Input
-                  type="date"
-                  id="update-scheduledDate"
-                  value={updateData.scheduledDate}
-                  onChange={(e) =>
-                    setUpdateData({ ...updateData, scheduledDate: e.target.value })
-                  }
-                />
-              </FormField>
-
-              <FormField label="Completed Date" htmlFor="update-completedDate">
-                <Input
-                  type="date"
-                  id="update-completedDate"
-                  value={updateData.completedDate}
-                  onChange={(e) =>
-                    setUpdateData({ ...updateData, completedDate: e.target.value })
-                  }
-                />
-              </FormField>
-
-              <FormField label="Assigned To" htmlFor="update-assignedTo" className="md:col-span-2">
-                <Select
-                  id="update-assignedTo"
-                  value={updateData.assignedTo}
-                  onChange={(e) =>
-                    setUpdateData({ ...updateData, assignedTo: e.target.value })
-                  }
-                >
-                  <option value="">Unassigned</option>
-                  {assignees.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {`${user.firstName} ${user.lastName}`.trim() || user.initials}
-                    </option>
-                  ))}
-                </Select>
-                {assignees.length === 0 && (
-                  <p className="mt-1 text-xs text-amber-700">
-                    No admin/staff users available to assign yet.
-                  </p>
-                )}
-              </FormField>
-
-              <FormField label="Internal notes" htmlFor="update-notes" className="md:col-span-2">
-                <Textarea
-                  id="update-notes"
-                  value={updateData.notes}
-                  onChange={(e) => setUpdateData({ ...updateData, notes: e.target.value })}
-                  rows={3}
-                  placeholder="Office-only notes (not shown as a tenant conversation message)…"
-                />
-              </FormField>
+                  Save Changes
+                </Button>
+              </div>
             </div>
-
-            <MaintenanceThreadPanel
-              ref={threadRef}
-              requestId={selectedRequest.id}
-              hideSubmitButton
-              status={updateData.status || selectedRequest.status}
-              title="Discussion"
-              seedMessage={{
-                authorName: selectedRequest.tenant_name || 'Tenant',
-                authorRole: 'tenant',
-                body: [
-                  selectedRequest.title,
-                  selectedRequest.description,
-                ]
-                  .filter(Boolean)
-                  .join('\n\n'),
-                createdAt: selectedRequest.request_date,
-                photos: (selectedRequest.attachments || []).map((a) => ({
-                  url: a.url,
-                  fileName: a.fileName,
-                })),
-              }}
-              disabled={['closed', 'cancelled'].includes(
-                String(updateData.status || selectedRequest.status).toLowerCase()
-              )}
-            />
           </div>
-        )}
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }

@@ -70,6 +70,7 @@ export interface MaintenanceThreadSeed {
   body: string;
   createdAt: string;
   photos?: DiscussionPhoto[];
+  avatarUrl?: string | null;
 }
 
 interface MaintenanceThreadPanelProps {
@@ -83,9 +84,13 @@ interface MaintenanceThreadPanelProps {
   onPosted?: (payload: MaintenanceThreadSaveResult) => void;
   /** Original request shown as first timeline message */
   seedMessage?: MaintenanceThreadSeed | null;
+  /** Tenant profile photo for tenant messages in the thread */
+  tenantAvatarUrl?: string | null;
   /** Request status for header badge */
   status?: string | null;
   title?: string;
+  /** Override the conversation scroll area (default max-h-80) */
+  conversationClassName?: string;
 }
 
 function appendFields(form: FormData, fields: MaintenanceThreadPersistFields) {
@@ -117,8 +122,10 @@ export const MaintenanceThreadPanel = forwardRef<
     hideSubmitButton = false,
     onPosted,
     seedMessage,
+    tenantAvatarUrl,
     status,
     title = 'Discussion',
+    conversationClassName,
   },
   ref
 ) {
@@ -282,6 +289,7 @@ export const MaintenanceThreadPanel = forwardRef<
         body: seedMessage.body,
         createdAt: seedMessage.createdAt,
         photos: seedMessage.photos,
+        avatarUrl: seedMessage.avatarUrl || tenantAvatarUrl,
         isSeed: true,
       });
     }
@@ -297,10 +305,11 @@ export const MaintenanceThreadPanel = forwardRef<
         photoUrl: u.photoUrl,
         photoFileName: u.photoFileName,
         reactions: u.reactions,
+        avatarUrl: u.authorRole === 'tenant' ? tenantAvatarUrl : undefined,
       });
     }
     return list;
-  }, [requestId, seedMessage, updates]);
+  }, [requestId, seedMessage, tenantAvatarUrl, updates]);
 
   return (
     <div
@@ -323,7 +332,7 @@ export const MaintenanceThreadPanel = forwardRef<
             No messages yet. Add a comment below.
           </p>
         ) : (
-          <div className="max-h-80 overflow-y-auto pr-1">
+          <div className={cn('overflow-y-auto pr-1', conversationClassName || 'max-h-80')}>
             {messages.map((message, index) => (
               <MaintenanceDiscussionMessage
                 key={message.id}

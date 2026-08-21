@@ -21,7 +21,6 @@ import {
 } from '@/components/domain/StatusBadges';
 import {
   MaintenanceDiscussionComposer,
-  MaintenanceDiscussionHeader,
   MaintenanceDiscussionMessage,
   type DiscussionMessage,
 } from '@/components/features/maintenance/MaintenanceDiscussion';
@@ -30,7 +29,10 @@ import { useTenantPortalGate } from '@/hooks/useTenantPortalGate';
 import { useTenantData } from '@/hooks/useTenantPortalData';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
-import { formatMaintenanceCategory } from '@/lib/constants/maintenance';
+import {
+  formatMaintenanceCategory,
+  formatMaintenanceTicketNumber,
+} from '@/lib/constants/maintenance';
 
 interface MaintenancePhoto {
   id: string;
@@ -70,6 +72,7 @@ interface MaintenanceRequestDetail {
   notes?: string;
   roomNumber?: string;
   buildingName?: string;
+  tenantAvatarUrl?: string | null;
   attachments?: MaintenancePhoto[];
   updates?: MaintenanceUpdateItem[];
 }
@@ -78,13 +81,23 @@ function formatDate(value?: string | null) {
   if (!value) return '—';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
+  const sameYear = d.getFullYear() === new Date().getFullYear();
   return d.toLocaleString('en-PH', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function customerDisplayName(session: {
+  user?: { firstName?: string | null; lastName?: string | null };
+} | null): string {
+  return [session?.user?.firstName, session?.user?.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(' ');
 }
 
 export default function TenantMaintenanceDetailPage() {
@@ -99,7 +112,12 @@ export default function TenantMaintenanceDetailPage() {
 
   const [request, setRequest] = useState<MaintenanceRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'not_found' | 'unavailable' | null>(
+    null
+  );
   const [replyDraft, setReplyDraft] = useState('');
+  const [replyPhoto, setReplyPhoto] = useState<File | null>(null);
+  const [replyPhotoPreview, setReplyPhotoPreview] = useState<string | null>(null);
   const [feedbackRating, setFeedbackRating] = useState('5');
   const [showClosePanel, setShowClosePanel] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
@@ -108,23 +126,70 @@ export default function TenantMaintenanceDetailPage() {
   const loadRequest = useCallback(async () => {
     if (!requestId) return;
     setLoading(true);
+    setLoadError(null);
+    const maxAttempts = 3;
+    let lastMessage = 'Failed to load ticket';
+
     try {
-      const res = await fetch(`/api/tenant/maintenance/${requestId}`, {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Request not found');
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          const res = await fetch(`/api/tenant/maintenance/${requestId}`, {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          let data: {
+            success?: boolean;
+            error?: string;
+            retryable?: boolean;
+            data?: MaintenanceRequestDetail;
+          } = {};
+          try {
+            data = await res.json();
+          } catch {
+            data = {};
+          }
+
+          if (res.status === 404) {
+            setRequest(null);
+            setLoadError('not_found');
+            return;
+          }
+
+          if (!res.ok || !data.success || !data.data) {
+            const retryable =
+              Boolean(data.retryable) || res.status === 503 || res.status >= 500;
+            lastMessage = data.error || 'Failed to load ticket';
+            if (retryable && attempt < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+              continue;
+            }
+            setLoadError('unavailable');
+            showNotification({
+              type: 'error',
+              title: 'Unable to load',
+              message: lastMessage,
+            });
+            return;
+          }
+
+          setRequest(data.data);
+          setLoadError(null);
+          return;
+        } catch (error) {
+          lastMessage =
+            error instanceof Error ? error.message : 'Failed to load ticket';
+          if (attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+            continue;
+          }
+          setLoadError('unavailable');
+          showNotification({
+            type: 'error',
+            title: 'Unable to load',
+            message: lastMessage,
+          });
+        }
       }
-      setRequest(data.data as MaintenanceRequestDetail);
-    } catch (error) {
-      setRequest(null);
-      showNotification({
-        type: 'error',
-        title: 'Unable to load',
-        message: error instanceof Error ? error.message : 'Request not found',
-      });
     } finally {
       setLoading(false);
     }
@@ -141,24 +206,58 @@ export default function TenantMaintenanceDetailPage() {
     }
   }, [status, session, router, canAccess, gateLoading, loadRequest]);
 
+  const attachReplyPhoto = (file: File) => {
+    setReplyPhoto(file);
+    setReplyPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const clearReplyPhoto = () => {
+    setReplyPhoto(null);
+    setReplyPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (replyPhotoPreview) URL.revokeObjectURL(replyPhotoPreview);
+    };
+  }, [replyPhotoPreview]);
+
   const runTenantAction = async (
     action: 'acknowledge' | 'feedback' | 'close' | 'reply'
   ) => {
     if (!requestId) return;
     setActionBusy(true);
     try {
-      const res = await fetch(`/api/tenant/maintenance/${requestId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          note: replyDraft.trim() || undefined,
-          rating:
-            action === 'feedback' || action === 'close'
-              ? Number(feedbackRating)
-              : undefined,
-        }),
-      });
+      let res: Response;
+      if (action === 'reply') {
+        const form = new FormData();
+        form.append('action', 'reply');
+        if (replyDraft.trim()) form.append('note', replyDraft.trim());
+        if (replyPhoto) form.append('photo', replyPhoto);
+        res = await fetch(`/api/tenant/maintenance/${requestId}`, {
+          method: 'PATCH',
+          body: form,
+        });
+      } else {
+        res = await fetch(`/api/tenant/maintenance/${requestId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action,
+            note: replyDraft.trim() || undefined,
+            rating:
+              action === 'feedback' || action === 'close'
+                ? Number(feedbackRating)
+                : undefined,
+          }),
+        });
+      }
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Action failed');
@@ -167,15 +266,16 @@ export default function TenantMaintenanceDetailPage() {
         type: 'success',
         title:
           action === 'close'
-            ? 'Request closed'
+            ? 'Ticket closed'
             : action === 'acknowledge'
-              ? 'Service acknowledged'
+              ? 'Service confirmed'
               : action === 'reply'
                 ? 'Reply sent'
                 : 'Feedback sent',
         message: data.message || 'Update saved',
       });
       setReplyDraft('');
+      clearReplyPhoto();
       setShowClosePanel(false);
       invalidate('maintenance');
       if (Array.isArray(data.data?.updates)) {
@@ -252,16 +352,33 @@ export default function TenantMaintenanceDetailPage() {
   if (!request) {
     return (
       <div className={theme.page}>
-        <main className="mx-auto max-w-3xl space-y-4 px-4 py-8 sm:px-6">
+        <main className={theme.pagePad}>
           <Link
             href="/tenant/maintenance"
             className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-500"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to requests
+            All tickets
           </Link>
           <div className={theme.cardPad}>
-            <p className={theme.muted}>This maintenance request was not found.</p>
+            {loadError === 'unavailable' ? (
+              <div className="space-y-3">
+                <p className={theme.muted}>
+                  Couldn&apos;t load this ticket right now. The office may still
+                  be saving an update.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void loadRequest()}
+                  className={theme.primaryButton}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : (
+              <p className={theme.muted}>This ticket was not found.</p>
+            )}
           </div>
         </main>
       </div>
@@ -272,12 +389,16 @@ export default function TenantMaintenanceDetailPage() {
     String(request.status).toLowerCase()
   );
 
+  const customerName = customerDisplayName(session);
+
   const discussionMessages: DiscussionMessage[] = [
     {
       id: `seed-${request.id}`,
       authorName: 'You',
+      avatarName: customerName || undefined,
+      avatarUrl: request.tenantAvatarUrl || undefined,
       authorRole: 'tenant',
-      body: [request.title, request.description].filter(Boolean).join('\n\n'),
+      body: request.description || request.title,
       createdAt: request.createdAt,
       photos: (request.attachments || []).map((a) => ({
         url: a.url,
@@ -287,7 +408,11 @@ export default function TenantMaintenanceDetailPage() {
     },
     ...(request.updates || []).map((u) => ({
       id: u.id,
-      authorName: u.authorName || u.authorRole,
+      authorName: u.authorRole === 'tenant' ? 'You' : u.authorName || u.authorRole,
+      avatarName:
+        u.authorRole === 'tenant' ? customerName || undefined : u.authorName,
+      avatarUrl:
+        u.authorRole === 'tenant' ? request.tenantAvatarUrl || undefined : undefined,
       authorRole: u.authorRole,
       body: u.body,
       createdAt: u.createdAt,
@@ -299,177 +424,179 @@ export default function TenantMaintenanceDetailPage() {
     })),
   ];
 
+  const locationLabel = [
+    request.buildingName,
+    request.roomNumber && `Room ${request.roomNumber}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const openedAt = formatDate(request.createdAt);
+  const updatedAt = formatDate(request.updatedAt);
+  const showUpdated = Boolean(
+    request.updatedAt &&
+      request.createdAt &&
+      Math.abs(new Date(request.updatedAt).getTime() - new Date(request.createdAt).getTime()) >
+        60_000
+  );
+  const metaParts = [
+    formatMaintenanceCategory(request.category),
+    locationLabel,
+    openedAt !== '—' ? `Opened ${openedAt}` : null,
+    showUpdated ? `Updated ${updatedAt}` : null,
+  ].filter(Boolean);
+
   return (
     <div className={theme.page}>
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-8 sm:px-6">
+      <main className={theme.pagePad}>
         <Link
           href="/tenant/maintenance"
           className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-500"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to requests
+          All tickets
         </Link>
 
-        <div className={cn(theme.formPanel, 'overflow-hidden p-4 sm:p-6')}>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className={cn('text-2xl font-semibold', theme.shellHeader)}>
-              {request.title}
-            </h1>
-            <MaintenanceStatusBadge status={request.status} />
-            <MaintenancePriorityBadge priority={request.priority} />
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
-            <div>
-              <span className="font-medium">Category:</span>{' '}
-              {formatMaintenanceCategory(request.category)}
-            </div>
-            <div>
-              <span className="font-medium">Created:</span>{' '}
-              {formatDate(request.createdAt)}
-            </div>
-            <div>
-              <span className="font-medium">Last updated:</span>{' '}
-              {formatDate(request.updatedAt)}
-            </div>
-          </div>
-
-          {(request.roomNumber || request.buildingName) && (
-            <p className={cn('mt-2 text-sm', theme.muted)}>
-              {[request.buildingName, request.roomNumber && `Room ${request.roomNumber}`]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          )}
-
-          {request.scheduledDate && (
-            <div className="mt-2 text-sm text-blue-600">
-              <Calendar className="mr-1 inline h-4 w-4" />
-              <span className="font-medium">Scheduled:</span>{' '}
-              {formatDate(request.scheduledDate)}
-            </div>
-          )}
-          {request.completedDate && (
-            <div className="mt-2 text-sm text-green-600">
-              <CheckCircle2 className="mr-1 inline h-4 w-4" />
-              <span className="font-medium">Completed:</span>{' '}
-              {formatDate(request.completedDate)}
-            </div>
-          )}
-
-          <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="px-4 pt-4">
-              <MaintenanceDiscussionHeader
-                title="Discussion"
-                status={request.status}
-              />
-            </div>
-
-            <div className="px-4 py-3">
-              {discussionMessages.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
-                  No messages yet.
+        <div className={cn(theme.formPanel, 'overflow-hidden')}>
+          <div className="border-b border-gray-100 px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+              <div className="min-w-0">
+                <p className="font-mono text-xs text-gray-400">
+                  {formatMaintenanceTicketNumber(request.id)}
                 </p>
-              ) : (
-                <div>
-                  {discussionMessages.map((message, index) => (
-                    <MaintenanceDiscussionMessage
-                      key={message.id}
-                      message={message}
-                      isLast={index === discussionMessages.length - 1}
-                      reactionBusy={reactionBusyId === message.id}
-                      reactionsDisabled={isPreview}
-                      onToggleReaction={(id, reaction) =>
-                        void toggleReaction(id, reaction)
-                      }
-                    />
-                  ))}
-                </div>
-              )}
+                <h1 className="mt-1 text-xl font-semibold tracking-tight text-gray-900">
+                  {request.title}
+                </h1>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <MaintenanceStatusBadge status={request.status} />
+                <MaintenancePriorityBadge priority={request.priority} />
+              </div>
             </div>
+            {metaParts.length > 0 && (
+              <p className="mt-2 text-sm text-gray-500">{metaParts.join(' · ')}</p>
+            )}
+            {request.scheduledDate && (
+              <p className="mt-2 text-sm text-sky-600">
+                <Calendar className="mr-1 inline h-4 w-4" />
+                Visit scheduled {formatDate(request.scheduledDate)}
+              </p>
+            )}
+            {request.completedDate && (
+              <p className="mt-2 text-sm text-emerald-600">
+                <CheckCircle2 className="mr-1 inline h-4 w-4" />
+                Completed {formatDate(request.completedDate)}
+              </p>
+            )}
+          </div>
 
-            {!isClosed && (
-              <div className="space-y-3 px-4 pb-4">
-                <MaintenanceDiscussionComposer
-                  value={replyDraft}
-                  onChange={setReplyDraft}
-                  disabled={isPreview}
-                  saving={actionBusy}
-                  placeholder="Add a comment"
-                  onSend={() => void runTenantAction('reply')}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    isDisabled={actionBusy || isPreview}
-                    onClick={() => void runTenantAction('acknowledge')}
-                  >
-                    Acknowledge service
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    isDisabled={actionBusy || isPreview}
-                    onClick={() => setShowClosePanel((v) => !v)}
-                  >
-                    Close request…
-                  </Button>
-                </div>
-                {showClosePanel && (
-                  <div className="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3">
-                    <FormField label="Closing note (optional)" htmlFor="close-note">
-                      <textarea
-                        id="close-note"
-                        rows={2}
-                        value={replyDraft}
-                        onChange={(e) => setReplyDraft(e.target.value)}
-                        placeholder="Optional note when closing…"
-                        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                      />
-                    </FormField>
-                    <FormField label="Rating" htmlFor="close-rating">
-                      <Select
-                        id="close-rating"
-                        value={feedbackRating}
-                        onChange={(e) => setFeedbackRating(e.target.value)}
-                      >
-                        <option value="5">5 — Excellent</option>
-                        <option value="4">4 — Good</option>
-                        <option value="3">3 — Okay</option>
-                        <option value="2">2 — Poor</option>
-                        <option value="1">1 — Very poor</option>
-                      </Select>
-                    </FormField>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        isDisabled={actionBusy || isPreview}
-                        onClick={() => void runTenantAction('close')}
-                      >
-                        Confirm close
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        isDisabled={actionBusy}
-                        onClick={() => {
-                          setShowClosePanel(false);
-                          setReplyDraft('');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
+          <div className="px-4 py-4 sm:px-5">
+            {discussionMessages.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
+                No messages yet.
+              </p>
+            ) : (
+              <div>
+                {discussionMessages.map((message, index) => (
+                  <MaintenanceDiscussionMessage
+                    key={message.id}
+                    message={message}
+                    isLast={index === discussionMessages.length - 1}
+                    reactionBusy={reactionBusyId === message.id}
+                    reactionsDisabled={isPreview}
+                    onToggleReaction={(id, reaction) =>
+                      void toggleReaction(id, reaction)
+                    }
+                  />
+                ))}
               </div>
             )}
           </div>
+
+          {!isClosed && (
+            <div className="space-y-3 px-4 pb-4 sm:px-5">
+              <MaintenanceDiscussionComposer
+                value={replyDraft}
+                onChange={setReplyDraft}
+                disabled={isPreview}
+                saving={actionBusy}
+                placeholder="Reply to the office…"
+                onSend={() => void runTenantAction('reply')}
+                onAttach={attachReplyPhoto}
+                onClearPhoto={clearReplyPhoto}
+                photoPreview={replyPhotoPreview}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  isDisabled={actionBusy || isPreview}
+                  onClick={() => void runTenantAction('acknowledge')}
+                >
+                  Confirm this was fixed
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  isDisabled={actionBusy || isPreview}
+                  onClick={() => setShowClosePanel((v) => !v)}
+                >
+                  Close ticket…
+                </Button>
+              </div>
+              {showClosePanel && (
+                <div className="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3">
+                  <FormField label="Closing note (optional)" htmlFor="close-note">
+                    <textarea
+                      id="close-note"
+                      rows={2}
+                      value={replyDraft}
+                      onChange={(e) => setReplyDraft(e.target.value)}
+                      placeholder="Optional note when closing…"
+                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                  </FormField>
+                  <FormField label="How did we do?" htmlFor="close-rating">
+                    <Select
+                      id="close-rating"
+                      value={feedbackRating}
+                      onChange={(e) => setFeedbackRating(e.target.value)}
+                    >
+                      <option value="5">5 — Excellent</option>
+                      <option value="4">4 — Good</option>
+                      <option value="3">3 — Okay</option>
+                      <option value="2">2 — Poor</option>
+                      <option value="1">1 — Very poor</option>
+                    </Select>
+                  </FormField>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      isDisabled={actionBusy || isPreview}
+                      onClick={() => void runTenantAction('close')}
+                    >
+                      Confirm close
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      isDisabled={actionBusy}
+                      onClick={() => {
+                        setShowClosePanel(false);
+                        setReplyDraft('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

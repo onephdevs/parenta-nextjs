@@ -222,6 +222,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       [tenantId]
     );
 
+    // One active lease per room — previous create-tenant retries left duplicates
+    await client.query(
+      `UPDATE tenant_room_assignments 
+       SET assignment_status = 'terminated', end_date = CURRENT_DATE,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE room_id = $1 AND assignment_status = 'active'`,
+      [roomId]
+    );
+
     // Snapshot tenant identity for forever history
     const { loadTenantContactSnapshot, markPersonAsCurrentTenant } = await import(
       '@/lib/services/tenant-lifecycle'

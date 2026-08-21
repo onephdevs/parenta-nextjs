@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { CalendarClock, Tag } from 'lucide-react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { DetailSection } from '@/components/ui/DetailSection';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
@@ -143,134 +143,134 @@ export function InvoiceNegotiationPanel({
 
   if (!canEdit) {
     return (
-      <Card>
-        <h3 className="mb-2 text-lg font-medium text-gray-900">Billing agreements</h3>
-        <p className="text-sm text-gray-600">
-          This invoice is paid or cancelled — deadline and discount changes are locked.
-        </p>
-        {(negotiatedDueDate || (adjustmentAmount != null && Number(adjustmentAmount) > 0)) && (
-          <div className="mt-3 space-y-2 text-sm text-gray-700">
-            {negotiatedDueDate && (
-              <p>
-                Agreed deadline: <strong>{toInputDate(negotiatedDueDate)}</strong>
-                {negotiatedDueReason ? ` — ${negotiatedDueReason}` : ''}
-              </p>
-            )}
-            {adjustmentAmount != null && Number(adjustmentAmount) > 0 && (
-              <p>
-                Discount: <strong>₱{Number(adjustmentAmount).toLocaleString('en-PH')}</strong>
-                {adjustmentReason ? ` — ${adjustmentReason}` : ''}
-              </p>
-            )}
-          </div>
-        )}
-      </Card>
+      <DetailSection title="Billing agreements">
+        <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+          <p className="text-sm text-gray-600">
+            This invoice is paid or cancelled — deadline and discount changes are locked.
+          </p>
+          {(negotiatedDueDate || (adjustmentAmount != null && Number(adjustmentAmount) > 0)) && (
+            <div className="mt-3 space-y-2 text-sm text-gray-700">
+              {negotiatedDueDate && (
+                <p>
+                  Agreed deadline: <strong>{toInputDate(negotiatedDueDate)}</strong>
+                  {negotiatedDueReason ? ` — ${negotiatedDueReason}` : ''}
+                </p>
+              )}
+              {adjustmentAmount != null && Number(adjustmentAmount) > 0 && (
+                <p>
+                  Discount: <strong>₱{Number(adjustmentAmount).toLocaleString('en-PH')}</strong>
+                  {adjustmentReason ? ` — ${adjustmentReason}` : ''}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </DetailSection>
     );
   }
 
   return (
-    <Card>
-      <h3 className="mb-1 text-lg font-medium text-gray-900">Billing agreements</h3>
-      <p className="mb-4 text-sm text-gray-600">
-        No late-fee penalties — agree a new deadline when rent is delayed, or apply a
-        discretionary discount.
-      </p>
-
-      {error && <FormErrorBanner message={error} className="mb-3" />}
-      {success && (
-        <Alert variant="success" className="mb-3" onDismiss={() => setSuccess(null)}>
-          {success}
-        </Alert>
-      )}
-
-      <form onSubmit={handleSaveDue} className="space-y-3 border-b border-gray-100 pb-5">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-          <CalendarClock className="h-4 w-4" />
-          Negotiate due date
-        </div>
-        {dueDate && (
-          <p className="text-xs text-gray-500">
-            Original due date: {toInputDate(dueDate)}
-            {negotiatedDueDate
-              ? ` · Current agreed: ${toInputDate(negotiatedDueDate)}`
-              : ''}
-          </p>
+    <DetailSection
+      title="Billing agreements"
+      description="No late-fee penalties — agree a new deadline when rent is delayed, or apply a discretionary discount."
+    >
+      <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+        {error && <FormErrorBanner message={error} className="mb-3" />}
+        {success && (
+          <Alert variant="success" className="mb-3" onDismiss={() => setSuccess(null)}>
+            {success}
+          </Alert>
         )}
-        <FormField label="New agreed deadline" htmlFor="nego-due" required>
-          <Input
-            id="nego-due"
-            type="date"
-            required
-            value={dueValue}
-            onChange={(e) => setDueValue(e.target.value)}
-          />
-        </FormField>
-        <FormField
-          label="Reason"
-          htmlFor="nego-reason"
-          required
-          hint="e.g. Salary arrives on the 15th — agreed to pay then"
-        >
-          <Textarea
-            id="nego-reason"
-            required
-            rows={2}
-            value={dueReason}
-            onChange={(e) => setDueReason(e.target.value)}
-            placeholder="Tenant explanation / agreed reason"
-          />
-        </FormField>
-        <Button type="submit" size="sm" isLoading={savingDue} disabled={savingDiscount}>
-          Save deadline
-        </Button>
-      </form>
 
-      <form onSubmit={handleSaveDiscount} className="mt-5 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-          <Tag className="h-4 w-4" />
-          Discretionary discount
-        </div>
-        <FormField
-          label="Discount amount (₱)"
-          htmlFor="nego-discount"
-          hint="Example: ₱1,800 for collecting rent and cleaning common areas. Set 0 to clear."
-        >
-          <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-gray-500">
-              ₱
-            </span>
-            <Input
-              id="nego-discount"
-              type="number"
-              min={0}
-              step="0.01"
-              className="pl-8"
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-              placeholder="0.00"
-            />
+        <form onSubmit={handleSaveDue} className="space-y-3 border-b border-gray-100 pb-5">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+            <CalendarClock className="h-4 w-4" />
+            Negotiate due date
           </div>
-        </FormField>
-        <FormField label="Discount reason" htmlFor="nego-discount-reason" required>
-          <Textarea
-            id="nego-discount-reason"
+          {dueDate && (
+            <p className="text-xs text-gray-500">
+              Original due date: {toInputDate(dueDate)}
+              {negotiatedDueDate
+                ? ` · Current agreed: ${toInputDate(negotiatedDueDate)}`
+                : ''}
+            </p>
+          )}
+          <FormField label="New agreed deadline" htmlFor="nego-due" required>
+            <Input
+              id="nego-due"
+              type="date"
+              required
+              value={dueValue}
+              onChange={(e) => setDueValue(e.target.value)}
+            />
+          </FormField>
+          <FormField
+            label="Reason"
+            htmlFor="nego-reason"
             required
-            rows={2}
-            value={discountReason}
-            onChange={(e) => setDiscountReason(e.target.value)}
-            placeholder="Why this discount was given"
-          />
-        </FormField>
-        <Button
-          type="submit"
-          size="sm"
-          variant="outline"
-          isLoading={savingDiscount}
-          disabled={savingDue}
-        >
-          Apply discount
-        </Button>
-      </form>
-    </Card>
+            hint="e.g. Salary arrives on the 15th — agreed to pay then"
+          >
+            <Textarea
+              id="nego-reason"
+              required
+              rows={2}
+              value={dueReason}
+              onChange={(e) => setDueReason(e.target.value)}
+              placeholder="Tenant explanation / agreed reason"
+            />
+          </FormField>
+          <Button type="submit" size="sm" isLoading={savingDue} disabled={savingDiscount}>
+            Save deadline
+          </Button>
+        </form>
+
+        <form onSubmit={handleSaveDiscount} className="mt-5 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+            <Tag className="h-4 w-4" />
+            Discretionary discount
+          </div>
+          <FormField
+            label="Discount amount (₱)"
+            htmlFor="nego-discount"
+            hint="Example: ₱1,800 for collecting rent and cleaning common areas. Set 0 to clear."
+          >
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-gray-500">
+                ₱
+              </span>
+              <Input
+                id="nego-discount"
+                type="number"
+                min={0}
+                step="0.01"
+                className="pl-8"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </FormField>
+          <FormField label="Discount reason" htmlFor="nego-discount-reason" required>
+            <Textarea
+              id="nego-discount-reason"
+              required
+              rows={2}
+              value={discountReason}
+              onChange={(e) => setDiscountReason(e.target.value)}
+              placeholder="Why this discount was given"
+            />
+          </FormField>
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            isLoading={savingDiscount}
+            disabled={savingDue}
+          >
+            Apply discount
+          </Button>
+        </form>
+      </div>
+    </DetailSection>
   );
 }

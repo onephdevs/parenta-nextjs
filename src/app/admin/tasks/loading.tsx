@@ -1,11 +1,5 @@
-import AppLoader from '@/components/ui/AppLoader';
+import { RouteLoadingFallback } from '@/components/layout/route-loader';
 
 export default function TasksLoading() {
-  return (
-    <AppLoader
-      variant="inline"
-      label="Loading pipeline…"
-      className="min-h-[calc(100vh-8rem)]"
-    />
-  );
+  return <RouteLoadingFallback />;
 }

@@ -1,5 +1,5 @@
-import AppLoader from '@/components/ui/AppLoader';
+import { RouteLoadingFallback } from '@/components/layout/route-loader';
 
 export default function TenantsLoading() {
-  return <AppLoader variant="inline" className="min-h-[calc(100vh-4rem)]" />;
+  return <RouteLoadingFallback />;
 }

@@ -31,6 +31,8 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
     activeUnits: dbBuilding.active_units || 0,
     amenities: dbBuilding.amenities,
     isActive: dbBuilding.is_active,
+    autoLateFee: dbBuilding.auto_late_fee !== false,
+    showOnLandingNearby: dbBuilding.show_on_landing_nearby !== false,
     createdAt: dbBuilding.created_at,
     updatedAt: dbBuilding.updated_at,
   };
@@ -150,6 +152,9 @@ export interface RoomAssignmentHistoryItem {
   startDate: string | Date;
   endDate?: string | Date | null;
   monthlyRate: number;
+  depositPaid?: number;
+  advancePaid?: number;
+  utilityDepositPaid?: number;
   assignmentStatus: string;
 }
 
@@ -283,10 +288,15 @@ export async function getPropertyBuildingDetail(
         LIMIT 1
       ) AS next_due_date
     FROM rooms r
-    LEFT JOIN tenant_room_assignments tra
-      ON tra.room_id = r.id
-      AND tra.assignment_status = 'active'
-      AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+    LEFT JOIN LATERAL (
+      SELECT tra.*
+      FROM tenant_room_assignments tra
+      WHERE tra.room_id = r.id
+        AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+      ORDER BY tra.created_at DESC NULLS LAST, tra.start_date DESC NULLS LAST
+      LIMIT 1
+    ) tra ON true
     LEFT JOIN tenants t ON t.id = tra.tenant_id
     WHERE r.building_id = $1 AND r.is_active = true
     ORDER BY
@@ -468,6 +478,7 @@ export interface RoomsPageListItem {
   squareFootage?: number;
   monthlyRate: number;
   tenantName: string | null;
+  primaryImagePath?: string | null;
 }
 
 export interface RoomPageDetail {
@@ -504,6 +515,7 @@ function mapRoomRowToPropertyRoomDetail(
           emergencyContactPhone: (r.tenant_emergency_contact_phone as string | null) ?? null,
           notes: (r.tenant_notes as string | null) ?? null,
           startDate: r.assignment_start as string | Date,
+          endDate: (r.assignment_end as string | Date | null) ?? null,
           dueDate: (r.next_due_date as string | Date | null) ?? null,
           monthlyRate:
             parseFloat(String(r.assignment_monthly_rate)) ||
@@ -557,13 +569,25 @@ export async function getRoomsForRoomsPage(): Promise<RoomsPageListItem[]> {
       r.square_footage,
       r.monthly_rate,
       t.first_name AS tenant_first_name,
-      t.last_name AS tenant_last_name
+      t.last_name AS tenant_last_name,
+      (
+        SELECT i.file_path
+        FROM images i
+        WHERE i.entity_type = 'room' AND i.entity_id = r.id
+        ORDER BY i.is_primary DESC, i.created_at ASC
+        LIMIT 1
+      ) AS primary_image_path
     FROM rooms r
     JOIN buildings b ON b.id = r.building_id AND b.is_active = true
-    LEFT JOIN tenant_room_assignments tra
-      ON tra.room_id = r.id
-      AND tra.assignment_status = 'active'
-      AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+    LEFT JOIN LATERAL (
+      SELECT tra.tenant_id
+      FROM tenant_room_assignments tra
+      WHERE tra.room_id = r.id
+        AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+      ORDER BY tra.created_at DESC NULLS LAST, tra.start_date DESC NULLS LAST
+      LIMIT 1
+    ) tra ON true
     LEFT JOIN tenants t ON t.id = tra.tenant_id
     WHERE r.is_active = true
     ORDER BY b.name ASC,
@@ -589,6 +613,7 @@ export async function getRoomsForRoomsPage(): Promise<RoomsPageListItem[]> {
       squareFootage: row.square_footage ?? undefined,
       monthlyRate: parseFloat(row.monthly_rate) || 0,
       tenantName,
+      primaryImagePath: row.primary_image_path || null,
     };
   });
 }
@@ -625,6 +650,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       t.emergency_contact_phone AS tenant_emergency_contact_phone,
       t.notes AS tenant_notes,
       tra.start_date AS assignment_start,
+      tra.end_date AS assignment_end,
       tra.deposit_paid,
       tra.advance_paid,
       tra.utility_deposit_paid,
@@ -651,11 +677,16 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
         LIMIT 1
       ) AS next_due_date,
       (
-        SELECT img.file_path
-        FROM images img
-        WHERE img.entity_type = 'tenant' AND img.entity_id = t.id
-        ORDER BY img.is_primary DESC, img.created_at ASC
-        LIMIT 1
+        SELECT COALESCE(
+          NULLIF(t.profile_picture_url, ''),
+          (
+            SELECT img.file_path
+            FROM images img
+            WHERE img.entity_type = 'tenant' AND img.entity_id = t.id
+            ORDER BY img.is_primary DESC, img.created_at ASC
+            LIMIT 1
+          )
+        )
       ) AS tenant_profile_image,
       (
         SELECT COUNT(*)::int FROM rooms rr
@@ -671,10 +702,15 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       ) AS vacant_units_count
     FROM rooms r
     JOIN buildings b ON b.id = r.building_id AND b.is_active = true
-    LEFT JOIN tenant_room_assignments tra
-      ON tra.room_id = r.id
-      AND tra.assignment_status = 'active'
-      AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+    LEFT JOIN LATERAL (
+      SELECT tra.*
+      FROM tenant_room_assignments tra
+      WHERE tra.room_id = r.id
+        AND tra.assignment_status = 'active'
+        AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE)
+      ORDER BY tra.created_at DESC NULLS LAST, tra.start_date DESC NULLS LAST
+      LIMIT 1
+    ) tra ON true
     LEFT JOIN tenants t ON t.id = tra.tenant_id
     WHERE r.id = $1 AND r.is_active = true
     `,
@@ -899,6 +935,14 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
         startDate: item.start_date as string | Date,
         endDate: (item.end_date as string | Date | null) ?? null,
         monthlyRate: parseFloat(String(item.monthly_rate)) || 0,
+        depositPaid:
+          item.deposit_paid != null ? parseFloat(String(item.deposit_paid)) || 0 : undefined,
+        advancePaid:
+          item.advance_paid != null ? parseFloat(String(item.advance_paid)) || 0 : undefined,
+        utilityDepositPaid:
+          item.utility_deposit_paid != null
+            ? parseFloat(String(item.utility_deposit_paid)) || 0
+            : undefined,
         assignmentStatus: String(item.assignment_status || ''),
       };
     }
