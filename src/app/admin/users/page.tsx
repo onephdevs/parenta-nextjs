@@ -26,15 +26,11 @@ import {
   Pagination,
   SearchInput,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  TableCard,
+  WorkItemRow,
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import { BuildingStatusBadge } from '@/components/domain/StatusBadges';
+import { formatShortDate } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 
@@ -165,13 +161,6 @@ export default function AdminUsersPage() {
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/signin');
   }
-
-  const formatDate = (value: string) =>
-    new Date(value).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
 
   const openCreateModal = () => {
     setCreateForm(emptyCreateForm);
@@ -400,15 +389,25 @@ export default function AdminUsersPage() {
         />
       </div>
 
-      <FilterBar columns={4}>
-        <FormField label="Search" htmlFor="users-search">
+      <FilterBar
+        columns={4}
+        collapsible
+        activeCount={statusFilter ? 1 : 0}
+        search={
           <SearchInput
             id="users-search"
             placeholder="Name, email, username..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search users"
           />
-        </FormField>
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            Showing {filteredUsers.length} of {users.length} users
+          </p>
+        }
+      >
         <FormField label="Status" htmlFor="users-status">
           <Select
             id="users-status"
@@ -422,7 +421,7 @@ export default function AdminUsersPage() {
         </FormField>
       </FilterBar>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <TableCard title="Admin users" description="Accounts that can sign in to the admin portal.">
         {filteredUsers.length === 0 ? (
           <EmptyState
             title="No admin users found"
@@ -430,78 +429,58 @@ export default function AdminUsersPage() {
           />
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageUsers.map((user) => {
-                  const isSelf = user.id === session.user.id;
-                  return (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.firstName} {user.lastName}
-                          {isSelf && (
-                            <span className="ml-2 text-xs font-normal text-gray-500">(you)</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            user.role === 'caretaker'
-                              ? 'bg-amber-100 text-amber-900'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {user.role === 'caretaker' ? 'Caretaker' : 'Admin'}
-                        </span>
-                      </TableCell>
-                      <TableCell>{user.email || '—'}</TableCell>
-                      <TableCell>{user.username || '—'}</TableCell>
-                      <TableCell>
-                        <BuildingStatusBadge isActive={user.isActive} />
-                      </TableCell>
-                      <TableCell>{formatDate(user.createdAt)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(user)}
-                            className="text-gray-500 hover:text-gray-900"
-                            title="Edit"
-                          >
-                            <Pencil className="h-5 w-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleActive(user)}
-                            disabled={isSelf && user.isActive}
-                            className="text-gray-500 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
-                            title={user.isActive ? 'Deactivate' : 'Activate'}
-                          >
-                            {user.isActive ? (
-                              <UserX className="h-5 w-5" />
-                            ) : (
-                              <UserCheck className="h-5 w-5" />
-                            )}
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            {pageUsers.map((user) => {
+              const isSelf = user.id === session.user.id;
+              const fullName = `${user.firstName} ${user.lastName}`.trim() || 'Unnamed user';
+              return (
+                <WorkItemRow
+                  key={user.id}
+                  title={isSelf ? `${fullName} (you)` : fullName}
+                  subtitle={user.email || user.username || null}
+                  badges={[
+                    {
+                      key: 'role',
+                      label: user.role === 'caretaker' ? 'Caretaker' : 'Admin',
+                      tone: user.role === 'caretaker' ? 'warning' : 'info',
+                    },
+                    {
+                      key: 'status',
+                      label: user.isActive ? 'Active' : 'Inactive',
+                      tone: user.isActive ? 'success' : 'neutral',
+                    },
+                  ]}
+                  date={formatShortDate(user.createdAt)}
+                  metaLabel={user.isActive ? 'Active' : 'Inactive'}
+                  metaTone={user.isActive ? 'muted' : 'default'}
+                  dotTone={user.isActive ? 'success' : 'neutral'}
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(user)}
+                        className="text-gray-500 hover:text-gray-900"
+                        title="Edit"
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleActive(user)}
+                        disabled={isSelf && user.isActive}
+                        className="text-gray-500 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+                        title={user.isActive ? 'Deactivate' : 'Activate'}
+                      >
+                        {user.isActive ? (
+                          <UserX className="h-5 w-5" />
+                        ) : (
+                          <UserCheck className="h-5 w-5" />
+                        )}
+                      </button>
+                    </>
+                  }
+                />
+              );
+            })}
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}
@@ -511,7 +490,7 @@ export default function AdminUsersPage() {
             />
           </>
         )}
-      </div>
+      </TableCard>
 
       <Dialog
         isOpen={showCreateModal}

@@ -364,7 +364,7 @@ export function TenantSummaryCard({
               label: 'Terminate',
               icon: <Ban className="h-4 w-4 shrink-0 text-red-500" />,
               href: activeLeaseId
-                ? `/admin/lease-management/${activeLeaseId}?action=terminate`
+                ? `/admin/leasing/${activeLeaseId}?action=terminate`
                 : undefined,
               disabled: !activeLeaseId,
               onSelect: () => onManageLease?.('terminate'),

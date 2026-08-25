@@ -202,7 +202,7 @@ export default function MoveOutInspectionPage() {
           message: data.message || 'Settlement completed',
         });
         setWorksheet(data.data);
-        router.push('/admin/lease-management');
+        router.push('/admin/leasing');
       } else {
         showNotification({
           type: 'error',
@@ -232,7 +232,7 @@ export default function MoveOutInspectionPage() {
         title="Move-out inspection & refund"
         description={`${worksheet.tenantName} · ${worksheet.buildingName} · Unit ${worksheet.roomNumber}`}
         actions={
-          <Link href="/admin/lease-management">
+          <Link href="/admin/leasing">
             <Button variant="outline">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Lease management

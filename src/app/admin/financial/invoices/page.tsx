@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { getInvoices, getInvoiceSummary } from '@/lib/api/invoices';
 import { getAllTenants } from '@/lib/api/tenants';
-import { PageHeader, ListSummaryCard, Button, EmptyState, FilterBar, SearchInput, Select, Pagination, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui';
-import { AlertTriangle, CheckCircle2, Clock, Eye, FileText, Plus } from 'lucide-react';
-import { FormField } from '@/components/forms/FormField';
-import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
+import { PageHeader, ListSummaryCard, Button, EmptyState, Pagination, TableCard, WorkItemRow } from '@/components/ui';
+import { AlertTriangle, CheckCircle2, Clock, FileText, Plus } from 'lucide-react';
+import { InvoicesFilterBar } from '@/components/features/InvoicesFilterBar';
+import { formatShortDate } from '@/lib/utils';
+import type { WorkItemTone } from '@/components/ui/WorkItemRow';
 
 interface SearchParams {
   page?: string;
@@ -97,12 +98,21 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
     }).format(value);
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const invoiceStatusTone = (status: string): WorkItemTone => {
+    const key = (status || '').toLowerCase();
+    if (key === 'paid') return 'success';
+    if (key === 'overdue') return 'danger';
+    if (key === 'partial' || key === 'pending' || key === 'due') return 'warning';
+    if (key === 'issued' || key === 'sent') return 'info';
+    return 'neutral';
+  };
+
+  const invoiceStatusLabel = (status: string) => {
+    const key = (status || '').toLowerCase();
+    if (key === 'due') return 'Due';
+    if (key === 'overdue') return 'Overdue';
+    if (key === 'sent') return 'Sent';
+    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const totalPages = Math.ceil(invoicesData.total / 20);
@@ -146,54 +156,16 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
         />
       </div>
 
-      <form method="GET">
-        <FilterBar columns={4}>
-          <FormField label="Search" htmlFor="search">
-            <SearchInput
-              name="search"
-              id="search"
-              defaultValue={search}
-              placeholder="Invoice #, tenant..."
-            />
-          </FormField>
+      <InvoicesFilterBar
+        search={search}
+        status={status}
+        tenantId={tenantId}
+        tenants={uniqueTenants}
+        shown={invoicesData.invoices.length}
+        total={invoicesData.total}
+      />
 
-          <FormField label="Status" htmlFor="status">
-            <Select name="status" id="status" defaultValue={status}>
-              <option value="">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-              <option value="cancelled">Cancelled</option>
-            </Select>
-          </FormField>
-
-          <FormField label="Tenant" htmlFor="tenant">
-            <Select name="tenant" id="tenant" defaultValue={tenantId}>
-              <option value="">All Tenants</option>
-              {uniqueTenants.length > 0 ? (
-                uniqueTenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.firstName} {tenant.lastName}
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled>
-                  No tenants available
-                </option>
-              )}
-            </Select>
-          </FormField>
-
-          <div className="flex items-end">
-            <Button type="submit" className="w-full">
-              Apply filters
-            </Button>
-          </div>
-        </FilterBar>
-      </form>
-
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <TableCard title="Invoices" description="Open an invoice from the View action.">
         {invoicesData.invoices.length === 0 ? (
           <EmptyState
             title="No invoices found"
@@ -206,61 +178,35 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
           />
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoicesData.invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">
-                        {invoice.invoiceNumber}
-                      </div>
-                      {invoice.description && (
-                        <div className="mt-0.5 max-w-xs truncate text-xs text-gray-500">
-                          {invoice.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">
-                        {invoice.tenantName || '—'}
-                      </div>
-                      {(invoice as { buildingName?: string }).buildingName && (
-                        <div className="text-sm text-gray-600">
-                          {(invoice as { buildingName?: string }).buildingName}{' '}
-                          {(invoice as { roomNumber?: string }).roomNumber || ''}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDate(invoice.dueDate)}</TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(invoice.totalAmount)}
-                    </TableCell>
-                    <TableCell>
-                      <InvoiceStatusBadge status={invoice.status} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/admin/financial/invoices/${invoice.id}`}
-                        className="inline-flex text-gray-500 hover:text-gray-900"
-                        title="View"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {invoicesData.invoices.map((invoice) => {
+              const statusTone = invoiceStatusTone(invoice.status);
+              const statusLabel = invoiceStatusLabel(invoice.status);
+              const location = [
+                (invoice as { buildingName?: string }).buildingName,
+                (invoice as { roomNumber?: string }).roomNumber,
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              return (
+                <WorkItemRow
+                  key={invoice.id}
+                  href={`/admin/financial/invoices/${invoice.id}`}
+                  title={invoice.tenantName || invoice.invoiceNumber}
+                  subtitle={location || invoice.invoiceNumber}
+                  badges={[{ key: 'status', label: statusLabel, tone: statusTone }]}
+                  date={formatShortDate(invoice.dueDate)}
+                  metaLabel={formatCurrency(invoice.totalAmount)}
+                  metaTone={
+                    statusTone === 'danger'
+                      ? 'danger'
+                      : statusTone === 'warning'
+                        ? 'warning'
+                        : 'default'
+                  }
+                  dotTone={statusTone}
+                />
+              );
+            })}
             <Pagination
               currentPage={page}
               totalPages={Math.max(1, totalPages)}
@@ -269,7 +215,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
             />
           </>
         )}
-      </div>
+      </TableCard>
     </div>
   );
 }

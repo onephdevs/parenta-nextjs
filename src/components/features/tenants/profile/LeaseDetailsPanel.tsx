@@ -142,7 +142,7 @@ export function LeaseDetailsPanel({ lease, tenantId, onBack }: LeaseDetailsPanel
               <RefreshCw className="h-4 w-4" />
             </IconAction>
             <IconAction
-              href={`/admin/lease-management/${lease.id}?action=terminate`}
+              href={`/admin/leasing/${lease.id}?action=terminate`}
               label="Terminate"
               className="text-red-600 hover:bg-red-50"
             >

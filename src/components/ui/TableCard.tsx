@@ -34,7 +34,12 @@ export function TableCard({
   className,
 }: TableCardProps) {
   return (
-    <div className={cn('overflow-hidden rounded-lg bg-white shadow', className)}>
+    <div
+      className={cn(
+        'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm',
+        className
+      )}
+    >
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
           <div className="min-w-0">

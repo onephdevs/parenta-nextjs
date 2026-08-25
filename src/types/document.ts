@@ -146,4 +146,19 @@ export const DOCUMENT_TYPES = [
   'other'
 ];
 
+/** Types that commonly have a validity period (IDs, policies, leases, inspections). */
+export const DOCUMENT_TYPES_WITH_EXPIRY = [
+  'lease',
+  'id_proof',
+  'background_check',
+  'legal',
+  'insurance',
+  'inspection',
+  'contract',
+] as const;
+
+export function documentTypeHasExpiry(documentType: string): boolean {
+  return (DOCUMENT_TYPES_WITH_EXPIRY as readonly string[]).includes(documentType);
+}
+
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB 

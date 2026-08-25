@@ -2,20 +2,30 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { useNotifications } from '@/hooks/useNotifications';
-import { DocumentCategory, DOCUMENT_TYPES, MAX_FILE_SIZE, SUPPORTED_FILE_TYPES } from '@/types/document';
+import {
+  DocumentCategory,
+  DOCUMENT_TYPES,
+  MAX_FILE_SIZE,
+  SUPPORTED_FILE_TYPES,
+  documentTypeHasExpiry,
+} from '@/types/document';
 import { TakePhotoButton } from '@/components/features/TakePhotoButton';
 
 interface AdminDocumentUploadProps {
   categories: DocumentCategory[];
   buildings: Array<{ id: string; name: string }>;
   tenants?: Array<{ id: string; firstName: string; lastName: string }>;
+}
+
+function fileLabel(file: File): string {
+  return file.name.replace(/\.[^/.]+$/, '') || file.name;
 }
 
 export default function AdminDocumentUpload({
@@ -29,7 +39,7 @@ export default function AdminDocumentUpload({
 
   const [isOpen, setIsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [documentName, setDocumentName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [buildingId, setBuildingId] = useState('');
@@ -39,7 +49,7 @@ export default function AdminDocumentUpload({
 
   useEffect(() => {
     if (!isOpen) {
-      setFile(null);
+      setFiles([]);
       setDocumentName('');
       setCategoryId('');
       setBuildingId('');
@@ -50,29 +60,68 @@ export default function AdminDocumentUpload({
     }
   }, [isOpen]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = event.target.files?.[0] || null;
-    applySelectedFile(selected);
+  const addFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return;
+    if (files.length === 0 && incoming.length === 1 && !documentName.trim()) {
+      setDocumentName(incoming[0].name);
+    }
+    setFiles((prev) => [...prev, ...incoming]);
   };
 
-  const applySelectedFile = (selected: File | null) => {
-    setFile(selected);
-    if (selected && !documentName.trim()) {
-      setDocumentName(selected.name);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(event.target.files || []));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 1) {
+        setDocumentName((name) => name.trim() || next[0].name);
+      }
+      if (next.length === 0) setDocumentName('');
+      return next;
+    });
+  };
+
+  const uploadOne = async (file: File, name: string) => {
+    if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
+      throw new Error(`Unsupported file type: ${file.name}`);
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`${file.name} is over ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('documentName', name);
+    if (categoryId) formData.append('categoryId', categoryId);
+    if (buildingId) formData.append('buildingId', buildingId);
+    if (tenantId) formData.append('tenantId', tenantId);
+    if (documentType) formData.append('documentType', documentType);
+    if (expiryDate) formData.append('expiryDate', expiryDate);
+
+    const response = await fetch('/api/documents', {
+      method: 'POST',
+      body: formData,
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || `Failed to upload ${file.name}`);
     }
   };
 
   const handleSubmit = async () => {
-    if (!file) {
+    if (files.length === 0) {
       showNotification({
         type: 'error',
         title: 'File required',
-        message: 'Please choose a file to upload.',
+        message: 'Please choose one or more files to upload.',
       });
       return;
     }
 
-    if (!documentName.trim()) {
+    if (files.length === 1 && !documentName.trim()) {
       showNotification({
         type: 'error',
         title: 'Name required',
@@ -81,58 +130,47 @@ export default function AdminDocumentUpload({
       return;
     }
 
-    if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
-      showNotification({
-        type: 'error',
-        title: 'Unsupported file',
-        message: 'This file type is not supported.',
-      });
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      showNotification({
-        type: 'error',
-        title: 'File too large',
-        message: `File must be under ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
-      });
-      return;
-    }
-
     setIsUploading(true);
+    let uploaded = 0;
+    const errors: string[] = [];
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentName', documentName.trim());
-      if (categoryId) formData.append('categoryId', categoryId);
-      if (buildingId) formData.append('buildingId', buildingId);
-      if (tenantId) formData.append('tenantId', tenantId);
-      if (documentType) formData.append('documentType', documentType);
-      if (expiryDate) formData.append('expiryDate', expiryDate);
-
-      const response = await fetch('/api/documents', {
-        method: 'POST',
-        body: formData,
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to upload document');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const name =
+          files.length === 1 ? documentName.trim() : fileLabel(file);
+        try {
+          await uploadOne(file, name);
+          uploaded += 1;
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : `Failed ${file.name}`);
+        }
       }
 
-      showNotification({
-        type: 'success',
-        title: 'Document uploaded',
-        message: `"${documentName.trim()}" has been uploaded.`,
-      });
-      setIsOpen(false);
-      router.refresh();
-    } catch (error) {
-      showNotification({
-        type: 'error',
-        title: 'Upload failed',
-        message: error instanceof Error ? error.message : 'Failed to upload document',
-      });
+      if (uploaded > 0 && errors.length === 0) {
+        showNotification({
+          type: 'success',
+          title: uploaded === 1 ? 'Document uploaded' : 'Documents uploaded',
+          message:
+            uploaded === 1
+              ? `"${documentName.trim() || files[0].name}" has been uploaded.`
+              : `${uploaded} documents have been uploaded.`,
+        });
+        setIsOpen(false);
+        router.refresh();
+      } else if (uploaded > 0) {
+        showNotification({
+          type: 'warning',
+          title: 'Partial upload',
+          message: `${uploaded} uploaded. ${errors[0] || 'Some files failed.'}`,
+        });
+        router.refresh();
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'Upload failed',
+          message: errors[0] || 'Failed to upload documents',
+        });
+      }
     } finally {
       setIsUploading(false);
     }
@@ -148,52 +186,84 @@ export default function AdminDocumentUpload({
         isOpen={isOpen}
         onClose={() => !isUploading && setIsOpen(false)}
         title="Upload document"
-        description="Add a file and optionally link it to a property or tenant."
+        description="Add one or more files and optionally link them to a property or tenant."
         size="lg"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsOpen(false)} isDisabled={isUploading}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} isLoading={isUploading}>
-              Upload
+            <Button onClick={() => void handleSubmit()} isLoading={isUploading}>
+              {files.length > 1 ? `Upload ${files.length} files` : 'Upload'}
             </Button>
           </div>
         }
       >
         <div className="space-y-4 px-6 py-4">
-          <FormField label="File" htmlFor="doc-upload-file" required>
+          <FormField label="Files" htmlFor="doc-upload-file" required>
             <div className="space-y-2">
               <input
                 id="doc-upload-file"
                 ref={fileInputRef}
                 type="file"
+                multiple
+                accept={SUPPORTED_FILE_TYPES.join(',')}
                 onChange={handleFileChange}
                 className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-purple-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-purple-700 hover:file:bg-purple-100"
               />
               <TakePhotoButton
                 disabled={isUploading}
-                onCapture={(captured) => applySelectedFile(captured)}
+                onCapture={(captured) => addFiles([captured])}
                 title="Take document photo"
                 description="Allow camera access if prompted, then capture the document or receipt."
                 fileNamePrefix="document"
               />
-              {file ? (
-                <p className="text-xs text-gray-500">
-                  Selected: {file.name} ({(file.size / 1024).toFixed(0)} KB)
-                </p>
-              ) : null}
+              {files.length > 0 ? (
+                <ul className="divide-y divide-gray-100 rounded-md border border-gray-200">
+                  {files.map((file, index) => (
+                    <li
+                      key={`${file.name}-${file.size}-${index}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                    >
+                      <span className="min-w-0 truncate text-gray-800">
+                        {file.name}
+                        <span className="ml-2 text-xs text-gray-500">
+                          {(file.size / 1024).toFixed(0)} KB
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                        aria-label={`Remove ${file.name}`}
+                        disabled={isUploading}
+                        onClick={() => removeFile(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-gray-500">You can select multiple files at once.</p>
+              )}
             </div>
           </FormField>
 
-          <FormField label="Document name" htmlFor="doc-upload-name" required>
-            <Input
-              id="doc-upload-name"
-              value={documentName}
-              onChange={(e) => setDocumentName(e.target.value)}
-              placeholder="e.g. Signed lease 2026"
-            />
-          </FormField>
+          {files.length <= 1 ? (
+            <FormField label="Document name" htmlFor="doc-upload-name" required>
+              <Input
+                id="doc-upload-name"
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+                placeholder="e.g. Signed lease 2026"
+              />
+            </FormField>
+          ) : (
+            <p className="text-sm text-gray-600">
+              Each file will be uploaded with its filename. Category, type, and links below apply to
+              all files.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Category" htmlFor="doc-upload-category">
@@ -215,7 +285,11 @@ export default function AdminDocumentUpload({
               <Select
                 id="doc-upload-type"
                 value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
+                onChange={(e) => {
+                  const nextType = e.target.value;
+                  setDocumentType(nextType);
+                  if (!documentTypeHasExpiry(nextType)) setExpiryDate('');
+                }}
               >
                 <option value="">Select type</option>
                 {DOCUMENT_TYPES.map((type) => (
@@ -256,14 +330,16 @@ export default function AdminDocumentUpload({
               </Select>
             </FormField>
 
-            <FormField label="Expiry date" htmlFor="doc-upload-expiry">
-              <Input
-                id="doc-upload-expiry"
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-              />
-            </FormField>
+            {documentTypeHasExpiry(documentType) ? (
+              <FormField label="Expiry date" htmlFor="doc-upload-expiry">
+                <Input
+                  id="doc-upload-expiry"
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                />
+              </FormField>
+            ) : null}
           </div>
         </div>
       </Dialog>

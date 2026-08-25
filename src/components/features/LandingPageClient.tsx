@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   Building2,
@@ -18,6 +19,7 @@ import {
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { HomeContactForm } from '@/components/features/HomeContactForm';
 import { NearbyAmenitiesSection } from '@/components/features/nearby/NearbyAmenitiesSection';
+import { landingPropertyCoverSrc } from '@/lib/format/image-url';
 import type { PublicPortfolioPayload } from '@/lib/api/public-portfolio';
 
 interface PortfolioStats {
@@ -58,6 +60,47 @@ function locationLabel(p: FeaturedProperty): string {
   const parts = [p.city, p.state].filter(Boolean);
   if (parts.length) return parts.join(', ');
   return p.address || 'Location TBA';
+}
+
+const HERO_FALLBACK = '/brand/hero-room.jpg';
+
+function FeaturedPropertyCover({
+  name,
+  imageUrl,
+}: {
+  name: string;
+  imageUrl: string | null;
+}) {
+  const primary = landingPropertyCoverSrc(name, imageUrl);
+  const [src, setSrc] = useState<string | null>(primary);
+
+  useEffect(() => {
+    setSrc(landingPropertyCoverSrc(name, imageUrl));
+  }, [name, imageUrl]);
+
+  if (!src) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Building2 className="h-14 w-14 text-slate-300" />
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={name}
+      fill
+      sizes="(max-width: 768px) 100vw, 33vw"
+      className="object-cover transition duration-500 group-hover:scale-[1.03]"
+      onError={() => {
+        setSrc((current) => {
+          if (current && current !== HERO_FALLBACK) return HERO_FALLBACK;
+          return null;
+        });
+      }}
+    />
+  );
 }
 
 /** Customer landing — light modern palette, sharp hierarchy, glanceable CTAs. */
@@ -423,19 +466,11 @@ export default function LandingPageClient({
                       href="#contact"
                       className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
                     >
-                      <div className="relative h-52 bg-slate-100">
-                        {building.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- dynamic API/blob paths
-                          <img
-                            src={building.imageUrl}
-                            alt={building.name}
-                            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center">
-                            <Building2 className="h-14 w-14 text-slate-300" />
-                          </div>
-                        )}
+                      <div className="relative h-52 overflow-hidden bg-slate-100">
+                        <FeaturedPropertyCover
+                          name={building.name}
+                          imageUrl={building.imageUrl}
+                        />
                         <div
                           className={`absolute top-4 left-4 rounded-lg px-3 py-1 text-xs font-semibold shadow-sm ${
                             lowAvailability

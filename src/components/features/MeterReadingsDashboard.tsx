@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
-import { StatCard } from '@/components/ui/StatCard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import { SearchInput } from '@/components/ui/SearchInput';
+import {
+  TableCard,
+  WorkItemRow,
+} from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
+import { Building2, Calendar, Gauge, Zap } from 'lucide-react';
+import { formatShortDate } from '@/lib/utils';
 
 interface MeterReading {
   id: string;
@@ -133,184 +141,245 @@ export default function MeterReadingsDashboard() {
     readings.map((r) => `${r.buildingId}-${r.utilityType}-${r.meterNumber || 'default'}`)
   ).size;
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [buildingFilter, setBuildingFilter] = useState('');
+  const [utilityFilter, setUtilityFilter] = useState('');
+
+  const filteredReadings = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return readings.filter((r) => {
+      const matchesSearch =
+        !term ||
+        (r.building_name || '').toLowerCase().includes(term) ||
+        (r.meterNumber || '').toLowerCase().includes(term) ||
+        (r.utilityType || '').toLowerCase().includes(term);
+      const matchesBuilding = !buildingFilter || r.buildingId === buildingFilter;
+      const matchesUtility = !utilityFilter || r.utilityType === utilityFilter;
+      return matchesSearch && matchesBuilding && matchesUtility;
+    });
+  }, [readings, searchTerm, buildingFilter, utilityFilter]);
+
+  const utilityTone = (type: string) => {
+    const key = type.toLowerCase();
+    if (key === 'electricity') return 'warning' as const;
+    if (key === 'water') return 'info' as const;
+    if (key === 'gas') return 'danger' as const;
+    return 'neutral' as const;
+  };
+
   if (loading) {
     return (
-      <Card>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4" />
+          <div className="mb-4 h-4 w-3/4 rounded bg-gray-200" />
           <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded" />
-            <div className="h-4 bg-gray-200 rounded w-5/6" />
-            <div className="h-4 bg-gray-200 rounded w-4/6" />
+            <div className="h-4 rounded bg-gray-200" />
+            <div className="h-4 w-5/6 rounded bg-gray-200" />
+            <div className="h-4 w-4/6 rounded bg-gray-200" />
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Meter Readings Dashboard</h2>
-            <Button variant="primary" onClick={() => setShowForm(true)}>
-              Add Reading
-            </Button>
-          </div>
-          <p className="text-sm text-gray-900">
-            Track and manage utility meter readings across all properties.
-          </p>
-        </CardHeader>
-        {error && (
-          <div className="px-6 pb-4">
-            <Alert variant="danger">{error}</Alert>
-          </div>
-        )}
-      </Card>
+      {error && <Alert variant="danger">{error}</Alert>}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Readings" value={readings.length} />
-        <StatCard title="Unique Meters" value={uniqueMeters} />
-        <StatCard title="This Month" value={monthCount} />
-        <StatCard title="Buildings" value={buildings.length} />
+        <ListSummaryCard
+          title="Total Readings"
+          value={readings.length}
+          footer="all recorded readings"
+          icon={<Gauge className="h-8 w-8 text-blue-600" />}
+        />
+        <ListSummaryCard
+          title="Unique Meters"
+          value={uniqueMeters}
+          footer="meters tracked"
+          icon={<Zap className="h-8 w-8 text-amber-500" />}
+        />
+        <ListSummaryCard
+          title="This Month"
+          value={monthCount}
+          footer="readings this month"
+          icon={<Calendar className="h-8 w-8 text-green-600" />}
+        />
+        <ListSummaryCard
+          title="Buildings"
+          value={buildings.length}
+          footer="properties with meters"
+          icon={<Building2 className="h-8 w-8 text-slate-600" />}
+        />
       </div>
 
+      <FilterBar
+        columns={3}
+        collapsible
+        activeCount={[buildingFilter, utilityFilter].filter(Boolean).length}
+        search={
+          <SearchInput
+            id="meter-search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Building, meter, utility..."
+            aria-label="Search meter readings"
+          />
+        }
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
+              Showing {filteredReadings.length} of {readings.length} readings
+            </p>
+            <Button onClick={() => setShowForm(true)}>Add Reading</Button>
+          </div>
+        }
+      >
+        <FormField label="Building" htmlFor="meter-building-filter">
+          <Select
+            id="meter-building-filter"
+            value={buildingFilter}
+            onChange={(e) => setBuildingFilter(e.target.value)}
+          >
+            <option value="">All Buildings</option>
+            {buildings.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Utility" htmlFor="meter-utility-filter">
+          <Select
+            id="meter-utility-filter"
+            value={utilityFilter}
+            onChange={(e) => setUtilityFilter(e.target.value)}
+          >
+            <option value="">All Types</option>
+            <option value="electricity">Electricity</option>
+            <option value="water">Water</option>
+            <option value="gas">Gas</option>
+            <option value="internet">Internet</option>
+            <option value="other">Other</option>
+          </Select>
+        </FormField>
+      </FilterBar>
+
       {showForm && (
-        <Card>
-          <CardHeader>
-            <h3 className="text-lg font-medium text-gray-900">Add Meter Reading</h3>
-          </CardHeader>
-          <CardBody>
-            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Building" htmlFor="meter-building" required>
-                <Select
-                  id="meter-building"
-                  required
-                  value={form.buildingId}
-                  onChange={(e) => setForm((f) => ({ ...f, buildingId: e.target.value }))}
-                >
-                  <option value="">Select building</option>
-                  {buildings.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </Select>
-              </FormField>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-medium text-gray-900">Add Meter Reading</h3>
+          <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField label="Building" htmlFor="meter-building" required>
+              <Select
+                id="meter-building"
+                required
+                value={form.buildingId}
+                onChange={(e) => setForm((f) => ({ ...f, buildingId: e.target.value }))}
+              >
+                <option value="">Select building</option>
+                {buildings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-              <FormField label="Utility Type" htmlFor="meter-utility-type">
-                <Select
-                  id="meter-utility-type"
-                  value={form.utilityType}
-                  onChange={(e) => setForm((f) => ({ ...f, utilityType: e.target.value }))}
-                >
-                  <option value="electricity">Electricity</option>
-                  <option value="water">Water</option>
-                  <option value="gas">Gas</option>
-                  <option value="internet">Internet</option>
-                  <option value="other">Other</option>
-                </Select>
-              </FormField>
+            <FormField label="Utility Type" htmlFor="meter-utility-type">
+              <Select
+                id="meter-utility-type"
+                value={form.utilityType}
+                onChange={(e) => setForm((f) => ({ ...f, utilityType: e.target.value }))}
+              >
+                <option value="electricity">Electricity</option>
+                <option value="water">Water</option>
+                <option value="gas">Gas</option>
+                <option value="internet">Internet</option>
+                <option value="other">Other</option>
+              </Select>
+            </FormField>
 
-              <FormField label="Reading Date" htmlFor="meter-reading-date" required>
-                <Input
-                  id="meter-reading-date"
-                  type="date"
-                  required
-                  value={form.readingDate}
-                  onChange={(e) => setForm((f) => ({ ...f, readingDate: e.target.value }))}
-                />
-              </FormField>
+            <FormField label="Reading Date" htmlFor="meter-reading-date" required>
+              <Input
+                id="meter-reading-date"
+                type="date"
+                required
+                value={form.readingDate}
+                onChange={(e) => setForm((f) => ({ ...f, readingDate: e.target.value }))}
+              />
+            </FormField>
 
-              <FormField label="Reading Value" htmlFor="meter-reading-value" required>
-                <Input
-                  id="meter-reading-value"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  value={form.readingValue}
-                  onChange={(e) => setForm((f) => ({ ...f, readingValue: e.target.value }))}
-                />
-              </FormField>
+            <FormField label="Reading Value" htmlFor="meter-reading-value" required>
+              <Input
+                id="meter-reading-value"
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={form.readingValue}
+                onChange={(e) => setForm((f) => ({ ...f, readingValue: e.target.value }))}
+              />
+            </FormField>
 
-              <FormField label="Meter Number (optional)" htmlFor="meter-number">
-                <Input
-                  id="meter-number"
-                  type="text"
-                  value={form.meterNumber}
-                  onChange={(e) => setForm((f) => ({ ...f, meterNumber: e.target.value }))}
-                />
-              </FormField>
+            <FormField label="Meter Number (optional)" htmlFor="meter-number">
+              <Input
+                id="meter-number"
+                type="text"
+                value={form.meterNumber}
+                onChange={(e) => setForm((f) => ({ ...f, meterNumber: e.target.value }))}
+              />
+            </FormField>
 
-              <FormField label="Notes (optional)" htmlFor="meter-notes">
-                <Textarea
-                  id="meter-notes"
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  rows={1}
-                />
-              </FormField>
+            <FormField label="Notes (optional)" htmlFor="meter-notes">
+              <Textarea
+                id="meter-notes"
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={1}
+              />
+            </FormField>
 
-              <div className="md:col-span-2 flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary" isLoading={saving}>
-                  Save Reading
-                </Button>
-              </div>
-            </form>
-          </CardBody>
-        </Card>
+            <div className="flex justify-end gap-3 md:col-span-2">
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" isLoading={saving}>
+                Save Reading
+              </Button>
+            </div>
+          </form>
+        </div>
       )}
 
-      <Card padding="none">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Recent Meter Readings
-          </h3>
-
-          {readings.length === 0 ? (
-            <div className="text-center py-12">
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No meter readings</h3>
-              <p className="mt-1 text-sm text-gray-900">Get started by adding your first meter reading.</p>
-              <div className="mt-6">
-                <Button variant="primary" onClick={() => setShowForm(true)}>
-                  Add Meter Reading
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead>
-                  <tr className="text-left text-gray-700">
-                    <th className="py-2 pr-4">Date</th>
-                    <th className="py-2 pr-4">Building</th>
-                    <th className="py-2 pr-4">Utility</th>
-                    <th className="py-2 pr-4">Value</th>
-                    <th className="py-2">Meter #</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {readings.map((r) => (
-                    <tr key={r.id}>
-                      <td className="py-2 pr-4">{new Date(r.readingDate).toLocaleDateString()}</td>
-                      <td className="py-2 pr-4">{r.building_name || r.buildingId}</td>
-                      <td className="py-2 pr-4 capitalize">{r.utilityType}</td>
-                      <td className="py-2 pr-4">{Number(r.readingValue).toLocaleString()}</td>
-                      <td className="py-2">{r.meterNumber || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Card>
+      <TableCard title="Meter readings" description="Recent consumption readings across properties.">
+        {filteredReadings.length === 0 ? (
+          <EmptyState
+            title="No meter readings"
+            description="Get started by adding your first meter reading."
+            action={<Button onClick={() => setShowForm(true)}>Add Meter Reading</Button>}
+          />
+        ) : (
+          filteredReadings.map((r) => (
+            <WorkItemRow
+              key={r.id}
+              title={r.building_name || r.buildingId}
+              subtitle={r.meterNumber ? `Meter ${r.meterNumber}` : r.room_number ? `Room ${r.room_number}` : null}
+              badges={[
+                {
+                  key: 'utility',
+                  label: r.utilityType,
+                  tone: utilityTone(r.utilityType),
+                },
+              ]}
+              date={formatShortDate(r.readingDate)}
+              metaLabel={Number(r.readingValue).toLocaleString()}
+              metaDetail={r.usageCalculated != null ? `+${Number(r.usageCalculated).toLocaleString()}` : null}
+              dotTone={utilityTone(r.utilityType)}
+            />
+          ))
+        )}
+      </TableCard>
     </div>
   );
 }
-
-
 

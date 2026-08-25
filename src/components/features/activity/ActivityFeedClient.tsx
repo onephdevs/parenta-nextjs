@@ -4,12 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { FormField } from '@/components/forms/FormField';
+import { WorkItemRow } from '@/components/ui/WorkItemRow';
+import { Activity, Filter, Hash, List } from 'lucide-react';
+import { formatShortDate } from '@/lib/utils';
 import {
   ACTIVITY_CATEGORIES,
   CATEGORY_DEFAULTS,
@@ -172,82 +178,115 @@ export default function ActivityFeedClient() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Recent Activity</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Chronological audit of meaningful changes across the app.
-        </p>
+      <PageHeader
+        title="Recent Activity"
+        description="Chronological audit of meaningful changes across the app."
+      />
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ListSummaryCard
+          title="Total events"
+          value={total}
+          footer="matching current filters"
+          icon={<Activity className="h-8 w-8 text-blue-600" />}
+        />
+        <ListSummaryCard
+          title="This page"
+          value={items.length}
+          footer={`page ${page} of ${totalPages}`}
+          icon={<List className="h-8 w-8 text-slate-600" />}
+        />
+        <ListSummaryCard
+          title="Category"
+          value={category ? CATEGORY_DEFAULTS[category as keyof typeof CATEGORY_DEFAULTS]?.label || category : 'All'}
+          footer="activity category"
+          icon={<Filter className="h-8 w-8 text-amber-600" />}
+        />
+        <ListSummaryCard
+          title="Selected"
+          value={selectedId ? 1 : 0}
+          footer={selectedId ? 'viewing event details' : 'none selected'}
+          icon={<Hash className="h-8 w-8 text-green-600" />}
+        />
       </div>
 
-      <Card className="p-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <FormField label="Category" htmlFor="filter-category">
-            <Select
-              id="filter-category"
-              value={category}
-              onChange={(e) => {
-                setPage(1);
-                setCategory(e.target.value);
-              }}
-            >
-              <option value="">All categories</option>
-              {ACTIVITY_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_DEFAULTS[c].label}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Action type" htmlFor="filter-action">
-            <Input
-              id="filter-action"
-              value={actionType}
-              onChange={(e) => {
-                setPage(1);
-                setActionType(e.target.value);
-              }}
-              placeholder="e.g. tenant.created"
-            />
-          </FormField>
-          <FormField label="Search label" htmlFor="filter-q">
-            <Input
-              id="filter-q"
-              value={q}
-              onChange={(e) => {
-                setPage(1);
-                setQ(e.target.value);
-              }}
-              placeholder="Entity name"
-            />
-          </FormField>
-          <FormField label="From" htmlFor="filter-from">
-            <Input
-              id="filter-from"
-              type="date"
-              value={from}
-              onChange={(e) => {
-                setPage(1);
-                setFrom(e.target.value);
-              }}
-            />
-          </FormField>
-          <FormField label="To" htmlFor="filter-to">
-            <Input
-              id="filter-to"
-              type="date"
-              value={to}
-              onChange={(e) => {
-                setPage(1);
-                setTo(e.target.value);
-              }}
-            />
-          </FormField>
-        </div>
-      </Card>
+      <FilterBar
+        columns={4}
+        collapsible
+        activeCount={[category, actionType, from, to].filter(Boolean).length}
+        search={
+          <SearchInput
+            id="filter-q"
+            value={q}
+            onChange={(e) => {
+              setPage(1);
+              setQ(e.target.value);
+            }}
+            placeholder="Entity name..."
+            aria-label="Search activity"
+          />
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            Showing {items.length} of {total} events
+          </p>
+        }
+      >
+        <FormField label="Category" htmlFor="filter-category">
+          <Select
+            id="filter-category"
+            value={category}
+            onChange={(e) => {
+              setPage(1);
+              setCategory(e.target.value);
+            }}
+          >
+            <option value="">All categories</option>
+            {ACTIVITY_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_DEFAULTS[c].label}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Action type" htmlFor="filter-action">
+          <Input
+            id="filter-action"
+            value={actionType}
+            onChange={(e) => {
+              setPage(1);
+              setActionType(e.target.value);
+            }}
+            placeholder="e.g. tenant.created"
+          />
+        </FormField>
+        <FormField label="From" htmlFor="filter-from">
+          <Input
+            id="filter-from"
+            type="date"
+            value={from}
+            onChange={(e) => {
+              setPage(1);
+              setFrom(e.target.value);
+            }}
+          />
+        </FormField>
+        <FormField label="To" htmlFor="filter-to">
+          <Input
+            id="filter-to"
+            type="date"
+            value={to}
+            onChange={(e) => {
+              setPage(1);
+              setTo(e.target.value);
+            }}
+          />
+        </FormField>
+      </FilterBar>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <Card className="overflow-hidden">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 px-4 py-3 text-sm text-gray-600">
               {total} event{total === 1 ? '' : 's'}
             </div>
@@ -265,37 +304,29 @@ export default function ActivityFeedClient() {
                 />
               </div>
             ) : (
-              <ul>
-                {items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => selectActivity(item.id)}
-                      className={`w-full border-b border-gray-50 px-4 py-3 text-left hover:bg-gray-50 ${
-                        selectedId === item.id ? 'bg-purple-50' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{item.description}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <Badge tone="neutral" size="sm">
-                              {CATEGORY_DEFAULTS[item.category as keyof typeof CATEGORY_DEFAULTS]
-                                ?.label || item.category}
-                            </Badge>
-                            <span className="text-xs text-gray-500">
-                              {getActionTitle(item.actionType)}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-xs text-gray-500">
-                          {formatRelative(item.createdAt)}
-                        </span>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              items.map((item) => (
+                <WorkItemRow
+                  key={item.id}
+                  onClick={() => selectActivity(item.id)}
+                  className={selectedId === item.id ? 'bg-purple-50' : undefined}
+                  title={item.description}
+                  subtitle={item.actorName}
+                  badges={[
+                    {
+                      key: 'category',
+                      label:
+                        CATEGORY_DEFAULTS[item.category as keyof typeof CATEGORY_DEFAULTS]
+                          ?.label || item.category,
+                      tone: 'info',
+                    },
+                    { key: 'action', label: getActionTitle(item.actionType), tone: 'neutral' },
+                  ]}
+                  date={formatShortDate(item.createdAt)}
+                  metaLabel={formatRelative(item.createdAt)}
+                  metaTone="muted"
+                  dotTone="info"
+                />
+              ))
             )}
             <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
               <Button
@@ -319,8 +350,8 @@ export default function ActivityFeedClient() {
               >
                 Next
               </Button>
+              </div>
             </div>
-          </Card>
         </div>
 
         <div className="lg:col-span-2">

@@ -68,7 +68,7 @@ export default function LeasePackageTemplateForm({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const backHref = '/admin/leasing';
+  const backHref = '/admin/lease-templates';
   const title = mode === 'create' ? 'Create Lease Template' : 'Edit Lease Template';
 
   const openConfirm = (e: FormEvent) => {

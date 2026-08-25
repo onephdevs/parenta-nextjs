@@ -2,12 +2,14 @@ import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import { TableCard, WorkItemRow } from '@/components/ui';
 import {
   AlertCircle,
   DollarSign,
@@ -148,8 +150,27 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
         }
       />
 
-      <Card className="mb-6">
-        <form method="GET" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <form method="GET">
+        <FilterBar
+          columns={3}
+          collapsible
+          activeCount={
+            [
+              resolvedSearchParams.startDate,
+              resolvedSearchParams.endDate,
+              resolvedSearchParams.period,
+            ].filter(Boolean).length
+          }
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-gray-600">
+                Report period: {formatDate(financialReport.period.start)} –{' '}
+                {formatDate(financialReport.period.end)}
+              </p>
+              <Button type="submit">Generate Report</Button>
+            </div>
+          }
+        >
           <FormField label="Start Date" htmlFor="startDate">
             <Input
               type="date"
@@ -172,19 +193,8 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
               <option value="this-year">This Year</option>
             </Select>
           </FormField>
-
-          <div className="flex items-end">
-            <Button type="submit" className="w-full">
-              Generate Report
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      <p className="text-sm text-gray-600">
-        Report period: {formatDate(financialReport.period.start)} –{' '}
-        {formatDate(financialReport.period.end)}
-      </p>
+        </FilterBar>
+      </form>
 
       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <ListSummaryCard
@@ -218,168 +228,102 @@ export default async function FinancialReportsPage({ searchParams }: ReportsPage
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="border-b border-gray-100 px-6 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Revenue by Category</h3>
-          </div>
-          <div className="px-6 py-4">
-            {revenueByCategory.length === 0 ? (
-              <p className="py-4 text-center text-sm text-gray-600">
-                No revenue data for this period
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {revenueByCategory.map((item) => (
-                  <div key={item.category} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatReportCategoryLabel(item.category)}
-                      </span>
-                      <span className="text-sm text-gray-500">({item.count})</span>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <TableCard title="Revenue by Category">
+          {revenueByCategory.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-gray-600">
+              No revenue data for this period
+            </p>
+          ) : (
+            revenueByCategory.map((item) => (
+              <WorkItemRow
+                key={item.category}
+                title={formatReportCategoryLabel(item.category)}
+                subtitle={`${item.count} ${item.count === 1 ? 'item' : 'items'}`}
+                badges={[{ key: 'type', label: 'Revenue', tone: 'success' }]}
+                metaLabel={formatCurrency(item.amount)}
+                metaTone="muted"
+                dotTone="success"
+              />
+            ))
+          )}
+        </TableCard>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="border-b border-gray-100 px-6 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Expenses by Category</h3>
-          </div>
-          <div className="px-6 py-4">
-            {expenseByCategory.length === 0 ? (
-              <p className="py-4 text-center text-sm text-gray-600">
-                No expense data for this period
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {expenseByCategory.map((item) => (
-                  <div key={item.category} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatReportCategoryLabel(item.category)}
-                      </span>
-                      <span className="text-sm text-gray-500">({item.count})</span>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-900">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <TableCard title="Expenses by Category">
+          {expenseByCategory.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-gray-600">
+              No expense data for this period
+            </p>
+          ) : (
+            expenseByCategory.map((item) => (
+              <WorkItemRow
+                key={item.category}
+                title={formatReportCategoryLabel(item.category)}
+                subtitle={`${item.count} ${item.count === 1 ? 'item' : 'items'}`}
+                badges={[{ key: 'type', label: 'Expense', tone: 'danger' }]}
+                metaLabel={formatCurrency(item.amount)}
+                metaTone="danger"
+                dotTone="danger"
+              />
+            ))
+          )}
+        </TableCard>
       </div>
 
-      <div className="mb-8 overflow-hidden rounded-lg bg-white shadow">
-        <div className="border-b border-gray-100 px-6 py-3">
-          <h3 className="text-sm font-semibold text-gray-900">Monthly Financial Trends</h3>
-        </div>
+      <TableCard title="Monthly Financial Trends" className="mb-8">
         {monthlyTrends.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="text-sm text-gray-600">No trend data available</p>
-          </div>
+          <p className="px-4 py-6 text-center text-sm text-gray-600">No trend data available</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Month
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Revenue
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Expenses
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Profit
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {monthlyTrends.map((trend) => (
-                  <tr key={trend.month} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {trend.month}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {formatCurrency(trend.revenue)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {formatCurrency(trend.expenses)}
-                    </td>
-                    <td
-                      className={`whitespace-nowrap px-6 py-4 text-sm font-medium ${
-                        trend.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {formatCurrency(trend.profit)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          monthlyTrends.map((trend) => (
+            <WorkItemRow
+              key={trend.month}
+              title={trend.month}
+              subtitle={`Expenses ${formatCurrency(trend.expenses)}`}
+              badges={[
+                {
+                  key: 'result',
+                  label: trend.profit >= 0 ? 'Profit' : 'Loss',
+                  tone: trend.profit >= 0 ? 'success' : 'danger',
+                },
+              ]}
+              metaLabel={formatCurrency(trend.profit)}
+              metaDetail={`Rev ${formatCurrency(trend.revenue)}`}
+              metaTone={trend.profit >= 0 ? 'muted' : 'danger'}
+              dotTone={trend.profit >= 0 ? 'success' : 'danger'}
+            />
+          ))
         )}
-      </div>
+      </TableCard>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        <div className="border-b border-gray-100 px-6 py-3">
-          <h3 className="text-sm font-semibold text-gray-900">Outstanding Balances by Tenant</h3>
-        </div>
+      <TableCard title="Outstanding Balances by Tenant">
         {outstandingBalances.length === 0 ? (
-          <div className="p-8 text-center text-gray-900">
-            <p className="text-sm text-gray-600">No outstanding balances</p>
-          </div>
+          <p className="px-4 py-6 text-center text-sm text-gray-600">No outstanding balances</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Tenant
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Total Outstanding
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Overdue Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                    Days Past Due
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {outstandingBalances.map((balance) => (
-                  <tr key={balance.tenantId} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                      {balance.tenantName}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {formatCurrency(balance.totalAmount)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-red-600">
-                      {formatCurrency(balance.overdueAmount)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {balance.daysPastDue > 0 ? `${balance.daysPastDue} days` : 'Current'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          outstandingBalances.map((balance) => (
+            <WorkItemRow
+              key={balance.tenantId}
+              title={balance.tenantName}
+              subtitle={
+                balance.daysPastDue > 0 ? `${balance.daysPastDue} days past due` : 'Current'
+              }
+              badges={[
+                {
+                  key: 'status',
+                  label: balance.daysPastDue > 0 ? 'Overdue' : 'Outstanding',
+                  tone: balance.daysPastDue > 0 ? 'danger' : 'warning',
+                },
+              ]}
+              metaLabel={
+                balance.daysPastDue > 0
+                  ? `${balance.daysPastDue} days late`
+                  : 'Outstanding'
+              }
+              metaDetail={formatCurrency(balance.totalAmount)}
+              metaTone={balance.daysPastDue > 0 ? 'danger' : 'warning'}
+              dotTone={balance.daysPastDue > 0 ? 'danger' : 'warning'}
+            />
+          ))
         )}
-      </div>
+      </TableCard>
     </div>
   );
 }

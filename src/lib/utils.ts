@@ -26,6 +26,20 @@ export function formatDate(date: Date | string): string {
   });
 }
 
+/** Compact date used in tenant-style list rows, e.g. "Aug 21". */
+export function formatShortDate(date: Date | string | null | undefined): string | null {
+  if (date == null || date === '') return null;
+  const d =
+    typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())
+      ? new Date(`${date.trim()}T12:00:00`)
+      : new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 /**
  * Format date with time
  */

@@ -83,10 +83,18 @@ export function AdminBackButton({
   }, [target, router, fallbackHref]);
 
   const label = target
-    ? target.includes('/lease-management/')
-      ? 'Back to lease'
-      : target.includes('/lease-management')
-        ? 'Back to leases'
+    ? target.includes('/lease-templates/')
+      ? 'Back to template'
+      : target.includes('/lease-templates')
+        ? 'Back to templates'
+        : /\/leasing\/.+/.test(target)
+          ? 'Back to lease'
+          : target.includes('/leasing')
+            ? 'Back to leases'
+            : target.includes('/lease-management/')
+              ? 'Back to lease'
+              : target.includes('/lease-management')
+                ? 'Back to leases'
         : target.includes('/tenants/')
           ? 'Back to tenant'
           : 'Back'

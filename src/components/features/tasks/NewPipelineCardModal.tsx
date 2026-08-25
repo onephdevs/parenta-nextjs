@@ -3134,7 +3134,7 @@ export function AddOpportunityModal({
                       This opportunity is linked to Lease management.
                     </p>
                     <a
-                      href={`/admin/lease-management/${card.assignmentId}`}
+                      href={`/admin/leasing/${card.assignmentId}`}
                       className="mt-2 inline-block font-medium text-emerald-700 underline"
                       target="_blank"
                       rel="noreferrer"

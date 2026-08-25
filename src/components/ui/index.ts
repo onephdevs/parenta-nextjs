@@ -9,7 +9,7 @@
 
 export { Alert, type AlertProps, type AlertVariant } from './Alert';
 export { Avatar, type AvatarProps } from './Avatar';
-export { Badge, type BadgeProps, type BadgeTone } from './Badge';
+export { Badge, type BadgeProps, type BadgeTone, type BadgeVariant } from './Badge';
 export { BrandLogo } from './BrandLogo';
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
 export {
@@ -87,6 +87,13 @@ export {
   type TableEmptyProps,
 } from './Table';
 export { TableCard, type TableCardProps } from './TableCard';
+export {
+  WorkItemList,
+  WorkItemRow,
+  type WorkItemBadge,
+  type WorkItemRowProps,
+  type WorkItemTone,
+} from './WorkItemRow';
 export { Tab, TabList, TabPanel, Tabs, type TabPanelProps, type TabProps, type TabsProps } from './Tabs';
 export { Textarea, type TextareaProps } from './Textarea';
 

@@ -5,13 +5,13 @@ import Link from 'next/link';
 import {
   AlertCircle,
   CheckCircle2,
-  Eye,
   FileText,
+  Plus,
   XCircle,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Spinner } from '@/components/ui/Spinner';
@@ -19,14 +19,19 @@ import { FormField } from '@/components/forms/FormField';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import Pagination from '@/components/ui/Pagination';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { LeaseStatusBadge } from '@/components/domain/StatusBadges';
-import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import {
-  formatLeaseTermShort,
+  TableCard,
+  WorkItemRow,
+} from '@/components/ui';
+import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import NewLeaseModal from '@/components/features/leasing/NewLeaseModal';
+import {
   type LeaseListItem,
   type LeaseStats,
   type LeaseUiStatus,
 } from '@/lib/leases-shared';
+import { formatShortDate } from '@/lib/utils';
+import type { WorkItemTone } from '@/components/ui/WorkItemRow';
 
 const PAGE_SIZE = 20;
 
@@ -42,6 +47,21 @@ interface LeasePagination {
   limit: number;
   total: number;
   totalPages: number;
+}
+
+function leaseStatusTone(status: string): WorkItemTone {
+  const key = (status || '').toLowerCase();
+  if (key === 'active') return 'success';
+  if (key === 'expiring_soon') return 'warning';
+  if (key === 'terminated') return 'danger';
+  return 'neutral';
+}
+
+function leaseStatusLabel(status: string): string {
+  const key = (status || '').toLowerCase();
+  if (key === 'expiring_soon') return 'Expiring soon';
+  if (key === 'pending') return 'Draft';
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Lease';
 }
 
 export default function LeaseManagement() {
@@ -64,6 +84,7 @@ export default function LeaseManagement() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [renewals, setRenewals] = useState<any[]>([]);
   const [moveouts, setMoveouts] = useState<any[]>([]);
+  const [newLeaseOpen, setNewLeaseOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
@@ -204,7 +225,7 @@ export default function LeaseManagement() {
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Leases"
+        title="Leasing"
         description="Tenant room assignments, renewals, and move-outs"
         actions={
           <div className="flex flex-wrap gap-2">
@@ -213,7 +234,14 @@ export default function LeaseManagement() {
                 Generate Alerts
               </Button>
             )}
-            <AddTenantButton label="New lease" />
+            <AddTenantButton label="New tenant" variant="outline" />
+            <Button
+              type="button"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => setNewLeaseOpen(true)}
+            >
+              New lease
+            </Button>
           </div>
         }
       />
@@ -274,15 +302,25 @@ export default function LeaseManagement() {
 
       {activeTab === 'leases' && (
         <>
-          <FilterBar columns={4}>
-            <FormField label="Search" htmlFor="lease-search">
+          <FilterBar
+            columns={3}
+            collapsible
+            activeCount={[status !== 'all' ? status : '', buildingId].filter(Boolean).length}
+            search={
               <SearchInput
                 id="lease-search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Tenant, unit..."
+                aria-label="Search leases"
               />
-            </FormField>
+            }
+            footer={
+              <p className="text-sm text-gray-600">
+                Showing {leases.length} of {pagination?.total ?? leases.length} leases
+              </p>
+            }
+          >
             <FormField label="Status" htmlFor="lease-status">
               <Select
                 id="lease-status"
@@ -312,305 +350,196 @@ export default function LeaseManagement() {
             </FormField>
           </FilterBar>
 
-          {loading ? (
-            <div className="flex justify-center overflow-hidden rounded-lg bg-white p-8 shadow">
-              <Spinner label="Loading leases" />
-            </div>
-          ) : leases.length === 0 ? (
-            <div className="overflow-hidden rounded-lg bg-white shadow">
-              <EmptyState
-                title="No leases found"
-                description="Create a tenant with a room assignment to start a lease."
-                action={<AddTenantButton label="New lease" />}
-              />
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-lg bg-white shadow">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                        Unit
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                        Tenant
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                        Term
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                        Rent
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {leases.map((lease) => {
-                      const tenantLabel =
-                        `${lease.tenantFirstName} ${lease.tenantLastName}`.trim();
-                      const withOccupants =
-                        lease.occupantCount > 0
-                          ? `${tenantLabel} +${lease.occupantCount}`
-                          : tenantLabel || '—';
-                      return (
-                        <tr key={lease.id} className="hover:bg-gray-50">
-                          <td className="whitespace-nowrap px-6 py-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {lease.buildingName}
-                            </div>
-                            <div className="text-sm text-gray-600">Room {lease.roomNumber}</div>
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                            {withOccupants}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                            {formatLeaseTermShort(lease.startDate, lease.endDate)}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                            ₱{Number(lease.monthlyRate || 0).toLocaleString()}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4">
-                            <LeaseStatusBadge status={lease.uiStatus} />
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                            <Link
-                              href={`/admin/lease-management/${lease.id}`}
-                              className="inline-flex text-gray-500 hover:text-gray-900"
-                              title="View"
-                            >
-                              <Eye className="h-5 w-5" />
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          <TableCard
+            title="Leases"
+            description="Open a lease from the View button."
+          >
+            {loading ? (
+              <div className="flex justify-center p-8">
+                <Spinner label="Loading leases" />
               </div>
-              <Pagination
-                currentPage={Math.min(page, pagination.totalPages)}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.total}
-                itemsPerPage={PAGE_SIZE}
-                onPageChange={setPage}
-              />
-            </div>
-          )}
+            ) : (
+              <>
+                {leases.length === 0 ? (
+                  <EmptyState
+                    title="No leases found"
+                    description="Create a tenant with a room assignment to start a lease."
+                  />
+                ) : (
+                  leases.map((lease) => {
+                    const tenantLabel =
+                      `${lease.tenantFirstName} ${lease.tenantLastName}`.trim();
+                    const withOccupants =
+                      lease.occupantCount > 0
+                        ? `${tenantLabel} +${lease.occupantCount}`
+                        : tenantLabel || 'Lease';
+                    const statusTone = leaseStatusTone(lease.uiStatus);
+                    const statusLabel = leaseStatusLabel(lease.uiStatus);
+                    return (
+                      <WorkItemRow
+                        key={lease.id}
+                        href={`/admin/leasing/${lease.id}`}
+                        title={withOccupants}
+                        subtitle={`${lease.buildingName} · Room ${lease.roomNumber}`}
+                        badges={[{ key: 'status', label: statusLabel, tone: statusTone }]}
+                        date={formatShortDate(lease.endDate || lease.startDate)}
+                        metaLabel={statusLabel}
+                        metaDetail={`₱${Number(lease.monthlyRate || 0).toLocaleString()}`}
+                        metaTone={
+                          statusTone === 'danger'
+                            ? 'danger'
+                            : statusTone === 'warning'
+                              ? 'warning'
+                              : statusTone === 'success'
+                                ? 'muted'
+                                : 'default'
+                        }
+                        dotTone={statusTone}
+                        trailingIcon={
+                          statusTone === 'success' ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : statusTone === 'warning' || statusTone === 'danger' ? (
+                            <AlertCircle className="h-4 w-4 text-rose-500" />
+                          ) : null
+                        }
+                      />
+                    );
+                  })
+                )}
+                {leases.length > 0 ? (
+                  <Pagination
+                    currentPage={Math.min(page, pagination.totalPages)}
+                    totalPages={pagination.totalPages}
+                    totalItems={pagination.total}
+                    itemsPerPage={PAGE_SIZE}
+                    onPageChange={setPage}
+                  />
+                ) : null}
+              </>
+            )}
+          </TableCard>
         </>
       )}
 
       {activeTab !== 'leases' &&
         (loading ? (
-          <div className="flex justify-center overflow-hidden rounded-lg bg-white p-8 shadow">
-            <Spinner label="Loading" />
-          </div>
+          <TableCard>
+            <div className="flex justify-center p-8">
+              <Spinner label="Loading" />
+            </div>
+          </TableCard>
         ) : (
           <>
             {activeTab === 'alerts' && (
-              <div className="overflow-hidden rounded-lg bg-white shadow">
+              <TableCard
+                title="Expiration alerts"
+                description="Leases that are nearing their end date."
+              >
                 {alerts.length === 0 ? (
                   <EmptyState
-                    title="No pending alerts"
+                    title="No expiration alerts"
                     description="Expiration alerts will appear here when leases are nearing end."
                   />
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Unit
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Tenant
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Lease Ends
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Days Left
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Alert
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {alerts.map((alert) => (
-                          <tr key={alert.id} className="hover:bg-gray-50">
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {alert.building_name}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                Room {alert.room_number}
-                              </div>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {alert.tenant_name}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {new Date(alert.lease_end_date).toLocaleDateString()}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-red-600">
-                              {alert.days_until_expiry}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <span className="inline-flex rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-                                {alert.alert_type}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  alerts.map((alert) => (
+                    <WorkItemRow
+                      key={alert.id}
+                      title={alert.tenant_name || 'Lease'}
+                      subtitle={`${alert.building_name} · Room ${alert.room_number}`}
+                      badges={[
+                        {
+                          key: 'alert',
+                          label: String(alert.alert_type || 'Alert').replace(/_/g, ' '),
+                          tone: 'warning',
+                        },
+                      ]}
+                      date={formatShortDate(alert.lease_end_date)}
+                      metaLabel={`${alert.days_until_expiry} days left`}
+                      metaTone="danger"
+                      dotTone="warning"
+                      trailingIcon={<AlertCircle className="h-4 w-4 text-rose-500" />}
+                    />
+                  ))
                 )}
-              </div>
+              </TableCard>
             )}
 
             {activeTab === 'renewals' && (
-              <div className="overflow-hidden rounded-lg bg-white shadow">
+              <TableCard
+                title="Renewals"
+                description="Submitted renewal requests."
+              >
                 {renewals.length === 0 ? (
-                    <EmptyState
-                      title="No renewal requests"
-                      description="Renewal requests will show up here when submitted."
+                  <EmptyState
+                    title="No renewals"
+                    description="Renewal requests will show up here when submitted."
+                  />
+                ) : (
+                  renewals.map((renewal) => (
+                    <WorkItemRow
+                      key={renewal.id}
+                      title={renewal.tenant_name || 'Renewal'}
+                      subtitle={`${renewal.building_name} · Room ${renewal.room_number}`}
+                      badges={[
+                        {
+                          key: 'status',
+                          label: String(renewal.status || 'Pending').replace(/_/g, ' '),
+                          tone: 'info',
+                        },
+                      ]}
+                      date={formatShortDate(renewal.proposed_lease_end_date)}
+                      metaLabel={`₱${Number(renewal.proposed_monthly_rent || 0).toLocaleString()}`}
+                      metaDetail={`from ₱${Number(renewal.current_monthly_rent || 0).toLocaleString()}`}
+                      dotTone="info"
                     />
-                  ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Unit
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Tenant
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Current → Proposed
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Rent
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {renewals.map((renewal) => (
-                          <tr key={renewal.id} className="hover:bg-gray-50">
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {renewal.building_name}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                Room {renewal.room_number}
-                              </div>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {renewal.tenant_name}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {new Date(renewal.current_lease_end_date).toLocaleDateString()}
-                              {' → '}
-                              {new Date(renewal.proposed_lease_end_date).toLocaleDateString()}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              ₱{Number(renewal.current_monthly_rent || 0).toLocaleString()}
-                              {' → '}
-                              ₱{Number(renewal.proposed_monthly_rent || 0).toLocaleString()}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium capitalize text-gray-800">
-                                {renewal.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  ))
                 )}
-              </div>
+              </TableCard>
             )}
 
             {activeTab === 'moveouts' && (
-              <div className="overflow-hidden rounded-lg bg-white shadow">
+              <TableCard
+                title="Move-outs"
+                description="Open a record from the View button for inspection and refund."
+              >
                 {moveouts.length === 0 ? (
-                    <EmptyState
-                      title="No move-out records"
-                      description="Move-out processing records will appear here."
+                  <EmptyState
+                    title="No move-outs"
+                    description="Move-out processing records will appear here."
+                  />
+                ) : (
+                  moveouts.map((moveout) => (
+                    <WorkItemRow
+                      key={moveout.id}
+                      href={`/admin/leasing/moveouts/${moveout.id}`}
+                      title={moveout.tenant_name || 'Move-out'}
+                      subtitle={`${moveout.building_name} · Room ${moveout.room_number}`}
+                      badges={[
+                        {
+                          key: 'status',
+                          label: String(moveout.status || 'Open').replace(/_/g, ' '),
+                          tone: 'info',
+                        },
+                      ]}
+                      date={formatShortDate(moveout.moveout_date)}
+                      metaLabel={String(moveout.status || 'Open').replace(/_/g, ' ')}
+                      dotTone="info"
                     />
-                  ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Unit
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Tenant
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Move-out Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-900">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {moveouts.map((moveout) => (
-                          <tr key={moveout.id} className="hover:bg-gray-50">
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {moveout.building_name}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                Room {moveout.room_number}
-                              </div>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {moveout.tenant_name}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                              {new Date(moveout.moveout_date).toLocaleDateString()}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium capitalize text-blue-800">
-                                {moveout.status}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                              <Link
-                                href={`/admin/lease-management/moveouts/${moveout.id}`}
-                                className="font-medium text-blue-600 hover:text-blue-800"
-                              >
-                                Inspection &amp; refund
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  ))
                 )}
-              </div>
+              </TableCard>
             )}
           </>
         ))}
+
+      <NewLeaseModal
+        isOpen={newLeaseOpen}
+        onClose={() => setNewLeaseOpen(false)}
+        onCreated={() => {
+          setNewLeaseOpen(false);
+          void fetchLeases();
+        }}
+      />
     </div>
   );
 }

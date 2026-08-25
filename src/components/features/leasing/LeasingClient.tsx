@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   Building2,
-  Eye,
   FileText,
   Home,
   MoreVertical,
@@ -15,17 +14,16 @@ import {
 } from 'lucide-react';
 import {
   Button,
+  EmptyState,
+  FilterBar,
   ListSummaryCard,
   PageHeader,
-  Table,
-  TableBody,
+  SearchInput,
+  Select,
   TableCard,
-  TableCell,
-  TableEmpty,
-  TableHead,
-  TableHeader,
-  TableRow,
+  WorkItemRow,
 } from '@/components/ui';
+import { FormField } from '@/components/forms/FormField';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { LeasePackageTemplate } from '@/lib/lease-package-templates-shared';
 import {
@@ -33,6 +31,7 @@ import {
   formatDepositLabel,
   formatTermLabel,
 } from '@/lib/lease-package-templates-shared';
+import { formatShortDate } from '@/lib/utils';
 
 interface LeasingClientProps {
   initialTemplates: LeasePackageTemplate[];
@@ -73,7 +72,7 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
         message: 'Changes applied to all tenants using the updated template.',
       });
     }
-    router.replace('/admin/leasing', { scroll: false });
+    router.replace('/admin/lease-templates', { scroll: false });
   }, [searchParams, showNotification, router]);
 
   useEffect(() => {
@@ -84,6 +83,23 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [menuId]);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [appliedFilter, setAppliedFilter] = useState('');
+
+  const filteredTemplates = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return templates.filter((t) => {
+      const matchesSearch = !term || t.name.toLowerCase().includes(term);
+      const units = t.appliedUnitCount || 0;
+      const matchesApplied =
+        !appliedFilter ||
+        (appliedFilter === 'applied' ? units > 0 : units === 0);
+      return matchesSearch && matchesApplied;
+    });
+  }, [templates, searchTerm, appliedFilter]);
+
+  const unused = templates.filter((t) => !(t.appliedUnitCount || 0)).length;
 
   const stats = useMemo(() => {
     const units = templates.reduce((sum, t) => sum + (t.appliedUnitCount || 0), 0);
@@ -136,16 +152,16 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Leasing"
+        title="Lease templates"
         description="Create lease packages and see which buildings and units they apply to."
         actions={
-          <Link href="/admin/leasing/new">
+          <Link href="/admin/lease-templates/new">
             <Button leftIcon={<Plus className="h-4 w-4" />}>Create Lease Template</Button>
           </Link>
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <ListSummaryCard
           title="Templates"
           value={stats.templates}
@@ -164,104 +180,127 @@ export default function LeasingClient({ initialTemplates }: LeasingClientProps) 
           footer="properties with these packages"
           icon={<Building2 className="h-8 w-8 text-gray-700" />}
         />
+        <ListSummaryCard
+          title="Unused"
+          value={unused}
+          footer="not assigned to a unit"
+          icon={<AlertTriangle className="h-8 w-8 text-amber-600" />}
+        />
       </div>
+
+      <FilterBar
+        columns={4}
+        collapsible
+        activeCount={appliedFilter ? 1 : 0}
+        search={
+          <SearchInput
+            id="template-search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Template name..."
+            aria-label="Search lease templates"
+          />
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            Showing {filteredTemplates.length} of {templates.length} templates
+          </p>
+        }
+      >
+        <FormField label="Applied" htmlFor="template-applied">
+          <Select
+            id="template-applied"
+            value={appliedFilter}
+            onChange={(e) => setAppliedFilter(e.target.value)}
+          >
+            <option value="">All templates</option>
+            <option value="applied">Assigned to units</option>
+            <option value="unused">Unused</option>
+          </Select>
+        </FormField>
+      </FilterBar>
 
       <TableCard
         title="Lease templates"
         description="Preview terms and see assigned units from the View page."
       >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Template</TableHead>
-              <TableHead>Lease term</TableHead>
-              <TableHead>Deposit</TableHead>
-              <TableHead>Advance</TableHead>
-              <TableHead>Applied to</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {templates.length === 0 ? (
-              <TableEmpty colSpan={6}>
-                No lease templates yet. Create one to get started.
-              </TableEmpty>
-            ) : (
-              templates.map((t) => {
-                const units = t.appliedUnitCount || 0;
-                const buildings = t.appliedBuildingCount || 0;
-                return (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-semibold text-gray-900">{t.name}</TableCell>
-                    <TableCell>{formatTermLabel(t.termMonths)}</TableCell>
-                    <TableCell>{formatDepositLabel(t.depositMonths)}</TableCell>
-                    <TableCell>{formatAdvanceLabel(t.advanceMonths)}</TableCell>
-                    <TableCell className="text-gray-700">
-                      {units > 0
-                        ? `${units} ${units === 1 ? 'unit' : 'units'} · ${buildings} ${
-                            buildings === 1 ? 'building' : 'buildings'
-                          }`
-                        : 'Not assigned'}
-                    </TableCell>
-                    <TableCell className="relative text-right">
-                      <div className="inline-flex items-center justify-end gap-2">
-                        <Link href={`/admin/leasing/${t.id}`}>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            leftIcon={<Eye className="h-3.5 w-3.5" />}
-                          >
-                            View
-                          </Button>
+        {filteredTemplates.length === 0 ? (
+          <EmptyState
+            title="No lease templates yet"
+            description="Create one to get started."
+          />
+        ) : (
+          filteredTemplates.map((t) => {
+            const units = t.appliedUnitCount || 0;
+            return (
+              <WorkItemRow
+                key={t.id}
+                className="relative"
+                href={`/admin/lease-templates/${t.id}`}
+                title={t.name}
+                subtitle={formatTermLabel(t.termMonths)}
+                badges={[
+                  units > 0
+                    ? {
+                        key: 'applied',
+                        label: `${units} ${units === 1 ? 'unit' : 'units'}`,
+                        tone: 'success' as const,
+                      }
+                    : { key: 'applied', label: 'Unused', tone: 'neutral' as const },
+                  { key: 'deposit', label: formatDepositLabel(t.depositMonths), tone: 'purple' as const },
+                  { key: 'advance', label: formatAdvanceLabel(t.advanceMonths), tone: 'info' as const },
+                ]}
+                date={formatShortDate(t.updatedAt)}
+                metaLabel={units > 0 ? 'Applied' : 'Unused'}
+                metaTone={units > 0 ? 'muted' : 'default'}
+                dotTone={units > 0 ? 'success' : 'neutral'}
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      className="inline-flex rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      aria-label="Template actions"
+                      onClick={() => setMenuId((id) => (id === t.id ? null : t.id))}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {menuId === t.id && (
+                      <div
+                        ref={menuRef}
+                        className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-left shadow-lg"
+                      >
+                        <Link
+                          href={`/admin/lease-templates/${t.id}`}
+                          className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                          onClick={() => setMenuId(null)}
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={`/admin/lease-templates/${t.id}/edit`}
+                          className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                          onClick={() => setMenuId(null)}
+                        >
+                          Edit
                         </Link>
                         <button
                           type="button"
-                          className="inline-flex rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                          aria-label="Template actions"
-                          onClick={() => setMenuId((id) => (id === t.id ? null : t.id))}
+                          className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                          onClick={() => {
+                            setMenuId(null);
+                            setDeleteTarget(t);
+                          }}
                         >
-                          <MoreVertical className="h-4 w-4" />
+                          Delete
                         </button>
                       </div>
-                      {menuId === t.id && (
-                        <div
-                          ref={menuRef}
-                          className="absolute right-6 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-left shadow-lg"
-                        >
-                          <Link
-                            href={`/admin/leasing/${t.id}`}
-                            className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                            onClick={() => setMenuId(null)}
-                          >
-                            View
-                          </Link>
-                          <Link
-                            href={`/admin/leasing/${t.id}/edit`}
-                            className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                            onClick={() => setMenuId(null)}
-                          >
-                            Edit
-                          </Link>
-                          <button
-                            type="button"
-                            className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              setMenuId(null);
-                              setDeleteTarget(t);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                    )}
+                  </>
+                }
+              />
+            );
+          })
+        )}
       </TableCard>
 
       {deleteTarget && (

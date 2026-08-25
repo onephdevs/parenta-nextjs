@@ -1,9 +1,9 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { 
   BarChart3, 
+  ChevronRight,
   DollarSign, 
   TrendingUp, 
   FileText, 
@@ -15,14 +15,24 @@ import {
   Layers
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Card } from '@/components/ui/Card';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import { WorkItemList, WorkItemRow } from '@/components/ui/WorkItemRow';
+import { ReportsFilterBar } from '@/components/features/ReportsFilterBar';
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== 'admin') {
     redirect('/auth/signin');
   }
+
+  const params = await searchParams;
+  const query = (params.q || '').trim().toLowerCase();
+  const categoryFilter = params.category || '';
 
   const reportCategories = [
     {
@@ -240,24 +250,26 @@ export default async function ReportsPage() {
     }
   ];
 
-  const getColorClasses = (color: string) => {
-    switch (color) {
-      case 'blue':
-        return 'bg-blue-100 text-blue-600';
-      case 'green':
-        return 'bg-green-100 text-green-600';
-      case 'purple':
-        return 'bg-purple-100 text-purple-600';
-      case 'orange':
-        return 'bg-orange-100 text-orange-600';
-      case 'yellow':
-        return 'bg-yellow-100 text-yellow-600';
-      case 'pink':
-        return 'bg-pink-100 text-pink-600';
-      default:
-        return 'bg-gray-100 text-gray-900';
-    }
-  };
+  const visibleCategories = reportCategories
+    .filter((category) => !categoryFilter || category.title === categoryFilter)
+    .map((category) => ({
+      ...category,
+      reports: category.reports.filter((report) => {
+        if (!query) return true;
+        return (
+          report.name.toLowerCase().includes(query) ||
+          report.description.toLowerCase().includes(query)
+        );
+      }),
+    }))
+    .filter((category) => category.reports.length > 0);
+
+  const reportItems = visibleCategories.flatMap((category) =>
+    category.reports.map((report) => ({
+      ...report,
+      category: category.title.replace(' Reports', ''),
+    }))
+  );
 
   return (
     <div className="space-y-6 p-6">
@@ -266,129 +278,44 @@ export default async function ReportsPage() {
         description="Access all available reports and insights"
       />
 
-        {/* Quick Stats */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Access</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Link
-              href="/admin/financial/reports"
-              className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-900">Financial</p>
-                  <p className="text-xs text-gray-900">View reports</p>
-                </div>
-              </div>
-            </Link>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {reportCategories.slice(0, 4).map((category) => (
+          <ListSummaryCard
+            key={category.title}
+            title={category.title.replace(' Reports', '')}
+            value={category.reports.length}
+            footer={category.description}
+            icon={<category.icon className="h-8 w-8 text-gray-700" />}
+          />
+        ))}
+      </div>
 
-            <Link
-              href="/admin/analytics"
-              className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <BarChart3 className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-900">Analytics</p>
-                  <p className="text-xs text-gray-900">View charts</p>
-                </div>
-              </div>
-            </Link>
+      <ReportsFilterBar
+        query={params.q || ''}
+        category={categoryFilter}
+        categories={reportCategories.map((category) => category.title)}
+        shown={visibleCategories.reduce((sum, c) => sum + c.reports.length, 0)}
+      />
 
-            <Link
-              href="/admin/export"
-              className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-900">Export</p>
-                  <p className="text-xs text-gray-900">Download data</p>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              href="/admin/financial/advanced-analytics"
-              className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-pink-600" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-900">Insights</p>
-                  <p className="text-xs text-gray-900">Advanced data</p>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* Report Categories */}
-        <div className="space-y-8">
-          {reportCategories.map((category) => (
-            <div key={category.title} className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClasses(category.color)}`}>
-                    <category.icon className="w-6 h-6" />
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{category.title}</h3>
-                    <p className="text-sm text-gray-900">{category.description}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {category.reports.map((report) => (
-                    <Link
-                      key={report.href}
-                      href={report.href}
-                      className="group block p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                          <report.icon className="w-5 h-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
-                        </div>
-                        <div className="ml-3">
-                          <h4 className="text-sm font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
-                            {report.name}
-                          </h4>
-                          <p className="mt-1 text-xs text-gray-900">
-                            {report.description}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex items-center text-xs text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                        View Report
-                        <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <WorkItemList>
+          {reportItems.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-gray-500">No reports match your filters.</p>
+          ) : (
+            reportItems.map((report) => (
+              <WorkItemRow
+                key={report.href}
+                href={report.href}
+                title={report.name}
+                subtitle={report.description}
+                badges={[{ key: 'category', label: report.category, tone: 'info' }]}
+                metaLabel="Open"
+                metaTone="muted"
+                trailingIcon={<ChevronRight className="h-4 w-4 text-gray-400" />}
+                dotTone="info"
+              />
+            ))
+          )}
+        </WorkItemList>
 
         {/* Help Section */}
         <div className="mt-8 bg-blue-50 rounded-lg p-6">

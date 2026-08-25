@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import { Document, DOCUMENT_TYPES } from '@/types/document';
@@ -9,8 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/forms/FormField';
 import { Dialog } from '@/components/ui/Dialog';
-import { Progress } from '@/components/ui/Progress';
-import { FolderUp, Tags, Package, Trash2 } from 'lucide-react';
+import { Tags, Package, Trash2 } from 'lucide-react';
 
 interface BulkDocumentOperationsProps {
   selectedDocuments: Document[];
@@ -18,15 +17,6 @@ interface BulkDocumentOperationsProps {
   onSelectionCleared: () => void;
   buildings: Array<{ id: string; name: string }>;
   tenants: Array<{ id: string; firstName: string; lastName: string }>;
-}
-
-interface UploadProgress {
-  [key: string]: {
-    name: string;
-    progress: number;
-    status: 'uploading' | 'success' | 'error';
-    error?: string;
-  };
 }
 
 export default function BulkDocumentOperations({
@@ -38,120 +28,13 @@ export default function BulkDocumentOperations({
 }: BulkDocumentOperationsProps) {
   const { showNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
   const [isDownloading, setIsDownloading] = useState(false);
 
   const [showBulkCategorize, setShowBulkCategorize] = useState(false);
   const [bulkCategory, setBulkCategory] = useState('lease');
   const [bulkBuildingId, setBulkBuildingId] = useState('');
   const [bulkTenantId, setBulkTenantId] = useState('');
-
-  const handleMultipleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    const initialProgress: UploadProgress = {};
-
-    Array.from(files).forEach((file, index) => {
-      initialProgress[`${file.name}-${index}`] = {
-        name: file.name,
-        progress: 0,
-        status: 'uploading',
-      };
-    });
-    setUploadProgress(initialProgress);
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileKey = `${file.name}-${i}`;
-        await uploadSingleFile(file, fileKey);
-      }
-
-      showNotification({
-        type: 'success',
-        title: 'Upload Complete',
-        message: `Successfully uploaded ${files.length} documents`,
-      });
-
-      onDocumentsUpdated();
-    } catch (error) {
-      console.error('Error during bulk upload:', error);
-      showNotification({
-        type: 'error',
-        title: 'Upload Failed',
-        message: 'Some files failed to upload. Please try again.',
-      });
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const uploadSingleFile = async (file: File, fileKey: string): Promise<void> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('documentName', file.name.replace(/\.[^/.]+$/, '') || file.name);
-    formData.append('documentType', 'other');
-
-    try {
-      const xhr = new XMLHttpRequest();
-
-      return new Promise((resolve, reject) => {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress((prev) => ({
-              ...prev,
-              [fileKey]: { ...prev[fileKey], progress },
-            }));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status === 200 || xhr.status === 201) {
-            setUploadProgress((prev) => ({
-              ...prev,
-              [fileKey]: { ...prev[fileKey], progress: 100, status: 'success' },
-            }));
-            resolve();
-          } else {
-            const error = `Upload failed: ${xhr.statusText}`;
-            setUploadProgress((prev) => ({
-              ...prev,
-              [fileKey]: { ...prev[fileKey], status: 'error', error },
-            }));
-            reject(new Error(error));
-          }
-        };
-
-        xhr.onerror = () => {
-          const error = 'Network error during upload';
-          setUploadProgress((prev) => ({
-            ...prev,
-            [fileKey]: { ...prev[fileKey], status: 'error', error },
-          }));
-          reject(new Error(error));
-        };
-
-        xhr.open('POST', '/api/documents');
-        xhr.send(formData);
-      });
-    } catch (error) {
-      console.error(`Error uploading ${file.name}:`, error);
-      throw error;
-    }
-  };
 
   const handleBulkCategorize = async () => {
     if (selectedDocuments.length === 0) return;
@@ -280,9 +163,9 @@ export default function BulkDocumentOperations({
     }
   };
 
-  const clearUploadProgress = () => {
-    setUploadProgress({});
-  };
+  if (selectedDocuments.length === 0) {
+    return <>{dialog}</>;
+  }
 
   return (
     <div className="space-y-4">
@@ -294,100 +177,41 @@ export default function BulkDocumentOperations({
               {selectedDocuments.length} document
               {selectedDocuments.length !== 1 ? 's' : ''} selected
             </span>
-            {selectedDocuments.length > 0 && (
-              <Button type="button" variant="ghost" size="sm" onClick={onSelectionCleared}>
-                Clear selection
-              </Button>
-            )}
+            <Button type="button" variant="ghost" size="sm" onClick={onSelectionCleared}>
+              Clear selection
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              onClick={handleMultipleFileSelect}
-              isLoading={isUploading}
-              leftIcon={<FolderUp className="h-4 w-4" />}
+              variant="success"
+              onClick={() => setShowBulkCategorize(true)}
+              leftIcon={<Tags className="h-4 w-4" />}
             >
-              Upload Multiple
+              Categorize
             </Button>
 
-            {selectedDocuments.length > 0 && (
-              <>
-                <Button
-                  type="button"
-                  variant="success"
-                  onClick={() => setShowBulkCategorize(true)}
-                  leftIcon={<Tags className="h-4 w-4" />}
-                >
-                  Categorize
-                </Button>
+            <Button
+              type="button"
+              onClick={handleBulkDownload}
+              isLoading={isDownloading}
+              leftIcon={<Package className="h-4 w-4" />}
+            >
+              Download ZIP
+            </Button>
 
-                <Button
-                  type="button"
-                  onClick={handleBulkDownload}
-                  isLoading={isDownloading}
-                  leftIcon={<Package className="h-4 w-4" />}
-                >
-                  Download ZIP
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={handleBulkDelete}
-                  leftIcon={<Trash2 className="h-4 w-4" />}
-                >
-                  Delete
-                </Button>
-              </>
-            )}
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleBulkDelete}
+              leftIcon={<Trash2 className="h-4 w-4" />}
+            >
+              Delete
+            </Button>
           </div>
         </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
-          onChange={handleFileChange}
-          className="hidden"
-        />
       </Card>
-
-      {Object.keys(uploadProgress).length > 0 && (
-        <Card padding="md">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-medium text-gray-900">Upload Progress</h3>
-            <Button type="button" variant="ghost" size="sm" onClick={clearUploadProgress}>
-              Clear
-            </Button>
-          </div>
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {Object.entries(uploadProgress).map(([key, file]) => (
-              <div key={key} className="border rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900 truncate">{file.name}</span>
-                  <span className="text-sm text-gray-900">
-                    {file.status === 'success'
-                      ? 'Done'
-                      : file.status === 'error'
-                        ? 'Error'
-                        : `${file.progress}%`}
-                  </span>
-                </div>
-
-                {file.status === 'uploading' && (
-                  <Progress value={file.progress} size="md" tone="default" className="mt-0" />
-                )}
-
-                {file.status === 'error' && file.error && (
-                  <p className="text-sm text-red-600 mt-1">{file.error}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       <Dialog
         isOpen={showBulkCategorize}

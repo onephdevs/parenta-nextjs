@@ -11,7 +11,7 @@ export default async function ActivityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6 p-6">
       <Suspense
         fallback={
           <div className="space-y-4">

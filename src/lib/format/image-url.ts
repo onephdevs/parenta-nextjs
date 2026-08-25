@@ -18,6 +18,33 @@ export function getImageUrl(filePath: string): string {
   return `/api/images/serve/${pathParts.join('/')}`;
 }
 
+/**
+ * Same-origin landing covers for known properties.
+ * Production cards were hotlinking 3–4MB Blob PNGs, which show as broken
+ * images in the browser even though the Blob URL itself returns 200.
+ */
+const LANDING_COVERS: { test: (name: string) => boolean; src: string }[] = [
+  {
+    test: (name) => name.includes('apartment-1') || name.includes('balibago'),
+    src: '/brand/featured-apartment-1.jpg',
+  },
+  {
+    test: (name) =>
+      name.includes('villasol') || name.includes('aprtment-2') || name.includes('apartment-2'),
+    src: '/brand/featured-apartment-2.jpg',
+  },
+];
+
+export function landingPropertyCoverSrc(
+  name: string,
+  imageUrl: string | null
+): string | null {
+  const key = name.toLowerCase();
+  const matched = LANDING_COVERS.find((row) => row.test(key));
+  if (matched) return matched.src;
+  return imageUrl;
+}
+
 /** Normalize a newly uploaded asset path for storage / <img src>. */
 export function toPublicAssetUrl(filePath: string): string {
   if (!filePath) return '';

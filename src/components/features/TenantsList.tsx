@@ -6,7 +6,6 @@ import { Tenant, Building } from '@/types/database';
 import TenantCard from './TenantCard';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import {
-  Avatar,
   EmptyState,
   FilterBar,
   IconButton,
@@ -17,7 +16,6 @@ import {
 import { FormField } from '@/components/forms/FormField';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import { cn } from '@/lib/utils';
-import { getImageUrl } from '@/lib/format/image-url';
 import { compareByRoomThenName, compareNatural } from '@/lib/utils/natural-sort';
 import { getPastDueStatus } from '@/lib/past-due-status';
 import {
@@ -216,15 +214,6 @@ function TenantWorkItemRow({
             <span className="truncate text-xs text-gray-500">{unit}</span>
           )}
         </div>
-      </div>
-
-      <div className="hidden min-w-0 items-center gap-1.5 sm:flex">
-        <Avatar
-          name={fullName}
-          src={tenant.profilePictureUrl ? getImageUrl(tenant.profilePictureUrl) : null}
-          size="sm"
-          className="h-6 w-6 text-[10px]"
-        />
       </div>
 
       <div className="hidden min-w-0 flex-[1.4] flex-wrap items-center justify-end gap-1.5 md:flex">

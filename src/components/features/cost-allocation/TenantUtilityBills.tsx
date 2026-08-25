@@ -5,7 +5,6 @@ import {
   FileText,
   Search,
   Filter,
-  Eye,
   CheckCircle,
   Clock,
   AlertTriangle,
@@ -19,6 +18,9 @@ import { Select } from '@/components/ui/Select';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import { FormField } from '@/components/forms/FormField';
 import { formatPaymentNotesForPeople } from '@/lib/format-payment-notes';
+import { formatShortDate } from '@/lib/utils';
+import { WorkItemRow } from '@/components/ui/WorkItemRow';
+import type { WorkItemTone } from '@/components/ui/WorkItemRow';
 
 interface TenantUtilityBillsProps {
   buildingId?: string;
@@ -352,89 +354,61 @@ export default function TenantUtilityBills({ buildingId, tenantId }: TenantUtili
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Tenant
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Room
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Utility
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Period
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredBills.map((bill) => (
-                  <tr key={bill.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {bill.tenantName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.roomNumber}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                      {bill.utilityType}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(new Date(bill.billingPeriodStart), 'MMM d')} - {format(new Date(bill.billingPeriodEnd), 'MMM d, yyyy')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      ${bill.allocatedAmount.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(bill.billStatus)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.dueDate && (
-                        <span className={`${new Date(bill.dueDate) < new Date() && bill.billStatus !== 'paid' ? 'text-red-600 font-medium' : ''}`}>
-                          {format(new Date(bill.dueDate), 'MMM d, yyyy')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedBill(bill);
-                          setShowBillDetail(true);
-                        }}
-                        leftIcon={<Eye className="h-4 w-4" />}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="-mx-6">
+            {filteredBills.length === 0 ? (
+              <p className="px-6 py-8 text-center text-sm text-gray-500">
+                No tenant utility bills found matching your criteria.
+              </p>
+            ) : (
+              filteredBills.map((bill) => {
+                const status = String(bill.billStatus || 'pending');
+                const statusTone: WorkItemTone =
+                  status === 'paid'
+                    ? 'success'
+                    : status === 'overdue'
+                      ? 'danger'
+                      : status === 'sent'
+                        ? 'info'
+                        : 'warning';
+                return (
+                  <WorkItemRow
+                    key={bill.id}
+                    onClick={() => {
+                      setSelectedBill(bill);
+                      setShowBillDetail(true);
+                    }}
+                    title={bill.tenantName || 'Tenant bill'}
+                    subtitle={bill.roomNumber ? `Room ${bill.roomNumber}` : bill.utilityType}
+                    badges={[
+                      {
+                        key: 'utility',
+                        label: String(bill.utilityType || 'Utility'),
+                        tone: String(bill.utilityType).toLowerCase() === 'electricity' ? 'warning' : 'info',
+                      },
+                      {
+                        key: 'status',
+                        label: status.replace(/_/g, ' '),
+                        tone: statusTone,
+                      },
+                    ]}
+                    date={bill.dueDate ? formatShortDate(bill.dueDate) : null}
+                    metaLabel={status.replace(/_/g, ' ')}
+                    metaDetail={`$${Number(bill.allocatedAmount || 0).toFixed(2)}`}
+                    metaTone={
+                      statusTone === 'danger'
+                        ? 'danger'
+                        : statusTone === 'warning'
+                          ? 'warning'
+                          : statusTone === 'success'
+                            ? 'muted'
+                            : 'default'
+                    }
+                    dotTone={statusTone}
+                  />
+                );
+              })
+            )}
           </div>
-
-          {filteredBills.length === 0 && (
-            <div className="text-center py-8 text-gray-900">
-              No tenant utility bills found matching your criteria.
-            </div>
-          )}
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-6">

@@ -1,40 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   FileText,
-  Pencil,
-  Trash2,
-  Download,
   Eye,
+  MoreVertical,
   Shield,
   IdCard,
   Bell,
   Image as ImageIcon,
 } from 'lucide-react';
 import { Document, DocumentCategory } from '@/types/document';
+import { useListQuery } from '@/hooks/useListQuery';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppDialog } from '@/hooks/useAppDialog';
 import PDFPreview from './PDFPreview';
 import BulkDocumentOperations from './BulkDocumentOperations';
 import {
+  Button,
   Checkbox,
   EmptyState,
   FilterBar,
   Pagination,
   SearchInput,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  TableCard,
+  WorkItemRow,
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
-import { DocumentStatusBadge } from '@/components/domain/StatusBadges';
+import { formatShortDate } from '@/lib/utils';
+import type { WorkItemTone } from '@/components/ui/WorkItemRow';
 import {
   formatDocumentLinkedTo,
   getDocumentUiStatus,
@@ -156,6 +153,7 @@ export default function DocumentsList({
   total,
 }: DocumentsListProps) {
   const router = useRouter();
+  const { navigateList } = useListQuery();
   const urlSearchParams = useSearchParams();
   const { showNotification } = useNotifications();
   const { confirm, dialog } = useAppDialog();
@@ -166,14 +164,17 @@ export default function DocumentsList({
   const [categoryDraft, setCategoryDraft] = useState(searchParams.categoryId || '');
   const [buildingDraft, setBuildingDraft] = useState(searchParams.buildingId || '');
   const [statusDraft, setStatusDraft] = useState(searchParams.status || '');
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  useEffect(() => {
+    if (!menuId) return;
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuId(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [menuId]);
 
   const applyFilters = (overrides: Record<string, string> = {}) => {
     const params = new URLSearchParams();
@@ -189,7 +190,7 @@ export default function DocumentsList({
       if (value) params.set(key, value);
     });
     params.set('page', '1');
-    router.push(`/admin/documents?${params.toString()}`);
+    navigateList(`/admin/documents?${params.toString()}`);
   };
 
   useEffect(() => {
@@ -210,7 +211,7 @@ export default function DocumentsList({
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(urlSearchParams.toString());
     params.set('page', page.toString());
-    router.push(`/admin/documents?${params.toString()}`);
+    navigateList(`/admin/documents?${params.toString()}`);
   };
 
   const handleDeleteDocument = async (documentId: string, documentName: string) => {
@@ -295,15 +296,25 @@ export default function DocumentsList({
         tenants={tenants}
       />
 
-      <FilterBar columns={4}>
-        <FormField label="Search" htmlFor="document-search">
+      <FilterBar
+        columns={3}
+        collapsible
+        activeCount={[categoryDraft, buildingDraft, statusDraft].filter(Boolean).length}
+        search={
           <SearchInput
             id="document-search"
             value={searchDraft}
             onChange={(e) => setSearchDraft(e.target.value)}
             placeholder="Filename, tenant..."
+            aria-label="Search documents"
           />
-        </FormField>
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            Showing {documents.length} of {total} documents
+          </p>
+        }
+      >
         <FormField label="Category" htmlFor="document-category">
           <Select
             id="document-category"
@@ -359,133 +370,167 @@ export default function DocumentsList({
         </FormField>
       </FilterBar>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <TableCard
+        title="Documents"
+        description="Preview a file from the View button."
+        actions={
+          documents.length > 0 ? (
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              <Checkbox
+                checked={
+                  selectedDocuments.length === documents.length && documents.length > 0
+                }
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                aria-label="Select all documents"
+              />
+              Select all
+            </label>
+          ) : null
+        }
+      >
         {documents.length === 0 ? (
           <EmptyState
             title="No documents found"
             description="Upload a document or adjust your filters."
           />
         ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
+          documents.map((document) => {
+            const status: DocumentUiStatus = getDocumentUiStatus(document);
+            const linkedTo = formatDocumentLinkedTo(document);
+            const unlinked = !linkedTo;
+            const secondary = documentSecondaryLabel(document);
+            const statusTone: WorkItemTone =
+              status === 'signed'
+                ? 'success'
+                : status === 'expiring_soon'
+                  ? 'warning'
+                  : status === 'needs_review'
+                    ? 'danger'
+                    : 'neutral';
+            const statusLabel =
+              status === 'on_file'
+                ? 'On file'
+                : status === 'expiring_soon'
+                  ? 'Expiring soon'
+                  : status === 'needs_review'
+                    ? 'Needs review'
+                    : 'Signed';
+
+            return (
+              <WorkItemRow
+                key={document.id}
+                className="relative"
+                href={`/admin/documents/${document.id}/edit`}
+                leading={
+                  <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={
-                        selectedDocuments.length === documents.length && documents.length > 0
-                      }
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      aria-label="Select all documents"
+                      checked={isDocumentSelected(document.id)}
+                      onChange={(e) => handleDocumentSelect(document, e.target.checked)}
+                      aria-label={`Select ${document.documentName}`}
                     />
-                  </TableHead>
-                  <TableHead>Document</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Linked to</TableHead>
-                  <TableHead>Uploaded</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {documents.map((document) => {
-                  const status: DocumentUiStatus = getDocumentUiStatus(document);
-                  const linkedTo = formatDocumentLinkedTo(document);
-                  const unlinked = !linkedTo;
-                  const secondary = documentSecondaryLabel(document);
-
-                  return (
-                    <TableRow key={document.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={isDocumentSelected(document.id)}
-                          onChange={(e) => handleDocumentSelect(document, e.target.checked)}
-                          aria-label={`Select ${document.documentName}`}
-                        />
-                      </TableCell>
-                      <TableCell className="whitespace-normal">
-                        <div className="flex items-center gap-3">
-                          <DocumentThumb doc={document} />
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium text-gray-900">
-                              {documentPrimaryLabel(document)}
-                            </div>
-                            {secondary && (
-                              <div className="truncate text-xs text-gray-500">{secondary}</div>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {document.categoryName || (
-                          <span className="text-gray-400">Uncategorized</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {unlinked ? (
-                          <span className="font-medium text-red-600">Not linked</span>
-                        ) : (
-                          linkedTo
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(document.createdAt)}</TableCell>
-                      <TableCell>
-                        <DocumentStatusBadge status={status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setPreviewDocument(document)}
-                            className="text-gray-500 hover:text-gray-900"
-                            title="Preview"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadDocument(document)}
-                            className="text-gray-500 hover:text-gray-900"
-                            title="Download"
-                          >
-                            <Download className="h-5 w-5" />
-                          </button>
-                          <Link
-                            href={`/admin/documents/${document.id}/edit`}
-                            className="text-gray-500 hover:text-gray-900"
-                            title="Edit"
-                          >
-                            <Pencil className="h-5 w-5" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeleteDocument(document.id, document.documentName)
-                            }
-                            disabled={isDeleting === document.id}
-                            className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={total}
-              itemsPerPage={PAGE_SIZE}
-              onPageChange={handlePageChange}
-            />
-          </>
+                    <DocumentThumb doc={document} />
+                  </div>
+                }
+                title={documentPrimaryLabel(document)}
+                subtitle={secondary}
+                badges={[
+                  { key: 'status', label: statusLabel, tone: statusTone },
+                  {
+                    key: 'category',
+                    label: document.categoryName || 'Uncategorized',
+                    tone: document.categoryName ? 'info' : 'neutral',
+                  },
+                  ...(unlinked
+                    ? [{ key: 'link', label: 'Not linked', tone: 'danger' as const }]
+                    : []),
+                ]}
+                date={formatShortDate(document.createdAt)}
+                metaLabel={linkedTo}
+                metaTone="default"
+                dotTone={statusTone}
+                actions={
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Eye className="h-3.5 w-3.5" />}
+                      onClick={() => setPreviewDocument(document)}
+                    >
+                      View
+                    </Button>
+                    <button
+                      type="button"
+                      className="inline-flex rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      aria-label="Document actions"
+                      onClick={() =>
+                        setMenuId((id) => (id === document.id ? null : document.id))
+                      }
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {menuId === document.id && (
+                      <div
+                        ref={menuRef}
+                        className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-left shadow-lg"
+                      >
+                        <button
+                          type="button"
+                          className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-50"
+                          onClick={() => {
+                            setMenuId(null);
+                            setPreviewDocument(document);
+                          }}
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-50"
+                          onClick={() => {
+                            setMenuId(null);
+                            void handleDownloadDocument(document);
+                          }}
+                        >
+                          Download
+                        </button>
+                        <Link
+                          href={`/admin/documents/${document.id}/edit`}
+                          className="block px-3.5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                          onClick={() => setMenuId(null)}
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          type="button"
+                          className="block w-full px-3.5 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          disabled={isDeleting === document.id}
+                          onClick={() => {
+                            setMenuId(null);
+                            void handleDeleteDocument(document.id, document.documentName);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </>
+                }
+              />
+            );
+          })
         )}
-      </div>
+
+        {documents.length > 0 ? (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={total}
+            itemsPerPage={PAGE_SIZE}
+            onPageChange={handlePageChange}
+          />
+        ) : null}
+      </TableCard>
 
       {previewDocument && (
         <PDFPreview

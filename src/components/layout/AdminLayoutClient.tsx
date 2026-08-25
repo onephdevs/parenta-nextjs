@@ -22,6 +22,8 @@ interface AdminLayoutClientProps {
 function defaultUuidLabel(parent: string | undefined): string {
   switch (parent) {
     case 'leasing':
+      return 'Lease';
+    case 'lease-templates':
       return 'Template';
     case 'lease-management':
       return 'Lease';
@@ -137,7 +139,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
         return;
       }
 
-      if (parent === 'lease-management') {
+      if (parent === 'leasing' || parent === 'lease-management') {
         fetch(`/api/leases/${segment}`, { credentials: 'include' })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
@@ -150,7 +152,7 @@ export default function AdminLayoutClient({ children, session }: AdminLayoutClie
         return;
       }
 
-      if (parent === 'leasing') {
+      if (parent === 'lease-templates') {
         fetch(`/api/lease-package-templates/${segment}`, { credentials: 'include' })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {

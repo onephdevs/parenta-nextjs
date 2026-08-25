@@ -18,7 +18,7 @@ function PaymentStatusBadge({ status }: { status: string }) {
     refunded: 'neutral',
     cancelled: 'neutral',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
 }
 
 function InvoiceStatusBadge({ status }: { status: string }) {
@@ -41,7 +41,7 @@ function InvoiceStatusBadge({ status }: { status: string }) {
     partial: 'Partial',
   };
   const key = status.toLowerCase();
-  return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
 }
 
 function RoomStatusBadge({ status }: { status: string }) {
@@ -53,7 +53,7 @@ function RoomStatusBadge({ status }: { status: string }) {
     maintenance: 'warning',
     unavailable: 'danger',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
 }
 
 function TenantStatusBadge({ status }: { status: string }) {
@@ -65,7 +65,7 @@ function TenantStatusBadge({ status }: { status: string }) {
     terminated: 'danger',
     evicted: 'danger',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
 }
 
 function AssetStatusBadge({ status }: { status: string }) {
@@ -75,7 +75,7 @@ function AssetStatusBadge({ status }: { status: string }) {
     maintenance: 'warning',
     disposed: 'danger',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
 }
 
 function AssetConditionBadge({ condition }: { condition: string }) {
@@ -87,7 +87,7 @@ function AssetConditionBadge({ condition }: { condition: string }) {
     damaged: 'danger',
   };
   return (
-    <Badge tone={map[condition.toLowerCase()] ?? 'neutral'}>
+    <Badge variant="dot" tone={map[condition.toLowerCase()] ?? 'neutral'}>
       {formatLabel(condition)}
     </Badge>
   );
@@ -117,7 +117,7 @@ function MaintenanceStatusBadge({ status }: { status: string }) {
   };
   const key = status.toLowerCase();
   return (
-    <Badge tone={map[key] ?? 'neutral'}>{labelMap[key] ?? formatLabel(status)}</Badge>
+    <Badge variant="dot" tone={map[key] ?? 'neutral'}>{labelMap[key] ?? formatLabel(status)}</Badge>
   );
 }
 
@@ -128,12 +128,12 @@ function ReservationStatusBadge({ status }: { status: string }) {
     expired: 'neutral',
     cancelled: 'danger',
   };
-  return <Badge tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[status.toLowerCase()] ?? 'neutral'}>{formatLabel(status)}</Badge>;
 }
 
 function BuildingStatusBadge({ isActive }: { isActive: boolean }) {
   return (
-    <Badge tone={isActive ? 'success' : 'neutral'}>
+    <Badge variant="dot" tone={isActive ? 'success' : 'neutral'}>
       {isActive ? 'Active' : 'Inactive'}
     </Badge>
   );
@@ -155,7 +155,7 @@ function LeaseStatusBadge({ status }: { status: string }) {
     terminated: 'Terminated',
   };
   const key = status.toLowerCase();
-  return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
 }
 
 function DocumentStatusBadge({ status }: { status: string }) {
@@ -172,7 +172,7 @@ function DocumentStatusBadge({ status }: { status: string }) {
     needs_review: 'Needs review',
   };
   const key = status.toLowerCase();
-  return <Badge tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
+  return <Badge variant="dot" tone={map[key] ?? 'neutral'}>{labels[key] ?? formatLabel(status)}</Badge>;
 }
 
 function PaymentTypeBadge({ type }: { type: string }) {
@@ -183,7 +183,7 @@ function PaymentTypeBadge({ type }: { type: string }) {
     utilities: 'success',
     other: 'neutral',
   };
-  return <Badge tone={map[type.toLowerCase()] ?? 'neutral'}>{formatLabel(type)}</Badge>;
+  return <Badge variant="dot" tone={map[type.toLowerCase()] ?? 'neutral'}>{formatLabel(type)}</Badge>;
 }
 
 function ExpenseCategoryBadge({ category }: { category: string }) {
@@ -201,7 +201,7 @@ function ExpenseCategoryBadge({ category }: { category: string }) {
     other: 'neutral',
   };
   return (
-    <Badge tone={map[category.toLowerCase()] ?? 'neutral'}>
+    <Badge variant="dot" tone={map[category.toLowerCase()] ?? 'neutral'}>
       {formatLabel(category)}
     </Badge>
   );
@@ -223,7 +223,7 @@ function MaintenancePriorityBadge({ priority }: { priority: string }) {
   };
   const key = priority.toLowerCase();
   return (
-    <Badge tone={map[key] ?? 'neutral'}>
+    <Badge variant="dot" tone={map[key] ?? 'neutral'}>
       {labels[key] ?? formatLabel(priority)}
     </Badge>
   );

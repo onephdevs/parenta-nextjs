@@ -161,11 +161,7 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
       children: [
         {
           name: 'Lease Templates',
-          href: '/admin/leasing',
-        },
-        {
-          name: 'Lease Management',
-          href: '/admin/lease-management',
+          href: '/admin/lease-templates',
         },
       ],
     },

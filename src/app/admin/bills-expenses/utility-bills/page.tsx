@@ -16,25 +16,19 @@ import {
   SearchInput,
   Select,
   Spinner,
-  Badge,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  TableCard,
+  WorkItemRow,
 } from '@/components/ui';
-import { InvoiceStatusBadge } from '@/components/domain/StatusBadges';
 import { 
   Plus, 
   Trash2, 
   CheckCircle2, 
   AlertCircle,
-  Zap,
-  Droplets,
+  AlertTriangle,
   DollarSign,
-  Eye,
 } from 'lucide-react';
+import { formatShortDate } from '@/lib/utils';
+import type { WorkItemTone } from '@/components/ui/WorkItemRow';
 
 const PAGE_SIZE = 20;
 
@@ -275,19 +269,17 @@ export default function RoomUtilityBillsPage() {
     }).format(amount);
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  const billStatusTone = (status: string): WorkItemTone => {
+    if (status === 'paid') return 'success';
+    if (status === 'overdue') return 'danger';
+    if (status === 'disputed') return 'purple';
+    if (status === 'sent') return 'info';
+    return 'warning';
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'disputed') {
-      return <Badge tone="purple">Disputed</Badge>;
-    }
-    return <InvoiceStatusBadge status={status} />;
+  const billStatusLabel = (status: string) => {
+    if (status === 'disputed') return 'Disputed';
+    return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const summary = {
@@ -338,16 +330,29 @@ export default function RoomUtilityBillsPage() {
           />
         </div>
 
-        <FilterBar columns={6}>
-          <FormField label="Search" htmlFor="search">
-            <SearchInput
-              id="search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Room, building, provider..."
-            />
-          </FormField>
-
+        <FilterBar
+        columns={5}
+        collapsible
+        activeCount={
+          [buildingFilter, utilityTypeFilter, statusFilter, dateFromFilter, dateToFilter].filter(
+            Boolean
+          ).length
+        }
+        search={
+          <SearchInput
+            id="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Room, building, provider..."
+            aria-label="Search utility bills"
+          />
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            Showing {filteredBills.length} of {bills.length} bills
+          </p>
+        }
+      >
           <FormField label="Building" htmlFor="building">
             <Select
               id="building"
@@ -409,7 +414,7 @@ export default function RoomUtilityBillsPage() {
         </FilterBar>
 
         {/* Bills Table */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <TableCard title="Room utility bills" description="Track electricity and water bills by room.">
           {isLoading ? (
             <div className="flex justify-center p-8">
               <Spinner label="Loading bills" />
@@ -426,87 +431,71 @@ export default function RoomUtilityBillsPage() {
             />
           ) : (
             <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Utility</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Billing Period</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageBills.map((bill) => (
-                  <TableRow key={bill.id}>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">{bill.buildingName}</div>
-                      <div className="text-sm text-gray-600">Room {bill.roomNumber}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {bill.utilityType === 'electricity' ? (
-                          <Zap className="mr-2 h-4 w-4 text-yellow-500" />
-                        ) : (
-                          <Droplets className="mr-2 h-4 w-4 text-blue-500" />
-                        )}
-                        <span className="capitalize">{bill.utilityType}</span>
-                      </div>
-                      {bill.usageAmount && (
-                        <div className="text-xs text-gray-600">
-                          {bill.usageAmount} {bill.usageUnit}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div>{bill.providerName}</div>
-                      {bill.providerAccountNumber && (
-                        <div className="text-xs text-gray-600">{bill.providerAccountNumber}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div>{formatDate(bill.billingPeriodStart)}</div>
-                      <div className="text-xs text-gray-600">to {formatDate(bill.billingPeriodEnd)}</div>
-                    </TableCell>
-                    <TableCell>{formatDate(bill.dueDate)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(bill.amount)}</TableCell>
-                    <TableCell>{getStatusBadge(bill.billStatus)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Link
-                          href={`/admin/bills-expenses/utility-bills/${bill.id}`}
-                          className="inline-flex text-gray-500 hover:text-gray-900"
-                          title="View"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </Link>
-                        {bill.billStatus !== 'paid' && (
-                          <button
-                            onClick={() => handleMarkPaid(bill.id)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Mark as Paid"
-                            type="button"
-                          >
-                            <CheckCircle2 className="h-5 w-5" />
-                          </button>
-                        )}
+            {pageBills.map((bill) => {
+              const statusTone = billStatusTone(bill.billStatus);
+              return (
+                <WorkItemRow
+                  key={bill.id}
+                  href={`/admin/bills-expenses/utility-bills/${bill.id}`}
+                  title={bill.buildingName || 'Utility bill'}
+                  subtitle={bill.roomNumber ? `Room ${bill.roomNumber}` : bill.providerName}
+                  badges={[
+                    {
+                      key: 'utility',
+                      label: bill.utilityType,
+                      tone: bill.utilityType === 'electricity' ? 'warning' : 'info',
+                    },
+                    {
+                      key: 'status',
+                      label: billStatusLabel(bill.billStatus),
+                      tone: statusTone,
+                    },
+                  ]}
+                  date={formatShortDate(bill.dueDate)}
+                  metaLabel={billStatusLabel(bill.billStatus)}
+                  metaDetail={formatCurrency(bill.amount)}
+                  metaTone={
+                    statusTone === 'danger'
+                      ? 'danger'
+                      : statusTone === 'warning'
+                        ? 'warning'
+                        : statusTone === 'success'
+                          ? 'muted'
+                          : 'default'
+                  }
+                  dotTone={statusTone}
+                  trailingIcon={
+                    statusTone === 'success' ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : statusTone === 'danger' ? (
+                      <AlertTriangle className="h-4 w-4 text-rose-500" />
+                    ) : null
+                  }
+                  actions={
+                    <>
+                      {bill.billStatus !== 'paid' ? (
                         <button
-                          onClick={() => handleDelete(bill.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
+                          onClick={() => handleMarkPaid(bill.id)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Mark as Paid"
                           type="button"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <CheckCircle2 className="h-5 w-5" />
                         </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      ) : null}
+                      <button
+                        onClick={() => handleDelete(bill.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete"
+                        type="button"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </>
+                  }
+                />
+              );
+            })}
             <Pagination
               currentPage={Math.min(currentPage, totalPages)}
               totalPages={totalPages}
@@ -516,7 +505,7 @@ export default function RoomUtilityBillsPage() {
             />
             </>
           )}
-        </div>
+        </TableCard>
     </div>
   );
 }

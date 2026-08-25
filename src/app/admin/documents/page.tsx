@@ -147,30 +147,30 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
         }
       />
 
-      <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <ListSummaryCard
           title="Total documents"
           value={stats.totalDocuments}
           footer="all documents"
-          icon={<FileText className="h-8 w-8 text-blue-600" />}
+          icon={<FileText className="h-8 w-8 text-gray-700" />}
         />
         <ListSummaryCard
           title="Pending signature"
           value={stats.pendingSignature}
           footer="awaiting signature"
-          icon={<FileSignature className="h-8 w-8 text-slate-600" />}
+          icon={<FileSignature className="h-8 w-8 text-gray-700" />}
         />
         <ListSummaryCard
           title="Expiring soon"
           value={stats.expiringDocuments}
           footer="documents expiring"
-          icon={<AlertTriangle className="h-8 w-8 text-yellow-600" />}
+          icon={<AlertTriangle className="h-8 w-8 text-gray-700" />}
         />
         <ListSummaryCard
           title="Unlinked"
           value={stats.unlinkedDocuments}
           footer="not linked to a record"
-          icon={<Link2Off className="h-8 w-8 text-red-600" />}
+          icon={<Link2Off className="h-8 w-8 text-gray-700" />}
         />
       </div>
 

@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
             type: 'lease' as const,
             title: `${row.tenant_name} · ${row.room_number}`,
             subtitle: `${row.building_name} — ${row.assignment_status || 'n/a'} · ends ${end}`,
-            url: `/admin/lease-management/${row.id}`,
+            url: `/admin/leasing/${row.id}`,
           };
         });
       });

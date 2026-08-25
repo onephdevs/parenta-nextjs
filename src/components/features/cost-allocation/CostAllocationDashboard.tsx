@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Building, Settings, Calculator, FileText, Info } from 'lucide-react';
+import { Building, Settings, Calculator, FileText, Info, Layers } from 'lucide-react';
 import AllocationRulesConfig from './AllocationRulesConfig';
 import CostAllocationCalculator from './CostAllocationCalculator';
 import TenantUtilityBills from './TenantUtilityBills';
@@ -13,6 +13,10 @@ import { Alert } from '@/components/ui/Alert';
 import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/Tabs';
 import { FormField } from '@/components/forms/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SearchInput } from '@/components/ui/SearchInput';
 
 export default function CostAllocationDashboard() {
   const [buildings, setBuildings] = useState<BuildingType[]>([]);
@@ -55,6 +59,17 @@ export default function CostAllocationDashboard() {
     }
   };
 
+  const [buildingSearch, setBuildingSearch] = useState('');
+
+  const filteredBuildings = buildings.filter((building) => {
+    if (!buildingSearch.trim()) return true;
+    const term = buildingSearch.toLowerCase();
+    return (
+      (building.name || '').toLowerCase().includes(term) ||
+      (building.addressLine1 || '').toLowerCase().includes(term)
+    );
+  });
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Info },
     { id: 'rules', label: 'Allocation Rules', icon: Settings },
@@ -63,53 +78,83 @@ export default function CostAllocationDashboard() {
   ];
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title="Cost Allocation"
+        description="Configure allocation rules, calculate costs, and manage tenant utility bills"
+      />
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ListSummaryCard
+          title="Buildings"
+          value={buildings.length}
+          footer="properties available"
+          icon={<Building className="h-8 w-8 text-blue-600" />}
+        />
+        <ListSummaryCard
+          title="Selected units"
+          value={selectedBuilding?.totalUnits ?? 0}
+          footer={selectedBuilding?.name || 'choose a building'}
+          icon={<Layers className="h-8 w-8 text-slate-600" />}
+        />
+        <ListSummaryCard
+          title="Floors"
+          value={selectedBuilding?.totalFloors ?? 0}
+          footer="in selected building"
+          icon={<Building className="h-8 w-8 text-green-600" />}
+        />
+        <ListSummaryCard
+          title="Active tab"
+          value={tabs.find((t) => t.id === activeTab)?.label || 'Overview'}
+          footer="allocation workspace"
+          icon={<Settings className="h-8 w-8 text-amber-600" />}
+        />
+      </div>
+
+      <FilterBar
+        columns={4}
+        collapsible
+        activeCount={buildingSearch.trim() ? 1 : 0}
+        search={
+          <SearchInput
+            id="building-search"
+            value={buildingSearch}
+            onChange={(e) => setBuildingSearch(e.target.value)}
+            placeholder="Building name or address..."
+            aria-label="Search buildings"
+          />
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            {selectedBuilding
+              ? `${selectedBuilding.name} · ${selectedBuilding.totalUnits ?? 0} units`
+              : 'Select a building to continue'}
+          </p>
+        }
+      >
+        <FormField label="Building" htmlFor="building-select">
+          <Select
+            id="building-select"
+            value={selectedBuildingId}
+            onChange={(e) => setSelectedBuildingId(e.target.value)}
+          >
+            <option value="">Choose a building</option>
+            {filteredBuildings.map((building) => (
+              <option key={building.id} value={building.id}>
+                {building.name} - {building.addressLine1}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      </FilterBar>
+
+      {buildings.length === 0 && !isLoading && (
+        <Alert variant="info">
+          No buildings found. Please create a building first to set up cost allocation.
+        </Alert>
+      )}
+
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Cost Allocation System</h1>
-            <p className="text-gray-900">
-              Configure allocation rules, calculate costs, and manage tenant utility bills
-            </p>
-          </div>
-        </div>
-
-        <Card>
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900">
-            <Building className="h-5 w-5 text-gray-900" />
-            Select Building
-          </h3>
-          <div className="flex items-center gap-4">
-            <div className="flex-1 max-w-md">
-              <FormField label="Building" htmlFor="building-select">
-                <Select
-                  id="building-select"
-                  value={selectedBuildingId}
-                  onChange={(e) => setSelectedBuildingId(e.target.value)}
-                >
-                  <option value="">Choose a building</option>
-                  {buildings.map(building => (
-                    <option key={building.id} value={building.id}>
-                      {building.name} - {building.address}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-            {selectedBuilding && (
-              <div className="text-sm text-gray-900">
-                {selectedBuilding.totalUnits} units • {selectedBuilding.totalFloors} floors
-              </div>
-            )}
-          </div>
-
-          {buildings.length === 0 && !isLoading && (
-            <Alert variant="info" className="mt-4">
-              No buildings found. Please create a building first to set up cost allocation.
-            </Alert>
-          )}
-        </Card>
-
         {selectedBuilding ? (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabList>

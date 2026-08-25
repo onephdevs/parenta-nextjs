@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Clock,
   Save,
-  Camera,
   ArrowLeft,
   X,
   ChevronRight,
@@ -34,13 +33,17 @@ import {
   Pagination,
   SearchInput,
   Select,
+  TableCard,
   Textarea,
+  WorkItemRow,
 } from '@/components/ui';
 import { FormField } from '@/components/forms/FormField';
 import {
   MaintenancePriorityBadge,
   MaintenanceStatusBadge,
 } from '@/components/domain/StatusBadges';
+import { formatShortDate } from '@/lib/utils';
+import type { WorkItemTone } from '@/components/ui/WorkItemRow';
 import {
   MaintenanceThreadPanel,
   type MaintenanceThreadHandle,
@@ -455,16 +458,26 @@ export default function AdminMaintenancePage() {
         />
       </div>
 
-      <FilterBar columns={4} className="mb-0">
-        <FormField label="Search" htmlFor="maintenance-search">
+      <FilterBar
+        columns={3}
+        className="mb-0"
+        collapsible
+        activeCount={[filterStatus, filterPriority, filterCategory].filter(Boolean).length}
+        search={
           <SearchInput
             id="maintenance-search"
             placeholder="Ticket, title, tenant, building…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search maintenance requests"
           />
-        </FormField>
-
+        }
+        footer={
+          <p className="text-sm text-gray-600">
+            Showing {filteredRequests.length} of {requests.length} requests
+          </p>
+        }
+      >
         <FormField label="Status" htmlFor="maintenance-status">
           <Select
             id="maintenance-status"
@@ -510,7 +523,7 @@ export default function AdminMaintenancePage() {
         </FormField>
       </FilterBar>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <TableCard title="Maintenance requests" description="Open a request to update status and add notes.">
         {filteredRequests.length === 0 ? (
           <EmptyState
             title="No maintenance requests found"
@@ -518,7 +531,7 @@ export default function AdminMaintenancePage() {
           />
         ) : (
           <>
-            <ul className="divide-y divide-gray-100">
+            <div>
               {pageRequests.map((request) => {
                 const photoCount =
                   request.attachmentCount || request.attachments?.length || 0;
@@ -528,56 +541,61 @@ export default function AdminMaintenancePage() {
                 ]
                   .filter(Boolean)
                   .join(' · ');
+                const statusKey = (request.status || '').toLowerCase();
+                const statusLabel =
+                  statusKey === 'submitted' || statusKey === 'open'
+                    ? 'Open'
+                    : statusKey === 'in_progress'
+                      ? 'In Progress'
+                      : statusKey === 'completed' || statusKey === 'resolved'
+                        ? 'Resolved'
+                        : statusKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                const statusTone: WorkItemTone =
+                  statusKey === 'completed' || statusKey === 'resolved'
+                    ? 'success'
+                    : statusKey === 'in_progress'
+                      ? 'info'
+                      : statusKey === 'cancelled' || statusKey === 'closed'
+                        ? 'neutral'
+                        : 'warning';
+                const priorityKey = (request.priority || '').toLowerCase();
+                const priorityTone: WorkItemTone =
+                  priorityKey === 'urgent' || priorityKey === 'emergency'
+                    ? 'danger'
+                    : priorityKey === 'high' || priorityKey === 'medium'
+                      ? 'warning'
+                      : 'success';
 
                 return (
-                  <li key={request.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateRequest(request)}
-                      className="flex w-full items-start gap-3 px-4 py-4 text-left transition hover:bg-gray-50 sm:px-5"
-                    >
-                      <Avatar
-                        name={request.tenant_name || 'Tenant'}
-                        src={request.tenant_avatar_url}
-                        size="sm"
-                        className="mt-0.5 shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="font-mono text-xs text-gray-500">
-                            {formatMaintenanceTicketNumber(request.id)}
-                          </span>
-                          <MaintenanceStatusBadge status={request.status} />
-                          <MaintenancePriorityBadge priority={request.priority} />
-                        </div>
-                        <p className="mt-1 truncate text-sm font-semibold text-gray-900">
-                          {request.title}
-                        </p>
-                        {request.description ? (
-                          <p className="mt-0.5 line-clamp-1 text-sm text-gray-500">
-                            {request.description}
-                          </p>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                          <span>{request.tenant_name || 'No tenant'}</span>
-                          {location ? <span>{location}</span> : null}
-                          <span>{formatMaintenanceCategory(request.category)}</span>
-                          <span>{request.assigned_to_name || 'Unassigned'}</span>
-                          <span>{formatDate(request.request_date)}</span>
-                          {photoCount > 0 ? (
-                            <span className="inline-flex items-center gap-1 font-medium text-indigo-600">
-                              <Camera className="h-3.5 w-3.5" />
-                              {photoCount} photo{photoCount === 1 ? '' : 's'}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <ChevronRight className="mt-2 h-5 w-5 shrink-0 text-gray-400" />
-                    </button>
-                  </li>
+                  <WorkItemRow
+                    key={request.id}
+                    onClick={() => handleUpdateRequest(request)}
+                    idLabel={formatMaintenanceTicketNumber(request.id)}
+                    title={request.title}
+                    subtitle={location || request.tenant_name || null}
+                    badges={[
+                      { key: 'status', label: statusLabel, tone: statusTone },
+                      {
+                        key: 'priority',
+                        label: request.priority
+                          ? request.priority.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                          : 'Priority',
+                        tone: priorityTone,
+                      },
+                      ...(photoCount > 0
+                        ? [{ key: 'photos', label: `${photoCount} photo${photoCount === 1 ? '' : 's'}`, tone: 'info' as const }]
+                        : []),
+                    ]}
+                    date={formatShortDate(request.request_date)}
+                    metaLabel={statusLabel}
+                    metaDetail={request.assigned_to_name || 'Unassigned'}
+                    metaTone={statusTone === 'success' ? 'muted' : statusTone === 'warning' ? 'warning' : 'default'}
+                    dotTone={priorityTone === 'danger' ? 'danger' : statusTone}
+                    trailingIcon={<ChevronRight className="h-4 w-4 text-gray-400" />}
+                  />
                 );
               })}
-            </ul>
+            </div>
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}
@@ -587,7 +605,7 @@ export default function AdminMaintenancePage() {
             />
           </>
         )}
-      </div>
+      </TableCard>
 
       {showUpdateModal && selectedRequest && (
         <div className="fixed inset-0 z-50 overflow-hidden">

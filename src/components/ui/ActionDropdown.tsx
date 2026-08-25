@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,28 +37,63 @@ export function ActionDropdown({
   align = 'left',
 }: ActionDropdownProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  const placeMenu = () => {
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger || !menu) return;
+    const rect = trigger.getBoundingClientRect();
+    const menuHeight = menu.offsetHeight;
+    const menuWidth = Math.max(menu.offsetWidth, rect.width);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < menuHeight + 8 && rect.top > spaceBelow;
+    let left = align === 'right' ? rect.right - menuWidth : rect.left;
+    left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
+    menu.style.minWidth = `${rect.width}px`;
+    menu.style.left = `${left}px`;
+    if (openUp) {
+      menu.style.top = 'auto';
+      menu.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+    } else {
+      menu.style.bottom = 'auto';
+      menu.style.top = `${rect.bottom + 6}px`;
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    placeMenu();
+  }, [open, align, items.length]);
 
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', placeMenu);
+    window.addEventListener('scroll', placeMenu, true);
     return () => {
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', placeMenu);
+      window.removeEventListener('scroll', placeMenu, true);
     };
-  }, [open]);
+  }, [open, align]);
 
   return (
-    <div ref={rootRef} className={cn('relative', className)}>
+    <div className={cn('relative', className)}>
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -75,60 +111,60 @@ export function ActionDropdown({
           className={cn('h-3.5 w-3.5 shrink-0 opacity-70', open && 'rotate-180')}
         />
       </button>
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={menuId}
+            role="menu"
+            className="fixed z-[120] w-max overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-md"
+          >
+            {items.map((item) => {
+              const content = (
+                <>
+                  {item.icon}
+                  <span className="whitespace-nowrap">{item.label}</span>
+                </>
+              );
+              const itemClass = cn(
+                'flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-gray-900 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50',
+                item.tone ? toneClass[item.tone] : null
+              );
 
-      {open && (
-        <div
-          id={menuId}
-          role="menu"
-          className={cn(
-            'absolute z-50 mt-1.5 w-max min-w-full overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-md',
-            align === 'right' ? 'right-0' : 'left-0'
-          )}
-        >
-          {items.map((item) => {
-            const content = (
-              <>
-                {item.icon}
-                <span className="whitespace-nowrap">{item.label}</span>
-              </>
-            );
-            const itemClass = cn(
-              'flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-gray-900 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50',
-              item.tone ? toneClass[item.tone] : null
-            );
+              if (item.href && !item.disabled) {
+                return (
+                  <a
+                    key={item.id}
+                    role="menuitem"
+                    href={item.href}
+                    className={itemClass}
+                    onClick={() => setOpen(false)}
+                  >
+                    {content}
+                  </a>
+                );
+              }
 
-            if (item.href && !item.disabled) {
               return (
-                <a
+                <button
                   key={item.id}
+                  type="button"
                   role="menuitem"
-                  href={item.href}
+                  disabled={item.disabled}
                   className={itemClass}
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    item.onSelect?.();
+                    setOpen(false);
+                  }}
                 >
                   {content}
-                </a>
+                </button>
               );
-            }
-
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="menuitem"
-                disabled={item.disabled}
-                className={itemClass}
-                onClick={() => {
-                  item.onSelect?.();
-                  setOpen(false);
-                }}
-              >
-                {content}
-              </button>
-            );
-          })}
-        </div>
-      )}
+            })}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
