@@ -56,7 +56,7 @@ export function LeaseTab({ tenant, onViewLease }: LeaseTabProps) {
                 </tr>
               ) : (
                 rows.map((lease) => {
-                  const status = deriveLeaseRowStatus(lease);
+                  const status = deriveLeaseRowStatus(lease, leases);
                   return (
                     <tr key={lease.id} className="hover:bg-gray-50/60">
                       <td className="px-5 py-4">

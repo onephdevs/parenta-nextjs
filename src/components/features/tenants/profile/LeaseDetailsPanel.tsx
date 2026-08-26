@@ -20,11 +20,17 @@ interface LeaseActivity {
 interface LeaseDetailsPanelProps {
   lease: TenantProfileAssignment;
   tenantId: string;
+  history?: TenantProfileAssignment[];
   onBack: () => void;
 }
 
-export function LeaseDetailsPanel({ lease, tenantId, onBack }: LeaseDetailsPanelProps) {
-  const status = deriveLeaseRowStatus(lease);
+export function LeaseDetailsPanel({
+  lease,
+  tenantId,
+  history = [],
+  onBack,
+}: LeaseDetailsPanelProps) {
+  const status = deriveLeaseRowStatus(lease, history);
   const [activity, setActivity] = useState<LeaseActivity[]>([]);
   const [loading, setLoading] = useState(true);
 

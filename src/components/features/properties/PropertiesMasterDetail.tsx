@@ -10,6 +10,7 @@ import type {
 import PropertiesListPanel from './PropertiesListPanel';
 import PropertyDetailPane from './PropertyDetailPane';
 import RoomDetailsModal from '@/components/features/rooms/RoomDetailsModal';
+import { firstPropertyId, sortPropertiesByName } from '@/lib/format/property-sort';
 
 interface PropertiesMasterDetailProps {
   initialBuildings: PropertyListBuilding[];
@@ -26,10 +27,10 @@ export default function PropertiesMasterDetail({
 
   const [buildings, setBuildings] = useState(initialBuildings);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
-    initialBuildingId || initialBuildings[0]?.id || null
+    initialBuildingId || firstPropertyId(initialBuildings)
   );
   const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(
-    initialBuildingId || initialBuildings[0]?.id || null
+    initialBuildingId || firstPropertyId(initialBuildings)
   );
   const [detail, setDetail] = useState<PropertyBuildingDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -104,13 +105,15 @@ export default function PropertiesMasterDetail({
       const response = await fetch('/api/buildings', { credentials: 'include' });
       const json = await response.json();
       if (response.ok && json.success) {
-        const next = (json.data.buildings as PropertyListBuilding[]).map((b) => ({
-          ...b,
-          occupiedUnits: b.occupiedUnits ?? 0,
-          vacantUnits: b.vacantUnits ?? 0,
-          primaryImagePath:
-            (b as PropertyListBuilding).primaryImagePath ?? null,
-        }));
+        const next = sortPropertiesByName(
+          (json.data.buildings as PropertyListBuilding[]).map((b) => ({
+            ...b,
+            occupiedUnits: b.occupiedUnits ?? 0,
+            vacantUnits: b.vacantUnits ?? 0,
+            primaryImagePath:
+              (b as PropertyListBuilding).primaryImagePath ?? null,
+          }))
+        );
         setBuildings(next);
         return next;
       }
@@ -221,8 +224,7 @@ export default function PropertiesMasterDetail({
     const targetId =
       buildingId ||
       next.find((b) => !buildings.some((old) => old.id === b.id))?.id ||
-      next[0]?.id ||
-      null;
+      firstPropertyId(next);
     if (targetId) {
       setSelectedBuildingId(targetId);
       setExpandedBuildingId(targetId);
@@ -242,7 +244,7 @@ export default function PropertiesMasterDetail({
     const deletedId = selectedBuildingId;
     const next = (await refreshBuildingsList()).filter((b) => b.id !== deletedId);
     setBuildings(next);
-    const fallback = next[0]?.id || null;
+    const fallback = firstPropertyId(next);
     setSelectedBuildingId(fallback);
     setExpandedBuildingId(fallback);
     syncUrl(fallback);

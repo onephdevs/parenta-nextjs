@@ -107,6 +107,7 @@ export default function TenantProfilePage({ tenant: initialTenant }: TenantProfi
             <LeaseDetailsPanel
               lease={selectedLease}
               tenantId={tenant.id}
+              history={tenant.assignmentHistory}
               onBack={() => setSelectedLease(null)}
             />
           ) : (

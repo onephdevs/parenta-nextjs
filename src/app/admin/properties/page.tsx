@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { getBuildingsForPropertiesPage } from '@/lib/api/properties';
+import { firstPropertyId } from '@/lib/format/property-sort';
 import PropertiesMasterDetail from '@/components/features/properties/PropertiesMasterDetail';
 import { Alert } from '@/components/ui/Alert';
 import AppLoader from '@/components/ui/AppLoader';
@@ -30,7 +31,7 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
   const initialBuildingId =
     params.buildingId && buildings.some((b) => b.id === params.buildingId)
       ? params.buildingId
-      : buildings[0]?.id || null;
+      : firstPropertyId(buildings);
 
   return (
     <Suspense

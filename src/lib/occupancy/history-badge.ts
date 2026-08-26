@@ -20,15 +20,25 @@ export function occupancyDateKey(value: string | Date | null | undefined): strin
   return iso ? iso[1] : raw.slice(0, 10);
 }
 
-function personKey(item: {
-  tenantId?: string | null;
-  tenantName?: string | null;
-}): string {
-  const id = String(item.tenantId || '').trim();
-  if (id) return `id:${id}`;
-  return `name:${String(item.tenantName || '')
+function normalizePersonName(name?: string | null): string {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
     .trim()
-    .toLowerCase()}`;
+    .toLowerCase();
+}
+
+function isSamePerson(
+  a: { tenantId?: string | null; tenantName?: string | null },
+  b: { tenantId?: string | null; tenantName?: string | null }
+): boolean {
+  const idA = String(a.tenantId || '').trim();
+  const idB = String(b.tenantId || '').trim();
+  if (idA && idB && idA === idB) return true;
+  const nameA = normalizePersonName(a.tenantName);
+  const nameB = normalizePersonName(b.tenantName);
+  return Boolean(nameA && nameB && nameA === nameB);
 }
 
 function isCurrentStay(item: {
@@ -58,11 +68,10 @@ export function withOccupancyHistoryBadges<
     if (isCurrentStay(item)) {
       return { ...item, occupancyBadge: 'current' as const };
     }
-    const key = personKey(item);
     const start = occupancyDateKey(item.startDate);
     const hasLaterStay = items.some((other) => {
       if (other.id === item.id) return false;
-      if (personKey(other) !== key) return false;
+      if (!isSamePerson(item, other)) return false;
       return occupancyDateKey(other.startDate) > start;
     });
     return {

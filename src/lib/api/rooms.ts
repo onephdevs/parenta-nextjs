@@ -619,9 +619,17 @@ export async function getRoomAssignmentHistory(roomId: string) {
         t.tenant_status,
         t.is_tenant,
         t.id as live_tenant_id,
-        (t.id IS NOT NULL) as tenant_exists
+        (t.id IS NOT NULL) as tenant_exists,
+        lpt.name as lease_package_template_name,
+        lpt.term_months as lease_package_term_months,
+        lpt.deposit_months as lease_package_deposit_months,
+        lpt.advance_months as lease_package_advance_months,
+        lpt.grace_period_days as lease_package_grace_period_days,
+        lpt.penalty_type as lease_package_penalty_type,
+        lpt.penalty_fee as lease_package_penalty_fee
       FROM tenant_room_assignments tra
       LEFT JOIN tenants t ON tra.tenant_id = t.id
+      LEFT JOIN lease_package_templates lpt ON lpt.id = tra.lease_package_template_id
       WHERE tra.room_id = $1
       ORDER BY tra.start_date DESC NULLS LAST, tra.created_at DESC
     `;

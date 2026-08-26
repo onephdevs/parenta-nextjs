@@ -41,6 +41,7 @@ import TenantProfileModal from '@/components/features/tenants/TenantProfileModal
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import RoomShowcaseGallery from '@/components/features/rooms/RoomShowcaseGallery';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 const TEAL = '#39CCCC';
@@ -878,27 +879,32 @@ function AssignmentHistoryCard({
 
   return (
     <div>
-      <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Occupant history</p>
+      <p className="mb-3 text-[16px] font-bold leading-none text-gray-900">Lease history</p>
       <div className={cardClassName()}>
         {history.length === 0 ? (
           <p className="px-4 py-6 text-center text-[12px] text-gray-400">
-            No previous occupants.
+            No lease history for this unit.
           </p>
         ) : (
           <ul>
             {history.map((item) => {
               const badge = item.occupancyBadge;
               const isCurrent = badge === 'current';
-              const isRenewed = badge === 'renewed';
+              const leaseStatus =
+                badge === 'current' ? 'active' : badge === 'renewed' ? 'renewed' : 'terminated';
+              const tenantHref =
+                item.tenantId && item.tenantExists !== false
+                  ? `/admin/tenants/${item.tenantId}?tab=lease`
+                  : null;
               return (
                 <li
                   key={item.id}
                   className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3.5 last:border-b-0"
                 >
                   <div className="min-w-0 flex-1">
-                    {item.tenantId && item.tenantExists !== false ? (
+                    {tenantHref ? (
                       <Link
-                        href={`/admin/tenants/${item.tenantId}`}
+                        href={tenantHref}
                         className="truncate text-[13px] font-bold leading-none text-gray-900 hover:underline"
                       >
                         {item.tenantName}
@@ -921,6 +927,9 @@ function AssignmentHistoryCard({
                         : isCurrent
                           ? 'Present'
                           : '—'}
+                    </p>
+                    <p className="mt-1.5 text-[11px] text-gray-600">
+                      {item.leasePackageTemplateName || 'No lease template'}
                     </p>
                     <div className="mt-2 space-y-1 text-[11px] text-gray-600">
                       {(item.depositPaid != null ||
@@ -964,21 +973,19 @@ function AssignmentHistoryCard({
                     </div>
                   </div>
                   <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none ${
-                        isCurrent
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : isRenewed
-                            ? 'bg-sky-100 text-sky-800'
-                            : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {isCurrent ? 'Current' : isRenewed ? 'Renewed' : 'Terminated'}
-                    </span>
+                    <StatusBadge status={leaseStatus} />
                     <span className="text-[12px] font-medium leading-none text-gray-900">
                       {formatCurrency(item.monthlyRate)}
                       <span className="ml-0.5 text-[10px] font-normal text-gray-500">/mo</span>
                     </span>
+                    {tenantHref && (
+                      <Link
+                        href={tenantHref}
+                        className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                      >
+                        View
+                      </Link>
+                    )}
                   </div>
                 </li>
               );

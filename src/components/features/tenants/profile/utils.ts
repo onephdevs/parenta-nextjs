@@ -1,4 +1,5 @@
 import type { TenantProfileAssignment } from './types';
+import { occupancyDateKey } from '@/lib/occupancy/history-badge';
 
 export function formatProfileDate(value?: string | Date | null, fallback = '—'): string {
   if (!value) return fallback;
@@ -30,10 +31,16 @@ export function derivePersonBadge(input: {
   return 'inactive';
 }
 
-/** Map assignment row → lease history badge (Upcoming / Active / Completed / Terminated). */
-export function deriveLeaseRowStatus(assignment: TenantProfileAssignment): string {
+/**
+ * Map assignment row → lease history badge.
+ * Current/upcoming stay is Active/Upcoming. An ended stay is Renewed when the
+ * same person has a later stay in `history` (renewal), otherwise Terminated.
+ */
+export function deriveLeaseRowStatus(
+  assignment: TenantProfileAssignment,
+  history: TenantProfileAssignment[] = []
+): string {
   const status = String(assignment.assignmentStatus || '').toLowerCase();
-  if (status === 'terminated') return 'terminated';
   if (status === 'pending') return 'upcoming';
 
   const today = new Date();
@@ -43,6 +50,15 @@ export function deriveLeaseRowStatus(assignment: TenantProfileAssignment): strin
 
   if (start && !Number.isNaN(start.getTime()) && start > today) return 'upcoming';
   if (status === 'active' && (!end || end >= today)) return 'active';
+
+  const startKey = occupancyDateKey(assignment.startDate);
+  const siblings = history.length > 0 ? history : [assignment];
+  const hasLaterStay = siblings.some((other) => {
+    if (other.id === assignment.id) return false;
+    return occupancyDateKey(other.startDate) > startKey;
+  });
+  if (hasLaterStay) return 'renewed';
+  if (status === 'terminated') return 'terminated';
   if (end && end < today) return 'completed';
   if (status === 'active') return 'active';
   return status || 'completed';

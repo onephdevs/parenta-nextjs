@@ -11,6 +11,7 @@ export type ProfileStatus =
   | 'upcoming'
   | 'completed'
   | 'terminated'
+  | 'renewed'
   | 'overdue'
   | 'unpaid'
   | 'paid'
@@ -24,6 +25,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   upcoming: 'neutral',
   completed: 'info',
   terminated: 'danger',
+  renewed: 'info',
   overdue: 'danger',
   unpaid: 'purple',
   paid: 'success',
@@ -37,6 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
   upcoming: 'Upcoming',
   completed: 'Completed',
   terminated: 'Terminated',
+  renewed: 'Renewed',
   overdue: 'Overdue',
   unpaid: 'Unpaid',
   paid: 'Paid',

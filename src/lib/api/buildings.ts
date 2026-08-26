@@ -14,7 +14,7 @@ import {
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
     id: dbBuilding.id,
-    name: dbBuilding.name,
+    name: (dbBuilding.name || '').trim(),
     addressLine1: dbBuilding.address_line1 || '',
     addressLine2: dbBuilding.address_line2,
     city: dbBuilding.city,

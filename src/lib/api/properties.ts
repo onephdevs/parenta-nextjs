@@ -16,11 +16,12 @@ import {
 import { LANDING_FEATURED_LIMIT } from '@/lib/landing-featured';
 import { countLandingFeaturedBuildings } from '@/lib/api/buildings';
 import { withOccupancyHistoryBadges } from '@/lib/occupancy/history-badge';
+import { sortPropertiesByName } from '@/lib/format/property-sort';
 
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
     id: dbBuilding.id,
-    name: dbBuilding.name,
+    name: (dbBuilding.name || '').trim(),
     addressLine1: dbBuilding.address_line1 || '',
     addressLine2: dbBuilding.address_line2,
     city: dbBuilding.city,
@@ -60,6 +61,8 @@ export interface PropertyRoomOccupant {
 
 export interface PropertyRoomTenant {
   tenantId: string;
+  assignmentId?: string;
+  assignmentStatus?: string;
   firstName: string;
   lastName: string;
   email?: string | null;
@@ -80,6 +83,14 @@ export interface PropertyRoomTenant {
   advancePaid?: number;
   utilityDepositPaid?: number;
   profileImagePath?: string | null;
+  leasePackageTemplateId?: string | null;
+  leasePackageTemplateName?: string | null;
+  leasePackageTermMonths?: number | null;
+  leasePackageDepositMonths?: number | null;
+  leasePackageAdvanceMonths?: number | null;
+  leasePackageGracePeriodDays?: number | null;
+  leasePackagePenaltyType?: 'percentage' | 'flat_fee' | null;
+  leasePackagePenaltyFee?: number | null;
 }
 
 export interface PropertyRoomImage {
@@ -169,6 +180,14 @@ export interface RoomAssignmentHistoryItem {
   assignmentStatus: string;
   /** UI badge: current stay, renewed (same person later stay), or left. */
   occupancyBadge?: 'current' | 'renewed' | 'terminated';
+  leasePackageTemplateId?: string | null;
+  leasePackageTemplateName?: string | null;
+  leasePackageTermMonths?: number | null;
+  leasePackageDepositMonths?: number | null;
+  leasePackageAdvanceMonths?: number | null;
+  leasePackageGracePeriodDays?: number | null;
+  leasePackagePenaltyType?: 'percentage' | 'flat_fee' | null;
+  leasePackagePenaltyFee?: number | null;
 }
 
 export interface PropertyBuildingDetail {
@@ -225,7 +244,7 @@ export async function getBuildingsForPropertiesPage(options?: {
 
   const result = await pool.query(query, values);
 
-  return result.rows.map((row) => {
+  const buildings = result.rows.map((row) => {
     const building = mapDatabaseBuildingToBuilding(row);
     return {
       ...building,
@@ -235,6 +254,8 @@ export async function getBuildingsForPropertiesPage(options?: {
       primaryImagePath: row.primary_image_path || null,
     };
   });
+
+  return sortPropertiesByName(buildings);
 }
 
 export async function getPropertyBuildingDetail(
@@ -285,6 +306,16 @@ export async function getPropertyBuildingDetail(
       tra.deposit_paid,
       tra.advance_paid,
       tra.utility_deposit_paid,
+      tra.id AS assignment_id,
+      tra.assignment_status,
+      tra.lease_package_template_id,
+      lpt.name AS lease_package_template_name,
+      lpt.term_months AS lease_package_term_months,
+      lpt.deposit_months AS lease_package_deposit_months,
+      lpt.advance_months AS lease_package_advance_months,
+      lpt.grace_period_days AS lease_package_grace_period_days,
+      lpt.penalty_type AS lease_package_penalty_type,
+      lpt.penalty_fee AS lease_package_penalty_fee,
       COALESCE(tra.monthly_rate, r.monthly_rate) AS assignment_monthly_rate,
       COALESCE((
         SELECT SUM(p.amount)
@@ -330,6 +361,7 @@ export async function getPropertyBuildingDetail(
       LIMIT 1
     ) tra ON true
     LEFT JOIN tenants t ON t.id = tra.tenant_id
+    LEFT JOIN lease_package_templates lpt ON lpt.id = tra.lease_package_template_id
     WHERE r.building_id = $1 AND r.is_active = true
     ORDER BY
       regexp_replace(lower(r.room_number), '[0-9]+', '', 'g'),
@@ -567,6 +599,37 @@ export interface RoomPageDetail {
   assets: PropertyRoomAsset[];
 }
 
+function mapLeasePackageFields(r: Record<string, unknown>) {
+  return {
+    assignmentId: r.assignment_id ? String(r.assignment_id) : undefined,
+    assignmentStatus: r.assignment_status ? String(r.assignment_status) : undefined,
+    leasePackageTemplateId: r.lease_package_template_id
+      ? String(r.lease_package_template_id)
+      : null,
+    leasePackageTemplateName: r.lease_package_template_name
+      ? String(r.lease_package_template_name)
+      : null,
+    leasePackageTermMonths:
+      r.lease_package_term_months == null ? null : Number(r.lease_package_term_months),
+    leasePackageDepositMonths:
+      r.lease_package_deposit_months == null ? null : Number(r.lease_package_deposit_months),
+    leasePackageAdvanceMonths:
+      r.lease_package_advance_months == null ? null : Number(r.lease_package_advance_months),
+    leasePackageGracePeriodDays:
+      r.lease_package_grace_period_days == null
+        ? null
+        : Number(r.lease_package_grace_period_days),
+    leasePackagePenaltyType:
+      r.lease_package_penalty_type === 'flat_fee'
+        ? ('flat_fee' as const)
+        : r.lease_package_penalty_type === 'percentage'
+          ? ('percentage' as const)
+          : null,
+    leasePackagePenaltyFee:
+      r.lease_package_penalty_fee == null ? null : Number(r.lease_package_penalty_fee),
+  };
+}
+
 function mapRoomRowToPropertyRoomDetail(
   r: Record<string, unknown>,
   occupants: PropertyRoomOccupant[],
@@ -604,6 +667,7 @@ function mapRoomRowToPropertyRoomDetail(
               ? parseFloat(String(r.utility_deposit_paid)) || 0
               : undefined,
           profileImagePath: (r.tenant_profile_image as string | null) ?? null,
+          ...mapLeasePackageFields(r),
         }
       : null;
 
@@ -678,7 +742,7 @@ export async function getRoomsForRoomsPage(): Promise<RoomsPageListItem[]> {
     return {
       id: row.id,
       buildingId: row.building_id,
-      buildingName: row.building_name,
+      buildingName: String(row.building_name || '').trim(),
       roomNumber: row.room_number,
       roomType: row.room_type,
       roomStatus: row.room_status,
@@ -731,6 +795,16 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       tra.deposit_paid,
       tra.advance_paid,
       tra.utility_deposit_paid,
+      tra.id AS assignment_id,
+      tra.assignment_status,
+      tra.lease_package_template_id,
+      lpt.name AS lease_package_template_name,
+      lpt.term_months AS lease_package_term_months,
+      lpt.deposit_months AS lease_package_deposit_months,
+      lpt.advance_months AS lease_package_advance_months,
+      lpt.grace_period_days AS lease_package_grace_period_days,
+      lpt.penalty_type AS lease_package_penalty_type,
+      lpt.penalty_fee AS lease_package_penalty_fee,
       COALESCE(tra.monthly_rate, r.monthly_rate) AS assignment_monthly_rate,
       COALESCE((
         SELECT SUM(p.amount)
@@ -789,6 +863,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       LIMIT 1
     ) tra ON true
     LEFT JOIN tenants t ON t.id = tra.tenant_id
+    LEFT JOIN lease_package_templates lpt ON lpt.id = tra.lease_package_template_id
     WHERE r.id = $1 AND r.is_active = true
     `,
     [roomId]
@@ -939,7 +1014,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     totalUnits: number;
   } = {
     id: buildingId,
-    name: row.building_name,
+    name: String(row.building_name || '').trim(),
     addressLine1: row.address_line1 || '',
     addressLine2: row.address_line2,
     city: row.city,
@@ -1028,6 +1103,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
             ? parseFloat(String(item.utility_deposit_paid)) || 0
             : undefined,
         assignmentStatus: String(item.assignment_status || ''),
+        ...mapLeasePackageFields(item),
       };
     })
   );

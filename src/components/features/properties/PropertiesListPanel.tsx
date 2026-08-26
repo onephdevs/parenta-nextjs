@@ -4,19 +4,11 @@ import { useMemo, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import AddBuildingModal from '@/components/features/AddBuildingModal';
 import type { PropertyListBuilding, PropertyRoomDetail } from '@/lib/api/properties';
+import { comparePropertyNames } from '@/lib/format/property-sort';
 import PropertyListCard from './PropertyListCard';
 
 type FilterValue = 'all' | 'has_vacant' | 'fully_occupied';
 type SortValue = 'name-asc' | 'name-desc' | 'city-asc' | 'vacant-desc';
-
-/** Natural name compare so "Apartment 1" comes before "Apartment 2" / "APRTMENT-2". */
-function comparePropertyNames(a: string, b: string): number {
-  return (a || '').trim().localeCompare((b || '').trim(), undefined, {
-    numeric: true,
-    sensitivity: 'base',
-    ignorePunctuation: true,
-  });
-}
 
 interface PropertiesListPanelProps {
   buildings: PropertyListBuilding[];
