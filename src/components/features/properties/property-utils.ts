@@ -51,6 +51,15 @@ export function toDisplayRoomStatus(status: string): DisplayRoomStatus {
   return 'pending';
 }
 
+/** Occupied when a tenant is assigned; otherwise use the stored room status. */
+export function occupancyStatusFromRoom(room: {
+  roomStatus: string;
+  tenant?: unknown;
+}): DisplayRoomStatus {
+  if (room.tenant) return 'occupied';
+  return toDisplayRoomStatus(room.roomStatus);
+}
+
 export function displayStatusLabel(status: DisplayRoomStatus): string {
   switch (status) {
     case 'vacant':

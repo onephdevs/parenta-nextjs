@@ -38,6 +38,7 @@ export default function RoomDetailsModal({
     try {
       const response = await fetch(`/api/rooms/${id}/properties`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const json = await response.json();
       if (!response.ok || !json.success) {

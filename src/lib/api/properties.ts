@@ -116,6 +116,10 @@ export interface PropertyRoomDetail {
   occupants: PropertyRoomOccupant[];
   images: PropertyRoomImage[];
   documents: PropertyRoomDocument[];
+  electricBillAmount?: number;
+  waterBillAmount?: number;
+  lastPaymentAmount?: number;
+  lastPaymentDate?: string | Date | null;
 }
 
 export interface RoomFinancialSummary {
@@ -261,10 +265,15 @@ export async function getPropertyBuildingDetail(
       t.last_name AS tenant_last_name,
       t.email AS tenant_email,
       t.phone AS tenant_phone,
+      t.previous_address AS tenant_previous_address,
+      t.emergency_contact_name AS tenant_emergency_contact_name,
+      t.emergency_contact_phone AS tenant_emergency_contact_phone,
+      t.notes AS tenant_notes,
       tra.start_date AS assignment_start,
       tra.end_date AS assignment_end,
       tra.deposit_paid,
       tra.advance_paid,
+      tra.utility_deposit_paid,
       COALESCE(tra.monthly_rate, r.monthly_rate) AS assignment_monthly_rate,
       COALESCE((
         SELECT SUM(p.amount)
@@ -286,7 +295,19 @@ export async function getPropertyBuildingDetail(
           AND GREATEST(i.total_amount - COALESCE(i.amount_paid, 0), 0) > 0.01
         ORDER BY i.due_date ASC NULLS LAST
         LIMIT 1
-      ) AS next_due_date
+      ) AS next_due_date,
+      (
+        SELECT COALESCE(
+          NULLIF(t.profile_picture_url, ''),
+          (
+            SELECT img.file_path
+            FROM images img
+            WHERE img.entity_type = 'tenant' AND img.entity_id = t.id
+            ORDER BY img.is_primary DESC, img.created_at ASC
+            LIMIT 1
+          )
+        )
+      ) AS tenant_profile_image
     FROM rooms r
     LEFT JOIN LATERAL (
       SELECT tra.*
@@ -373,7 +394,13 @@ export async function getPropertyBuildingDetail(
       FROM documents d
       WHERE d.room_id = ANY($1::uuid[])
          OR (cardinality($2::uuid[]) > 0 AND d.tenant_id = ANY($2::uuid[]))
-      ORDER BY d.created_at DESC
+      ORDER BY
+        CASE
+          WHEN lower(COALESCE(d.document_type, '')) LIKE '%lease%' THEN 0
+          WHEN lower(COALESCE(d.document_name, '')) LIKE '%lease%' THEN 0
+          ELSE 1
+        END,
+        d.created_at DESC
       `,
       [roomIds, tenantIds]
     );
@@ -405,7 +432,7 @@ export async function getPropertyBuildingDetail(
         seen.add(mapped.id);
         seenByRoom.set(rid, seen);
         const list = documentsByRoom.get(rid) || [];
-        if (list.length < 5) {
+        if (list.length < 12) {
           list.push(mapped);
           documentsByRoom.set(rid, list);
         }
@@ -413,46 +440,78 @@ export async function getPropertyBuildingDetail(
     }
   }
 
-  const rooms: PropertyRoomDetail[] = roomsResult.rows.map((r) => {
-    const tenant =
-      r.tenant_id
-        ? {
-            tenantId: r.tenant_id as string,
-            firstName: r.tenant_first_name as string,
-            lastName: r.tenant_last_name as string,
-            email: r.tenant_email as string | null,
-            phone: r.tenant_phone as string | null,
-            startDate: r.assignment_start as string | Date,
-            endDate: (r.assignment_end as string | Date | null) ?? null,
-            dueDate: (r.next_due_date as string | Date | null) ?? null,
-            monthlyRate: parseFloat(r.assignment_monthly_rate) || parseFloat(r.monthly_rate) || 0,
-            overdueAmount: parseFloat(r.overdue_amount) || 0,
-            pendingAmount: parseFloat(r.pending_amount) || 0,
-            depositPaid:
-              r.deposit_paid != null ? parseFloat(String(r.deposit_paid)) || 0 : undefined,
-            advancePaid:
-              r.advance_paid != null ? parseFloat(String(r.advance_paid)) || 0 : undefined,
-          }
-        : null;
+  const utilitiesByRoom = new Map<string, { electric: number; water: number }>();
+  const lastPayByTenant = new Map<string, { amount: number; date: string | Date | null }>();
+  if (roomIds.length > 0) {
+    const tenantIdsForPay = roomsResult.rows
+      .map((r) => r.tenant_id as string | null)
+      .filter((id): id is string => Boolean(id));
 
+    const [utilResult, lastPayResult] = await Promise.all([
+      pool.query(
+        `
+        SELECT DISTINCT ON (ub.room_id, lower(ub.utility_type))
+          ub.room_id,
+          lower(ub.utility_type) AS utility_type,
+          ub.amount
+        FROM utility_bills ub
+        WHERE ub.room_id = ANY($1::uuid[])
+          AND COALESCE(ub.bill_status, 'pending') IS DISTINCT FROM 'cancelled'
+          AND ub.parent_bill_id IS NULL
+          AND lower(COALESCE(ub.utility_type, '')) IN ('electric', 'electricity', 'water')
+        ORDER BY ub.room_id, lower(ub.utility_type), ub.due_date DESC NULLS LAST, ub.created_at DESC
+        `,
+        [roomIds]
+      ),
+      tenantIdsForPay.length > 0
+        ? pool.query(
+            `
+            SELECT DISTINCT ON (p.tenant_id)
+              p.tenant_id,
+              p.amount,
+              p.payment_date
+            FROM payments p
+            WHERE p.tenant_id = ANY($1::uuid[])
+              AND p.payment_status IN ('paid', 'completed', 'confirmed')
+            ORDER BY p.tenant_id, p.payment_date DESC NULLS LAST, p.created_at DESC
+            `,
+            [tenantIdsForPay]
+          )
+        : Promise.resolve({ rows: [] as Record<string, unknown>[] }),
+    ]);
+
+    for (const row of utilResult.rows) {
+      const roomId = String(row.room_id);
+      const current = utilitiesByRoom.get(roomId) || { electric: 0, water: 0 };
+      const type = String(row.utility_type || '');
+      const amount = parseFloat(String(row.amount)) || 0;
+      if (type === 'electric' || type === 'electricity') current.electric = amount;
+      if (type === 'water') current.water = amount;
+      utilitiesByRoom.set(roomId, current);
+    }
+    for (const row of lastPayResult.rows) {
+      lastPayByTenant.set(String(row.tenant_id), {
+        amount: parseFloat(String(row.amount)) || 0,
+        date: (row.payment_date as string | Date | null) ?? null,
+      });
+    }
+  }
+
+  const rooms: PropertyRoomDetail[] = roomsResult.rows.map((r) => {
+    const mapped = mapRoomRowToPropertyRoomDetail(
+      r,
+      occupantsByRoom.get(r.id) || [],
+      imagesByRoom.get(r.id) || [],
+      documentsByRoom.get(r.id) || []
+    );
+    const util = utilitiesByRoom.get(r.id);
+    const lastPay = r.tenant_id ? lastPayByTenant.get(String(r.tenant_id)) : undefined;
     return {
-      id: r.id,
-      roomNumber: r.room_number,
-      roomType: r.room_type,
-      floorNumber: r.floor_number ?? undefined,
-      squareFootage: r.square_footage ?? undefined,
-      monthlyRate: parseFloat(r.monthly_rate) || 0,
-      depositAmount:
-        r.deposit_amount != null ? parseFloat(r.deposit_amount) || 0 : undefined,
-      roomStatus: r.room_status,
-      amenities: normalizeAmenities(r.amenities),
-      description: r.description ?? undefined,
-      createdAt: r.created_at ?? undefined,
-      updatedAt: r.updated_at ?? undefined,
-      tenant,
-      occupants: occupantsByRoom.get(r.id) || [],
-      images: imagesByRoom.get(r.id) || [],
-      documents: documentsByRoom.get(r.id) || [],
+      ...mapped,
+      electricBillAmount: util?.electric || 0,
+      waterBillAmount: util?.water || 0,
+      lastPaymentAmount: lastPay?.amount,
+      lastPaymentDate: lastPay?.date ?? null,
     };
   });
 
@@ -816,13 +875,13 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
         due_date,
         bill_status
       FROM utility_bills
-      WHERE is_active = true
-        AND bill_status IS DISTINCT FROM 'cancelled'
+      WHERE COALESCE(bill_status, 'pending') IS DISTINCT FROM 'cancelled'
+        AND parent_bill_id IS NULL
         AND (
           room_id = $1
           OR (room_id IS NULL AND building_id = $2)
         )
-        AND utility_type IN ('electricity', 'water')
+        AND lower(COALESCE(utility_type, '')) IN ('electric', 'electricity', 'water')
       ORDER BY due_date DESC NULLS LAST, created_at DESC
       `,
       [roomId, buildingId]
@@ -887,9 +946,11 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
   let electricBillAmount = 0;
   let waterBillAmount = 0;
   for (const bill of utilityResult.rows) {
-    const type = String(bill.utility_type || '');
+    const type = String(bill.utility_type || '').toLowerCase();
     const amount = parseFloat(String(bill.amount)) || 0;
-    if (type === 'electricity' && electricBillAmount === 0) electricBillAmount = amount;
+    if ((type === 'electricity' || type === 'electric') && electricBillAmount === 0) {
+      electricBillAmount = amount;
+    }
     if (type === 'water' && waterBillAmount === 0) waterBillAmount = amount;
   }
 
@@ -956,6 +1017,11 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     model: a.model ? String(a.model) : null,
     condition: a.asset_condition ? String(a.asset_condition) : null,
   }));
+
+  room.electricBillAmount = electricBillAmount;
+  room.waterBillAmount = waterBillAmount;
+  room.lastPaymentAmount = lastPay ? parseFloat(String(lastPay.amount)) || 0 : 0;
+  room.lastPaymentDate = lastPay?.payment_date ?? null;
 
   return {
     room,

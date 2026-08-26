@@ -68,6 +68,7 @@ export default function PropertiesMasterDetail({
     try {
       const response = await fetch(`/api/buildings/${buildingId}/properties`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const json = await response.json();
 
@@ -198,6 +199,7 @@ export default function PropertiesMasterDetail({
         try {
           const response = await fetch(`/api/buildings/${id}/properties`, {
             credentials: 'include',
+            cache: 'no-store',
           });
           const json = await response.json();
           if (response.ok && json.success) {

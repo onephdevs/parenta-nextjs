@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Building2,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type {
   ExpenseCategoryRow,
+  LedgerBuilding,
   PortfolioLedgerData,
   PropertyCardData,
   RentRollRow,
@@ -59,10 +60,14 @@ export default function PortfolioLedger() {
   const [scope, setScope] = useState('ALL');
   const [month, setMonth] = useState('');
   const [data, setData] = useState<PortfolioLedgerData | null>(null);
+  const [buildings, setBuildings] = useState<LedgerBuilding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const hasLoadedRef = useRef(false);
 
   const load = useCallback(async (buildingId: string, monthKey: string, silent = false) => {
+    const requestId = ++requestIdRef.current;
     try {
       if (!silent) {
         setIsLoading(true);
@@ -76,22 +81,28 @@ export default function PortfolioLedger() {
         cache: 'no-store',
       });
       const json = await res.json();
+      if (requestId !== requestIdRef.current) return;
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to load ledger');
       setData(json.data);
+      if (Array.isArray(json.data?.buildings) && json.data.buildings.length > 0) {
+        setBuildings(json.data.buildings);
+      }
       if (!monthKey && json.data?.monthKey) setMonth(json.data.monthKey);
+      hasLoadedRef.current = true;
       setError(null);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       if (!silent) {
         setError(err instanceof Error ? err.message : 'Failed to load ledger');
         setData(null);
       }
     } finally {
-      if (!silent) setIsLoading(false);
+      if (!silent && requestId === requestIdRef.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load(scope, month);
+    void load(scope, month, hasLoadedRef.current);
     const interval = setInterval(() => void load(scope, month, true), 60_000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') void load(scope, month, true);
@@ -159,28 +170,23 @@ export default function PortfolioLedger() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg bg-white p-1 ring-1 ring-slate-200">
-            <button
-              type="button"
-              onClick={() => setScope('ALL')}
-              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                scope === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-800'
-              }`}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-500" htmlFor="ledger-property">
+              Property
+            </label>
+            <select
+              id="ledger-property"
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
+              className="min-w-[10.5rem] rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 shadow-sm"
             >
-              All properties
-            </button>
-            {data.buildings.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => setScope(b.id)}
-                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                  scope === b.id ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {b.shortName}
-              </button>
-            ))}
+              <option value="ALL">All properties</option>
+              {(buildings.length > 0 ? buildings : data.buildings).map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.shortName}
+                </option>
+              ))}
+            </select>
           </div>
           <Link
             href="/admin/financial/payments/new"

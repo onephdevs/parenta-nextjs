@@ -10,7 +10,8 @@ import {
   displayStatusLabel,
   formatArea,
   formatBuildingAddress,
-  toDisplayRoomStatus,
+  occupancyStatusFromRoom,
+  type DisplayRoomStatus,
 } from './property-utils';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
@@ -28,18 +29,17 @@ interface PropertyListCardProps {
   onViewRoom: (roomId: string) => void;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const display = toDisplayRoomStatus(status);
+function StatusBadge({ status }: { status: DisplayRoomStatus }) {
   return (
     <span
       className="inline-flex h-[18px] min-w-[52px] items-center justify-center gap-2.5 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none text-white"
       style={{
         fontFamily: LATO,
         backgroundColor:
-          display === 'vacant' ? '#57D163' : display === 'occupied' ? '#FF6C64' : '#B0B0B0',
+          status === 'vacant' ? '#57D163' : status === 'occupied' ? '#FF6C64' : '#B0B0B0',
       }}
     >
-      {displayStatusLabel(display)}
+      {displayStatusLabel(status)}
     </span>
   );
 }
@@ -178,7 +178,7 @@ export default function PropertyListCard({
                       </p>
                     </div>
                     <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                      <StatusBadge status={room.roomStatus} />
+                      <StatusBadge status={occupancyStatusFromRoom(room)} />
                       <span className="text-[12px] font-normal leading-none text-gray-500">
                         {area}
                       </span>

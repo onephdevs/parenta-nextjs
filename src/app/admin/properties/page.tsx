@@ -4,7 +4,7 @@ import PropertiesMasterDetail from '@/components/features/properties/PropertiesM
 import { Alert } from '@/components/ui/Alert';
 import AppLoader from '@/components/ui/AppLoader';
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 interface PropertiesPageProps {
   searchParams: Promise<{ buildingId?: string; page?: string }>;

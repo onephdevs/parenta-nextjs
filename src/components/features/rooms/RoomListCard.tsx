@@ -93,7 +93,7 @@ export default function RoomListCard({ room, isSelected, onSelect }: RoomListCar
           </div>
         </div>
 
-        <StatusBadge status={room.roomStatus} />
+        <StatusBadge status={room.tenantName ? 'occupied' : toDisplayRoomStatus(room.roomStatus)} />
       </div>
     </button>
   );

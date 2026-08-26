@@ -15,9 +15,10 @@ import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { getImageUrl } from '@/lib/format/image-url';
 import {
   displayStatusLabel,
+  formatArea,
   formatShortDate,
   getRoomTypeStats,
-  toDisplayRoomStatus,
+  occupancyStatusFromRoom,
 } from './property-utils';
 import { cn } from '@/lib/utils';
 import { LightboxImage } from '@/components/ui/ImageLightbox';
@@ -112,13 +113,10 @@ export default function PropertyRoomCard({
   hideEdit = false,
   onViewDetails,
 }: PropertyRoomCardProps) {
-  const displayStatus = toDisplayRoomStatus(room.roomStatus);
-  const isOccupied = displayStatus === 'occupied' && room.tenant;
+  const displayStatus = occupancyStatusFromRoom(room);
+  const isOccupied = Boolean(room.tenant);
   const { bedroomsLabel, bathroomsLabel } = getRoomTypeStats(room.roomType);
-  const areaLabel =
-    room.squareFootage != null && Number.isFinite(room.squareFootage)
-      ? `${Math.round(room.squareFootage)} sqft`
-      : null;
+  const areaLabel = formatArea(room.squareFootage);
   const amenityChips = room.amenities.slice(0, 8);
   const gallery = room.images.slice(0, 6);
   const documents = room.documents || [];
@@ -160,7 +158,9 @@ export default function PropertyRoomCard({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h4 className="text-[24px] font-bold leading-none text-gray-900">
-                  {room.roomNumber}
+                  {/^unit\b/i.test((room.roomNumber || '').trim())
+                    ? room.roomNumber
+                    : `Unit ${room.roomNumber}`}
                 </h4>
                 <span
                   className={cn(
@@ -224,7 +224,7 @@ export default function PropertyRoomCard({
                 Listed rent
               </p>
               <p className="mt-1 text-[13px] font-semibold text-gray-900">
-                {formatCurrency(room.monthlyRate)}
+                {formatCurrency(room.tenant?.monthlyRate || room.monthlyRate)}
               </p>
             </div>
             <div>
@@ -232,9 +232,11 @@ export default function PropertyRoomCard({
                 Deposit
               </p>
               <p className="mt-1 text-[13px] font-semibold text-gray-900">
-                {room.depositAmount != null && room.depositAmount > 0
-                  ? formatCurrency(room.depositAmount)
-                  : '—'}
+                {room.tenant?.depositPaid != null
+                  ? formatCurrency(room.tenant.depositPaid)
+                  : room.depositAmount != null && room.depositAmount > 0
+                    ? formatCurrency(room.depositAmount)
+                    : '—'}
               </p>
             </div>
             <div>
@@ -245,6 +247,36 @@ export default function PropertyRoomCard({
                 {room.images.length}
               </p>
             </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Electric bill
+              </p>
+              <p className="mt-1 text-[13px] font-semibold text-gray-900">
+                {formatCurrency(room.electricBillAmount || 0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Water bill
+              </p>
+              <p className="mt-1 text-[13px] font-semibold text-gray-900">
+                {formatCurrency(room.waterBillAmount || 0)}
+              </p>
+            </div>
+            {(room.lastPaymentAmount != null && room.lastPaymentAmount > 0) ||
+            room.lastPaymentDate ? (
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                  Last payment
+                </p>
+                <p className="mt-1 text-[13px] font-semibold text-gray-900">
+                  {room.lastPaymentAmount
+                    ? formatCurrency(room.lastPaymentAmount)
+                    : '—'}
+                  {room.lastPaymentDate ? ` · ${formatShortDate(room.lastPaymentDate)}` : ''}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {room.description?.trim() && (
@@ -404,7 +436,14 @@ export default function PropertyRoomCard({
               <div className="flex min-h-[11rem] flex-col justify-between gap-4 px-3 py-4">
                 <div className="flex flex-col items-center gap-3 text-center">
                   <UserRoundSearch className="h-12 w-12 text-white/80" strokeWidth={1.5} />
-                  <p className="text-[16px] font-bold leading-none tracking-wide">VACANT</p>
+                  <p className="text-[16px] font-bold leading-none tracking-wide">
+                    {displayStatusLabel(displayStatus).toUpperCase()}
+                  </p>
+                  {displayStatus !== 'vacant' && (
+                    <p className="text-[12px] font-normal leading-snug text-white/60">
+                      No tenant assigned to this unit.
+                    </p>
+                  )}
                 </div>
                 <dl className="space-y-2 text-[12px] font-normal leading-none">
                   <div className="flex justify-between gap-2">
@@ -421,6 +460,18 @@ export default function PropertyRoomCard({
                       </dd>
                     </div>
                   )}
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-white/60">Electric</dt>
+                    <dd className="text-right text-white">
+                      {formatCurrency(room.electricBillAmount || 0)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-white/60">Water</dt>
+                    <dd className="text-right text-white">
+                      {formatCurrency(room.waterBillAmount || 0)}
+                    </dd>
+                  </div>
                 </dl>
               </div>
             )}

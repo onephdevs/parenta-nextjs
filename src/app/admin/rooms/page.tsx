@@ -4,7 +4,7 @@ import { getRoomsForRoomsPage } from '@/lib/api/properties';
 import RoomsMasterDetail from '@/components/features/rooms/RoomsMasterDetail';
 import { Alert } from '@/components/ui/Alert';
 
-export const revalidate = 60;
+export const revalidate = 0;
 
 interface RoomsPageProps {
   searchParams: Promise<{ roomId?: string; page?: string }>;

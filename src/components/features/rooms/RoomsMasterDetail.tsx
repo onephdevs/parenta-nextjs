@@ -55,6 +55,7 @@ export default function RoomsMasterDetail({
     try {
       const response = await fetch(`/api/rooms/${roomId}/properties`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const json = await response.json();
       if (gen !== detailLoadGen.current) return;
