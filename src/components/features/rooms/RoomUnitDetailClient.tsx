@@ -119,6 +119,7 @@ export default function RoomUnitDetailClient({
     advance_paid: item.advancePaid,
     utility_deposit_paid: item.utilityDepositPaid,
     assignment_status: item.assignmentStatus,
+    occupancy_badge: item.occupancyBadge,
     first_name: item.tenantName.split(' ')[0] || item.tenantName,
     last_name: item.tenantName.split(' ').slice(1).join(' ') || '',
     email: item.tenantEmail || '',

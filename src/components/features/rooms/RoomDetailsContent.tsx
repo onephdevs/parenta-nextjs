@@ -887,8 +887,9 @@ function AssignmentHistoryCard({
         ) : (
           <ul>
             {history.map((item) => {
-              const status = (item.assignmentStatus || '').replace(/_/g, ' ');
-              const isCurrent = status === 'active' && !item.endDate;
+              const badge = item.occupancyBadge;
+              const isCurrent = badge === 'current';
+              const isRenewed = badge === 'renewed';
               return (
                 <li
                   key={item.id}
@@ -967,10 +968,12 @@ function AssignmentHistoryCard({
                       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none ${
                         isCurrent
                           ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-gray-100 text-gray-600'
+                          : isRenewed
+                            ? 'bg-sky-100 text-sky-800'
+                            : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {isCurrent ? 'Current' : status || 'Past'}
+                      {isCurrent ? 'Current' : isRenewed ? 'Renewed' : 'Terminated'}
                     </span>
                     <span className="text-[12px] font-medium leading-none text-gray-900">
                       {formatCurrency(item.monthlyRate)}

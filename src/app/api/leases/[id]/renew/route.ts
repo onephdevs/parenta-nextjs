@@ -88,7 +88,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const status =
       message === 'Lease not found'
         ? 404
-        : message.includes('required') || message.includes('overlapping')
+        : message.includes('required') ||
+            message.includes('overlapping') ||
+            message.includes('already has')
           ? 400
           : 500;
     return NextResponse.json({ success: false, error: message }, { status });

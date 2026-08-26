@@ -12,6 +12,7 @@ import {
   buildOccupancyReconciliation,
   estimateLostRent,
 } from '@/lib/occupancy/reconcile';
+import { withOccupancyHistoryBadges } from '@/lib/occupancy/history-badge';
 
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
@@ -160,6 +161,8 @@ export interface RoomAssignmentHistoryItem {
   advancePaid?: number;
   utilityDepositPaid?: number;
   assignmentStatus: string;
+  /** UI badge: current stay, renewed (same person later stay), or left. */
+  occupancyBadge?: 'current' | 'renewed' | 'terminated';
 }
 
 export interface PropertyBuildingDetail {
@@ -980,8 +983,8 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     occupancyRatePercent: occupancyRaw.occupancy_rate_percent || 0,
   };
 
-  const assignmentHistory: RoomAssignmentHistoryItem[] = (historyRaw || []).map(
-    (item: Record<string, unknown>) => {
+  const assignmentHistory = withOccupancyHistoryBadges(
+    (historyRaw || []).map((item: Record<string, unknown>) => {
       const displayName = String(item.display_name || '').trim();
       const fallbackName = `${item.first_name || ''} ${item.last_name || ''}`.trim();
       return {
@@ -1006,7 +1009,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
             : undefined,
         assignmentStatus: String(item.assignment_status || ''),
       };
-    }
+    })
   );
 
   const assets: PropertyRoomAsset[] = (assetsResult.rows || []).map((a) => ({

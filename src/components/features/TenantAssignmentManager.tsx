@@ -63,6 +63,7 @@ interface AssignmentHistory {
   display_email?: string;
   tenant_exists?: boolean;
   live_tenant_id?: string | null;
+  occupancy_badge?: 'current' | 'renewed' | 'terminated';
 }
 
 interface Occupant {
@@ -598,8 +599,13 @@ export default function TenantAssignmentManager({
         ) : (
           <div className="space-y-3">
             {assignmentHistory.map((assignment) => {
+              const badge = assignment.occupancy_badge;
               const isCurrent =
-                assignment.assignment_status === 'active' && !assignment.end_date;
+                badge === 'current' ||
+                (badge == null &&
+                  assignment.assignment_status === 'active' &&
+                  !assignment.end_date);
+              const isRenewed = badge === 'renewed';
               const name =
                 assignment.display_name ||
                 `${assignment.first_name || ''} ${assignment.last_name || ''}`.trim() ||
@@ -626,8 +632,9 @@ export default function TenantAssignmentManager({
                         <h4 className="font-medium text-gray-900">{name}</h4>
                       )}
                       {isCurrent && <Badge tone="success">Current</Badge>}
-                      {!isCurrent && (
-                        <Badge tone="neutral">{assignment.assignment_status}</Badge>
+                      {!isCurrent && isRenewed && <Badge tone="info">Renewed</Badge>}
+                      {!isCurrent && !isRenewed && (
+                        <Badge tone="neutral">Terminated</Badge>
                       )}
                     </div>
                     {email && <p className="mt-1 text-sm text-gray-500">{email}</p>}

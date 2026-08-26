@@ -1,6 +1,10 @@
 import pool from '@/lib/db';
 import type { LeaseDetail, LeaseListItem, LeaseStats, LeaseUiStatus } from '@/lib/leases-shared';
 import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
+import {
+  loadTenantContactSnapshot,
+  markPersonAsCurrentTenant,
+} from '@/lib/services/tenant-lifecycle';
 
 export type { LeaseDetail, LeaseListItem, LeaseStats, LeaseUiStatus };
 export {
@@ -613,8 +617,10 @@ function addDaysIso(isoDate: string, days: number): string {
 }
 
 /**
- * Renew: keep current lease history, create a new upcoming/active assignment.
- * Old lease end is set to the day before the new start when needed.
+ * Renew: keep the previous stay as occupancy history, then insert a new
+ * current assignment for the same person. The old row is terminated so
+ * room Occupant history can show Renewed (same person, later stay) + Current.
+ * Postgres unique indexes allow only one active assignment per room/tenant.
  */
 export async function renewLease(
   currentLeaseId: string,
@@ -643,11 +649,10 @@ export async function renewLease(
     throw new Error('Invalid rent amount');
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(`${startDate}T12:00:00`);
-  const isUpcoming = start > today;
-  const newStatus = isUpcoming ? 'pending' : 'active';
+  // Keep the renewed term as the live occupancy row so the room still has
+  // a current occupant. Pending would vanish from occupant JOINs that only
+  // look at assignment_status = 'active'.
+  const newStatus = 'active';
 
   const depositPaid = input.options.carryOverDeposit
     ? existing.depositPaid || 0
@@ -659,21 +664,31 @@ export async function renewLease(
   try {
     await client.query('BEGIN');
 
-    // Ensure previous lease ends the day before renewal starts
     const previousEnd = addDaysIso(startDate, -1);
-    if (!existing.endDate || existing.endDate > previousEnd) {
+    const existingEnd = toDateOnlyString(existing.endDate);
+    const endToSet = !existingEnd || existingEnd > previousEnd ? previousEnd : existingEnd;
+    const previousIsLive = ['active', 'pending'].includes(
+      String(existing.assignmentStatus || '').toLowerCase()
+    );
+
+    if (previousIsLive) {
       await client.query(
         `
         UPDATE tenant_room_assignments
         SET end_date = $2::date,
+            assignment_status = 'terminated',
+            notes = CASE
+              WHEN notes IS NULL OR BTRIM(notes) = '' THEN $3
+              WHEN notes ILIKE '%superseded by renewal%' THEN notes
+              ELSE notes || E'\n' || $3
+            END,
             updated_at = NOW()
         WHERE id = $1
         `,
-        [currentLeaseId, previousEnd]
+        [currentLeaseId, endToSet, 'Superseded by renewal']
       );
     }
 
-    // Conflict: another active lease on room (excluding current)
     const conflict = await client.query(
       `
       SELECT id FROM tenant_room_assignments
@@ -690,6 +705,20 @@ export async function renewLease(
       throw new Error('Selected unit already has an overlapping active lease');
     }
 
+    const tenantConflict = await client.query(
+      `
+      SELECT id FROM tenant_room_assignments
+      WHERE tenant_id = $1
+        AND id <> $2
+        AND assignment_status = 'active'
+      LIMIT 1
+      `,
+      [existing.tenantId, currentLeaseId]
+    );
+    if (tenantConflict.rows.length > 0) {
+      throw new Error('This person already has an active lease. Renew that lease instead.');
+    }
+
     const noteParts = [
       input.notes?.trim() || '',
       input.templateName ? `Template: ${input.templateName}` : '',
@@ -700,14 +729,23 @@ export async function renewLease(
       input.options.waiveOutstanding ? 'Outstanding balance waived' : '',
     ].filter(Boolean);
 
+    const snap = await loadTenantContactSnapshot(client, existing.tenantId);
+
     const insert = await client.query(
       `
       INSERT INTO tenant_room_assignments (
         tenant_id, room_id, start_date, end_date, monthly_rate,
         deposit_paid, advance_paid, utility_deposit_paid,
-        assignment_status, notes, lease_package_template_id
+        assignment_status, notes, lease_package_template_id,
+        tenant_name_snapshot, tenant_email_snapshot, tenant_phone_snapshot,
+        tenant_emergency_name_snapshot, tenant_emergency_phone_snapshot,
+        billing_cycle_start_day
       )
-      VALUES ($1, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11)
+      VALUES (
+        $1, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11,
+        $12, $13, $14, $15, $16,
+        LEAST(GREATEST(EXTRACT(DAY FROM $3::date)::INT, 1), 31)
+      )
       RETURNING id
       `,
       [
@@ -722,9 +760,29 @@ export async function renewLease(
         newStatus,
         noteParts.join('\n') || null,
         input.leasePackageTemplateId,
+        snap.tenantNameSnapshot,
+        snap.tenantEmailSnapshot,
+        snap.tenantPhoneSnapshot,
+        snap.tenantEmergencyNameSnapshot,
+        snap.tenantEmergencyPhoneSnapshot,
       ]
     );
     newId = String(insert.rows[0].id);
+
+    if (existing.roomId && existing.roomId !== roomId) {
+      await client.query(
+        `
+        UPDATE rooms
+        SET room_status = 'vacant', updated_at = NOW()
+        WHERE id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM tenant_room_assignments
+            WHERE room_id = $1 AND assignment_status = 'active'
+          )
+        `,
+        [existing.roomId]
+      );
+    }
 
     if (input.options.waiveOutstanding) {
       await client.query(
@@ -744,9 +802,20 @@ export async function renewLease(
       [roomId]
     );
 
+    await markPersonAsCurrentTenant(client, {
+      tenantId: existing.tenantId,
+      moveInDate: startDate,
+      leaseEndDate: endDate,
+    });
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
+    const code =
+      error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+    if (code === '23505') {
+      throw new Error('Selected unit already has an overlapping active lease');
+    }
     throw error;
   } finally {
     client.release();

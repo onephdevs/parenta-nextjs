@@ -63,7 +63,7 @@ Idempotent on `(room_id, start_date)`. Re-running dry-run after commit should sh
 - Do not guess deposit splits. Apt 1 expected = `rent × 3 + utility` → store `deposit_paid = rent×2`, `advance_paid = rent×1`, `utility_deposit_paid = utility`. Mismatch → flag, skip write.
 - Apt 2 template (when that file exists): ₱6,000 deposit + ₱6,000 advance + ₱3,000 utility.
 - Dummy current occupant → **rename** that Person (and `users` / `contacts`). Do not create a second live Person or move invoices onto a former row.
-- If a former Person with the same name already exists, keep both (historical stay vs live dummy rename). Flag `dummy_rename_vs_existing_person`; do not auto-merge.
+- After dummy rename, if a former Person with the same name still exists, **merge** the former into the live portal Person (`scripts/merge-duplicate-people.mjs --name="…" --commit`) so People has one id. Keep the portal row; re-point stays; delete the absorb row.
 - Fail loudly if a sheet unit has no matching `rooms.room_number`.
 - Do not insert a second active assignment on a room (`uq_tra_one_active_per_room`).
 - Do not put one Person on two active rooms (`uq_tra_one_active_per_tenant`).

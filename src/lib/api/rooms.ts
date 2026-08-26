@@ -5,6 +5,7 @@ import {
   MAX_BULK_ROOMS,
   roomNumberNaturalOrderSql,
 } from '@/lib/rooms/parse-room-numbers';
+import { withOccupancyHistoryBadges } from '@/lib/occupancy/history-badge';
 
 // Helper function to map database room to Room interface
 function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
@@ -626,7 +627,21 @@ export async function getRoomAssignmentHistory(roomId: string) {
     `;
     
     const result = await pool.query(query, [roomId]);
-    return result.rows;
+    const badged = withOccupancyHistoryBadges(
+      result.rows.map((row: Record<string, unknown>) => ({
+        id: String(row.id),
+        tenantId: (row.live_tenant_id as string | null) ?? (row.tenant_id as string | null),
+        tenantName: (row.display_name as string | null) ?? null,
+        startDate: row.start_date as string | Date | null,
+        endDate: (row.end_date as string | Date | null) ?? null,
+        assignmentStatus: String(row.assignment_status || ''),
+      }))
+    );
+    const badgeById = new Map(badged.map((item) => [item.id, item.occupancyBadge]));
+    return result.rows.map((row: Record<string, unknown>) => ({
+      ...row,
+      occupancy_badge: badgeById.get(String(row.id)) || 'terminated',
+    }));
   } catch (error) {
     console.error('Error fetching room assignment history:', error);
     throw error;
