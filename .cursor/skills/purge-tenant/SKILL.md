@@ -6,7 +6,8 @@ description: >-
   to delete a tenant, purge a tenant, wipe tenant data from all modules,
   remove occupancy-history-blocked tenants, or delete leftover seed/test
   tenants (for example tenant@parenta.com). Not for Excel ledger Apt 1/2
-  sync — use excel-ledger-sync for that.
+  cash sync — use excel-ledger-sync. Not for occupancy history or dummy
+  Tenant Unit N names — use lease-history-import.
 ---
 
 # Purge tenant

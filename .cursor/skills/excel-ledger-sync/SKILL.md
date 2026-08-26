@@ -10,7 +10,9 @@ description: >-
   /admin/financial/payments, seed apartment ledgers, pipeline/onboarding cards
   missing for Apt 1/2, July grand total, disbursement waterfall, payments
   waiting confirmation, or asks to record ledger data into other modules. Do
-  not use for deleting tenants — use purge-tenant.
+  not use for deleting tenants — use purge-tenant. Do not use for Start &
+  End Date occupancy history or dummy Tenant Unit N names — use
+  lease-history-import.
 ---
 
 # Excel ledger sync
@@ -37,6 +39,7 @@ If Excel figures change, update those scripts first, then re-run sync and verify
 - July **Total Collection** is tenant cash only (rent + advance + deposit + paid occupied utilities). Vacant / Admin meter bills are expenses, not collection. Cheques are added on the waterfall after Ima cash allowance.
 - Never invent photos, maintenance tickets, reservations, extra occupants, late fees, or lease PDFs the spreadsheet does not contain.
 - Never purge Apt 1/2 tenants from this skill. Tenant wipes belong in **purge-tenant**.
+- Named occupancy history (Start & End Date Excel, dummy `Tenant Unit N` → real people) belongs in **lease-history-import**. This skill owns Jun–Jul **cash** occupancy, invoices, and payments. Do not occupy ledger-vacant units.
 
 ## Tags
 

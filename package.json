@@ -17,6 +17,7 @@
     "verify:excel-ledger": "node scripts/verify-excel-ledger-sync.mjs",
     "sync:excel-modules": "node scripts/sync-excel-ledger-modules.mjs",
     "sync:apartment1-occupancy-history": "node scripts/sync-apartment1-occupancy-history.mjs",
+    "import:apartment-lease-history": "node scripts/import-apartment-lease-history.mjs",
     "purge:tenants": "node scripts/purge-tenants.mjs",
     "test:occupancy": "node scripts/test-occupancy-reconcile.mjs"
   },

@@ -50,3 +50,7 @@ scripts/.deploy-secrets
 next-env.d.ts
 
 /src/generated/prisma
+
+# lease-history workbooks (PII) and generated dry-run reports
+/data/imports/*.xlsx
+/data/imports/*.dry-run.json
