@@ -58,6 +58,10 @@ interface SectionedFormShellBaseProps<T extends string> {
   /** Or custom primary click when not using form submit */
   onPrimary?: () => void;
   primaryType?: 'submit' | 'button';
+  /** Hide the header primary action (e.g. nested form has its own submit). */
+  hidePrimary?: boolean;
+  /** Wider right drawer (e.g. Process Payment). */
+  size?: 'default' | 'wide';
   errorBanner?: ReactNode;
   className?: string;
 }
@@ -173,6 +177,8 @@ function SectionedFormLayout<T extends string>({
   formId,
   onPrimary,
   primaryType = 'submit',
+  hidePrimary = false,
+  size = 'default',
   errorBanner,
   className,
   fillViewport,
@@ -294,16 +300,18 @@ function SectionedFormLayout<T extends string>({
             <Button type="button" variant="outline" onClick={onCancel} isDisabled={primaryLoading}>
               {cancelLabel}
             </Button>
-            <Button
-              type={primaryType}
-              form={formId}
-              variant="primary"
-              isLoading={primaryLoading}
-              isDisabled={primaryDisabled}
-              onClick={primaryType === 'button' ? onPrimary : undefined}
-            >
-              {primaryLoading ? 'Saving...' : primaryLabel}
-            </Button>
+            {!hidePrimary && (
+              <Button
+                type={primaryType}
+                form={formId}
+                variant="primary"
+                isLoading={primaryLoading}
+                isDisabled={primaryDisabled}
+                onClick={primaryType === 'button' ? onPrimary : undefined}
+              >
+                {primaryLoading ? 'Saving...' : primaryLabel}
+              </Button>
+            )}
             <button
               type="button"
               onClick={onHidePanel || onCancel}
@@ -350,7 +358,11 @@ function SectionedFormLayout<T extends string>({
           {errorBanner}
           <div
             className={
-              compact ? 'max-w-none' : fillViewport ? 'mx-auto w-full max-w-6xl' : 'max-w-2xl'
+              compact
+                ? 'max-w-none'
+                : fillViewport
+                  ? cn('mx-auto w-full', size === 'wide' ? 'max-w-none' : 'max-w-6xl')
+                  : 'max-w-2xl'
             }
           >
             {children}
@@ -440,7 +452,10 @@ export default function SectionedFormShell<T extends string>(
         role="dialog"
         aria-modal={!panelHidden}
         className={cn(
-          'pointer-events-auto absolute inset-y-0 right-0 flex w-[min(100%,74rem)] flex-col bg-white shadow-2xl ring-1 ring-black/5 transition-transform duration-300 ease-out sm:w-[min(77vw,74rem)] lg:w-[min(74rem,calc((100%-16rem)*0.81))]',
+          'pointer-events-auto absolute inset-y-0 right-0 flex flex-col bg-white shadow-2xl ring-1 ring-black/5 transition-transform duration-300 ease-out',
+          props.size === 'wide'
+            ? 'w-[min(100%,96rem)] sm:w-[min(94vw,96rem)] lg:w-[min(96rem,calc(100%-16rem-1.5rem))]'
+            : 'w-[min(100%,74rem)] sm:w-[min(77vw,74rem)] lg:w-[min(74rem,calc((100%-16rem)*0.81))]',
           panelHidden && 'translate-x-full'
         )}
       >

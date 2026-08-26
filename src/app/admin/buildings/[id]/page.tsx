@@ -78,7 +78,7 @@ export default async function BuildingDetailPage({ params }: BuildingDetailPageP
   const roomStats = buildingWithStats.roomStats;
 
   const formatAddress = (building: Building) => {
-    return `${building.addressLine1}${building.addressLine2 ? `, ${building.addressLine2}` : ''}, ${building.city}, ${building.state} ${building.postalCode}`;
+    return `${building.addressLine1}${building.addressLine2 ? `, ${building.addressLine2}` : ''}, ${building.city}, ${building.state}`;
   };
 
   return (

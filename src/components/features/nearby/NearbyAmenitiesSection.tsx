@@ -740,8 +740,9 @@ export function NearbyAmenitiesSection({ properties }: NearbyAmenitiesSectionPro
 
                 {data?.fetchedAt && (
                   <p className="mt-4 text-xs text-[#9CA3AF]">
-                    {data.fromCache ? 'Cached places' : 'Just refreshed'} · updates every{' '}
-                    {data.refreshDays ?? 7} days
+                    {data.fetchedAt
+                      ? `Last saved ${new Date(data.fetchedAt).toLocaleDateString()}`
+                      : 'Places saved by the property admin'}
                   </p>
                 )}
               </>

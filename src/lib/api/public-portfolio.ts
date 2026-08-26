@@ -27,7 +27,7 @@ export interface PublicFeaturedProperty {
   imageUrl: string | null;
   latitude: number | null;
   longitude: number | null;
-  /** When false, omit from landing nearby / commute picker. */
+  /** When true, include in landing Featured properties and What’s nearby. */
   showOnLandingNearby: boolean;
 }
 
@@ -44,7 +44,7 @@ function formatAddress(row: {
   state?: string | null;
   postal_code?: string | null;
 }): string {
-  const parts = [row.address_line1, row.city, row.state, row.postal_code].filter(Boolean);
+  const parts = [row.address_line1, row.city, row.state].filter(Boolean);
   return parts.length ? parts.join(', ') : '';
 }
 
@@ -76,7 +76,7 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
         b.postal_code,
         b.latitude::text,
         b.longitude::text,
-        COALESCE(b.show_on_landing_nearby, true) AS show_on_landing_nearby,
+        COALESCE(b.show_on_landing_nearby, false) AS show_on_landing_nearby,
         COUNT(r.id)::text AS total_units,
         COUNT(r.id) FILTER (WHERE r.room_status = 'vacant')::text AS vacant_units,
         MIN(r.monthly_rate) FILTER (
@@ -120,7 +120,7 @@ async function fetchPublicPortfolio(): Promise<PublicPortfolioPayload> {
       imageUrl: imagePath ? getImageUrl(imagePath) : null,
       latitude: Number.isFinite(lat) ? lat : null,
       longitude: Number.isFinite(lng) ? lng : null,
-      showOnLandingNearby: row.show_on_landing_nearby !== false,
+      showOnLandingNearby: row.show_on_landing_nearby === true,
     };
   });
 

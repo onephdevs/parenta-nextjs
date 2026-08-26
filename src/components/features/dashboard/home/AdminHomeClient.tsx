@@ -28,6 +28,7 @@ import HomeQuickLinks from './HomeQuickLinks';
 import HomeRecents from './HomeRecents';
 import HomeStickies from './HomeStickies';
 import PortfolioLedger from './PortfolioLedger';
+import DashboardActionRail from './DashboardActionRail';
 
 const PIN_PRESETS: PinnedQuickLink[] = [
   { id: 'preset-properties', title: 'Properties', href: '/admin/properties' },
@@ -174,7 +175,7 @@ export default function AdminHomeClient({ firstName }: AdminHomeClientProps) {
   );
 
   return (
-    <div className="min-h-full bg-[#FAFBFC] px-4 py-8 sm:px-6 lg:px-10">
+    <div className="min-h-full bg-[#FAFBFC] px-4 py-8 pb-20 sm:px-6 lg:px-10 lg:pb-8 lg:pr-16">
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-[minmax(0,1fr)_11.5rem]">
         <header className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">{greeting}</h1>
@@ -281,6 +282,8 @@ export default function AdminHomeClient({ firstName }: AdminHomeClientProps) {
           </>
         )}
       </div>
+
+      <DashboardActionRail />
 
       <Dialog
         isOpen={pinOpen}

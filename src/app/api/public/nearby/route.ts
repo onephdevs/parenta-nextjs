@@ -9,8 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/public/nearby?buildingId=&categories=school,park
- * Uses DB snapshot when fresh (admin: nearby_refresh_days, default 7).
- * Pass refresh=1 to force a live Overpass refresh.
+ * Returns the admin-saved catalog only. Does not call OpenStreetMap.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const visibility = await pool.query<{ show_on_landing_nearby: boolean }>(
       `
-      SELECT COALESCE(show_on_landing_nearby, true) AS show_on_landing_nearby
+      SELECT COALESCE(show_on_landing_nearby, false) AS show_on_landing_nearby
       FROM buildings
       WHERE id = $1 AND is_active = true
       LIMIT 1
@@ -46,8 +45,6 @@ export async function GET(request: NextRequest) {
     }
 
     const categories = parseAmenityCategories(searchParams.get('categories'));
-    const forceRefresh =
-      searchParams.get('refresh') === '1' || searchParams.get('refresh') === 'true';
 
     const location = await ensureBuildingCoordinates(buildingId);
     if (!location) {
@@ -55,7 +52,7 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           error:
-            'Could not locate this property on the map. Check that the building has a complete address.',
+            'Could not locate this property on the map. Add a Google Maps pin on the property location.',
         },
         { status: 404 }
       );
@@ -68,7 +65,6 @@ export async function GET(request: NextRequest) {
     const data = await getNearbyAmenitiesForBuilding({
       building: location,
       categories,
-      forceRefresh,
     });
 
     return NextResponse.json({ success: true, data });

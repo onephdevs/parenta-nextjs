@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     const visibility = await pool.query<{ show_on_landing_nearby: boolean }>(
       `
-      SELECT COALESCE(show_on_landing_nearby, true) AS show_on_landing_nearby
+      SELECT COALESCE(show_on_landing_nearby, false) AS show_on_landing_nearby
       FROM buildings
       WHERE id = $1 AND is_active = true
       LIMIT 1

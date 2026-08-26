@@ -11,7 +11,7 @@ export interface Building {
   addressLine2?: string;
   city: string;
   state: string;
-  postalCode: string;
+  postalCode?: string | null;
   country: string;
   description?: string;
   buildingType: string;
@@ -25,8 +25,13 @@ export interface Building {
   isActive: boolean;
   /** When false, skip automatic late fees; use negotiated due-date workflow. */
   autoLateFee: boolean;
-  /** When false, hide from landing-page nearby / commute property picker. */
+  /** When true, show on landing Featured properties and What’s nearby. New buildings default off. */
   showOnLandingNearby: boolean;
+  /** WGS84 origin for landing “What’s nearby”. */
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Pasted Google Maps share link or coordinates. */
+  googleMapsUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,11 +39,11 @@ export interface Building {
 export interface DatabaseBuilding {
   id: string;
   name: string;
-  address_line1: string;
+  address_line1: string | null;
   address_line2?: string;
   city: string;
   state: string;
-  postal_code: string;
+  postal_code?: string | null;
   country: string;
   description?: string;
   building_type: string;
@@ -50,6 +55,10 @@ export interface DatabaseBuilding {
   is_active: boolean;
   auto_late_fee?: boolean;
   show_on_landing_nearby?: boolean;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  google_maps_url?: string | null;
+  geocoded_at?: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -702,11 +711,11 @@ export interface DatabaseDocument {
 
 export interface CreateBuildingData {
   name: string;
-  addressLine1: string;
+  addressLine1?: string;
   addressLine2?: string;
   city: string;
   state: string;
-  postalCode: string;
+  postalCode?: string;
   country?: string;
   description?: string;
   buildingType?: string;
@@ -715,6 +724,10 @@ export interface CreateBuildingData {
   amenities?: string;
   autoLateFee?: boolean;
   showOnLandingNearby?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  googleMapsUrl?: string | null;
+  geocodedAt?: Date | null;
 }
 
 export interface CreateRoomData {

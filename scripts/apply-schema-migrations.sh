@@ -99,6 +99,9 @@ MIGRATIONS=(
   add-building-coordinates.sql
   add-building-nearby-snapshots.sql
   add-building-show-on-landing-nearby.sql
+  building-landing-opt-in-default.sql
+  add-building-google-maps-url.sql
+  clear-building-postal-code.sql
   add-payment-or-fields.sql
   add-payment-updates.sql
   add-lease-package-templates.sql

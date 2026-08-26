@@ -1,6 +1,7 @@
 /**
  * Server-side geocoding via OpenStreetMap Nominatim.
  * Persist coordinates on buildings; never call from the browser.
+ * Admin-pasted Google Maps pins (latitude/longitude) take precedence.
  */
 
 import pool from '@/lib/db';

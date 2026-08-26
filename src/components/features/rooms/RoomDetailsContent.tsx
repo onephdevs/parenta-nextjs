@@ -31,7 +31,7 @@ import {
   formatBuildingAddress,
   formatShortDate,
   getRoomTypeStats,
-  googleMapsUrl,
+  googleMapsUrlForBuilding,
   toDisplayRoomStatus,
 } from '@/components/features/properties/property-utils';
 import { formatAmenityLabel } from '@/lib/format/amenities';
@@ -994,7 +994,7 @@ function BuildingSummaryCard({ detail }: { detail: RoomPageDetail }) {
   const { building, buildingImages } = detail;
   const address = formatBuildingAddress(building);
   const hero = buildingImages[0] ? getImageUrl(buildingImages[0].filePath) : null;
-  const mapsHref = googleMapsUrl(address);
+  const mapsHref = googleMapsUrlForBuilding(building);
 
   return (
     <div>

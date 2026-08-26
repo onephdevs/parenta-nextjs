@@ -41,16 +41,14 @@ export async function POST(request: Request) {
     // Basic validation
     if (
       !buildingData.name ||
-      !buildingData.addressLine1 ||
       !buildingData.city ||
-      !buildingData.state ||
-      !buildingData.postalCode
+      !buildingData.state
     ) {
       return NextResponse.json(
         {
           success: false,
           error: 'Missing required fields',
-          details: 'Name, address, city, region, and postal code are required',
+          details: 'Name, city, and region are required',
         },
         { status: 400 }
       );
@@ -69,8 +67,33 @@ export async function POST(request: Request) {
       );
     }
 
+    const { mapsFieldsFromAdminInput } = await import(
+      '@/lib/maps/resolve-google-maps-location'
+    );
+    const mapsFields = await mapsFieldsFromAdminInput(buildingData);
+    if (!mapsFields.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: mapsFields.error,
+          details: mapsFields.error,
+        },
+        { status: 400 }
+      );
+    }
+    if (!mapsFields.skipped) {
+      buildingData.latitude = mapsFields.latitude;
+      buildingData.longitude = mapsFields.longitude;
+      buildingData.googleMapsUrl = mapsFields.googleMapsUrl;
+    }
+
     const building = await createBuilding(buildingData);
-    const buildingId = String(building.id || building.buildingId || '');
+    const buildingId = String(building.id || '');
+
+    if (!mapsFields.skipped) {
+      const { invalidatePublicPortfolioCache } = await import('@/lib/cache/memory-cache');
+      invalidatePublicPortfolioCache();
+    }
 
     logActivitySafe({
       actorUserId: session?.user?.id || null,

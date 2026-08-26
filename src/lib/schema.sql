@@ -30,11 +30,11 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS buildings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
-  address_line1 VARCHAR(255) NOT NULL,
+  address_line1 VARCHAR(255),
   address_line2 VARCHAR(255),
   city VARCHAR(100) NOT NULL,
   state VARCHAR(50) NOT NULL,
-  postal_code VARCHAR(20) NOT NULL,
+  postal_code VARCHAR(20),
   country VARCHAR(50) DEFAULT 'USA',
   description TEXT,
   building_type VARCHAR(50) DEFAULT 'residential',

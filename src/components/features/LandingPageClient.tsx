@@ -21,6 +21,7 @@ import { HomeContactForm } from '@/components/features/HomeContactForm';
 import { NearbyAmenitiesSection } from '@/components/features/nearby/NearbyAmenitiesSection';
 import { landingPropertyCoverSrc } from '@/lib/format/image-url';
 import type { PublicPortfolioPayload } from '@/lib/api/public-portfolio';
+import { LANDING_FEATURED_LIMIT } from '@/lib/landing-featured';
 
 interface PortfolioStats {
   propertyCount: number;
@@ -185,9 +186,10 @@ export default function LandingPageClient({
     },
   ];
 
-  const featuredWithAvailability = properties.filter((p) => p.availableUnits > 0);
-  const featuredCards = featuredWithAvailability.slice(0, 2);
-  const availableForForm = featuredWithAvailability.map((p) => ({
+  const featuredCards = properties
+    .filter((p) => p.showOnLandingNearby)
+    .slice(0, LANDING_FEATURED_LIMIT);
+  const availableForForm = featuredCards.map((p) => ({
     id: p.id,
     name: p.name,
     availableUnits: p.availableUnits,
@@ -502,23 +504,25 @@ export default function LandingPageClient({
                   );
                 })}
 
-                <a
-                  href="#contact"
-                  className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center transition hover:border-[#2563EB]/40 hover:bg-white"
-                >
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
-                    <Plus className="h-5 w-5" />
-                  </div>
-                  <p className="text-sm text-[#6B7280]">
-                    More listings added regularly —{' '}
-                    <span className="font-semibold text-[#2563EB]">get notified →</span>
-                  </p>
-                </a>
+                {featuredCards.length < LANDING_FEATURED_LIMIT ? (
+                  <a
+                    href="#contact"
+                    className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center transition hover:border-[#2563EB]/40 hover:bg-white"
+                  >
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm text-[#6B7280]">
+                      More listings added regularly —{' '}
+                      <span className="font-semibold text-[#2563EB]">get notified →</span>
+                    </p>
+                  </a>
+                ) : null}
               </div>
               <p className="mt-10 text-center text-sm text-[#9CA3AF]">
-                Showing {featuredCards.length} of {totalProperties}{' '}
-                {totalProperties === 1 ? 'property' : 'properties'}
-                {propertiesWithAvailability > 0 ? ' with current availability' : ''}
+                Showing {featuredCards.length} of {LANDING_FEATURED_LIMIT}{' '}
+                {LANDING_FEATURED_LIMIT === 1 ? 'property' : 'properties'}
+                {' on the landing page'}
               </p>
             </>
           ) : (
@@ -544,7 +548,8 @@ export default function LandingPageClient({
 
       <NearbyAmenitiesSection
         properties={properties
-          .filter((p) => p.showOnLandingNearby !== false)
+          .filter((p) => p.showOnLandingNearby)
+          .slice(0, LANDING_FEATURED_LIMIT)
           .map((p) => ({
             id: p.id,
             name: p.name,

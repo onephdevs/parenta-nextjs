@@ -1,16 +1,46 @@
+import { formatAddress } from '@/lib/format/address';
+import {
+  canonicalGoogleMapsUrl,
+  isGoogleMapsShortUrl,
+  isValidLatLng,
+} from '@/lib/maps/google-maps-location';
+
 export function formatBuildingAddress(building: {
-  addressLine1: string;
+  addressLine1?: string | null;
   addressLine2?: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
+  city?: string | null;
+  state?: string | null;
 }): string {
-  const line2 = building.addressLine2 ? `, ${building.addressLine2}` : '';
-  return `${building.addressLine1}${line2}, ${building.city}, ${building.state} ${building.postalCode}`;
+  return formatAddress({ ...building, postalCode: undefined }, '');
 }
 
 export function googleMapsUrl(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+export function googleMapsUrlForBuilding(building: {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  googleMapsUrl?: string | null;
+}): string {
+  const stored = building.googleMapsUrl?.trim();
+  if (stored && /^https?:\/\//i.test(stored) && !isGoogleMapsShortUrl(stored)) {
+    return stored;
+  }
+  const lat = building.latitude;
+  const lng = building.longitude;
+  if (lat != null && lng != null && isValidLatLng(lat, lng)) {
+    return canonicalGoogleMapsUrl(lat, lng);
+  }
+  if (stored && /^https?:\/\//i.test(stored)) return stored;
+  const address = formatBuildingAddress(building);
+  if (address) return googleMapsUrl(address);
+  return 'https://www.google.com/maps';
 }
 
 export function formatArea(squareFootage?: number | null): string | null {

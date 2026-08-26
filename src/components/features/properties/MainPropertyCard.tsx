@@ -18,9 +18,10 @@ import DeleteBuildingModal from '@/components/features/DeleteBuildingModal';
 import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import {
   formatBuildingAddress,
-  googleMapsUrl,
+  googleMapsUrlForBuilding,
 } from './property-utils';
 import { Switch } from '@/components/ui/Switch';
+import { LANDING_FEATURED_LIMIT } from '@/lib/landing-featured';
 
 const LATO = 'var(--font-lato), Lato, sans-serif';
 const TEAL = '#39CCCC';
@@ -64,8 +65,12 @@ export default function MainPropertyCard({
 
   const address = formatBuildingAddress(building);
   const hero = buildingImages[0] ? getImageUrl(buildingImages[0].filePath) : null;
-  const mapsHref = googleMapsUrl(address);
+  const mapsHref = googleMapsUrlForBuilding(building);
   const roomCount = detail.rooms.length || building.totalUnits || 0;
+  const landingUsed = detail.landingFeaturedCount ?? 0;
+  const landingMax = detail.landingFeaturedMax ?? LANDING_FEATURED_LIMIT;
+  const onLanding = building.showOnLandingNearby === true;
+  const landingFull = landingUsed >= landingMax;
 
   const openEdit = (section: 'basic' | 'photos' = 'basic') => {
     setEditSection(section);
@@ -126,22 +131,22 @@ export default function MainPropertyCard({
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(json.error || 'Failed to update nearby visibility');
+        throw new Error(json.error || 'Failed to update landing visibility');
       }
       showNotification({
         type: 'success',
         title: 'Property updated',
         message: checked
-          ? 'Property will show in landing “What’s nearby”.'
-          : 'Property hidden from landing “What’s nearby”.',
+          ? 'Property will show on the landing page.'
+          : 'Property hidden from the landing page.',
       });
       onBuildingUpdated();
     } catch (err) {
       showNotification({
         type: 'error',
-        title: 'Update failed',
+        title: 'Could not update landing page',
         message:
-          err instanceof Error ? err.message : 'Failed to update nearby visibility',
+          err instanceof Error ? err.message : 'Failed to update landing visibility',
       });
     } finally {
       setSavingNearbyToggle(false);
@@ -250,13 +255,25 @@ export default function MainPropertyCard({
 
             <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5">
               <Switch
-                checked={building.showOnLandingNearby !== false}
+                checked={onLanding}
+                aria-label={`Show on landing page ${landingUsed} of ${landingMax}`}
                 onCheckedChange={(checked) => {
                   void toggleShowOnLandingNearby(checked);
                 }}
-                isDisabled={savingNearbyToggle}
-                label="Show in What’s nearby"
-                description="Landing page nearby / commute property picker"
+                isDisabled={savingNearbyToggle || (landingFull && !onLanding)}
+                label={
+                  <span className="inline-flex items-center gap-2">
+                    Show on landing page
+                    <span className="rounded-md bg-white px-1.5 py-0.5 text-xs font-semibold tabular-nums text-gray-700 ring-1 ring-gray-200">
+                      {landingUsed}/{landingMax}
+                    </span>
+                  </span>
+                }
+                description={
+                  landingFull && !onLanding
+                    ? `All ${landingMax} landing slots are used. Turn off another property to feature this one.`
+                    : 'Featured properties and What’s nearby'
+                }
               />
             </div>
           </div>

@@ -49,6 +49,10 @@ interface ProcessPaymentClientProps {
   initialTenantId?: string;
   initialInvoiceId?: string;
   initialAmount?: string;
+  /** Compact layout for a modal tab (no page chrome). */
+  embedded?: boolean;
+  onSuccess?: (paymentId: string) => void;
+  onCancel?: () => void;
 }
 
 function todayISO(): string {
@@ -94,6 +98,9 @@ export default function ProcessPaymentClient({
   initialTenantId = '',
   initialInvoiceId = '',
   initialAmount = '',
+  embedded = false,
+  onSuccess,
+  onCancel,
 }: ProcessPaymentClientProps) {
   const router = useRouter();
   const { showNotification } = useNotifications();
@@ -469,8 +476,12 @@ export default function ProcessPaymentClient({
         message: 'The payment has been processed and updated.',
       });
       setConfirmOpen(false);
-      router.push(`/admin/financial/payments/${paymentId}`);
-      router.refresh();
+      if (onSuccess) {
+        onSuccess(paymentId);
+      } else {
+        router.push(`/admin/financial/payments/${paymentId}`);
+        router.refresh();
+      }
     } catch (err) {
       showNotification({
         type: 'error',
@@ -483,6 +494,13 @@ export default function ProcessPaymentClient({
   };
 
   if (!initialTenantId && !tenant) {
+    if (embedded) {
+      return (
+        <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+          Select a tenant to load invoices and payment details.
+        </p>
+      );
+    }
     return (
       <div className="mx-auto max-w-lg space-y-6 p-6">
         <Link
@@ -593,24 +611,28 @@ export default function ProcessPaymentClient({
 
   if (loading) {
     return (
-      <div className="p-6 text-sm text-gray-500">Loading payment details…</div>
+      <div className={cn(embedded ? 'py-6' : 'p-6', 'text-sm text-gray-500')}>
+        Loading payment details…
+      </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Link
-            href="/admin/financial/payments"
-            className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Process Payment</h1>
+    <div className={cn('w-full space-y-6', embedded ? '' : 'mx-auto max-w-6xl p-6')}>
+      {!embedded && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <Link
+              href="/admin/financial/payments"
+              className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Process Payment</h1>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="space-y-8">
@@ -707,11 +729,7 @@ export default function ProcessPaymentClient({
             <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="OR No."
-                    htmlFor="or-no"
-                    hint="Auto-generated like txn ids (or-r-000001-26). Final number is assigned when you confirm."
-                  >
+                    <FormField label="OR No." htmlFor="or-no">
                     <Input
                       id="or-no"
                       value={orNumber}
@@ -896,9 +914,15 @@ export default function ProcessPaymentClient({
               </Button>
             </div>
             <div className="flex gap-2">
-              <Link href="/admin/financial/payments">
-                <Button variant="outline">Back</Button>
-              </Link>
+              {embedded ? (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Back
+                </Button>
+              ) : (
+                <Link href="/admin/financial/payments">
+                  <Button variant="outline">Back</Button>
+                </Link>
+              )}
               <Button
                 isDisabled={!canSubmit}
                 onClick={() => setConfirmOpen(true)}

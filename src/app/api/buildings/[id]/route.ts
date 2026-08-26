@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getBuildingById, updateBuilding, deleteBuilding } from '../../../../lib/api/buildings';
 import { requireAdmin } from '@/lib/api-auth';
 import { logActivitySafe } from '@/lib/services/activity-logger';
+import { LandingFeaturedFullError } from '@/lib/landing-featured';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -72,11 +73,50 @@ export async function PUT(request: Request, { params }: RouteParams) {
       }
     }
 
+    const { mapsFieldsFromAdminInput } = await import(
+      '@/lib/maps/resolve-google-maps-location'
+    );
+    const mapsFields = await mapsFieldsFromAdminInput(buildingData);
+    if (!mapsFields.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: mapsFields.error,
+          details: mapsFields.error,
+        },
+        { status: 400 }
+      );
+    }
+    if (!mapsFields.skipped) {
+      buildingData.latitude = mapsFields.latitude;
+      buildingData.longitude = mapsFields.longitude;
+      buildingData.googleMapsUrl = mapsFields.googleMapsUrl;
+      buildingData.geocodedAt = new Date();
+    } else {
+      delete buildingData.googleMapsUrl;
+      delete buildingData.latitude;
+      delete buildingData.longitude;
+    }
+
+    const coordsChanged =
+      !mapsFields.skipped &&
+      (Math.abs((before?.latitude ?? NaN) - mapsFields.latitude) > 1e-6 ||
+        Math.abs((before?.longitude ?? NaN) - mapsFields.longitude) > 1e-6 ||
+        before?.latitude == null ||
+        before?.longitude == null);
+
     const building = await updateBuilding(id, buildingData);
 
-    if (Object.prototype.hasOwnProperty.call(buildingData, 'showOnLandingNearby')) {
+    if (
+      coordsChanged ||
+      Object.prototype.hasOwnProperty.call(buildingData, 'showOnLandingNearby')
+    ) {
       const { invalidatePublicPortfolioCache } = await import('@/lib/cache/memory-cache');
       invalidatePublicPortfolioCache();
+    }
+    if (coordsChanged) {
+      const { clearNearbySnapshot } = await import('@/lib/maps/nearby-snapshot');
+      await clearNearbySnapshot(id);
     }
 
     logActivitySafe({
@@ -100,7 +140,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     console.error('Update building error:', error);
-    
+
+    if (error instanceof LandingFeaturedFullError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 409 }
+      );
+    }
+
     const status = error instanceof Error && error.message === 'Building not found' ? 404 : 500;
     
     return NextResponse.json(

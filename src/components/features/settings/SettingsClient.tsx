@@ -277,6 +277,13 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
   };
 
   const handleRefreshNearby = async () => {
+    if (
+      !window.confirm(
+        'This replaces nearby catalogs for all properties from OpenStreetMap without reviewing each list. Prefer Get latest on Edit property. Continue?'
+      )
+    ) {
+      return;
+    }
     setIsRefreshingNearby(true);
     try {
       const response = await fetch('/api/admin/nearby/refresh', {
@@ -667,14 +674,15 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
                 <div>
                   <h3 className="mb-4 text-lg font-medium text-gray-900">Nearby map</h3>
                   <p className="mb-4 text-sm text-gray-600">
-                    Landing-page “What’s nearby” stores places in the database and only
-                    re-fetches from OpenStreetMap when this interval expires (or when you
-                    force a refresh).
+                    Landing “What’s nearby” only shows places saved on each property.
+                    OpenStreetMap does not update automatically. On Edit property → Nearby
+                    places, click Get latest from OpenStreetMap, review the list, then Save
+                    nearby places.
                   </p>
                   <FormField
-                    label="Refresh nearby places every (days)"
+                    label="Cached street-route lifetime (days)"
                     htmlFor="nearby-refresh-days"
-                    hint="Default 7 (weekly). Range 1–90."
+                    hint="How long walk/drive routes stay cached. Range 1–90. Nearby places themselves are not auto-refreshed."
                   >
                     <Input
                       id="nearby-refresh-days"
@@ -696,7 +704,7 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
                       onClick={handleRefreshNearby}
                       isLoading={isRefreshingNearby}
                     >
-                      Refresh nearby places now
+                      Replace all catalogs from OpenStreetMap
                     </Button>
                   </div>
                 </div>

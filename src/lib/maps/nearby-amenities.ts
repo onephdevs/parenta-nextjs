@@ -54,6 +54,17 @@ export const CATEGORY_COLORS: Record<AmenityCategory, string> = {
   hospital: '#DC2626',
 };
 
+export const CATEGORY_LABELS: Record<AmenityCategory, string> = {
+  school: 'School',
+  market: 'Market',
+  mall: 'Mall',
+  park: 'Park',
+  store: 'Store',
+  restaurant: 'Restaurant',
+  barber: 'Salon',
+  hospital: 'Hospital',
+};
+
 export interface NearbyPlace {
   id: string;
   name: string;

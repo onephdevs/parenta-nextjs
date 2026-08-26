@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FormField } from '@/components/forms/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import {
+  formatLatLngPreview,
+  isGoogleMapsShortUrl,
+  parseGoogleMapsLocation,
+} from '@/lib/maps/google-maps-location';
 
 interface AddressRegionOption {
   id: string;
@@ -16,30 +22,29 @@ interface AddressCityOption {
 }
 
 interface BuildingLocationFieldsProps {
+  googleMapsUrl: string;
   addressLine1: string;
   addressLine2: string;
   city: string;
-  /** Stored in buildings.state — shown as Region in the UI */
   state: string;
-  postalCode: string;
   country: string;
   onChange: (fields: Partial<{
+    googleMapsUrl: string;
     addressLine1: string;
     addressLine2: string;
     city: string;
     state: string;
-    postalCode: string;
     country: string;
   }>) => void;
   disabled?: boolean;
 }
 
 export default function BuildingLocationFields({
+  googleMapsUrl,
   addressLine1,
   addressLine2,
   city,
   state,
-  postalCode,
   country,
   onChange,
   disabled = false,
@@ -50,6 +55,23 @@ export default function BuildingLocationFields({
   const [loadingRegions, setLoadingRegions] = useState(true);
   const [loadingCities, setLoadingCities] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const mapsPreview = useMemo(
+    () => parseGoogleMapsLocation(googleMapsUrl),
+    [googleMapsUrl]
+  );
+  const mapsIsShort = useMemo(
+    () => isGoogleMapsShortUrl(googleMapsUrl),
+    [googleMapsUrl]
+  );
+  const mapsValue = googleMapsUrl.trim();
+  const mapsHint = !mapsValue
+    ? 'Used as the pin for landing-page What’s nearby (schools, parks, commute). In Google Maps: Share → copy link, or paste lat, lng.'
+    : mapsPreview
+      ? `Pin for What’s nearby: ${formatLatLngPreview(mapsPreview.latitude, mapsPreview.longitude)}`
+      : mapsIsShort
+        ? 'Short Google Maps links are resolved to a pin when you save.'
+        : 'Couldn’t find coordinates yet. Paste a Maps share link or 15.145, 120.588.';
 
   useEffect(() => {
     let cancelled = false;
@@ -139,15 +161,14 @@ export default function BuildingLocationFields({
 
   return (
     <div className="space-y-5">
-      <FormField label="Address line 1" htmlFor="addressLine1" required>
+      <FormField label="Address line 1" htmlFor="addressLine1">
         <Input
           id="addressLine1"
           name="addressLine1"
-          required
           disabled={disabled}
           value={addressLine1}
           onChange={(e) => onChange({ addressLine1: e.target.value })}
-          placeholder="Enter street address"
+          placeholder="Street address (optional)"
         />
       </FormField>
 
@@ -168,7 +189,7 @@ export default function BuildingLocationFields({
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <FormField label="Region" htmlFor="region" required>
           <Select
             id="region"
@@ -210,23 +231,10 @@ export default function BuildingLocationFields({
                 {item.name}
               </option>
             ))}
-            {/* Keep existing city visible if not in list (legacy free-text values) */}
             {city && !cities.some((c) => c.name === city) && (
               <option value={city}>{city}</option>
             )}
           </Select>
-        </FormField>
-
-        <FormField label="Postal code" htmlFor="postalCode" required>
-          <Input
-            id="postalCode"
-            name="postalCode"
-            required
-            disabled={disabled}
-            value={postalCode}
-            onChange={(e) => onChange({ postalCode: e.target.value })}
-            placeholder="Postal code"
-          />
         </FormField>
       </div>
 
@@ -241,6 +249,30 @@ export default function BuildingLocationFields({
         >
           <option value="Philippines">Philippines</option>
         </Select>
+      </FormField>
+
+      <FormField
+        label="Google Maps pin"
+        htmlFor="googleMapsUrl"
+        hint={mapsHint}
+        error={
+          mapsValue &&
+          !mapsPreview &&
+          !mapsIsShort &&
+          (mapsValue.includes(',') || /https?:|maps\./i.test(mapsValue))
+            ? 'Paste a Google Maps share link or coordinates like 15.145, 120.588'
+            : undefined
+        }
+      >
+        <Textarea
+          id="googleMapsUrl"
+          name="googleMapsUrl"
+          rows={2}
+          disabled={disabled}
+          value={googleMapsUrl}
+          onChange={(e) => onChange({ googleMapsUrl: e.target.value })}
+          placeholder="https://maps.app.goo.gl/… or 15.145, 120.588"
+        />
       </FormField>
     </div>
   );

@@ -1,17 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, MapPin, Info } from 'lucide-react';
+import { Building2, Image as ImageIcon, Info, Map, MapPin, Wallet } from 'lucide-react';
 import { CreateBuildingData } from '@/types/database';
+import type { Image as BuildingImage } from '@/lib/api/images';
 import { useNotifications } from '@/hooks/useNotifications';
-import SectionedFormShell from '@/components/ui/SectionedFormShell';
+import SectionedFormShell, { type SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
 import BuildingLocationFields from '@/components/features/BuildingLocationFields';
+import BuildingDepositFields, {
+  DEFAULT_BUILDING_DEPOSIT_FORM,
+  type BuildingDepositFormData,
+} from '@/components/features/BuildingDepositFields';
+import ImageUpload from '@/components/features/ImageUpload';
+import ImageGallery from '@/components/features/ImageGallery';
+import BuildingNearbyPlacesPanel, {
+  type BuildingNearbyPlacesPanelHandle,
+} from '@/components/features/BuildingNearbyPlacesPanel';
 
 interface AddBuildingModalProps {
   isOpen: boolean;
@@ -19,53 +29,206 @@ interface AddBuildingModalProps {
   onBuildingAdded: (buildingId?: string) => void;
 }
 
-type AddBuildingSection = 'basic' | 'location' | 'details';
+type AddBuildingSection = 'basic' | 'location' | 'nearby' | 'details' | 'deposits' | 'photos';
 
-const SECTIONS: { id: AddBuildingSection; label: string; icon: React.ReactNode; title: string; subtitle: string }[] = [
-  { 
-    id: 'basic', 
-    label: 'Basic info', 
+const SECTIONS: SectionedFormSection<AddBuildingSection>[] = [
+  {
+    id: 'basic',
+    label: 'Basic info',
     icon: <Building2 className="h-4 w-4" />,
     title: 'Basic information',
-    subtitle: 'Name and building type.'
+    subtitle: 'Name and building type.',
   },
-  { 
-    id: 'location', 
-    label: 'Location', 
+  {
+    id: 'location',
+    label: 'Location',
     icon: <MapPin className="h-4 w-4" />,
     title: 'Location',
-    subtitle: 'Street address and region.'
+    subtitle: 'Address, region, and Google Maps pin.',
   },
-  { 
-    id: 'details', 
-    label: 'Details', 
+  {
+    id: 'nearby',
+    label: 'Nearby places',
+    icon: <Map className="h-4 w-4" />,
+    title: 'Nearby places',
+    subtitle: 'Get latest from OpenStreetMap, verify, then save for the landing map.',
+  },
+  {
+    id: 'details',
+    label: 'Details',
     icon: <Info className="h-4 w-4" />,
     title: 'Additional details',
-    subtitle: 'Description, size, and amenities.'
+    subtitle: 'Description, size, and amenities.',
+  },
+  {
+    id: 'deposits',
+    label: 'Deposits & advance',
+    icon: <Wallet className="h-4 w-4" />,
+    title: 'Deposits & advance',
+    subtitle: 'Rooms inherit these unless overridden individually.',
+  },
+  {
+    id: 'photos',
+    label: 'Photos',
+    icon: <ImageIcon className="h-4 w-4" />,
+    title: 'Photos',
+    subtitle: 'Upload photos and set the primary image for this property.',
   },
 ];
 
-export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: AddBuildingModalProps) {
+const EMPTY_FORM: CreateBuildingData = {
+  name: '',
+  showOnLandingNearby: false,
+  googleMapsUrl: '',
+  addressLine1: '',
+  addressLine2: '',
+  city: '',
+  state: '',
+  country: 'Philippines',
+  description: '',
+  buildingType: 'residential',
+  yearBuilt: undefined,
+  totalFloors: undefined,
+  amenities: '',
+};
+
+export default function AddBuildingModal({
+  isOpen,
+  onClose,
+  onBuildingAdded,
+}: AddBuildingModalProps) {
   const router = useRouter();
   const { showNotification, updateNotification } = useNotifications();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<AddBuildingSection>('basic');
+  const [createdBuildingId, setCreatedBuildingId] = useState<string | null>(null);
+  const [images, setImages] = useState<BuildingImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [formData, setFormData] = useState<CreateBuildingData>(EMPTY_FORM);
+  const [depositFormData, setDepositFormData] = useState<BuildingDepositFormData>(
+    DEFAULT_BUILDING_DEPOSIT_FORM
+  );
+  const nearbyPlacesRef = useRef<BuildingNearbyPlacesPanelHandle>(null);
 
-  const [formData, setFormData] = useState<CreateBuildingData>({
-    name: '',
-    addressLine1: '',
-    addressLine2: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'Philippines',
-    description: '',
-    buildingType: 'residential',
-    yearBuilt: undefined,
-    totalFloors: undefined,
-    amenities: '',
-  });
+  const resetForm = () => {
+    setFormData(EMPTY_FORM);
+    setDepositFormData(DEFAULT_BUILDING_DEPOSIT_FORM);
+    setCreatedBuildingId(null);
+    setImages([]);
+    setSection('basic');
+    setError(null);
+  };
+
+  const fetchImages = useCallback(async (buildingId: string) => {
+    setImagesLoading(true);
+    try {
+      const response = await fetch(
+        `/api/images?entityType=building&entityId=${buildingId}`,
+        { credentials: 'include' }
+      );
+      if (!response.ok) {
+        setImages([]);
+        return;
+      }
+      const result = await response.json();
+      setImages(result.success ? result.data : []);
+    } catch (err) {
+      console.error('Error fetching building images:', err);
+      setImages([]);
+    } finally {
+      setImagesLoading(false);
+    }
+  }, []);
+
+  const buildingPayload = () => {
+    const amenitiesArray = formData.amenities
+      ? String(formData.amenities)
+          .split(',')
+          .map((a) => a.trim())
+          .filter((a) => a.length > 0)
+      : [];
+    return { ...formData, amenities: amenitiesArray };
+  };
+
+  const saveDepositConfig = async (buildingId: string) => {
+    try {
+      await fetch('/api/building-deposit-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buildingId,
+          ...depositFormData,
+        }),
+      });
+    } catch (depositError) {
+      console.error('Error saving deposit config:', depositError);
+    }
+  };
+
+  const persistBuilding = async (): Promise<string> => {
+    const payload = buildingPayload();
+    if (createdBuildingId) {
+      const response = await fetch(`/api/buildings/${createdBuildingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update building');
+      }
+      return createdBuildingId;
+    }
+
+    const response = await fetch('/api/buildings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create building');
+    }
+    const id = String(result.data.id);
+    setCreatedBuildingId(id);
+    return id;
+  };
+
+  const ensureBuilding = async (): Promise<string | null> => {
+    if (createdBuildingId) return createdBuildingId;
+    if (!formData.name.trim() || !formData.city || !formData.state) {
+      return null;
+    }
+    try {
+      return await persistBuilding();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create property');
+      return null;
+    }
+  };
+
+  const handleSectionChange = async (next: AddBuildingSection) => {
+    setError(null);
+    if (next === 'photos' && !createdBuildingId) {
+      if (!formData.name.trim() || !formData.city || !formData.state) {
+        setSection(next);
+        return;
+      }
+      try {
+        const id = await persistBuilding();
+        await fetchImages(id);
+        setSection(next);
+      } catch (err) {
+        setSection(next);
+        setError(
+          err instanceof Error ? err.message : 'Could not create property for this tab'
+        );
+      }
+      return;
+    }
+    setSection(next);
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -89,32 +252,26 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
 
     const loadingNotificationId = showNotification({
       type: 'loading',
-      title: 'Creating building...',
-      message: 'Please wait while we create the building.',
+      title: createdBuildingId ? 'Saving building...' : 'Creating building...',
+      message: 'Please wait while we save the building.',
     });
 
     try {
-      const amenitiesArray = formData.amenities
-        ? String(formData.amenities)
-            .split(',')
-            .map((a) => a.trim())
-            .filter((a) => a.length > 0)
-        : [];
-
-      const response = await fetch('/api/buildings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          amenities: amenitiesArray,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create building');
+      const buildingId = await persistBuilding();
+      try {
+        await nearbyPlacesRef.current?.persist(buildingId);
+      } catch (nearbyErr) {
+        console.error('Nearby places save after create', nearbyErr);
+        showNotification({
+          type: 'error',
+          title: 'Nearby places not saved',
+          message:
+            nearbyErr instanceof Error
+              ? nearbyErr.message
+              : 'Add a Google Maps pin on Location, then save nearby places from Edit building.',
+        });
       }
+      await saveDepositConfig(buildingId);
 
       updateNotification(loadingNotificationId, {
         type: 'success',
@@ -122,27 +279,12 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
         message: `${formData.name} has been added to your portfolio.`,
       });
 
-      setFormData({
-        name: '',
-        addressLine1: '',
-        addressLine2: '',
-        city: '',
-        state: '',
-        postalCode: '',
-        country: 'Philippines',
-        description: '',
-        buildingType: 'residential',
-        yearBuilt: undefined,
-        totalFloors: undefined,
-        amenities: '',
-      });
-      setSection('basic');
-
+      resetForm();
       onClose();
-      onBuildingAdded(result.data.id);
+      onBuildingAdded(buildingId);
 
       setTimeout(() => {
-        router.push(`/admin/properties?buildingId=${result.data.id}`);
+        router.push(`/admin/properties?buildingId=${buildingId}`);
         router.refresh();
       }, 400);
     } catch (err) {
@@ -157,14 +299,24 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
     }
   };
 
+  const handleCancel = () => {
+    if (createdBuildingId) {
+      onBuildingAdded(createdBuildingId);
+    }
+    resetForm();
+    onClose();
+  };
+
   return (
     <SectionedFormShell
       isOpen={isOpen}
-      onCancel={onClose}
+      onCancel={handleCancel}
       eyebrow="Add building"
       sections={SECTIONS}
       activeSection={section}
-      onSectionChange={setSection}
+      onSectionChange={(id) => {
+        void handleSectionChange(id);
+      }}
       formId="add-building-form"
       primaryLabel="Create building"
       primaryLoading={isSubmitting}
@@ -202,11 +354,11 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
 
         {section === 'location' && (
           <BuildingLocationFields
-            addressLine1={formData.addressLine1}
+            googleMapsUrl={formData.googleMapsUrl || ''}
+            addressLine1={formData.addressLine1 || ''}
             addressLine2={formData.addressLine2 || ''}
             city={formData.city}
             state={formData.state}
-            postalCode={formData.postalCode}
             country={formData.country || 'Philippines'}
             onChange={(fields) => setFormData((prev) => ({ ...prev, ...fields }))}
             disabled={isSubmitting}
@@ -253,11 +405,7 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
               </FormField>
             </div>
 
-            <FormField
-              label="Amenities"
-              htmlFor="amenities"
-              hint="Separate with commas."
-            >
+            <FormField label="Amenities" htmlFor="amenities" hint="Separate with commas.">
               <Input
                 id="amenities"
                 name="amenities"
@@ -268,7 +416,65 @@ export default function AddBuildingModal({ isOpen, onClose, onBuildingAdded }: A
             </FormField>
           </div>
         )}
+
+        {section === 'deposits' && (
+          <BuildingDepositFields
+            value={depositFormData}
+            onChange={setDepositFormData}
+          />
+        )}
       </form>
+
+      <div className={section === 'nearby' ? undefined : 'hidden'}>
+        <BuildingNearbyPlacesPanel
+          ref={nearbyPlacesRef}
+          buildingId={createdBuildingId}
+          onEnsureBuilding={ensureBuilding}
+        />
+      </div>
+
+      {section === 'photos' && (
+        <div className="space-y-6">
+          {createdBuildingId ? (
+            <>
+              <div className="rounded-xl border-2 border-dashed border-gray-200 p-4">
+                <ImageUpload
+                  entityType="building"
+                  entityId={createdBuildingId}
+                  onUploadComplete={() => void fetchImages(createdBuildingId)}
+                  maxImages={20}
+                />
+              </div>
+              {imagesLoading ? (
+                <p className="text-sm text-gray-500">Loading photos...</p>
+              ) : (
+                <ImageGallery
+                  images={images}
+                  entityType="building"
+                  entityId={createdBuildingId}
+                  onImageUpdate={() => void fetchImages(createdBuildingId)}
+                  showUpload={false}
+                />
+              )}
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+              <p className="text-sm font-medium text-gray-900">Photos need a saved property</p>
+              <p className="mt-1 text-sm text-gray-600">
+                Add a name in Basic info and a region and city in Location, then enable
+                photo upload.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleSectionChange('photos')}
+                className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                Enable photo upload
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </SectionedFormShell>
   );
 }

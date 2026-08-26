@@ -8,7 +8,7 @@ import { getImageUrl } from '@/lib/format/image-url';
 import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import {
   formatBuildingAddress,
-  googleMapsUrl,
+  googleMapsUrlForBuilding,
 } from '@/components/features/properties/property-utils';
 import { formatUnitLabel } from './RoomDetailsContent';
 
@@ -24,7 +24,7 @@ export default function RoomHeroCard({ detail, notesRefreshKey = 0 }: RoomHeroCa
   const { room, building } = detail;
   const unitLabel = formatUnitLabel(room.roomNumber);
   const address = formatBuildingAddress(building);
-  const mapsHref = googleMapsUrl(address);
+  const mapsHref = googleMapsUrlForBuilding(building);
   const hero = useMemo(() => {
     const primary = room.images.find((img) => img.isPrimary) || room.images[0];
     return primary ? getImageUrl(primary.filePath) : null;

@@ -1,16 +1,21 @@
 import pool from '@/lib/db';
 import type { Building, DatabaseBuilding, CreateBuildingData } from '@/types/database';
+import { parseStoredCoordinate } from '@/lib/maps/google-maps-location';
 import {
   assertOccupancyReconciles,
   buildOccupancyReconciliation,
 } from '@/lib/occupancy/reconcile';
+import {
+  LANDING_FEATURED_LIMIT,
+  LandingFeaturedFullError,
+} from '@/lib/landing-featured';
 
 // Helper function to map database building to app building
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
     id: dbBuilding.id,
     name: dbBuilding.name,
-    addressLine1: dbBuilding.address_line1,
+    addressLine1: dbBuilding.address_line1 || '',
     addressLine2: dbBuilding.address_line2,
     city: dbBuilding.city,
     state: dbBuilding.state,
@@ -25,7 +30,10 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
     amenities: dbBuilding.amenities,
     isActive: dbBuilding.is_active,
     autoLateFee: dbBuilding.auto_late_fee !== false,
-    showOnLandingNearby: dbBuilding.show_on_landing_nearby !== false,
+    showOnLandingNearby: dbBuilding.show_on_landing_nearby === true,
+    latitude: parseStoredCoordinate(dbBuilding.latitude),
+    longitude: parseStoredCoordinate(dbBuilding.longitude),
+    googleMapsUrl: dbBuilding.google_maps_url || null,
     createdAt: dbBuilding.created_at,
     updatedAt: dbBuilding.updated_at,
   };
@@ -152,28 +160,36 @@ export async function getBuildingById(id: string): Promise<Building | null> {
 // Create building
 export async function createBuilding(buildingData: CreateBuildingData): Promise<Building> {
   try {
+    const hasCoords =
+      buildingData.latitude != null && buildingData.longitude != null;
     const query = `
       INSERT INTO buildings (
         name, address_line1, address_line2, city, state, postal_code, 
-        country, description, building_type, year_built, total_floors, amenities
+        country, description, building_type, year_built, total_floors, amenities,
+        latitude, longitude, google_maps_url, geocoded_at, show_on_landing_nearby
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `;
     
     const values = [
       buildingData.name,
-      buildingData.addressLine1,
-      buildingData.addressLine2,
+      buildingData.addressLine1?.trim() || null,
+      buildingData.addressLine2?.trim() || null,
       buildingData.city,
       buildingData.state,
-      buildingData.postalCode,
+      buildingData.postalCode?.trim() || null,
       buildingData.country || 'Philippines',
       buildingData.description,
       buildingData.buildingType || 'residential',
       buildingData.yearBuilt,
       buildingData.totalFloors,
-      buildingData.amenities || []
+      buildingData.amenities || [],
+      hasCoords ? buildingData.latitude : null,
+      hasCoords ? buildingData.longitude : null,
+      buildingData.googleMapsUrl?.trim() || null,
+      hasCoords ? new Date() : null,
+      buildingData.showOnLandingNearby === true,
     ];
     
     const result = await pool.query(query, values);
@@ -233,9 +249,34 @@ export async function getOccupancyStats() {
   }
 }
 
+export async function countLandingFeaturedBuildings(): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `
+    SELECT COUNT(*)::text AS count
+    FROM buildings
+    WHERE is_active = true AND COALESCE(show_on_landing_nearby, false) = true
+    `
+  );
+  return parseInt(result.rows[0]?.count ?? '0', 10) || 0;
+}
+
+export async function getLandingFeaturedState(): Promise<{ count: number; max: number }> {
+  const count = await countLandingFeaturedBuildings();
+  return { count, max: LANDING_FEATURED_LIMIT };
+}
+
 // Update building
 export async function updateBuilding(id: string, buildingData: Partial<CreateBuildingData>): Promise<Building> {
   try {
+    if (buildingData.showOnLandingNearby === true) {
+      const current = await getBuildingById(id);
+      if (!current?.showOnLandingNearby) {
+        const count = await countLandingFeaturedBuildings();
+        if (count >= LANDING_FEATURED_LIMIT) {
+          throw new LandingFeaturedFullError(count);
+        }
+      }
+    }
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
@@ -251,9 +292,15 @@ export async function updateBuilding(id: string, buildingData: Partial<CreateBui
                      key === 'totalFloors' ? 'total_floors' :
                      key === 'autoLateFee' ? 'auto_late_fee' :
                      key === 'showOnLandingNearby' ? 'show_on_landing_nearby' :
+                     key === 'googleMapsUrl' ? 'google_maps_url' :
+                     key === 'geocodedAt' ? 'geocoded_at' :
                      key;
         updates.push(`${dbKey} = $${paramCount}`);
-        values.push(value);
+        values.push(
+          key === 'addressLine1' || key === 'addressLine2' || key === 'googleMapsUrl'
+            ? (typeof value === 'string' ? value.trim() || null : value)
+            : value
+        );
       }
     });
 

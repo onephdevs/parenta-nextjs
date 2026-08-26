@@ -67,7 +67,7 @@ export default function BuildingDetailWithImages({ building }: BuildingDetailWit
   };
 
   const formatAddress = (building: Building) => {
-    return `${building.addressLine1}${building.addressLine2 ? `, ${building.addressLine2}` : ''}, ${building.city}, ${building.state} ${building.postalCode}`;
+    return `${building.addressLine1}${building.addressLine2 ? `, ${building.addressLine2}` : ''}, ${building.city}, ${building.state}`.replace(/^, |, $/g, '');
   };
 
   return (

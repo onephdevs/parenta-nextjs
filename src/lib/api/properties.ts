@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import type { Building, DatabaseBuilding } from '@/types/database';
+import { parseStoredCoordinate } from '@/lib/maps/google-maps-location';
 import { normalizeAmenities } from '@/lib/format/amenities';
 import { getImagesByEntity } from '@/lib/api/images';
 import {
@@ -12,13 +13,15 @@ import {
   buildOccupancyReconciliation,
   estimateLostRent,
 } from '@/lib/occupancy/reconcile';
+import { LANDING_FEATURED_LIMIT } from '@/lib/landing-featured';
+import { countLandingFeaturedBuildings } from '@/lib/api/buildings';
 import { withOccupancyHistoryBadges } from '@/lib/occupancy/history-badge';
 
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
   return {
     id: dbBuilding.id,
     name: dbBuilding.name,
-    addressLine1: dbBuilding.address_line1,
+    addressLine1: dbBuilding.address_line1 || '',
     addressLine2: dbBuilding.address_line2,
     city: dbBuilding.city,
     state: dbBuilding.state,
@@ -33,7 +36,10 @@ function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
     amenities: dbBuilding.amenities,
     isActive: dbBuilding.is_active,
     autoLateFee: dbBuilding.auto_late_fee !== false,
-    showOnLandingNearby: dbBuilding.show_on_landing_nearby !== false,
+    showOnLandingNearby: dbBuilding.show_on_landing_nearby === true,
+    latitude: parseStoredCoordinate(dbBuilding.latitude),
+    longitude: parseStoredCoordinate(dbBuilding.longitude),
+    googleMapsUrl: dbBuilding.google_maps_url || null,
     createdAt: dbBuilding.created_at,
     updatedAt: dbBuilding.updated_at,
   };
@@ -174,6 +180,8 @@ export interface PropertyBuildingDetail {
   buildingImages: PropertyRoomImage[];
   rooms: PropertyRoomDetail[];
   tenantCount: number;
+  landingFeaturedCount: number;
+  landingFeaturedMax: number;
 }
 
 export async function getBuildingsForPropertiesPage(options?: {
@@ -527,6 +535,8 @@ export async function getPropertyBuildingDetail(
     })),
     rooms,
     tenantCount: building.occupiedUnits,
+    landingFeaturedCount: await countLandingFeaturedBuildings(),
+    landingFeaturedMax: LANDING_FEATURED_LIMIT,
   };
 }
 
@@ -693,6 +703,11 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
       b.state,
       b.postal_code,
       b.country,
+      b.latitude,
+      b.longitude,
+      b.google_maps_url,
+      b.auto_late_fee,
+      b.show_on_landing_nearby,
       b.description AS building_description,
       b.building_type,
       b.year_built,
@@ -925,7 +940,7 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
   } = {
     id: buildingId,
     name: row.building_name,
-    addressLine1: row.address_line1,
+    addressLine1: row.address_line1 || '',
     addressLine2: row.address_line2,
     city: row.city,
     state: row.state,
@@ -941,6 +956,11 @@ export async function getRoomPageDetail(roomId: string): Promise<RoomPageDetail 
     vacantUnits: row.vacant_units_count || 0,
     amenities: Array.isArray(row.building_amenities) ? row.building_amenities : [],
     isActive: row.building_is_active,
+    autoLateFee: row.auto_late_fee !== false,
+    showOnLandingNearby: row.show_on_landing_nearby === true,
+    latitude: parseStoredCoordinate(row.latitude),
+    longitude: parseStoredCoordinate(row.longitude),
+    googleMapsUrl: (row.google_maps_url as string | null) || null,
     createdAt: row.building_created_at,
     updatedAt: row.building_updated_at,
   };

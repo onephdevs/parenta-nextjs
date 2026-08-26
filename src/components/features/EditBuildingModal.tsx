@@ -1,24 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Building2,
-  Check,
-  Clock,
   Image as ImageIcon,
   Info,
-  Lock,
+  Map,
   MapPin,
   Trash2,
   Wallet,
 } from 'lucide-react';
 import { Building } from '@/types/database';
+import { mapsFieldPrefill } from '@/lib/maps/google-maps-location';
 import type { Image as BuildingImage } from '@/lib/api/images';
 import { useNotifications } from '@/hooks/useNotifications';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import SectionedFormShell, { SectionCard, type SectionedFormSection } from '@/components/ui/SectionedFormShell';
-import { Button } from '@/components/ui/Button';
+import SectionedFormShell, { type SectionedFormSection } from '@/components/ui/SectionedFormShell';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
@@ -27,10 +25,12 @@ import { FormErrorBanner } from '@/components/forms/FormErrorBanner';
 import ImageUpload from '@/components/features/ImageUpload';
 import ImageGallery from '@/components/features/ImageGallery';
 import BuildingLocationFields from '@/components/features/BuildingLocationFields';
-import { cn } from '@/lib/utils';
+import BuildingDepositFields, {
+  DEFAULT_BUILDING_DEPOSIT_FORM,
+} from '@/components/features/BuildingDepositFields';
+import BuildingNearbyPlacesPanel from '@/components/features/BuildingNearbyPlacesPanel';
 
-type EditSection = 'basic' | 'location' | 'details' | 'deposits' | 'photos';
-type AmountType = 'months' | 'fixed' | 'percentage';
+type EditSection = 'basic' | 'location' | 'nearby' | 'details' | 'deposits' | 'photos';
 
 interface EditBuildingModalProps {
   building: Building;
@@ -54,7 +54,14 @@ const SECTIONS: SectionedFormSection<EditSection>[] = [
     label: 'Location', 
     icon: <MapPin className="h-4 w-4" />, 
     title: 'Location', 
-    subtitle: 'Street address and region.' 
+    subtitle: 'Address, region, and Google Maps pin.' 
+  },
+  { 
+    id: 'nearby', 
+    label: 'Nearby places', 
+    icon: <Map className="h-4 w-4" />, 
+    title: 'Nearby places', 
+    subtitle: 'Get latest from OpenStreetMap, verify, then save for the landing map.' 
   },
   { 
     id: 'details', 
@@ -78,103 +85,6 @@ const SECTIONS: SectionedFormSection<EditSection>[] = [
     subtitle: 'Upload photos and set the primary image for this property.' 
   },
 ];
-
-const TYPE_OPTIONS: { value: AmountType; label: string }[] = [
-  { value: 'months', label: 'Months of rent' },
-  { value: 'fixed', label: 'Fixed amount' },
-  { value: 'percentage', label: 'Percentage' },
-];
-
-function SegmentedControl({
-  value,
-  onChange,
-  options,
-  name,
-}: {
-  value: AmountType;
-  onChange: (next: AmountType) => void;
-  options: { value: AmountType; label: string }[];
-  name: string;
-}) {
-  return (
-    <div
-      className="inline-flex w-full flex-wrap gap-1 rounded-lg bg-gray-100 p-1 sm:w-auto"
-      role="group"
-      aria-label={name}
-    >
-      {options.map((opt) => {
-        const active = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:flex-none',
-              active
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function AffixedNumberInput({
-  id,
-  name,
-  value,
-  onChange,
-  prefix,
-  suffix,
-  min,
-  max,
-  step,
-  placeholder,
-}: {
-  id: string;
-  name: string;
-  value: number | undefined;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  prefix?: string;
-  suffix?: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  placeholder?: string;
-}) {
-  return (
-    <div className="relative">
-      {prefix && (
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-500">
-          {prefix}
-        </span>
-      )}
-      <Input
-        type="number"
-        id={id}
-        name={name}
-        min={min}
-        max={max}
-        step={step}
-        value={value ?? ''}
-        onChange={onChange}
-        placeholder={placeholder}
-        className={cn(prefix && 'pl-8', suffix && 'pr-16')}
-      />
-      {suffix && (
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-500">
-          {suffix}
-        </span>
-      )}
-    </div>
-  );
-}
-
 
 export default function EditBuildingModal({
   building,
@@ -200,11 +110,11 @@ export default function EditBuildingModal({
   const [formData, setFormData] = useState({
     name: building.name,
     buildingType: building.buildingType,
+    googleMapsUrl: mapsFieldPrefill(building),
     addressLine1: building.addressLine1,
     addressLine2: building.addressLine2 || '',
     city: building.city,
     state: building.state,
-    postalCode: building.postalCode,
     country: building.country,
     description: building.description || '',
     yearBuilt: building.yearBuilt,
@@ -212,20 +122,7 @@ export default function EditBuildingModal({
     amenities: amenitiesString,
   });
 
-  const [depositFormData, setDepositFormData] = useState({
-    depositMonths: 1,
-    depositType: 'months' as AmountType,
-    depositAmount: undefined as number | undefined,
-    depositPercentage: undefined as number | undefined,
-    advanceMonths: 1,
-    advanceType: 'months' as AmountType,
-    advanceAmount: undefined as number | undefined,
-    advancePercentage: undefined as number | undefined,
-    utilityDepositAmount: 0,
-    depositValidityDays: 5,
-    depositRefundableAfterDays: 5,
-    minimumDepositAmount: 3000,
-  });
+  const [depositFormData, setDepositFormData] = useState(DEFAULT_BUILDING_DEPOSIT_FORM);
 
   const fetchImages = useCallback(async () => {
     setImagesLoading(true);
@@ -282,11 +179,11 @@ export default function EditBuildingModal({
     setFormData({
       name: building.name,
       buildingType: building.buildingType,
+      googleMapsUrl: mapsFieldPrefill(building),
       addressLine1: building.addressLine1,
       addressLine2: building.addressLine2 || '',
       city: building.city,
       state: building.state,
-      postalCode: building.postalCode,
       country: building.country,
       description: building.description || '',
       yearBuilt: building.yearBuilt,
@@ -325,14 +222,6 @@ export default function EditBuildingModal({
             ? parseInt(value, 10)
             : undefined
           : value,
-    }));
-  };
-
-  const handleDepositConfigChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setDepositFormData((prev) => ({
-      ...prev,
-      [name]: value === '' ? undefined : parseFloat(value),
     }));
   };
 
@@ -498,11 +387,11 @@ export default function EditBuildingModal({
 
           {section === 'location' && (
             <BuildingLocationFields
-              addressLine1={formData.addressLine1}
+              googleMapsUrl={formData.googleMapsUrl || ''}
+              addressLine1={formData.addressLine1 || ''}
               addressLine2={formData.addressLine2 || ''}
               city={formData.city}
               state={formData.state}
-              postalCode={formData.postalCode}
               country={formData.country || 'Philippines'}
               onChange={(fields) => setFormData((prev) => ({ ...prev, ...fields }))}
               disabled={isSubmitting}
@@ -566,216 +455,16 @@ export default function EditBuildingModal({
           )}
 
           {section === 'deposits' && (
-            <div className="space-y-5">
-              <SectionCard title="Deposit requirement">
-                <div className="space-y-4">
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-gray-700">Deposit type</p>
-                    <SegmentedControl
-                      name="depositType"
-                      value={depositFormData.depositType}
-                      options={TYPE_OPTIONS}
-                      onChange={(next) =>
-                        setDepositFormData((prev) => ({ ...prev, depositType: next }))
-                      }
-                    />
-                  </div>
-
-                  {depositFormData.depositType === 'months' && (
-                    <FormField label="Months of rent" htmlFor="depositMonths">
-                      <AffixedNumberInput
-                        id="depositMonths"
-                        name="depositMonths"
-                        min={0}
-                        step={0.5}
-                        value={depositFormData.depositMonths}
-                        onChange={handleDepositConfigChange}
-                        suffix="months"
-                        placeholder="e.g., 2"
-                      />
-                    </FormField>
-                  )}
-
-                  {depositFormData.depositType === 'fixed' && (
-                    <FormField label="Deposit amount" htmlFor="depositAmount">
-                      <AffixedNumberInput
-                        id="depositAmount"
-                        name="depositAmount"
-                        min={0}
-                        step={0.01}
-                        value={depositFormData.depositAmount}
-                        onChange={handleDepositConfigChange}
-                        prefix="₱"
-                        placeholder="e.g., 9600"
-                      />
-                    </FormField>
-                  )}
-
-                  {depositFormData.depositType === 'percentage' && (
-                    <FormField label="Deposit percentage" htmlFor="depositPercentage">
-                      <AffixedNumberInput
-                        id="depositPercentage"
-                        name="depositPercentage"
-                        min={0}
-                        max={100}
-                        step={0.01}
-                        value={depositFormData.depositPercentage}
-                        onChange={handleDepositConfigChange}
-                        suffix="%"
-                        placeholder="e.g., 50"
-                      />
-                    </FormField>
-                  )}
-
-                  <FormField
-                    label="Minimum deposit floor"
-                    htmlFor="minimumDepositAmount"
-                    hint="Applied if computed deposit is lower than this."
-                  >
-                    <AffixedNumberInput
-                      id="minimumDepositAmount"
-                      name="minimumDepositAmount"
-                      min={0}
-                      step={0.01}
-                      value={depositFormData.minimumDepositAmount}
-                      onChange={handleDepositConfigChange}
-                      prefix="₱"
-                      placeholder="3000"
-                    />
-                  </FormField>
-                </div>
-              </SectionCard>
-
-              <SectionCard title="Advance payment">
-                <div className="space-y-4">
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-gray-700">Advance type</p>
-                    <SegmentedControl
-                      name="advanceType"
-                      value={depositFormData.advanceType}
-                      options={TYPE_OPTIONS}
-                      onChange={(next) =>
-                        setDepositFormData((prev) => ({ ...prev, advanceType: next }))
-                      }
-                    />
-                  </div>
-
-                  {depositFormData.advanceType === 'months' && (
-                    <FormField label="Months of rent" htmlFor="advanceMonths">
-                      <AffixedNumberInput
-                        id="advanceMonths"
-                        name="advanceMonths"
-                        min={0}
-                        step={0.5}
-                        value={depositFormData.advanceMonths}
-                        onChange={handleDepositConfigChange}
-                        suffix="months"
-                        placeholder="e.g., 1"
-                      />
-                    </FormField>
-                  )}
-
-                  {depositFormData.advanceType === 'fixed' && (
-                    <FormField label="Advance amount" htmlFor="advanceAmount">
-                      <AffixedNumberInput
-                        id="advanceAmount"
-                        name="advanceAmount"
-                        min={0}
-                        step={0.01}
-                        value={depositFormData.advanceAmount}
-                        onChange={handleDepositConfigChange}
-                        prefix="₱"
-                        placeholder="e.g., 4800"
-                      />
-                    </FormField>
-                  )}
-
-                  {depositFormData.advanceType === 'percentage' && (
-                    <FormField label="Advance percentage" htmlFor="advancePercentage">
-                      <AffixedNumberInput
-                        id="advancePercentage"
-                        name="advancePercentage"
-                        min={0}
-                        max={100}
-                        step={0.01}
-                        value={depositFormData.advancePercentage}
-                        onChange={handleDepositConfigChange}
-                        suffix="%"
-                        placeholder="e.g., 50"
-                      />
-                    </FormField>
-                  )}
-                </div>
-              </SectionCard>
-
-              <SectionCard title="Utility deposit & validity">
-                <div className="space-y-5">
-                  <FormField label="Utility deposit amount" htmlFor="utilityDepositAmount">
-                    <AffixedNumberInput
-                      id="utilityDepositAmount"
-                      name="utilityDepositAmount"
-                      min={0}
-                      step={0.01}
-                      value={depositFormData.utilityDepositAmount}
-                      onChange={handleDepositConfigChange}
-                      prefix="₱"
-                      placeholder="0"
-                    />
-                  </FormField>
-
-                  <div className="rounded-lg bg-gray-50 px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium">
-                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                        <Check className="h-3.5 w-3.5" />
-                        Lease starts
-                      </span>
-                      <span className="hidden h-px w-8 bg-emerald-300 sm:block" />
-                      <span className="inline-flex items-center gap-1.5 text-amber-700">
-                        <Clock className="h-3.5 w-3.5" />
-                        Refundable window ends
-                      </span>
-                      <span className="hidden h-px w-8 bg-amber-300 sm:block" />
-                      <span className="inline-flex items-center gap-1.5 text-red-600">
-                        <Lock className="h-3.5 w-3.5" />
-                        Non-refundable
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <FormField label="Deposit validity" htmlFor="depositValidityDays">
-                      <AffixedNumberInput
-                        id="depositValidityDays"
-                        name="depositValidityDays"
-                        min={1}
-                        step={1}
-                        value={depositFormData.depositValidityDays}
-                        onChange={handleDepositConfigChange}
-                        suffix="days"
-                        placeholder="5"
-                      />
-                    </FormField>
-                    <FormField
-                      label="Non-refundable after"
-                      htmlFor="depositRefundableAfterDays"
-                    >
-                      <AffixedNumberInput
-                        id="depositRefundableAfterDays"
-                        name="depositRefundableAfterDays"
-                        min={1}
-                        step={1}
-                        value={depositFormData.depositRefundableAfterDays}
-                        onChange={handleDepositConfigChange}
-                        suffix="days"
-                        placeholder="5"
-                      />
-                    </FormField>
-                  </div>
-                </div>
-              </SectionCard>
-            </div>
+            <BuildingDepositFields
+              value={depositFormData}
+              onChange={setDepositFormData}
+            />
           )}
         </form>
+
+        {section === 'nearby' && (
+          <BuildingNearbyPlacesPanel buildingId={building.id} />
+        )}
         
         {section === 'photos' && (
           <div className="space-y-6">

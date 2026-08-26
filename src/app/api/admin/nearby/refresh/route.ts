@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { ensureBuildingCoordinates } from '@/lib/maps/geocode';
 import { AMENITY_CATEGORIES } from '@/lib/maps/nearby-amenities';
 import {
-  clearNearbySnapshot,
   getNearbyAmenitiesForBuilding,
+  previewNearbyFromOverpass,
 } from '@/lib/maps/nearby-snapshot';
 import { invalidatePublicPortfolioCache } from '@/lib/cache/memory-cache';
 import pool from '@/lib/db';
@@ -14,8 +14,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/admin/nearby/refresh
- * Body: { buildingId?: string } — omit to refresh all active buildings with addresses.
- * Forces a live Overpass fetch and replaces the DB snapshot.
+ * Body: { buildingId, preview?: true } — preview loads OSM into the editor without
+ * publishing. Omit preview (or omit buildingId) to replace stored catalogs.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -24,9 +24,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = (await request.json().catch(() => ({}))) as { buildingId?: string };
-    let buildingIds: string[] = [];
+    const body = (await request.json().catch(() => ({}))) as {
+      buildingId?: string;
+      preview?: boolean;
+    };
+    const preview = Boolean(body.preview) && Boolean(body.buildingId?.trim());
 
+    if (preview) {
+      const buildingId = body.buildingId!.trim();
+      const location = await ensureBuildingCoordinates(buildingId);
+      if (!location) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Add a Google Maps pin on the property before fetching nearby places.',
+          },
+          { status: 400 }
+        );
+      }
+      if (location.newlyGeocoded) invalidatePublicPortfolioCache();
+      const places = await previewNearbyFromOverpass(location);
+      if (places.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'OpenStreetMap returned no places near this pin. Try again or add places by hand.',
+          },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        data: {
+          preview: true,
+          places,
+          results: [{ buildingId, ok: true, places: places.length }],
+        },
+      });
+    }
+
+    let buildingIds: string[] = [];
     if (body.buildingId?.trim()) {
       buildingIds = [body.buildingId.trim()];
     } else {
@@ -41,7 +78,6 @@ export async function POST(request: NextRequest) {
 
     for (const buildingId of buildingIds) {
       try {
-        await clearNearbySnapshot(buildingId);
         const location = await ensureBuildingCoordinates(buildingId);
         if (!location) {
           results.push({

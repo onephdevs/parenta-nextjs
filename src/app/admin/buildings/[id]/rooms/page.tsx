@@ -108,7 +108,7 @@ export default async function BuildingRoomsPage({ params }: BuildingRoomsPagePro
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Rooms in {building.name}</h1>
                 <p className="text-sm text-gray-900 mt-1">
-                  {building.addressLine1}, {building.city}, {building.state} {building.zipCode}
+                  {building.addressLine1}, {building.city}, {building.state}
                 </p>
               </div>
             </div>
