@@ -4,12 +4,10 @@ import Link from 'next/link';
 import {
   Bath,
   BedDouble,
-  Download,
-  FileText,
   Maximize2,
   UserRoundSearch,
 } from 'lucide-react';
-import type { PropertyRoomDetail, PropertyRoomDocument } from '@/lib/api/properties';
+import type { PropertyRoomDetail } from '@/lib/api/properties';
 import { formatAmenityLabel } from '@/lib/format/amenities';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { getImageUrl } from '@/lib/format/image-url';
@@ -36,77 +34,6 @@ interface PropertyRoomCardProps {
   onViewDetails?: (roomId: string) => void;
 }
 
-function formatFileSize(bytes?: number): string {
-  if (bytes == null || !Number.isFinite(bytes) || bytes < 0) return '';
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  const value = bytes / Math.pow(k, i);
-  return `${value < 10 && i > 0 ? value.toFixed(1) : Math.round(value)}${sizes[i]}`;
-}
-
-function fileTypeBadge(doc: PropertyRoomDocument): string {
-  const fromName = doc.fileName?.split('.').pop()?.toUpperCase();
-  if (fromName && fromName.length <= 5) return fromName;
-  if (doc.mimeType?.includes('pdf')) return 'PDF';
-  if (doc.mimeType?.includes('sheet') || doc.mimeType?.includes('excel')) return 'XLS';
-  if (doc.mimeType?.includes('word')) return 'DOC';
-  if (doc.mimeType?.includes('image')) return 'IMG';
-  return 'FILE';
-}
-
-function RoomDocumentsList({ documents }: { documents: PropertyRoomDocument[] }) {
-  if (documents.length === 0) {
-    return (
-      <div className="border-t border-gray-100 px-3 py-3">
-        <p className="text-[11px] font-normal leading-none text-gray-400">No documents yet</p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className="border-t border-gray-100">
-      {documents.map((doc) => {
-        const sizeLabel = formatFileSize(doc.fileSize);
-        const typeLabel = fileTypeBadge(doc);
-        return (
-          <li
-            key={doc.id}
-            className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5 last:border-b-0"
-          >
-            <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" strokeWidth={1.75} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-bold leading-none text-gray-900">
-                {doc.documentName || doc.fileName}
-              </p>
-              <div className="mt-1.5 flex items-center gap-1.5">
-                {sizeLabel && (
-                  <span className="text-[10px] font-normal leading-none text-gray-500">
-                    {sizeLabel}
-                  </span>
-                )}
-                <span className="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-gray-600">
-                  {typeLabel}
-                </span>
-              </div>
-            </div>
-            <a
-              href={`/api/documents/${doc.id}/download`}
-              download
-              onClick={(e) => e.stopPropagation()}
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-              title={`Download ${doc.documentName || doc.fileName}`}
-            >
-              <Download className="h-3.5 w-3.5" />
-            </a>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 export default function PropertyRoomCard({
   room,
   isActive = false,
@@ -119,8 +46,6 @@ export default function PropertyRoomCard({
   const areaLabel = formatArea(room.squareFootage);
   const amenityChips = room.amenities.slice(0, 8);
   const gallery = room.images.slice(0, 6);
-  const documents = room.documents || [];
-  const showDocuments = isOccupied || documents.length > 0;
 
   const amountDue = isOccupied && room.tenant
     ? (room.tenant.overdueAmount || 0) + (room.tenant.pendingAmount || 0)
@@ -327,7 +252,7 @@ export default function PropertyRoomCard({
           )}
         </div>
 
-        {/* Status / occupancy + documents column */}
+        {/* Occupancy column */}
         <div className="flex w-full flex-col lg:w-[220px] lg:flex-shrink-0">
           <div
             className="flex flex-col text-white"
@@ -476,8 +401,6 @@ export default function PropertyRoomCard({
               </div>
             )}
           </div>
-
-          {showDocuments && <RoomDocumentsList documents={documents} />}
         </div>
       </div>
     </div>
