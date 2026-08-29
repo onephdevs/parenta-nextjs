@@ -119,12 +119,6 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
-      children: [
-        {
-          name: 'All Rooms',
-          href: '/admin/rooms',
-        },
-      ],
     },
     {
       name: 'Tenants',
@@ -387,8 +381,7 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
   const renderMenuItem = (item: MenuItem) => {
     const hasChildren = Boolean(item.children && item.children.length > 0);
     const isExpanded = !collapsed && expandedSections.includes(item.name);
-    // A child that duplicates the parent href should not steal the parent highlight
-    // (same pattern as Properties → /admin/properties vs All Rooms).
+    // A child that duplicates the parent href should not steal the parent highlight.
     const childIsActive = Boolean(
       item.children?.some((child) => {
         if (!child.href || !isActive(child.href)) return false;

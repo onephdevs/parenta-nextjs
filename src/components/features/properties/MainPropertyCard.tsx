@@ -15,7 +15,6 @@ import { getImageUrl } from '@/lib/format/image-url';
 import { useNotifications } from '@/hooks/useNotifications';
 import EditBuildingModal from '@/components/features/EditBuildingModal';
 import DeleteBuildingModal from '@/components/features/DeleteBuildingModal';
-import { EntityNotesPanel } from '@/components/features/notes/EntityNotesModal';
 import {
   formatBuildingAddress,
   googleMapsUrlForBuilding,
@@ -30,15 +29,12 @@ interface MainPropertyCardProps {
   detail: PropertyBuildingDetail;
   onBuildingUpdated: () => void;
   onBuildingDeleted: () => void;
-  /** Bump after adding a note from the action row so the list reloads. */
-  notesRefreshKey?: number;
 }
 
 export default function MainPropertyCard({
   detail,
   onBuildingUpdated,
   onBuildingDeleted,
-  notesRefreshKey = 0,
 }: MainPropertyCardProps) {
   const { building, buildingImages } = detail;
   const { showNotification } = useNotifications();
@@ -188,59 +184,138 @@ export default function MainPropertyCard({
           </div>
 
           {/* Property info */}
-          <div className="relative flex min-w-0 flex-1 flex-col gap-3 p-5 lg:max-w-[340px] xl:max-w-[380px]">
-            {editingName ? (
-              <div>
-                <input
-                  ref={nameInputRef}
-                  value={nameDraft}
-                  disabled={savingName}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  onBlur={() => {
-                    void saveName();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      void saveName();
-                    }
-                    if (e.key === 'Escape') {
-                      setNameDraft(building.name);
-                      setEditingName(false);
-                    }
-                  }}
-                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-[24px] font-bold leading-none text-gray-900 focus:border-gray-500 focus:outline-none"
-                  aria-label="Property name"
-                />
-              </div>
-            ) : (
-              <div className="flex items-start gap-2">
-                <h3 className="text-[24px] font-bold leading-tight text-gray-900">
-                  {building.name}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setEditingName(true)}
-                  className="mt-1 rounded-md p-1 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-                  aria-label="Edit property name"
-                  title="Edit property name"
+          <div className="relative flex min-w-0 flex-1 flex-col gap-3 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {editingName ? (
+                  <div>
+                    <input
+                      ref={nameInputRef}
+                      value={nameDraft}
+                      disabled={savingName}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      onBlur={() => {
+                        void saveName();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void saveName();
+                        }
+                        if (e.key === 'Escape') {
+                          setNameDraft(building.name);
+                          setEditingName(false);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-[24px] font-bold leading-none text-gray-900 focus:border-gray-500 focus:outline-none"
+                      aria-label="Property name"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    <h3 className="text-[24px] font-bold leading-tight text-gray-900">
+                      {building.name}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setEditingName(true)}
+                      className="mt-1 rounded-md p-1 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+                      aria-label="Edit property name"
+                      title="Edit property name"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                <p className="mt-3 text-[13px] leading-snug text-gray-600">{address}</p>
+
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-normal leading-none text-blue-600 hover:text-blue-700"
                 >
-                  <Pencil className="h-4 w-4" />
-                </button>
+                  <MapPin className="h-4 w-4" style={{ color: TEAL }} />
+                  Open on Google Maps
+                </a>
               </div>
-            )}
 
-            <p className="text-[13px] leading-snug text-gray-600">{address}</p>
-
-            <a
-              href={mapsHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[12px] font-normal leading-none text-blue-600 hover:text-blue-700"
-            >
-              <MapPin className="h-4 w-4" style={{ color: TEAL }} />
-              Open on Google Maps
-            </a>
+              <div className="flex shrink-0 items-start gap-1">
+                <div className="w-[260px] rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5">
+                  <Switch
+                    checked={onLanding}
+                    aria-label={`Show on landing page ${landingUsed} of ${landingMax}`}
+                    onCheckedChange={(checked) => {
+                      void toggleShowOnLandingNearby(checked);
+                    }}
+                    isDisabled={savingNearbyToggle || (landingFull && !onLanding)}
+                    label={
+                      <span className="inline-flex items-center gap-2">
+                        Show on landing page
+                        <span className="rounded-md bg-white px-1.5 py-0.5 text-xs font-semibold tabular-nums text-gray-700 ring-1 ring-gray-200">
+                          {landingUsed}/{landingMax}
+                        </span>
+                      </span>
+                    }
+                    description={
+                      landingFull && !onLanding
+                        ? `All ${landingMax} landing slots are used. Turn off another property to feature this one.`
+                        : 'Featured properties and What’s nearby'
+                    }
+                  />
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((v) => !v)}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Property options"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                  {menuOpen && (
+                    <>
+                      <button
+                        type="button"
+                        className="fixed inset-0 z-10 cursor-default"
+                        aria-label="Close menu"
+                        onClick={() => setMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            openEdit('basic');
+                          }}
+                        >
+                          Edit property
+                        </button>
+                        <Link
+                          href={`/admin/buildings/${building.id}/rooms`}
+                          className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          Manage rooms
+                        </Link>
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          Delete property
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="mt-auto flex flex-wrap items-center gap-3 pt-1 text-[12px] font-normal leading-none text-gray-600">
               <span className="inline-flex items-center gap-1.5">
@@ -252,95 +327,6 @@ export default function MainPropertyCard({
                 {detail.tenantCount || 0} Tenants
               </span>
             </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5">
-              <Switch
-                checked={onLanding}
-                aria-label={`Show on landing page ${landingUsed} of ${landingMax}`}
-                onCheckedChange={(checked) => {
-                  void toggleShowOnLandingNearby(checked);
-                }}
-                isDisabled={savingNearbyToggle || (landingFull && !onLanding)}
-                label={
-                  <span className="inline-flex items-center gap-2">
-                    Show on landing page
-                    <span className="rounded-md bg-white px-1.5 py-0.5 text-xs font-semibold tabular-nums text-gray-700 ring-1 ring-gray-200">
-                      {landingUsed}/{landingMax}
-                    </span>
-                  </span>
-                }
-                description={
-                  landingFull && !onLanding
-                    ? `All ${landingMax} landing slots are used. Turn off another property to feature this one.`
-                    : 'Featured properties and What’s nearby'
-                }
-              />
-            </div>
-          </div>
-
-          {/* Notes (right side) */}
-          <div className="relative flex min-h-[160px] min-w-0 flex-1 flex-col border-t border-gray-100 bg-gray-50/70 p-4 lg:border-l lg:border-t-0">
-            <div className="absolute right-2 top-2 z-10">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((v) => !v)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-white hover:text-gray-700"
-                aria-label="Property options"
-              >
-                <MoreVertical className="h-5 w-5" />
-              </button>
-              {menuOpen && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-10 cursor-default"
-                    aria-label="Close menu"
-                    onClick={() => setMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        openEdit('basic');
-                      }}
-                    >
-                      Edit property
-                    </button>
-                    <Link
-                      href={`/admin/buildings/${building.id}/rooms`}
-                      className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Manage rooms
-                    </Link>
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      Delete property
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <EntityNotesPanel
-              entityType="building"
-              entityId={building.id}
-              entityLabel={building.name}
-              title="Notes"
-              compact
-              dense
-              showAddButton={false}
-              refreshKey={notesRefreshKey}
-              className="min-h-0 flex-1 pr-7"
-            />
           </div>
         </div>
       </div>

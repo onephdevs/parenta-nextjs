@@ -88,9 +88,11 @@ export {
 } from './Table';
 export { TableCard, type TableCardProps } from './TableCard';
 export {
+  WorkItemHeader,
   WorkItemList,
   WorkItemRow,
   type WorkItemBadge,
+  type WorkItemHeaderProps,
   type WorkItemRowProps,
   type WorkItemTone,
 } from './WorkItemRow';

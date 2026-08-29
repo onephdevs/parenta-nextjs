@@ -3,32 +3,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bar,
-  BarChart,
   Cell,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from 'recharts';
 import {
-  AlertTriangle,
   FileSignature,
   Home,
   Info,
   Plus,
-  StickyNote,
-  UserPlus,
-  Wallet,
-  Wrench,
 } from 'lucide-react';
 import type { PropertyBuildingReport } from '@/lib/api/properties';
 import { getImageUrl } from '@/lib/format/image-url';
-import { Button } from '@/components/ui/Button';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
-import { AddNotesButton } from '@/components/features/notes/EntityNotesModal';
 import { LightboxImage } from '@/components/ui/ImageLightbox';
 import AppLoader from '@/components/ui/AppLoader';
 
@@ -36,15 +25,8 @@ const LATO = 'var(--font-lato), Lato, sans-serif';
 
 interface PropertyReportPanelProps {
   buildingId: string;
-  buildingName?: string;
-  onAddTenant?: () => void;
-  onAddRoom?: () => void;
-  onRecordPayment?: () => void;
-  onMaintenance?: () => void;
   /** Refresh parent after creating a tenant from a unit card / fallback button. */
   onTenantCreated?: () => void;
-  /** Refresh property notes list after saving a note. */
-  onNoteSaved?: () => void;
 }
 
 function formatCurrency(amount: number) {
@@ -69,53 +51,9 @@ function monthOptions(count = 12): Array<{ value: string; label: string }> {
   return options;
 }
 
-function UnitThumbs({
-  thumbs,
-  moreCount,
-}: {
-  thumbs: PropertyBuildingReport['rent']['dueUnitThumbs'];
-  moreCount?: number;
-}) {
-  if (!thumbs.length && !moreCount) return null;
-  return (
-    <div className="mt-2 flex items-center gap-1.5">
-      {thumbs.slice(0, 4).map((t) => (
-        <div
-          key={t.roomId}
-          className="h-8 w-8 overflow-hidden rounded-md border border-white bg-gray-200 shadow-sm"
-          title={t.roomNumber}
-        >
-          {t.imagePath ? (
-            <LightboxImage
-              src={getImageUrl(t.imagePath)}
-              alt={t.roomNumber}
-              title={t.roomNumber}
-              wrapperClassName="h-full w-full focus:outline-none"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[9px] font-semibold text-gray-600">
-              {t.roomNumber.replace(/[^0-9]/g, '').slice(0, 2) || 'U'}
-            </div>
-          )}
-        </div>
-      ))}
-      {(moreCount || 0) > 0 && (
-        <span className="text-xs font-medium text-indigo-600">+ View {moreCount} more</span>
-      )}
-    </div>
-  );
-}
-
 export default function PropertyReportPanel({
   buildingId,
-  buildingName,
-  onAddTenant,
-  onAddRoom,
-  onRecordPayment,
-  onMaintenance,
   onTenantCreated,
-  onNoteSaved,
 }: PropertyReportPanelProps) {
   const months = useMemo(() => monthOptions(12), []);
   const [month, setMonth] = useState(months[0]?.value || '');
@@ -175,102 +113,8 @@ export default function PropertyReportPanel({
     ];
   }, [report]);
 
-  const categoryData = useMemo(() => {
-    if (!report) return [];
-    return report.maintenance.byCategory.map((c) => ({
-      name: c.category.replace(/_/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase()),
-      count: c.count,
-    }));
-  }, [report]);
-
-  const vacantCount = report?.availability.vacant ?? 0;
-
   return (
     <div className="space-y-5" style={{ fontFamily: LATO }}>
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-2">
-        {onRecordPayment ? (
-          <Button
-            type="button"
-            leftIcon={<Wallet className="h-4 w-4" />}
-            onClick={onRecordPayment}
-          >
-            Record Payment
-          </Button>
-        ) : (
-          <Link href="/admin/financial/payments/new">
-            <Button leftIcon={<Wallet className="h-4 w-4" />}>Record Payment</Button>
-          </Link>
-        )}
-        <AddNotesButton
-          entityType="building"
-          entityId={buildingId}
-          entityLabel={buildingName}
-          label="Add note"
-          variant="outline"
-          size="md"
-          leftIcon={<StickyNote className="h-4 w-4" />}
-          onSaved={() => onNoteSaved?.()}
-        />
-        {onAddTenant ? (
-          <Button
-            type="button"
-            variant="outline"
-            leftIcon={<UserPlus className="h-4 w-4" />}
-            onClick={onAddTenant}
-            className="relative"
-          >
-            Add Tenant
-            {vacantCount > 0 && (
-              <span className="absolute -right-2 -top-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                {vacantCount} vacant
-              </span>
-            )}
-          </Button>
-        ) : (
-          <AddTenantButton
-            buildingId={buildingId}
-            variant="outline"
-            leftIcon={<UserPlus className="h-4 w-4" />}
-            className="relative"
-            lockHousing={false}
-            redirectAfterCreate={false}
-            onCreated={() => onTenantCreated?.()}
-          >
-            {vacantCount > 0 ? (
-              <span className="absolute -right-2 -top-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                {vacantCount} vacant
-              </span>
-            ) : null}
-          </AddTenantButton>
-        )}
-        {onAddRoom ? (
-          <Button
-            type="button"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={onAddRoom}
-          >
-            Add Room
-          </Button>
-        ) : null}
-        {onMaintenance ? (
-          <Button
-            type="button"
-            variant="outline"
-            leftIcon={<Wrench className="h-4 w-4" />}
-            onClick={onMaintenance}
-          >
-            Maintenance
-          </Button>
-        ) : (
-          <Link href={`/admin/maintenance?buildingId=${encodeURIComponent(buildingId)}`}>
-            <Button variant="outline" leftIcon={<Wrench className="h-4 w-4" />}>
-              Maintenance
-            </Button>
-          </Link>
-        )}
-      </div>
-
       {/* Collection of Rent */}
       <section className="rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.06)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -331,15 +175,6 @@ export default function PropertyReportPanel({
                         {noInvoicesYet ? '—' : `${report.rent.unpaidPercent}%`}
                       </p>
                     </div>
-                    {!noInvoicesYet && (
-                      <UnitThumbs
-                        thumbs={report.rent.dueUnitThumbs}
-                        moreCount={Math.max(
-                          0,
-                          report.rent.unitsWithInvoiceDue - report.rent.dueUnitThumbs.length
-                        )}
-                      />
-                    )}
                   </div>
                 </div>
 
@@ -364,15 +199,6 @@ export default function PropertyReportPanel({
                         {noInvoicesYet ? '—' : `${report.rent.collectedPercent}%`}
                       </p>
                     </div>
-                    {!noInvoicesYet && (
-                      <UnitThumbs
-                        thumbs={report.rent.paidUnitThumbs}
-                        moreCount={Math.max(
-                          0,
-                          report.rent.unitsWithInvoicePaid - report.rent.paidUnitThumbs.length
-                        )}
-                      />
-                    )}
                   </div>
                 </div>
 
@@ -627,55 +453,6 @@ export default function PropertyReportPanel({
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Maintenance */}
-      {report && (
-        <section className="rounded-2xl bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.06)]">
-          <div className="mb-4 flex items-center gap-2">
-            <Wrench className="h-4 w-4 text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900">Open Maintenance Requests</h3>
-          </div>
-          <div className="mb-5 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-5 text-center">
-              <p className="text-3xl font-bold text-emerald-700">
-                {report.maintenance.newRequests}
-              </p>
-              <p className="mt-1 text-sm font-medium text-emerald-800">New Requests</p>
-            </div>
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-5 text-center">
-              <p className="text-3xl font-bold text-red-600">
-                {report.maintenance.urgentRequests}
-              </p>
-              <p className="mt-1 flex items-center justify-center gap-1 text-sm font-medium text-red-700">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Urgent Requests
-              </p>
-            </div>
-          </div>
-          <p className="mb-2 text-sm font-semibold text-indigo-900">By Category</p>
-          {categoryData.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">No open maintenance requests</p>
-          ) : (
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: '#6B7280' }}
-                    interval={0}
-                    angle={-20}
-                    textAnchor="end"
-                    height={48}
-                  />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#93C5FD" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 11 }} />
-                </BarChart>
-              </ResponsiveContainer>
             </div>
           )}
         </section>

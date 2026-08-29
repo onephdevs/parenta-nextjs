@@ -145,6 +145,7 @@ export default function RoomDetailPane({
               mode="modal"
               isOpen={recordPaymentOpen}
               buildingId={detail.building.id}
+              roomId={detail.room.id}
               initialData={
                 detail.room.tenant ? { tenantId: detail.room.tenant.tenantId } : undefined
               }

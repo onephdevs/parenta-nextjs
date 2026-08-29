@@ -164,6 +164,66 @@ function RowBody({
 const rowClassName =
   'group flex items-center gap-3 border-b border-gray-100 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-slate-50/80';
 
+export interface WorkItemHeaderProps {
+  title?: string;
+  status?: string;
+  date?: string;
+  meta?: string;
+  showStatus?: boolean;
+  showDate?: boolean;
+  showMeta?: boolean;
+  /** Reserve space for a single trailing action icon so columns line up. */
+  showActions?: boolean;
+  className?: string;
+}
+
+export function WorkItemHeader({
+  title = 'Item',
+  status = 'Status',
+  date = 'Date',
+  meta = 'Amount',
+  showStatus = true,
+  showDate = true,
+  showMeta = true,
+  showActions = false,
+  className,
+}: WorkItemHeaderProps) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 border-b border-gray-200 bg-slate-50/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500',
+        className
+      )}
+      role="row"
+    >
+      <span className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1" role="columnheader">
+        {title}
+      </div>
+      {showStatus ? (
+        <div
+          className="hidden min-w-0 flex-[1.4] items-center justify-end md:flex"
+          role="columnheader"
+        >
+          {status}
+        </div>
+      ) : null}
+      {showDate ? (
+        <div className="hidden w-24 shrink-0 items-center justify-end lg:flex" role="columnheader">
+          {date}
+        </div>
+      ) : null}
+      {showMeta ? (
+        <div className="hidden w-40 shrink-0 items-center justify-end sm:flex" role="columnheader">
+          {meta}
+        </div>
+      ) : null}
+      {showActions ? <div className="w-5 shrink-0" aria-hidden /> : null}
+      <div className="w-6 shrink-0" aria-hidden />
+    </div>
+  );
+}
+
 export function WorkItemRow({
   href,
   onClick,
@@ -182,9 +242,21 @@ export function WorkItemRow({
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cn(classes, 'w-full text-left')}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (event.currentTarget !== event.target) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick();
+          }
+        }}
+        className={cn(classes, 'w-full cursor-pointer text-left')}
+      >
         <RowBody {...body} />
-      </button>
+      </div>
     );
   }
 
