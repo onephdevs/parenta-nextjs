@@ -280,11 +280,7 @@ export default function PortfolioLedger() {
       </div>
 
       {data.properties.length > 0 && (
-        <PropertyComparison
-          properties={data.properties}
-          selectedId={scope}
-          onSelect={setScope}
-        />
+        <PropertyComparison properties={data.properties} selectedId={scope} />
       )}
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -388,11 +384,9 @@ function occupancyPct(property: PropertyCardData) {
 function PropertyComparison({
   properties,
   selectedId,
-  onSelect,
 }: {
   properties: PropertyCardData[];
   selectedId: string;
-  onSelect: (id: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<PropertySortKey>('occupancy');
@@ -428,18 +422,13 @@ function PropertyComparison({
     setSortDir(key === 'name' ? 'asc' : 'desc');
   };
 
-  const selectProperty = (id: string) => {
-    onSelect(id === selectedId ? 'ALL' : id);
-  };
-
   return (
     <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
       <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-3 pt-4">
         <div>
           <div className="text-lg font-semibold text-slate-900">By property</div>
           <p className="text-xs text-slate-500">
-            This billing period · click a row to filter the overview
-            {selectedId !== 'ALL' ? ' · click again to show all' : ''}
+            This billing period · filter with the Property dropdown above
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -474,47 +463,43 @@ function PropertyComparison({
               const selected = selectedId === property.buildingId;
               const empty = property.totalUnits === 0;
               return (
-                <li key={property.buildingId}>
-                  <button
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => selectProperty(property.buildingId)}
-                    className={`flex w-full flex-col gap-1.5 px-5 py-3 text-left ${
-                      selected ? 'bg-slate-50' : ''
-                    } ${empty ? 'opacity-60' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <span>
-                        <span className="block text-sm font-medium text-slate-800">{property.name}</span>
-                        <span className="block text-[11px] text-slate-400">
-                          {property.totalUnits} {property.totalUnits === 1 ? 'unit' : 'units'}
-                          {selected ? ' · filtering' : ''}
-                        </span>
+                <li
+                  key={property.buildingId}
+                  className={`flex flex-col gap-1.5 px-5 py-3 ${
+                    selected ? 'bg-slate-50' : ''
+                  } ${empty ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span>
+                      <span className="block text-sm font-medium text-slate-800">{property.name}</span>
+                      <span className="block text-[11px] text-slate-400">
+                        {property.totalUnits} {property.totalUnits === 1 ? 'unit' : 'units'}
+                        {selected ? ' · filtered' : ''}
                       </span>
-                      <span className="shrink-0 font-mono text-xs text-slate-600">{pct}%</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background: pct >= 80 ? '#0F766E' : pct >= 50 ? NAVY : '#BE123C',
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 font-mono text-[11px] text-slate-500">
-                      <span>
-                        <span className="text-emerald-700">{property.occupied}</span> occ
-                      </span>
-                      <span>
-                        <span className="text-rose-500">{property.vacant}</span> vac
-                      </span>
-                      <span>{peso(property.collection)}</span>
-                      <span className={property.lateRate > 0 ? 'text-amber-700' : ''}>
-                        {property.avgDaysLate}d · {property.lateRate}% late
-                      </span>
-                    </div>
-                  </button>
+                    </span>
+                    <span className="shrink-0 font-mono text-xs text-slate-600">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${pct}%`,
+                        background: pct >= 80 ? '#0F766E' : pct >= 50 ? NAVY : '#BE123C',
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 font-mono text-[11px] text-slate-500">
+                    <span>
+                      <span className="text-emerald-700">{property.occupied}</span> occ
+                    </span>
+                    <span>
+                      <span className="text-rose-500">{property.vacant}</span> vac
+                    </span>
+                    <span>{peso(property.collection)}</span>
+                    <span className={property.lateRate > 0 ? 'text-amber-700' : ''}>
+                      {property.avgDaysLate}d · {property.lateRate}% late
+                    </span>
+                  </div>
                 </li>
               );
             })}
@@ -572,16 +557,7 @@ function PropertyComparison({
                 return (
                   <tr
                     key={property.buildingId}
-                    tabIndex={0}
-                    aria-pressed={selected}
-                    onClick={() => selectProperty(property.buildingId)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        selectProperty(property.buildingId);
-                      }
-                    }}
-                    className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/80 ${
+                    className={`border-b border-slate-50 last:border-0 ${
                       selected ? 'bg-slate-50' : ''
                     } ${empty ? 'opacity-60' : ''}`}
                   >
@@ -595,7 +571,7 @@ function PropertyComparison({
                           <span className="block font-medium text-slate-800">{property.name}</span>
                           <span className="block text-[11px] text-slate-400">
                             {property.totalUnits} {property.totalUnits === 1 ? 'unit' : 'units'}
-                            {selected ? ' · filtering' : ''}
+                            {selected ? ' · filtered' : ''}
                           </span>
                         </span>
                       </div>
