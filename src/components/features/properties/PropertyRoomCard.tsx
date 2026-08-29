@@ -76,9 +76,9 @@ export default function PropertyRoomCard({
       )}
       style={{ fontFamily: LATO }}
     >
-      <div className="flex min-h-[277px] flex-col lg:flex-row">
+      <div className="grid min-h-[277px] grid-cols-1 items-stretch lg:grid-cols-[minmax(0,1fr)_220px]">
         {/* Room info */}
-        <div className="flex flex-1 flex-col p-4">
+        <div className="flex min-w-0 flex-col p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -252,14 +252,13 @@ export default function PropertyRoomCard({
           )}
         </div>
 
-        {/* Occupancy column */}
-        <div className="flex w-full flex-col lg:w-[220px] lg:flex-shrink-0">
-          <div
-            className="flex flex-col text-white"
-            style={{ backgroundColor: PANEL_BG }}
-          >
+        {/* Occupancy column — background on the stretched column so vacant fills the card */}
+        <div
+          className="flex min-h-full w-full flex-col text-white"
+          style={{ backgroundColor: PANEL_BG }}
+        >
             {isOccupied && room.tenant ? (
-              <div className="flex flex-col px-2 py-3">
+              <div className="flex flex-1 flex-col px-2 py-3">
                 <div className="flex items-center gap-2.5 px-1 pb-3">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-[#39CCCC]/60 bg-white/10 text-xs font-bold">
                     {room.tenant.firstName.charAt(0)}
@@ -358,7 +357,7 @@ export default function PropertyRoomCard({
                 )}
               </div>
             ) : (
-              <div className="flex min-h-[11rem] flex-col justify-between gap-4 px-3 py-4">
+              <div className="flex min-h-[11rem] flex-1 flex-col justify-between gap-4 px-3 py-4">
                 <div className="flex flex-col items-center gap-3 text-center">
                   <UserRoundSearch className="h-12 w-12 text-white/80" strokeWidth={1.5} />
                   <p className="text-[16px] font-bold leading-none tracking-wide">
@@ -400,7 +399,6 @@ export default function PropertyRoomCard({
                 </dl>
               </div>
             )}
-          </div>
         </div>
       </div>
     </div>

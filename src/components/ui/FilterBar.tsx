@@ -19,6 +19,8 @@ export interface FilterBarProps {
   footer?: ReactNode;
   /** Always-visible search field shown beside the filter toggle. */
   search?: ReactNode;
+  /** Always-visible actions shown after the filter toggle (e.g. Add). */
+  actions?: ReactNode;
   /** Hide extra fields behind a filter control until clicked. */
   collapsible?: boolean;
   defaultOpen?: boolean;
@@ -42,6 +44,7 @@ export function FilterBar({
   gridClassName,
   footer,
   search,
+  actions,
   collapsible = false,
   defaultOpen = false,
   activeCount = 0,
@@ -110,6 +113,7 @@ export function FilterBar({
             </span>
           ) : null}
         </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
         {!search && footer ? (
           <div className="min-w-0 flex-1 text-sm text-gray-600">{footer}</div>
         ) : null}

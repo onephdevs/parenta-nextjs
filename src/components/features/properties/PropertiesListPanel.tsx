@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import AddBuildingModal from '@/components/features/AddBuildingModal';
+import { FilterBar, FormField, SearchInput, Select } from '@/components/ui';
 import type { PropertyListBuilding, PropertyRoomDetail } from '@/lib/api/properties';
 import { comparePropertyNames } from '@/lib/format/property-sort';
 import PropertyListCard from './PropertyListCard';
@@ -85,54 +86,62 @@ export default function PropertiesListPanel({
   return (
     <aside className="flex h-full w-full flex-col border-r border-gray-200 bg-white lg:w-[340px] lg:flex-shrink-0">
       <div className="px-4 pb-3 pt-4">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
+        <FilterBar
+          collapsible
+          className="mb-0 border-0 bg-transparent p-0 shadow-none"
+          gridClassName="grid-cols-1 gap-3"
+          activeCount={(filter !== 'all' ? 1 : 0) + (sort !== 'name-asc' ? 1 : 0)}
+          search={
+            <SearchInput
+              id="property-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+              aria-label="Search properties"
             />
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-[#111827] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-black"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Add
-          </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium text-gray-500">
-            {filtered.length} {filtered.length === 1 ? 'Property' : 'Properties'}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <select
+          }
+          actions={
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className="inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-lg bg-[#111827] px-3 text-sm font-semibold text-white shadow-sm hover:bg-black"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              Add
+            </button>
+          }
+          footer={
+            <span className="text-xs font-medium text-gray-500">
+              {filtered.length} {filtered.length === 1 ? 'Property' : 'Properties'}
+            </span>
+          }
+        >
+          <FormField label="Sort" htmlFor="property-sort">
+            <Select
+              id="property-sort"
               value={sort}
               onChange={(e) => setSort(e.target.value as SortValue)}
-              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-gray-900 focus:outline-none"
               aria-label="Sort properties"
             >
               <option value="name-asc">Name A–Z</option>
               <option value="name-desc">Name Z–A</option>
               <option value="city-asc">City A–Z</option>
               <option value="vacant-desc">Most vacant</option>
-            </select>
-            <select
+            </Select>
+          </FormField>
+          <FormField label="Occupancy" htmlFor="property-filter">
+            <Select
+              id="property-filter"
               value={filter}
               onChange={(e) => setFilter(e.target.value as FilterValue)}
-              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-gray-900 focus:outline-none"
+              aria-label="Filter properties"
             >
               <option value="all">All properties</option>
               <option value="has_vacant">Has vacant rooms</option>
               <option value="fully_occupied">Fully occupied</option>
-            </select>
-          </div>
-        </div>
+            </Select>
+          </FormField>
+        </FilterBar>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">

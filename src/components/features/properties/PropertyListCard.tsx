@@ -36,7 +36,7 @@ function StatusBadge({ status }: { status: DisplayRoomStatus }) {
       style={{
         fontFamily: LATO,
         backgroundColor:
-          status === 'vacant' ? '#57D163' : status === 'occupied' ? '#FF6C64' : '#B0B0B0',
+          status === 'occupied' ? '#57D163' : status === 'pending' ? '#F59E0B' : '#9CA3AF',
       }}
     >
       {displayStatusLabel(status)}
@@ -135,7 +135,7 @@ export default function PropertyListCard({
       </div>
 
       {isExpanded && (
-        <div className="border-t border-gray-100 bg-white">
+        <div className="space-y-1 border-t border-gray-200 bg-[#E2E5F7] px-2 py-2">
           {roomsLoading && (
             <div className="flex items-center justify-center py-4" role="status" aria-label="Loading">
               <HomeTraceLoader size={36} />
@@ -151,13 +151,14 @@ export default function PropertyListCard({
                 : 'No tenants';
               const area = formatArea(room.squareFootage) ?? '—';
               const isActive = activeRoomId === room.id;
+              const status = occupancyStatusFromRoom(room);
 
               return (
                 <div
                   key={room.id}
                   className={cn(
-                    'flex w-full items-center gap-2 border-b border-gray-100 px-4 py-3 last:border-b-0 transition-colors',
-                    isActive ? 'bg-gray-100' : 'hover:bg-gray-50'
+                    'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 transition-colors',
+                    isActive ? 'bg-white ring-1 ring-gray-900' : 'bg-white hover:bg-white/90'
                   )}
                   style={{ fontFamily: LATO }}
                 >
@@ -178,7 +179,7 @@ export default function PropertyListCard({
                       </p>
                     </div>
                     <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                      <StatusBadge status={occupancyStatusFromRoom(room)} />
+                      <StatusBadge status={status} />
                       <span className="text-[12px] font-normal leading-none text-gray-500">
                         {area}
                       </span>

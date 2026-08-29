@@ -34,7 +34,7 @@ function StatusBadge({ status }: { status: string }) {
       style={{
         fontFamily: LATO,
         backgroundColor:
-          display === 'vacant' ? '#57D163' : display === 'occupied' ? '#FF6C64' : '#B0B0B0',
+          display === 'occupied' ? '#57D163' : display === 'pending' ? '#F59E0B' : '#9CA3AF',
       }}
     >
       {displayStatusLabel(display)}
