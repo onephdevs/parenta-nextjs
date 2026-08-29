@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Building2,
@@ -15,8 +15,11 @@ import {
   Users,
   Receipt,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Plus,
   Minus,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import type {
@@ -277,16 +280,16 @@ export default function PortfolioLedger() {
       </div>
 
       {data.properties.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {data.properties.map((p) => (
-            <PropertyCard key={p.buildingId} property={p} />
-          ))}
-        </div>
+        <PropertyComparison
+          properties={data.properties}
+          selectedId={scope}
+          onSelect={setScope}
+        />
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
         <RentRollTable rows={data.rentRoll} />
-        <div className="flex flex-col gap-4">
+        <div className="flex h-fit flex-col gap-4">
           <ExpenseBreakdown rows={data.expenses} total={expenseTotal} />
           <UtilityRecovery rows={data.utilityRecovery} />
           {data.alerts.length > 0 && (
@@ -376,51 +379,308 @@ function Kpi({
   );
 }
 
-function PropertyCard({ property }: { property: PropertyCardData }) {
-  const occPct = property.totalUnits > 0 ? Math.round((property.occupied / property.totalUnits) * 100) : 0;
+type PropertySortKey = 'name' | 'occupancy' | 'collection' | 'late';
+
+function occupancyPct(property: PropertyCardData) {
+  return property.totalUnits > 0 ? Math.round((property.occupied / property.totalUnits) * 100) : 0;
+}
+
+function PropertyComparison({
+  properties,
+  selectedId,
+  onSelect,
+}: {
+  properties: PropertyCardData[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<PropertySortKey>('occupancy');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const showSearch = properties.length >= 5;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const rows = q
+      ? properties.filter(
+          (p) => p.name.toLowerCase().includes(q) || p.shortName.toLowerCase().includes(q)
+        )
+      : [...properties];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    rows.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortKey === 'occupancy') cmp = occupancyPct(a) - occupancyPct(b);
+      else if (sortKey === 'collection') cmp = a.collection - b.collection;
+      else cmp = a.lateRate - b.lateRate || a.avgDaysLate - b.avgDaysLate;
+      if (cmp === 0) cmp = a.name.localeCompare(b.name);
+      return cmp * dir;
+    });
+    return rows;
+  }, [properties, query, sortKey, sortDir]);
+
+  const toggleSort = (key: PropertySortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === 'name' ? 'asc' : 'desc');
+  };
+
+  const selectProperty = (id: string) => {
+    onSelect(id === selectedId ? 'ALL' : id);
+  };
+
   return (
-    <div className="rounded-xl bg-white p-5 ring-1 ring-slate-200">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-3 pt-4">
         <div>
-          <div className="text-base font-semibold text-slate-900">{property.name}</div>
-          <div className="text-xs text-slate-400">{property.totalUnits} units</div>
+          <div className="text-lg font-semibold text-slate-900">By property</div>
+          <p className="text-xs text-slate-500">
+            This billing period · click a row to filter the overview
+            {selectedId !== 'ALL' ? ' · click again to show all' : ''}
+          </p>
         </div>
-        <span className="rounded-full px-2 py-1 font-mono text-xs text-slate-500 ring-1 ring-slate-200">
-          {occPct}% occupied
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-500 ring-1 ring-slate-200">
+            {properties.length} {properties.length === 1 ? 'property' : 'properties'}
+          </span>
+          {showSearch && (
+            <label className="relative">
+              <span className="sr-only">Search properties</span>
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search"
+                className="w-40 rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-2.5 text-sm text-slate-800 placeholder:text-slate-400"
+              />
+            </label>
+          )}
+        </div>
       </div>
-      <div className="grid grid-cols-4 gap-3 text-center">
-        <div>
-          <div className="font-mono text-sm text-emerald-700">{property.occupied}</div>
-          <div className="text-[10px] text-slate-400">Occupied</div>
-        </div>
-        <div>
-          <div className="font-mono text-sm text-rose-500">{property.vacant}</div>
-          <div className="text-[10px] text-slate-400">Vacant</div>
-        </div>
-        <div>
-          <div className="font-mono text-sm text-slate-700">{peso(property.collection)}</div>
-          <div className="text-[10px] text-slate-400">Collected</div>
-        </div>
-        <div>
-          <div className="font-mono text-sm text-amber-700">{property.avgDaysLate}d</div>
-          <div className="text-[10px] text-slate-400">Avg. late ({property.lateRate}%)</div>
-        </div>
+
+      <div className="max-h-[22rem] overflow-auto md:hidden">
+        {filtered.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-slate-400">
+            No properties match “{query.trim()}”
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-50">
+            {filtered.map((property) => {
+              const pct = occupancyPct(property);
+              const selected = selectedId === property.buildingId;
+              const empty = property.totalUnits === 0;
+              return (
+                <li key={property.buildingId}>
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => selectProperty(property.buildingId)}
+                    className={`flex w-full flex-col gap-1.5 px-5 py-3 text-left ${
+                      selected ? 'bg-slate-50' : ''
+                    } ${empty ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="block text-sm font-medium text-slate-800">{property.name}</span>
+                        <span className="block text-[11px] text-slate-400">
+                          {property.totalUnits} {property.totalUnits === 1 ? 'unit' : 'units'}
+                          {selected ? ' · filtering' : ''}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono text-xs text-slate-600">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background: pct >= 80 ? '#0F766E' : pct >= 50 ? NAVY : '#BE123C',
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 font-mono text-[11px] text-slate-500">
+                      <span>
+                        <span className="text-emerald-700">{property.occupied}</span> occ
+                      </span>
+                      <span>
+                        <span className="text-rose-500">{property.vacant}</span> vac
+                      </span>
+                      <span>{peso(property.collection)}</span>
+                      <span className={property.lateRate > 0 ? 'text-amber-700' : ''}>
+                        {property.avgDaysLate}d · {property.lateRate}% late
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="hidden max-h-[22rem] overflow-auto md:block">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-white">
+            <tr className="border-y border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
+              <SortHead
+                label="Property"
+                active={sortKey === 'name'}
+                dir={sortDir}
+                onClick={() => toggleSort('name')}
+                className="px-5"
+              />
+              <SortHead
+                label="Occupancy"
+                active={sortKey === 'occupancy'}
+                dir={sortDir}
+                onClick={() => toggleSort('occupancy')}
+              />
+              <th className="px-2 py-2 font-medium">Occ / Vac</th>
+              <SortHead
+                label="Collected"
+                active={sortKey === 'collection'}
+                dir={sortDir}
+                onClick={() => toggleSort('collection')}
+                align="right"
+              />
+              <SortHead
+                label="Late"
+                active={sortKey === 'late'}
+                dir={sortDir}
+                onClick={() => toggleSort('late')}
+                align="right"
+                className="px-5"
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400">
+                  No properties match “{query.trim()}”
+                </td>
+              </tr>
+            ) : (
+              filtered.map((property) => {
+                const pct = occupancyPct(property);
+                const selected = selectedId === property.buildingId;
+                const empty = property.totalUnits === 0;
+                return (
+                  <tr
+                    key={property.buildingId}
+                    tabIndex={0}
+                    aria-pressed={selected}
+                    onClick={() => selectProperty(property.buildingId)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectProperty(property.buildingId);
+                      }
+                    }}
+                    className={`cursor-pointer border-b border-slate-50 last:border-0 transition-colors hover:bg-slate-50/80 ${
+                      selected ? 'bg-slate-50' : ''
+                    } ${empty ? 'opacity-60' : ''}`}
+                  >
+                    <td className="px-5 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`h-8 w-0.5 shrink-0 rounded-full ${selected ? 'bg-[#252A45]' : 'bg-transparent'}`}
+                          aria-hidden
+                        />
+                        <span>
+                          <span className="block font-medium text-slate-800">{property.name}</span>
+                          <span className="block text-[11px] text-slate-400">
+                            {property.totalUnits} {property.totalUnits === 1 ? 'unit' : 'units'}
+                            {selected ? ' · filtering' : ''}
+                          </span>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <div className="flex min-w-[7.5rem] items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${pct}%`,
+                              background: pct >= 80 ? '#0F766E' : pct >= 50 ? NAVY : '#BE123C',
+                            }}
+                          />
+                        </div>
+                        <span className="w-8 shrink-0 font-mono text-xs text-slate-600">{pct}%</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2.5 font-mono text-xs">
+                      <span className="text-emerald-700">{property.occupied}</span>
+                      <span className="text-slate-300"> / </span>
+                      <span className="text-rose-500">{property.vacant}</span>
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono text-xs text-slate-700">
+                      {peso(property.collection)}
+                    </td>
+                    <td className="px-5 py-2.5 text-right font-mono text-xs">
+                      <span className={property.lateRate > 0 ? 'text-amber-700' : 'text-slate-400'}>
+                        {property.avgDaysLate}d · {property.lateRate}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-function RentRollTable({ rows }: { rows: RentRollRow[] }) {
+function SortHead({
+  label,
+  active,
+  dir,
+  onClick,
+  align = 'left',
+  className = 'px-2',
+}: {
+  label: string;
+  active: boolean;
+  dir: 'asc' | 'desc';
+  onClick: () => void;
+  align?: 'left' | 'right';
+  className?: string;
+}) {
+  const Icon = !active ? null : dir === 'asc' ? ChevronUp : ChevronDown;
   return (
-    <div className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+    <th className={`${className} py-2 font-medium`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-0.5 uppercase tracking-wide hover:text-slate-700 ${
+          align === 'right' ? 'w-full justify-end' : ''
+        } ${active ? 'text-slate-700' : ''}`}
+      >
+        {label}
+        {Icon ? <Icon size={12} /> : null}
+      </button>
+    </th>
+  );
+}
+
+function RentRollTable({ rows }: { rows: RentRollRow[] }) {
+  const needsScroll = rows.length > 12;
+  return (
+    <div className="h-fit w-full self-start overflow-hidden rounded-xl bg-white pb-4 ring-1 ring-slate-200">
       <div className="flex items-center justify-between px-5 pb-3 pt-4">
-        <div className="text-lg font-semibold text-slate-900">Rent Roll</div>
+        <div className="text-lg font-semibold text-slate-900">By unit</div>
         <Link href="/admin/properties" className="flex items-center gap-0.5 text-xs text-slate-400 hover:text-slate-700">
           View all units <ChevronRight size={13} />
         </Link>
       </div>
-      <div className="max-h-[32rem] overflow-auto">
+      <div className={needsScroll ? 'max-h-[32rem] overflow-auto' : undefined}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-y border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
