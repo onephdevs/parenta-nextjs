@@ -25,6 +25,7 @@ import {
 } from '@/components/ui';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
 import NewLeaseModal from '@/components/features/leasing/NewLeaseModal';
+import StartMoveOutModal from '@/components/features/leasing/StartMoveOutModal';
 import {
   type LeaseListItem,
   type LeaseStats,
@@ -53,6 +54,7 @@ function leaseStatusTone(status: string): WorkItemTone {
   const key = (status || '').toLowerCase();
   if (key === 'active') return 'success';
   if (key === 'expiring_soon') return 'warning';
+  if (key === 'notice_given') return 'warning';
   if (key === 'terminated') return 'danger';
   return 'neutral';
 }
@@ -60,6 +62,7 @@ function leaseStatusTone(status: string): WorkItemTone {
 function leaseStatusLabel(status: string): string {
   const key = (status || '').toLowerCase();
   if (key === 'expiring_soon') return 'Expiring soon';
+  if (key === 'notice_given') return 'Notice given';
   if (key === 'pending') return 'Draft';
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Lease';
 }
@@ -85,6 +88,7 @@ export default function LeaseManagement() {
   const [renewals, setRenewals] = useState<any[]>([]);
   const [moveouts, setMoveouts] = useState<any[]>([]);
   const [newLeaseOpen, setNewLeaseOpen] = useState(false);
+  const [startMoveOutOpen, setStartMoveOutOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
@@ -234,6 +238,16 @@ export default function LeaseManagement() {
                 Generate Alerts
               </Button>
             )}
+            {activeTab === 'moveouts' && (
+              <Button
+                type="button"
+                variant="outline"
+                leftIcon={<Plus className="h-4 w-4" />}
+                onClick={() => setStartMoveOutOpen(true)}
+              >
+                Start move-out
+              </Button>
+            )}
             <AddTenantButton label="New tenant" variant="outline" />
             <Button
               type="button"
@@ -247,7 +261,7 @@ export default function LeaseManagement() {
       />
 
       {stats && activeTab === 'leases' && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <ListSummaryCard
             title="Active"
             value={stats.active}
@@ -259,6 +273,12 @@ export default function LeaseManagement() {
             value={stats.expiringSoon}
             footer="leases ending soon"
             icon={<AlertCircle className="h-8 w-8 text-yellow-600" />}
+          />
+          <ListSummaryCard
+            title="Notice given"
+            value={stats.noticeGiven}
+            footer="ended on paper, still occupying"
+            icon={<AlertCircle className="h-8 w-8 text-amber-600" />}
           />
           <ListSummaryCard
             title="Draft"
@@ -330,6 +350,7 @@ export default function LeaseManagement() {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="expiring_soon">Expiring soon</option>
+                <option value="notice_given">Notice given</option>
                 <option value="draft">Draft</option>
                 <option value="terminated">Terminated</option>
               </Select>
@@ -505,7 +526,12 @@ export default function LeaseManagement() {
                 {moveouts.length === 0 ? (
                   <EmptyState
                     title="No move-outs"
-                    description="Move-out processing records will appear here."
+                    description="Start a move-out to open the inspection worksheet. The unit stays occupied until you finalize."
+                    action={
+                      <Button type="button" onClick={() => setStartMoveOutOpen(true)}>
+                        Start move-out
+                      </Button>
+                    }
                   />
                 ) : (
                   moveouts.map((moveout) => (
@@ -532,6 +558,10 @@ export default function LeaseManagement() {
           </>
         ))}
 
+      <StartMoveOutModal
+        isOpen={startMoveOutOpen}
+        onClose={() => setStartMoveOutOpen(false)}
+      />
       <NewLeaseModal
         isOpen={newLeaseOpen}
         onClose={() => setNewLeaseOpen(false)}

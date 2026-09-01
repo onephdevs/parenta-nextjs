@@ -230,6 +230,17 @@ export default function RoomUtilityBillsPage() {
   };
 
   const handleMarkPaid = async (id: string) => {
+    if (
+      !(await confirm({
+        title: 'Mark bill as paid?',
+        message: 'This marks the utility bill paid. It does not record a tenant payment.',
+        confirmText: 'Mark as Paid',
+        variant: 'warning',
+      }))
+    ) {
+      return;
+    }
+
     try {
       const response = await fetch('/api/utility-bills/room', {
         method: 'PUT',

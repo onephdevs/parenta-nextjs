@@ -26,14 +26,14 @@ export async function requireRole(allowed: AppRole[] = ['admin']) {
 }
 
 export async function requireAdmin() {
-  return requireRole(['admin']);
+  return requireRole(['admin', 'caretaker']);
 }
 
 export async function requireAdminOrStaff() {
-  return requireRole(['admin', 'staff']);
+  return requireRole(['admin', 'staff', 'caretaker']);
 }
 
-/** Owner/admin or caretaker — payments entry without full finance visibility. */
+/** Same as requireAdmin — caretaker is not a separate office role. */
 export async function requireAdminOrCaretaker() {
   return requireRole(['admin', 'caretaker']);
 }

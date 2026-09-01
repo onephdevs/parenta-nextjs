@@ -31,6 +31,7 @@ export interface TenantProfileData {
   firstName: string;
   lastName: string;
   email: string;
+  hasPortalLogin: boolean;
   phone?: string | null;
   dateOfBirth?: string | null;
   previousAddress?: string | null;

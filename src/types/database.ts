@@ -324,7 +324,7 @@ export interface Payment {
   paymentMethod: 'cash' | 'check' | 'bank_transfer' | 'credit_card' | 'online';
   paymentDate: Date;
   dueDate: Date;
-  paymentStatus: 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled';
+  paymentStatus: 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled' | 'refunded';
   referenceNumber?: string;
   notes?: string;
   createdAt: Date;
@@ -342,7 +342,7 @@ export interface DatabasePayment {
   payment_method: 'cash' | 'check' | 'bank_transfer' | 'credit_card' | 'online';
   payment_date: Date;
   due_date: Date;
-  payment_status: 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled' | 'refunded';
   reference_number?: string;
   notes?: string;
   created_at: Date;

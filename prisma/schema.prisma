@@ -573,6 +573,9 @@ model tenant_room_assignments {
   billing_cycle_start_day Int?             @db.SmallInt
   assignment_status       String?          @default("active") @db.VarChar(20)
   notes                   String?
+  planned_move_out_date   DateTime?        @db.Date
+  contract_terminated_at  DateTime?        @db.Timestamptz(6)
+  contract_terminated_reason String?
   created_at              DateTime?        @default(now()) @db.Timestamp(6)
   updated_at              DateTime?        @default(now()) @db.Timestamp(6)
   payments                payments[]

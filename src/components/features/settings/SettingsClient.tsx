@@ -523,6 +523,12 @@ export default function SettingsClient({ session: _session }: SettingsClientProp
                     Tenants see this phone number on Pay online so they can send GCash / Maya /
                     bank transfers, then upload a receipt screenshot.
                   </p>
+                  {!paymentInstructions.phone.trim() && (
+                    <Alert variant="warning" title="Tenants cannot Pay online yet" className="mb-4">
+                      Enter the GCash / bank number below and save. Until this is filled in,
+                      Pay now on the tenant portal has nowhere to send money.
+                    </Alert>
+                  )}
                   <div className="max-w-xl space-y-4">
                     <FormField
                       label="Payment phone number"

@@ -20,6 +20,9 @@ import PaymentsHub from '@/components/features/PaymentsHub';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Button } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Alert';
+import { getTenantPaymentInstructions } from '@/lib/tenant-payment-instructions';
+import { isTenantPaymentInstructionsConfigured } from '@/lib/tenant-payment-instructions-shared';
 
 interface SearchParams {
   page?: string;
@@ -168,6 +171,14 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
 
   const totalPages = Math.max(1, Math.ceil(list.total / PAGE_SIZE));
   const pendingCount = pendingClaims.payments.length;
+  let payDetailsConfigured = true;
+  try {
+    payDetailsConfigured = isTenantPaymentInstructionsConfigured(
+      await getTenantPaymentInstructions()
+    );
+  } catch (error) {
+    console.error('Error loading tenant pay details:', error);
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -180,6 +191,21 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
           </Link>
         }
       />
+
+      {!payDetailsConfigured && (
+        <Alert variant="warning" title="Tenant Pay now is blocked">
+          <p>
+            Settings → Tenant pay details has no GCash / bank number. Tenants who tap Pay now
+            will be told to contact the office.{' '}
+            <Link
+              href="/admin/settings?tab=payments"
+              className="font-semibold text-amber-900 underline"
+            >
+              Add tenant pay details
+            </Link>
+          </p>
+        </Alert>
+      )}
 
       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <ListSummaryCard

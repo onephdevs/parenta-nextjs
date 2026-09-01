@@ -54,7 +54,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             username: user.username,
-            role: user.role,
+            role: user.role === 'caretaker' ? 'admin' : user.role,
             firstName: user.firstName,
             lastName: user.lastName,
             profileCompleted: user.profileCompleted,
@@ -87,12 +87,15 @@ export const authOptions: NextAuthOptions = {
       // Store user info in JWT when user signs in
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.role = user.role === 'caretaker' ? 'admin' : user.role;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
         token.email = user.email;
         token.username = user.username;
         token.profileCompleted = user.profileCompleted;
+      }
+      if (token.role === 'caretaker') {
+        token.role = 'admin';
       }
 
       // Support session.update() after profile edits
@@ -113,7 +116,7 @@ export const authOptions: NextAuthOptions = {
       // Send properties to the client
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as UserRole;
+        session.user.role = (token.role === 'caretaker' ? 'admin' : token.role) as UserRole;
         session.user.firstName = token.firstName as string;
         session.user.lastName = token.lastName as string;
         session.user.email = (token.email as string | null | undefined) ?? null;

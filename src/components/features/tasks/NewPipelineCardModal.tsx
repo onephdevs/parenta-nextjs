@@ -583,7 +583,7 @@ export function AddOpportunityModal({
   const isExpenses = board.slug === 'expenses';
   const isMaintenance = board.slug === 'maintenance';
   const baseSections = sectionsForBoard(board, isEditing);
-  const { showSuccess } = useNotifications();
+  const { showSuccess, showNotification } = useNotifications();
 
   const [activeSection, setActiveSection] = useState<FormSection>(
     board.slug === 'expenses' ||
@@ -1680,7 +1680,40 @@ export function AddOpportunityModal({
         throw new Error(json.error || json.details || 'Failed to generate lease');
       }
       setLeaseStatus('generated');
-      showSuccess('Lease generated');
+      const portal = json.data?.portalLogin as
+        | {
+            createdNewLogin?: boolean;
+            portalLoginSkipped?: boolean;
+            emailSent?: boolean;
+            email?: string;
+            temporaryPassword?: string;
+          }
+        | undefined;
+      if (portal?.createdNewLogin && portal.emailSent) {
+        showNotification({
+          type: 'success',
+          title: 'Lease generated',
+          message: `Portal login emailed to ${portal.email}. They must change the password on first sign-in.`,
+          duration: 12000,
+        });
+      } else if (portal?.createdNewLogin && portal.temporaryPassword) {
+        showNotification({
+          type: 'warning',
+          title: 'Lease generated — email failed',
+          message: `Send this temporary password to the tenant: ${portal.temporaryPassword}`,
+          duration: 20000,
+        });
+      } else if (portal?.portalLoginSkipped) {
+        showNotification({
+          type: 'success',
+          title: 'Lease generated',
+          message:
+            'That email is already an office account, so no tenant portal login was created.',
+          duration: 12000,
+        });
+      } else {
+        showSuccess('Lease generated');
+      }
       onSaved?.(json.data?.card as PipelineCard | undefined);
       onClose();
     } catch (err) {
@@ -3171,11 +3204,9 @@ export function AddOpportunityModal({
                       <>
                         <p className="text-sm text-gray-600">
                           Generate lease creates the tenant, assigns the room, posts the paid
-                          deposit/advance to the portal, and schedules rent invoices. Login for new
-                          contacts: their email / temporary password{' '}
-                          <span className="font-mono text-gray-800">tenant123</span>. On first
-                          portal login they must change the password and confirm name, email, and
-                          phone.
+                          deposit/advance to the portal, and schedules rent invoices. A unique
+                          temporary password is emailed to the contact. On first portal login they
+                          must change the password and confirm name, email, and phone.
                         </p>
                         <Button
                           type="button"

@@ -27,7 +27,7 @@ export default function BulkOperations() {
   const [csvPreview, setCsvPreview] = useState<any[]>([]);
 
   const [tenantIds, setTenantIds] = useState('');
-  const [newStatus, setNewStatus] = useState<'active' | 'inactive' | 'terminated'>('active');
+  const [newStatus, setNewStatus] = useState<'active' | 'inactive'>('active');
 
   const handleGenerateInvoices = async () => {
     if (
@@ -389,11 +389,10 @@ export default function BulkOperations() {
             <Select
               id="newStatus"
               value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value as 'active' | 'inactive' | 'terminated')}
+              onChange={(e) => setNewStatus(e.target.value as 'active' | 'inactive')}
             >
               <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="terminated">Terminated</option>
+              <option value="inactive">Former / inactive</option>
             </Select>
           </FormField>
 

@@ -35,6 +35,8 @@ import {
   formatTermLabel,
   type LeasePackagePenaltyType,
 } from '@/lib/lease-package-templates-shared';
+import StartMoveOutModal from '@/components/features/leasing/StartMoveOutModal';
+import TerminateLeaseDialog from '@/components/features/leasing/TerminateLeaseDialog';
 import { withReturnTo } from '@/lib/navigation';
 import { getImageUrl } from '@/lib/format/image-url';
 import { cn, formatDateTime } from '@/lib/utils';
@@ -209,6 +211,9 @@ export default function LeaseDetailClient({ leaseId }: LeaseDetailClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [showEmptyTenant, setShowEmptyTenant] = useState(false);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [startMoveOutOpen, setStartMoveOutOpen] = useState(false);
+  const [terminateOpen, setTerminateOpen] = useState(false);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,7 +251,15 @@ export default function LeaseDetailClient({ leaseId }: LeaseDetailClientProps) {
     return () => {
       cancelled = true;
     };
-  }, [leaseId]);
+  }, [leaseId, refreshNonce]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const action = new URLSearchParams(window.location.search).get('action');
+    if (action === 'terminate') {
+      setTerminateOpen(true);
+    }
+  }, []);
 
   const lease = data?.lease;
   const rent = Number(lease?.monthlyRate || 0);
@@ -387,6 +400,16 @@ export default function LeaseDetailClient({ leaseId }: LeaseDetailClientProps) {
               Download
             </Button>
           )}
+          {lease.assignmentStatus === 'active' ? (
+            <Button type="button" variant="outline" onClick={() => setStartMoveOutOpen(true)}>
+              Start move-out
+            </Button>
+          ) : null}
+          {lease.assignmentStatus === 'active' ? (
+            <Button type="button" variant="danger" onClick={() => setTerminateOpen(true)}>
+              Terminate
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -418,6 +441,12 @@ export default function LeaseDetailClient({ leaseId }: LeaseDetailClientProps) {
             <Field label="Term" value={formatTermLabel(termMonths)} />
             <Field label="Start" value={formatLeaseFormDate(lease.startDate)} />
             <Field label="End" value={formatLeaseFormDate(lease.endDate)} />
+            {lease.plannedMoveOutDate ? (
+              <Field
+                label="Planned move-out"
+                value={formatLeaseFormDate(lease.plannedMoveOutDate)}
+              />
+            ) : null}
           </dl>
           <dl className="mt-3 border-t border-gray-100 pt-2">
             <PairRow label="Deposit period" value={formatDepositLabel(depositMonths)} />
@@ -650,6 +679,24 @@ export default function LeaseDetailClient({ leaseId }: LeaseDetailClientProps) {
           </ul>
         )}
       </Panel>
+
+      <StartMoveOutModal
+        isOpen={startMoveOutOpen}
+        onClose={() => setStartMoveOutOpen(false)}
+        initialAssignmentId={lease.id}
+        initialTenantId={lease.tenantId}
+      />
+      <TerminateLeaseDialog
+        isOpen={terminateOpen}
+        onClose={() => setTerminateOpen(false)}
+        leaseId={lease.id}
+        tenantName={tenantName}
+        initialDate={lease.plannedMoveOutDate || lease.endDate}
+        onTerminated={() => {
+          window.history.replaceState({}, '', `/admin/leasing/${lease.id}`);
+          setRefreshNonce((n) => n + 1);
+        }}
+      />
     </div>
   );
 }

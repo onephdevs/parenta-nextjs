@@ -102,6 +102,7 @@ const ACTION_TITLES: Record<string, string> = {
   'tenant.preview_started': 'Tenant portal preview started',
   'tenant.preview_ended': 'Tenant portal preview ended',
   'tenant.updated': 'Tenant updated',
+  'tenant.password_reset': 'Tenant portal password updated',
   'tenant.deleted': 'Tenant deleted',
   'tenant.status_changed': 'Tenant status changed',
   'tenant.assigned': 'Tenant assigned to room',
@@ -114,6 +115,7 @@ const ACTION_TITLES: Record<string, string> = {
   'room.deleted': 'Room deleted',
   'payment.recorded': 'Payment recorded',
   'payment.updated': 'Payment updated',
+  'payment.refunded': 'Payment refunded',
   'payment.deleted': 'Payment deleted',
   'payment.allocated': 'Payment allocated',
   'payment.claim_submitted': 'Payment claim submitted',
@@ -139,6 +141,7 @@ const ACTION_TITLES: Record<string, string> = {
   'reservation.updated': 'Reservation updated',
   'reservation.cancelled': 'Reservation cancelled',
   'reservation.converted': 'Reservation converted',
+  'lease.terminated': 'Lease terminated (notice given)',
   'document.uploaded': 'Document uploaded',
   'document.updated': 'Document updated',
   'document.deleted': 'Document deleted',
@@ -336,6 +339,8 @@ export function formatActivityDescription(params: {
       return `${actor} created tenant${quoted ? ` ${quoted}` : ''}`;
     case 'tenant.updated':
       return `${actor} updated tenant${quoted ? ` ${quoted}` : ''}`;
+    case 'tenant.password_reset':
+      return `${actor} updated the portal password for tenant${quoted ? ` ${quoted}` : ''}`;
     default:
       break;
   }

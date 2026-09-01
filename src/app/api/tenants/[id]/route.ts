@@ -165,7 +165,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         entityId: id,
         entityLabel: label,
         beforeData: before as unknown as Record<string, unknown>,
-        afterData: { isTenant: false, tenantStatus: 'terminated' },
+        afterData: { isTenant: false, tenantStatus: 'inactive' },
         link: `/admin/tenants/${id}`,
         metadata: { link: `/admin/tenants/${id}` },
       });

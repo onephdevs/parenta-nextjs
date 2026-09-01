@@ -48,10 +48,12 @@ function toDateOnlyString(value: unknown): string | null {
 function computeUiStatus(row: {
   assignment_status: string;
   end_date: string | Date | null;
+  contract_terminated_at?: string | Date | null;
 }): LeaseUiStatus {
   const status = row.assignment_status;
   if (status === 'terminated') return 'terminated';
   if (status === 'pending') return 'draft';
+  if (status === 'active' && row.contract_terminated_at) return 'notice_given';
   if (status === 'active' && row.end_date) {
     const endOnly = toDateOnlyString(row.end_date);
     const end = endOnly ? new Date(`${endOnly}T12:00:00`) : new Date(row.end_date);
@@ -93,9 +95,17 @@ function mapListRow(row: Record<string, unknown>): LeaseListItem {
     uiStatus: computeUiStatus({
       assignment_status: assignmentStatus,
       end_date: endDate,
+      contract_terminated_at: row.contract_terminated_at as string | Date | null,
     }),
     occupantCount: Number(row.occupant_count || 0),
     createdAt: String(row.created_at || ''),
+    plannedMoveOutDate: toDateOnlyString(row.planned_move_out_date),
+    contractTerminatedAt: row.contract_terminated_at
+      ? String(row.contract_terminated_at)
+      : null,
+    contractTerminatedReason: row.contract_terminated_reason
+      ? String(row.contract_terminated_reason)
+      : null,
   };
 }
 
@@ -104,14 +114,20 @@ export async function getLeaseStats(): Promise<LeaseStats> {
     SELECT
       COUNT(*) FILTER (
         WHERE assignment_status = 'active'
+          AND contract_terminated_at IS NULL
           AND (end_date IS NULL OR end_date > CURRENT_DATE + INTERVAL '30 days')
       )::int AS active,
       COUNT(*) FILTER (
         WHERE assignment_status = 'active'
+          AND contract_terminated_at IS NULL
           AND end_date IS NOT NULL
           AND end_date >= CURRENT_DATE
           AND end_date <= CURRENT_DATE + INTERVAL '30 days'
       )::int AS expiring_soon,
+      COUNT(*) FILTER (
+        WHERE assignment_status = 'active'
+          AND contract_terminated_at IS NOT NULL
+      )::int AS notice_given,
       COUNT(*) FILTER (WHERE assignment_status = 'pending')::int AS draft,
       COUNT(*) FILTER (WHERE assignment_status = 'terminated')::int AS terminated
     FROM tenant_room_assignments
@@ -121,6 +137,7 @@ export async function getLeaseStats(): Promise<LeaseStats> {
   return {
     active: Number(row.active || 0),
     expiringSoon: Number(row.expiring_soon || 0),
+    noticeGiven: Number(row.notice_given || 0),
     draft: Number(row.draft || 0),
     terminated: Number(row.terminated || 0),
   };
@@ -163,11 +180,16 @@ export async function getLeases(filters: LeaseListFilters = {}): Promise<{
   if (filters.status && filters.status !== 'all') {
     if (filters.status === 'expiring_soon') {
       where.push(`tra.assignment_status = 'active'
+        AND tra.contract_terminated_at IS NULL
         AND tra.end_date IS NOT NULL
         AND tra.end_date >= CURRENT_DATE
         AND tra.end_date <= CURRENT_DATE + INTERVAL '30 days'`);
+    } else if (filters.status === 'notice_given') {
+      where.push(`tra.assignment_status = 'active'
+        AND tra.contract_terminated_at IS NOT NULL`);
     } else if (filters.status === 'active') {
       where.push(`tra.assignment_status = 'active'
+        AND tra.contract_terminated_at IS NULL
         AND (tra.end_date IS NULL OR tra.end_date > CURRENT_DATE + INTERVAL '30 days')`);
     } else if (filters.status === 'draft') {
       where.push(`tra.assignment_status = 'pending'`);
@@ -206,6 +228,9 @@ export async function getLeases(filters: LeaseListFilters = {}): Promise<{
       tra.tenant_name_snapshot,
       tra.tenant_email_snapshot,
       tra.created_at,
+      tra.planned_move_out_date,
+      tra.contract_terminated_at,
+      tra.contract_terminated_reason,
       r.room_number,
       b.id AS building_id,
       b.name AS building_name,
@@ -264,6 +289,9 @@ export async function getLeaseById(id: string): Promise<LeaseDetail | null> {
       tra.billing_cycle_start_day,
       tra.assignment_status,
       tra.notes,
+      tra.planned_move_out_date,
+      tra.contract_terminated_at,
+      tra.contract_terminated_reason,
       tra.tenant_name_snapshot,
       tra.tenant_email_snapshot,
       tra.created_at,
@@ -583,6 +611,53 @@ export async function updateLease(
     throw new Error('Lease updated but could not be reloaded');
   }
 
+  return { before: existing, after };
+}
+
+/**
+ * End the lease on paper without vacating the room.
+ * Occupancy stays until End Assignment or Finalize move-out.
+ */
+export async function terminateLeaseContract(
+  id: string,
+  input: {
+    plannedMoveOutDate: string;
+    reason?: string | null;
+  }
+): Promise<{ before: LeaseDetail; after: LeaseDetail }> {
+  const existing = await getLeaseById(id);
+  if (!existing) {
+    throw new Error('Lease not found');
+  }
+  if (existing.assignmentStatus !== 'active') {
+    throw new Error('Only an occupied lease can be terminated on paper. Use End Assignment if they already left.');
+  }
+
+  const planned = String(input.plannedMoveOutDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(planned)) {
+    throw new Error('Planned move-out date is required');
+  }
+
+  const reason = String(input.reason || '').trim() || null;
+
+  await pool.query(
+    `
+    UPDATE tenant_room_assignments
+    SET
+      planned_move_out_date = $2::date,
+      contract_terminated_at = COALESCE(contract_terminated_at, NOW()),
+      contract_terminated_reason = COALESCE($3, contract_terminated_reason),
+      updated_at = NOW()
+    WHERE id = $1
+      AND assignment_status = 'active'
+    `,
+    [id, planned, reason]
+  );
+
+  const after = await getLeaseById(id);
+  if (!after) {
+    throw new Error('Lease updated but could not be reloaded');
+  }
   return { before: existing, after };
 }
 

@@ -341,6 +341,7 @@ export default function TenantForm({
     tenantId: string;
     email: string;
     temporaryPassword: string;
+    emailSent?: boolean;
   } | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
 
@@ -779,6 +780,7 @@ export default function TenantForm({
 
       const tenantId = result.data.id;
       const temporaryPassword = result.data.temporaryPassword as string | undefined;
+      const emailSent = Boolean(result.data.emailSent);
 
       if (formData.roomId) {
         updateNotification(loadingNotificationId, {
@@ -874,6 +876,7 @@ export default function TenantForm({
           tenantId,
           email: formData.email,
           temporaryPassword,
+          emailSent,
         });
         // Close the form and refresh the parent now so the new tenant appears
         // behind the password dialog. TenantForm stays mounted until Continue.
@@ -1615,7 +1618,11 @@ export default function TenantForm({
         isOpen={Boolean(credentialsModal)}
         onClose={handleCredentialsModalContinue}
         title="Tenant account created"
-        description="Save these login details before continuing."
+        description={
+          credentialsModal?.emailSent
+            ? 'We emailed these login details to the tenant. Copy them if you also need to send them by chat.'
+            : 'The login email could not be sent. Copy these details and give them to the tenant.'
+        }
         size="sm"
         footer={
           <Button type="button" onClick={handleCredentialsModalContinue}>

@@ -84,6 +84,7 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
       firstName: tenant.firstName,
       lastName: tenant.lastName,
       email: tenant.email,
+      hasPortalLogin: Boolean(tenant.userId),
       phone: tenant.phone ?? null,
       dateOfBirth: toIso(tenant.dateOfBirth),
       previousAddress: tenant.previousAddress ?? null,

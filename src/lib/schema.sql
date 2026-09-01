@@ -107,6 +107,9 @@ CREATE TABLE IF NOT EXISTS tenant_room_assignments (
   deposit_paid DECIMAL(10,2),
   assignment_status VARCHAR(20) DEFAULT 'active' CHECK (assignment_status IN ('active', 'terminated', 'pending')),
   notes TEXT,
+  planned_move_out_date DATE,
+  contract_terminated_at TIMESTAMPTZ,
+  contract_terminated_reason TEXT,
   tenant_name_snapshot VARCHAR(255),
   tenant_email_snapshot VARCHAR(255),
   tenant_phone_snapshot VARCHAR(50),
@@ -132,7 +135,7 @@ CREATE TABLE IF NOT EXISTS payments (
   payment_method VARCHAR(50) DEFAULT 'cash' CHECK (payment_method IN ('cash', 'check', 'bank_transfer', 'credit_card', 'online')),
   payment_date DATE NOT NULL,
   due_date DATE NOT NULL,
-  payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'partial', 'overdue', 'cancelled')),
+  payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'partial', 'overdue', 'cancelled', 'refunded')),
   reference_number VARCHAR(100),
   notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -491,6 +494,12 @@ CREATE INDEX IF NOT EXISTS idx_assignments_tenant ON tenant_room_assignments(ten
 CREATE INDEX IF NOT EXISTS idx_assignments_room ON tenant_room_assignments(room_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_status ON tenant_room_assignments(assignment_status);
 CREATE INDEX IF NOT EXISTS idx_assignments_dates ON tenant_room_assignments(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_assignments_planned_move_out
+  ON tenant_room_assignments (planned_move_out_date)
+  WHERE planned_move_out_date IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_assignments_contract_terminated
+  ON tenant_room_assignments (contract_terminated_at)
+  WHERE contract_terminated_at IS NOT NULL;
 
 -- Payments indexes
 CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);

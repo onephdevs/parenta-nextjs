@@ -25,7 +25,7 @@ function mapAdminUser(row: AdminUserRow) {
     id: row.id,
     email: row.email,
     username: row.username,
-    role: row.role,
+    role: row.role === 'caretaker' ? 'admin' : row.role,
     firstName: row.first_name,
     lastName: row.last_name,
     isActive: row.is_active,
@@ -119,11 +119,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
 
       // Keep at least one active admin
-      if (!isActive && existing.rows[0].role === 'admin') {
+      if (!isActive && (existing.rows[0].role === 'admin' || existing.rows[0].role === 'caretaker')) {
         const activeCount = await pool.query<{ count: string }>(
           `SELECT COUNT(*)::text AS count
            FROM users
-           WHERE role = 'admin' AND is_active = true AND id <> $1`,
+           WHERE role IN ('admin', 'caretaker') AND is_active = true AND id <> $1`,
           [id]
         );
         if (Number(activeCount.rows[0]?.count || 0) < 1) {

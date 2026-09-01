@@ -217,8 +217,7 @@ function formatAuthorName(name: string | null): string {
 function formatAuthorRole(role: string | null | undefined): string | null {
   const r = String(role || '').trim().toLowerCase();
   if (!r) return null;
-  if (r === 'admin') return 'Admin';
-  if (r === 'caretaker') return 'Caretaker';
+  if (r === 'admin' || r === 'caretaker') return 'Admin';
   if (r === 'staff') return 'Staff';
   return r.charAt(0).toUpperCase() + r.slice(1);
 }

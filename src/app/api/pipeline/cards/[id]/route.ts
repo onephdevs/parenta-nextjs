@@ -143,7 +143,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
       }
 
-      const { card, changeNotes } = await updatePipelineCard(
+      const { card, changeNotes, portalLogin } = await updatePipelineCard(
         id,
         {
           title: typeof body.title === 'string' ? body.title : undefined,
@@ -241,7 +241,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
       }
 
-      return NextResponse.json({ success: true, data: { card } });
+      return NextResponse.json({ success: true, data: { card, portalLogin } });
     }
 
     return NextResponse.json(

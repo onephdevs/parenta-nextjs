@@ -136,10 +136,7 @@ export async function endTenancyAndVacate(
     await client.query(
       `UPDATE tenants
        SET is_tenant = false,
-           tenant_status = CASE
-             WHEN $3::boolean THEN 'terminated'
-             ELSE 'inactive'
-           END,
+           tenant_status = 'inactive',
            is_active = CASE WHEN $3::boolean THEN false ELSE is_active END,
            move_out_date = $2,
            updated_at = CURRENT_TIMESTAMP

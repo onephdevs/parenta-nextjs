@@ -34,6 +34,7 @@ import {
 import { AddOpportunityModal } from './NewPipelineCardModal';
 import { ManageStagesModal } from './ManageStagesModal';
 import { ManageCardFieldsMenu } from './ManageCardFieldsMenu';
+import PipelineCsvImportModal from './PipelineCsvImportModal';
 import {
   PipelineCardFace,
   type PipelineAssigneeOption,
@@ -42,6 +43,32 @@ import {
 type PageTab = 'board' | 'stages' | 'bulk';
 type ViewMode = 'kanban' | 'list';
 type SortKey = 'title' | 'amount' | 'dueAt' | 'updatedAt';
+
+interface AdvancedFilters {
+  stageId: string;
+  assignedTo: string;
+  amountMin: string;
+  amountMax: string;
+  dueFrom: string;
+  dueTo: string;
+  buildingId: string;
+  tag: string;
+}
+
+const EMPTY_ADVANCED: AdvancedFilters = {
+  stageId: '',
+  assignedTo: '',
+  amountMin: '',
+  amountMax: '',
+  dueFrom: '',
+  dueTo: '',
+  buildingId: '',
+  tag: '',
+};
+
+function countAdvancedFilters(filters: AdvancedFilters): number {
+  return Object.values(filters).filter((value) => String(value).trim() !== '').length;
+}
 
 const BUILT_IN_BOARD_SLUGS = new Set([
   'onboarding',
@@ -100,6 +127,9 @@ export function TasksBoard({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [confirmDeleteBoard, setConfirmDeleteBoard] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<AdvancedFilters>(EMPTY_ADVANCED);
   const [deletingBoard, setDeletingBoard] = useState(false);
   const [archivedBoards, setArchivedBoards] = useState<PipelineBoard[]>([]);
   const [restoringBoardId, setRestoringBoardId] = useState<string | null>(null);
@@ -134,6 +164,8 @@ export function TasksBoard({
       setActiveSlug(slug);
       setSearchQuery('');
       setTagFilter(null);
+      setAdvFilters(EMPTY_ADVANCED);
+      setAdvancedOpen(false);
       setSelectedIds(new Set());
       setFieldPair(loadCardFields(slug));
       setCreatingBoard(false);
@@ -443,6 +475,36 @@ export function TasksBoard({
       ) {
         return false;
       }
+      if (advFilters.stageId && card.stageId !== advFilters.stageId) return false;
+      if (advFilters.assignedTo === '__unassigned__' && card.assignedTo) return false;
+      if (
+        advFilters.assignedTo &&
+        advFilters.assignedTo !== '__unassigned__' &&
+        card.assignedTo !== advFilters.assignedTo
+      ) {
+        return false;
+      }
+      if (advFilters.buildingId && card.buildingId !== advFilters.buildingId) return false;
+      if (
+        advFilters.tag &&
+        !card.tags?.some((t) => t.toLowerCase() === advFilters.tag.toLowerCase())
+      ) {
+        return false;
+      }
+      const amount = getCardBoardValue(card, activeSlug);
+      const min = advFilters.amountMin ? Number(advFilters.amountMin) : null;
+      const max = advFilters.amountMax ? Number(advFilters.amountMax) : null;
+      if (min != null && Number.isFinite(min) && amount < min) return false;
+      if (max != null && Number.isFinite(max) && amount > max) return false;
+      const due = card.dueAt ? new Date(card.dueAt).getTime() : null;
+      if (advFilters.dueFrom) {
+        const from = new Date(`${advFilters.dueFrom}T00:00:00`).getTime();
+        if (due == null || due < from) return false;
+      }
+      if (advFilters.dueTo) {
+        const to = new Date(`${advFilters.dueTo}T23:59:59`).getTime();
+        if (due == null || due > to) return false;
+      }
       if (!q) return true;
       const hay = [
         card.title,
@@ -480,7 +542,7 @@ export function TasksBoard({
     });
 
     return list;
-  }, [cards, tagFilter, searchQuery, sortKey, sortDesc, activeSlug]);
+  }, [cards, tagFilter, searchQuery, sortKey, sortDesc, activeSlug, advFilters]);
 
   const cardsByStage = useMemo(() => {
     const map = new Map<string, PipelineCard[]>();
@@ -491,6 +553,26 @@ export function TasksBoard({
     }
     return map;
   }, [filteredCards]);
+
+  const advFilterCount = countAdvancedFilters(advFilters);
+  const filterBuildings = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const card of cards) {
+      if (card.buildingId && card.buildingName) {
+        map.set(card.buildingId, card.buildingName);
+      }
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [cards]);
+  const filterTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const card of cards) {
+      for (const tag of card.tags || []) {
+        if (tag.trim()) set.add(tag);
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [cards]);
 
   async function handleMove(cardId: string, stageId: string) {
     const card = cards.find((c) => c.id === cardId);
@@ -1045,9 +1127,7 @@ export function TasksBoard({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() =>
-                setSyncMessage('CSV import is coming soon — use Add opportunity for now.')
-              }
+              onClick={() => setImportOpen(true)}
             >
               <Upload className="mr-1.5 h-4 w-4" />
               Import
@@ -1094,14 +1174,16 @@ export function TasksBoard({
         <button
           type="button"
           className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          onClick={() =>
-            setSyncMessage(
-              'Advanced filters coming soon — use search for now.'
-            )
-          }
+          onClick={() => setAdvancedOpen((open) => !open)}
+          aria-expanded={advancedOpen}
         >
           <Filter className="h-4 w-4" />
           Advanced Filters
+          {advFilterCount > 0 && (
+            <span className="ml-0.5 rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
+              {advFilterCount}
+            </span>
+          )}
         </button>
 
         <div className="relative">
@@ -1143,6 +1225,119 @@ export function TasksBoard({
           onChange={setFieldPair}
         />
       </div>
+
+      {advancedOpen && (
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Stage</span>
+            <select
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
+              value={advFilters.stageId}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, stageId: e.target.value }))}
+            >
+              <option value="">All stages</option>
+              {(activeBoard?.stages || []).map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Assignee</span>
+            <select
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
+              value={advFilters.assignedTo}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, assignedTo: e.target.value }))}
+            >
+              <option value="">Anyone</option>
+              <option value="__unassigned__">Unassigned</option>
+              {assignees.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {`${person.firstName} ${person.lastName}`.trim() || 'User'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Building</span>
+            <select
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
+              value={advFilters.buildingId}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, buildingId: e.target.value }))}
+            >
+              <option value="">All buildings</option>
+              {filterBuildings.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Tag</span>
+            <select
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
+              value={advFilters.tag}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, tag: e.target.value }))}
+            >
+              <option value="">All tags</option>
+              {filterTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Amount min</span>
+            <input
+              type="number"
+              className="h-9 w-full rounded-md border border-gray-300 px-2 text-sm"
+              value={advFilters.amountMin}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, amountMin: e.target.value }))}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Amount max</span>
+            <input
+              type="number"
+              className="h-9 w-full rounded-md border border-gray-300 px-2 text-sm"
+              value={advFilters.amountMax}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, amountMax: e.target.value }))}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Due from</span>
+            <input
+              type="date"
+              className="h-9 w-full rounded-md border border-gray-300 px-2 text-sm"
+              value={advFilters.dueFrom}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, dueFrom: e.target.value }))}
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Due to</span>
+            <input
+              type="date"
+              className="h-9 w-full rounded-md border border-gray-300 px-2 text-sm"
+              value={advFilters.dueTo}
+              onChange={(e) => setAdvFilters((f) => ({ ...f, dueTo: e.target.value }))}
+            />
+          </label>
+          <div className="flex items-end sm:col-span-2 lg:col-span-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAdvFilters(EMPTY_ADVANCED)}
+              isDisabled={advFilterCount === 0}
+            >
+              Clear filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {syncMessage && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -1344,6 +1539,16 @@ export function TasksBoard({
             ))}
           </div>
         ))}
+
+      {activeBoard && (
+        <PipelineCsvImportModal
+          isOpen={importOpen}
+          onClose={() => setImportOpen(false)}
+          boardSlug={activeSlug}
+          boardName={activeBoard.name}
+          onImported={() => void loadBoard(activeSlug)}
+        />
+      )}
 
       {activeBoard && (
         <AddOpportunityModal

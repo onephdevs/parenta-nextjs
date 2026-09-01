@@ -6,6 +6,7 @@ import { getPaymentById } from '@/lib/api/payments';
 import pool from '@/lib/db';
 import DownloadReceiptButton from '@/components/features/DownloadReceiptButton';
 import ConfirmPaymentActions from '@/components/features/ConfirmPaymentActions';
+import PaymentRefundVoidActions from '@/components/features/payments/PaymentRefundVoidActions';
 import {
   extractInvoiceIdFromNotes,
   formatPaymentNotesDisplay,
@@ -198,6 +199,14 @@ export default async function PaymentDetailPage({ params }: PaymentDetailPagePro
               invoiceNumber={invoiceNumber}
               parentaTxnId={payment.parentaTxnId}
               amountLabel={formatCurrency(payment.amount)}
+            />
+          )}
+          {session.user.role === 'admin' && (
+            <PaymentRefundVoidActions
+              paymentId={payment.id}
+              amountLabel={formatCurrency(payment.amount)}
+              invoiceNumber={invoiceNumber}
+              status={payment.paymentStatus}
             />
           )}
           <DownloadReceiptButton

@@ -11,7 +11,10 @@ import { FormField } from '@/components/forms/FormField';
 import { useTenantTheme } from '@/hooks/useTenantTheme';
 import { cn } from '@/lib/utils';
 import type { TenantPaymentInstructions } from '@/lib/tenant-payment-instructions-shared';
-import { DEFAULT_TENANT_PAYMENT_INSTRUCTIONS } from '@/lib/tenant-payment-instructions-shared';
+import {
+  DEFAULT_TENANT_PAYMENT_INSTRUCTIONS,
+  isTenantPaymentInstructionsConfigured,
+} from '@/lib/tenant-payment-instructions-shared';
 import { ReceiptImageField } from '@/components/features/tenant/ReceiptImageField';
 
 interface Invoice {
@@ -131,6 +134,7 @@ export default function PaymentForm({
 
   const selectedInvoice = invoices.find((inv) => inv.id === selectedInvoiceId);
   const maxAmount = selectedInvoice ? selectedInvoice.balanceDue : 0;
+  const payConfigured = isTenantPaymentInstructionsConfigured(instructions);
   const acceptedMethods = (instructions?.acceptedMethods?.length
     ? instructions.acceptedMethods
     : DEFAULT_TENANT_PAYMENT_INSTRUCTIONS.acceptedMethods) as PayMethod[];
@@ -154,6 +158,15 @@ export default function PaymentForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!payConfigured) {
+      showNotification({
+        type: 'error',
+        title: 'Pay online not set up',
+        message: 'The office has not published a GCash / bank number yet. Please contact them.',
+      });
+      return;
+    }
 
     if (!selectedInvoiceId || paymentAmount <= 0) {
       showNotification({
@@ -296,13 +309,28 @@ export default function PaymentForm({
             </p>
           </div>
         ) : (
-          <p className={theme.muted}>
-            Payment number is not configured yet. Please contact the office, or use Upload
-            receipt after you transfer.
+          <p className={theme.body}>
+            The office has not published a GCash or bank number yet. Pay now is unavailable
+            until they add it in Settings. Contact the office for where to send payment.
           </p>
         )}
       </div>
 
+      {!loadingInstructions && !payConfigured ? (
+        onCancel ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className={theme.outlineButton}
+            >
+              Back
+            </Button>
+          </div>
+        ) : null
+      ) : (
+      <>
       <FormField
         label="Select invoice to pay"
         htmlFor="invoiceId"
@@ -453,6 +481,8 @@ export default function PaymentForm({
           {isProcessing ? 'Submitting…' : 'Submit payment + receipt'}
         </Button>
       </div>
+      </>
+      )}
     </form>
   );
 }

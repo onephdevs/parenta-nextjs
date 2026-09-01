@@ -37,8 +37,9 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
-    
-    const result = await bulkUpdateTenantStatus(tenant_ids, status);
+
+    const personStatus = status === 'terminated' ? 'inactive' : status;
+    const result = await bulkUpdateTenantStatus(tenant_ids, personStatus);
     
     return NextResponse.json({
       success: true,

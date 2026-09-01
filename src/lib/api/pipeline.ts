@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { ensureTenantForLease, DEFAULT_TENANT_PASSWORD } from '@/lib/api/tenant-user-link';
+import { ensureTenantForLease } from '@/lib/api/tenant-user-link';
 import { buildMaintenancePipelineTags, formatMaintenanceCategory } from '@/lib/constants/maintenance';
 import { extractInvoiceIdFromNotes } from '@/lib/format-payment-notes';
 import type {
@@ -510,11 +510,12 @@ export async function movePipelineCard(
 
   // Onboarding → Lease signed: create tenant + lease assignment first
   if (stage.is_won && card.board_slug === 'onboarding' && !card.tenant_id) {
-    return convertOnboardingCardToLeaseSigned(cardId, {
+    const converted = await convertOnboardingCardToLeaseSigned(cardId, {
       userId: options?.userId,
       note: options?.note,
       targetStageId: stageId,
     });
+    return converted.card;
   }
 
   let cardStatus: PipelineCardStatus = 'open';
@@ -592,6 +593,14 @@ export async function movePipelineCard(
  * Won / Lease signed: create tenant (+ optional login) and room assignment,
  * then mark the card won and link tenant_id / assignment_id.
  */
+export interface OnboardingPortalLogin {
+  createdNewLogin: boolean;
+  portalLoginSkipped: boolean;
+  emailSent?: boolean;
+  email?: string;
+  temporaryPassword?: string;
+}
+
 export async function convertOnboardingCardToLeaseSigned(
   cardId: string,
   options?: {
@@ -604,7 +613,7 @@ export async function convertOnboardingCardToLeaseSigned(
     /** Pipeline lease status after conversion — generate → prepared (`generated`) */
     leaseStatus?: PipelineLeaseStatus;
   }
-): Promise<PipelineCard> {
+): Promise<{ card: PipelineCard; portalLogin?: OnboardingPortalLogin }> {
   const nextLeaseStatus: PipelineLeaseStatus =
     options?.leaseStatus || 'generated';
   const card = await getPipelineCardById(cardId);
@@ -642,7 +651,7 @@ export async function convertOnboardingCardToLeaseSigned(
         [nextLeaseStatus, cardId]
       );
     }
-    return (await getPipelineCardById(cardId))!;
+    return { card: (await getPipelineCardById(cardId))! };
   }
 
   const firstName = card.contactFirstName?.trim();
@@ -751,12 +760,12 @@ export async function convertOnboardingCardToLeaseSigned(
   // Deposit/advance already confirmed on the opportunity Payment section.
 
   let tenantId = card.tenantId || null;
+  let portalLogin: OnboardingPortalLogin | undefined;
 
   if (!tenantId) {
     const ensured = await ensureTenantForLease({
       email,
-      password: DEFAULT_TENANT_PASSWORD,
-      sendInvitation: false,
+      sendInvitation: true,
       profileCompleted: false,
       firstName,
       lastName,
@@ -766,6 +775,13 @@ export async function convertOnboardingCardToLeaseSigned(
       notes,
     });
     tenantId = ensured.tenantId;
+    portalLogin = {
+      createdNewLogin: ensured.createdNewLogin,
+      portalLoginSkipped: ensured.portalLoginSkipped,
+      emailSent: ensured.emailSent,
+      email,
+      temporaryPassword: ensured.temporaryPassword,
+    };
   }
 
   const client = await pool.connect();
@@ -1069,7 +1085,7 @@ export async function convertOnboardingCardToLeaseSigned(
 
   const updated = await getPipelineCardById(cardId);
   if (!updated) throw new Error('Failed to reload card after lease generation');
-  return updated;
+  return { card: updated, portalLogin };
 }
 
 export interface SyncLeasesResult {
@@ -3546,6 +3562,7 @@ export interface UpdatePipelineCardResult {
   card: PipelineCard;
   /** Human-readable field diffs written to pipeline_card_events (empty if no-op). */
   changeNotes: string[];
+  portalLogin?: OnboardingPortalLogin;
 }
 
 export async function updatePipelineCard(
@@ -4383,7 +4400,7 @@ export async function updatePipelineCard(
   }
 
   if (data.markLeaseSigned || data.generateLease) {
-    const card = await convertOnboardingCardToLeaseSigned(cardId, {
+    const converted = await convertOnboardingCardToLeaseSigned(cardId, {
       userId,
       note: data.generateLease
         ? 'Lease generated from opportunity form'
@@ -4400,11 +4417,12 @@ export async function updatePipelineCard(
         : 'signed',
     });
     return {
-      card,
+      card: converted.card,
       changeNotes: [
         ...changeNotes,
         data.generateLease ? 'Lease generated' : 'Marked lease signed',
       ],
+      portalLogin: converted.portalLogin,
     };
   }
 

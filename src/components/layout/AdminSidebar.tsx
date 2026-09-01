@@ -32,12 +32,11 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
-  const isCaretaker = session?.user?.role === 'caretaker';
 
   const displayName =
     [session?.user?.firstName, session?.user?.lastName].filter(Boolean).join(' ') ||
     session?.user?.email ||
-    (isCaretaker ? 'Caretaker' : 'Admin');
+    'Admin';
 
   const isActive = (href: string) => {
     // Exact match for dashboard root so /admin does not light up on every admin page
@@ -47,51 +46,7 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const caretakerBlockedHref = (href?: string) => {
-    if (!href || !isCaretaker) return false;
-    const blockedPrefixes = [
-      '/admin/reports',
-      '/admin/financial/reports',
-      '/admin/financial/expenses',
-      '/admin/financial/dashboard',
-      '/admin/financial/advanced-analytics',
-      '/admin/financial/late-fees',
-      '/admin/bills-expenses/reports',
-      '/admin/analytics',
-      '/admin/export',
-      '/admin/users',
-      '/admin/tools',
-    ];
-    return blockedPrefixes.some(
-      (p) => href === p || href.startsWith(`${p}/`) || href.startsWith(`${p}?`)
-    );
-  };
-
-  const filterMenuForRole = (entries: NavEntry[]): NavEntry[] => {
-    if (!isCaretaker) return entries;
-    const filtered: NavEntry[] = [];
-    for (const entry of entries) {
-      if (isDivider(entry)) {
-        filtered.push(entry);
-        continue;
-      }
-      if (entry.name === 'Reports' || entry.name === 'Bills & Expenses' || entry.name === 'Users') {
-        continue;
-      }
-      if (caretakerBlockedHref(entry.href)) continue;
-      const children = entry.children?.filter((c) => !caretakerBlockedHref(c.href));
-      filtered.push({ ...entry, ...(children ? { children } : {}) });
-    }
-    return filtered.filter((e, i, arr) => {
-      if (!isDivider(e)) return true;
-      const prev = arr[i - 1];
-      const next = arr[i + 1];
-      if (!prev || !next) return false;
-      return !isDivider(prev) && !isDivider(next);
-    });
-  };
-
-  const menuItems: NavEntry[] = filterMenuForRole([
+  const menuItems: NavEntry[] = [
     {
       name: 'Dashboard',
       href: '/admin',
@@ -128,6 +83,12 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
+      children: [
+        {
+          name: 'Reservations',
+          href: '/admin/tenants/reservations',
+        },
+      ],
     },
     { type: 'divider', id: 'after-tenants' },
     {
@@ -309,7 +270,7 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
         </svg>
       ),
     },
-  ]);
+  ];
 
   // Expand only the section that owns the current route; everything else stays collapsed
   useEffect(() => {
@@ -324,7 +285,7 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
     setExpandedSections(activeParents);
     // menuItems / isActive are driven by pathname
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isCaretaker]);
+  }, [pathname]);
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections((prev) => (prev.includes(sectionName) ? [] : [sectionName]));

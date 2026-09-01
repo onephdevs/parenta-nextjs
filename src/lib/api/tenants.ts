@@ -161,7 +161,11 @@ export async function getAllTenants(options?: {
 
     if (options?.status === 'current') {
       whereClause += ` WHERE t.is_tenant = true`;
-    } else if (options?.status === 'former') {
+    } else if (
+      options?.status === 'former' ||
+      options?.status === 'inactive' ||
+      options?.status === 'terminated'
+    ) {
       whereClause += ` WHERE t.is_tenant = false AND t.tenant_status IN ('inactive', 'terminated')`;
     } else if (options?.status) {
       paramCount++;
@@ -633,10 +637,12 @@ export async function updateTenant(id: string, updates: Partial<{
   }
 
   if (updates.tenantStatus !== undefined) {
-    push('tenant_status', updates.tenantStatus);
-    if (updates.tenantStatus === 'inactive' || updates.tenantStatus === 'terminated') {
+    const personStatus =
+      updates.tenantStatus === 'terminated' ? 'inactive' : updates.tenantStatus;
+    push('tenant_status', personStatus);
+    if (personStatus === 'inactive') {
       setClause.push(`is_tenant = false`);
-    } else if (updates.tenantStatus === 'active') {
+    } else if (personStatus === 'active') {
       setClause.push(`is_tenant = true`);
     }
   }
@@ -707,7 +713,7 @@ export async function deactivateTenant(id: string): Promise<boolean> {
     await client.query(
       `UPDATE tenants
        SET is_tenant = false,
-           tenant_status = 'terminated',
+           tenant_status = 'inactive',
            is_active = false,
            move_out_date = COALESCE(move_out_date, CURRENT_DATE),
            updated_at = CURRENT_TIMESTAMP

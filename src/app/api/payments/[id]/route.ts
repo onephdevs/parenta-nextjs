@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { getPaymentById, updatePayment, deletePayment } from '@/lib/api/payments';
+import { getPaymentById, updatePayment, deletePayment, refundPayment } from '@/lib/api/payments';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 
 interface RouteParams {
@@ -57,12 +57,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const before = await getPaymentById(id);
-    const payment = await updatePayment(id, body);
+    const status = String(body.paymentStatus || '').toLowerCase();
+    const payment =
+      status === 'refunded' || status === 'cancelled'
+        ? await refundPayment(id)
+        : await updatePayment(id, body);
 
     logActivitySafe({
       actorUserId: session.user.id || null,
       actorRole: 'admin',
-      actionType: 'payment.updated',
+      actionType: status === 'refunded' || status === 'cancelled' ? 'payment.refunded' : 'payment.updated',
       category: 'payments',
       entityType: 'payment',
       entityId: id,
@@ -78,7 +82,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       success: true,
       data: payment,
-      message: 'Payment updated successfully'
+      message:
+        status === 'refunded' || status === 'cancelled'
+          ? 'Payment refunded — invoice balances restored'
+          : 'Payment updated successfully'
     });
   } catch (error) {
     console.error('Error updating payment:', error);
@@ -89,9 +96,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         { status: 404 }
       );
     }
+
+    if (
+      error instanceof Error &&
+      (error.message.includes('already refunded') ||
+        error.message.includes('Only a completed payment'))
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     
     return NextResponse.json(
-      { error: 'Failed to update payment' },
+      { error: error instanceof Error ? error.message : 'Failed to update payment' },
       { status: 500 }
     );
   }
@@ -126,7 +141,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     
     return NextResponse.json({
       success: true,
-      message: 'Payment deleted successfully'
+      message: 'Payment voided — invoice balances restored'
     });
   } catch (error) {
     console.error('Error deleting payment:', error);
@@ -139,7 +154,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
     
     return NextResponse.json(
-      { error: 'Failed to delete payment' },
+      { error: error instanceof Error ? error.message : 'Failed to delete payment' },
       { status: 500 }
     );
   }

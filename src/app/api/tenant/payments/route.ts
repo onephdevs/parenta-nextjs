@@ -112,7 +112,7 @@ export async function GET() {
       LEFT JOIN payment_allocations pa ON pa.payment_id = p.id
       LEFT JOIN invoices i ON i.id = pa.invoice_id
       WHERE p.tenant_id = $1
-        AND p.payment_status IN ('paid', 'partial', 'completed', 'pending', 'failed')
+        AND p.payment_status IN ('paid', 'partial', 'completed', 'pending', 'failed', 'refunded', 'cancelled')
         AND p.payment_type IS NOT NULL
         AND p.payment_status IS NOT NULL
       GROUP BY p.id, p.amount, p.payment_type, p.payment_method, p.payment_date, 

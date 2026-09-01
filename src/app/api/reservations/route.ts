@@ -6,6 +6,14 @@ import { logActivitySafe } from '@/lib/services/activity-logger';
 
 export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     
     // Extract query parameters for filtering

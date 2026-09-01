@@ -219,3 +219,41 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; html: string; 
     text: 'Your move-out from {{roomNumber}} has been confirmed for {{moveOutDate}}.',
   },
 };
+
+export async function sendTenantPortalCredentialsEmail(input: {
+  to: string;
+  firstName: string;
+  temporaryPassword: string;
+  kind?: 'created' | 'reset';
+}): Promise<SendEmailResult> {
+  const baseUrl = (process.env.NEXTAUTH_URL || 'https://parenta.com.mx').replace(/\/$/, '');
+  const signInUrl = `${baseUrl}/auth/signin`;
+  const name = input.firstName.trim() || 'there';
+  const password = input.temporaryPassword;
+  const isReset = input.kind === 'reset';
+
+  return sendEmail({
+    to: input.to,
+    subject: isReset ? 'Your tenant portal password was updated' : 'Your tenant portal login',
+    text: isReset
+      ? `Hi ${name},\n\nThe office updated your tenant portal password.\n\nSign in: ${signInUrl}\nEmail: ${input.to}\nTemporary password: ${password}\n\nPlease sign in and change this password if you want one of your own.\n\n— Parenta`
+      : `Hi ${name},\n\nYour tenant portal account is ready.\n\nSign in: ${signInUrl}\nEmail: ${input.to}\nTemporary password: ${password}\n\nOn first login you must change this password and confirm your name, email, and phone.\n\n— Parenta`,
+    html: isReset
+      ? `
+      <p>Hi ${name},</p>
+      <p>The office updated your tenant portal password.</p>
+      <p><a href="${signInUrl}">Sign in</a></p>
+      <p>Email: <strong>${input.to}</strong><br/>Temporary password: <strong>${password}</strong></p>
+      <p>Please sign in and change this password if you want one of your own.</p>
+      <p>— Parenta</p>
+    `
+      : `
+      <p>Hi ${name},</p>
+      <p>Your tenant portal account is ready.</p>
+      <p><a href="${signInUrl}">Sign in</a></p>
+      <p>Email: <strong>${input.to}</strong><br/>Temporary password: <strong>${password}</strong></p>
+      <p>On first login you must change this password and confirm your name, email, and phone.</p>
+      <p>— Parenta</p>
+    `,
+  });
+}

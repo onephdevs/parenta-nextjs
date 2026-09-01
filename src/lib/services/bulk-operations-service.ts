@@ -399,7 +399,7 @@ export async function importPaymentsFromCSV(
  */
 export async function bulkUpdateTenantStatus(
   tenantIds: string[],
-  newStatus: 'active' | 'inactive' | 'terminated',
+  newStatus: 'active' | 'inactive',
   dbPool: Pool = pool
 ): Promise<{
   success: boolean;
@@ -408,8 +408,10 @@ export async function bulkUpdateTenantStatus(
 }> {
   try {
     const result = await dbPool.query(
-      `UPDATE tenants 
-       SET status = $1, updated_at = CURRENT_TIMESTAMP
+      `UPDATE tenants
+       SET tenant_status = $1,
+           is_tenant = CASE WHEN $1 = 'active' THEN true ELSE false END,
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = ANY($2)
        RETURNING id`,
       [newStatus, tenantIds]

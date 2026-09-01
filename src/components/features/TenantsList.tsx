@@ -561,8 +561,6 @@ export default function TenantsList({ tenants, buildings }: TenantsListProps) {
             <option value="active">Active</option>
             <option value="pending">Pending</option>
             <option value="former">Former tenants</option>
-            <option value="inactive">Inactive</option>
-            <option value="terminated">Terminated</option>
           </Select>
         </FormField>
 

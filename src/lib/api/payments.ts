@@ -1,6 +1,7 @@
 import pool from '@/lib/db';
 import type { PoolClient } from 'pg';
 import { toCanonicalPaymentMethod } from '@/lib/constants/payment-methods';
+import { recalculateInvoiceStatusesForIds } from '@/lib/services/invoice-status-recalculator';
 
 export interface Payment {
   id: string;
@@ -92,12 +93,12 @@ export interface PaymentFilters {
   search?: string;
 }
 
-// Map app payment status to DB enum (schema: pending, paid, partial, overdue, cancelled)
+// Map app payment status to DB enum (pending, paid, partial, overdue, cancelled, refunded)
 const mapPaymentStatusToDb = (status?: string): string => {
   switch (status) {
     case 'completed': return 'paid';
-    case 'failed':
-    case 'refunded': return 'cancelled';
+    case 'failed': return 'cancelled';
+    case 'refunded': return 'refunded';
     default: return status || 'pending';
   }
 };
@@ -587,20 +588,154 @@ export async function updatePayment(id: string, updateData: UpdatePaymentData): 
   }
 }
 
-// Delete payment
-export async function deletePayment(id: string): Promise<void> {
-  const query = 'DELETE FROM payments WHERE id = $1';
+function isAlreadyReversedStatus(status: string | undefined): boolean {
+  const key = String(status || '').toLowerCase();
+  return key === 'refunded' || key === 'cancelled' || key === 'failed';
+}
+
+function isPaidStatus(status: string | undefined): boolean {
+  const key = String(status || '').toLowerCase();
+  return key === 'paid' || key === 'completed';
+}
+
+/**
+ * Drop invoice allocations and unused excess-payment credits for this payment.
+ * Invoice amount_paid is recalculated after the caller commits (INSERT trigger
+ * does not fire on allocation DELETE).
+ */
+async function reversePaymentEffects(
+  client: PoolClient,
+  paymentId: string
+): Promise<{ invoiceIds: string[]; tenantId: string }> {
+  const paymentResult = await client.query(
+    `SELECT id, tenant_id, payment_status FROM payments WHERE id = $1 FOR UPDATE`,
+    [paymentId]
+  );
+  if (paymentResult.rows.length === 0) {
+    throw new Error('Payment not found');
+  }
+
+  const allocResult = await client.query(
+    `SELECT DISTINCT invoice_id::text AS invoice_id
+     FROM payment_allocations
+     WHERE payment_id = $1`,
+    [paymentId]
+  );
+  const invoiceIds = allocResult.rows.map((row) => String(row.invoice_id));
+
+  await client.query(`DELETE FROM payment_allocations WHERE payment_id = $1`, [paymentId]);
+  await client.query(
+    `UPDATE tenant_credits
+     SET status = 'refunded', updated_at = CURRENT_TIMESTAMP
+     WHERE payment_id = $1 AND status = 'available'`,
+    [paymentId]
+  );
+
+  return {
+    invoiceIds,
+    tenantId: String(paymentResult.rows[0].tenant_id),
+  };
+}
+
+async function recalcInvoicesAndSync(invoiceIds: string[], tenantId: string): Promise<void> {
+  if (invoiceIds.length > 0) {
+    await recalculateInvoiceStatusesForIds(invoiceIds);
+  }
+  try {
+    const { syncPaymentCardForTenant } = await import('@/lib/api/pipeline');
+    await syncPaymentCardForTenant(tenantId);
+  } catch (err) {
+    console.error('Payment pipeline sync after refund/void failed:', err);
+  }
+}
+
+/** Mark a collected payment as refunded and restore invoice balances. */
+export async function refundPayment(id: string): Promise<Payment> {
+  const client = await pool.connect();
+  let invoiceIds: string[] = [];
+  let tenantId = '';
 
   try {
-    const result = await pool.query(query, [id]);
-    
-    if (result.rowCount === 0) {
+    await client.query('BEGIN');
+    const current = await client.query(
+      `SELECT payment_status, notes FROM payments WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (current.rows.length === 0) {
       throw new Error('Payment not found');
     }
+    const status = String(current.rows[0].payment_status || '');
+    if (isAlreadyReversedStatus(status)) {
+      throw new Error('This payment is already refunded or cancelled');
+    }
+    if (!isPaidStatus(status)) {
+      throw new Error('Only a completed payment can be refunded. Reject or void a pending claim instead.');
+    }
+
+    const reversed = await reversePaymentEffects(client, id);
+    invoiceIds = reversed.invoiceIds;
+    tenantId = reversed.tenantId;
+
+    const priorNotes = current.rows[0].notes ? String(current.rows[0].notes) : '';
+    const refundNote = `Refunded by office on ${new Date().toISOString().slice(0, 10)}`;
+    await client.query(
+      `UPDATE payments
+       SET payment_status = $2,
+           notes = $3,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [id, mapPaymentStatusToDb('refunded'), [priorNotes, refundNote].filter(Boolean).join('\n')]
+    );
+    await client.query('COMMIT');
   } catch (error) {
-    console.error('Error deleting payment:', error);
-    throw new Error(`Failed to delete payment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    await client.query('ROLLBACK');
+    console.error('Error refunding payment:', error);
+    throw new Error(
+      `Failed to refund payment: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  } finally {
+    client.release();
   }
+
+  await recalcInvoicesAndSync(invoiceIds, tenantId);
+  const updated = await getPaymentById(id);
+  if (!updated) {
+    throw new Error('Payment not found');
+  }
+  return updated;
+}
+
+// Delete payment (void) — restores invoice balances first
+export async function deletePayment(id: string): Promise<void> {
+  const client = await pool.connect();
+  let invoiceIds: string[] = [];
+  let tenantId = '';
+
+  try {
+    await client.query('BEGIN');
+    const current = await client.query(
+      `SELECT id, tenant_id FROM payments WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (current.rows.length === 0) {
+      throw new Error('Payment not found');
+    }
+    const reversed = await reversePaymentEffects(client, id);
+    invoiceIds = reversed.invoiceIds;
+    tenantId = reversed.tenantId;
+    await client.query('DELETE FROM payments WHERE id = $1', [id]);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting payment:', error);
+    throw new Error(
+      `Failed to delete payment: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  } finally {
+    client.release();
+  }
+
+  await recalcInvoicesAndSync(invoiceIds, tenantId);
 }
 
 // Get payment summary statistics

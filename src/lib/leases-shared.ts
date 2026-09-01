@@ -1,4 +1,4 @@
-export type LeaseUiStatus = 'active' | 'expiring_soon' | 'draft' | 'terminated';
+export type LeaseUiStatus = 'active' | 'expiring_soon' | 'draft' | 'notice_given' | 'terminated';
 
 export interface LeaseListItem {
   id: string;
@@ -18,11 +18,15 @@ export interface LeaseListItem {
   uiStatus: LeaseUiStatus;
   occupantCount: number;
   createdAt: string;
+  plannedMoveOutDate: string | null;
+  contractTerminatedAt: string | null;
+  contractTerminatedReason: string | null;
 }
 
 export interface LeaseStats {
   active: number;
   expiringSoon: number;
+  noticeGiven: number;
   draft: number;
   terminated: number;
 }

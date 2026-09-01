@@ -29,6 +29,13 @@ export const DEFAULT_TENANT_PAYMENT_INSTRUCTIONS: TenantPaymentInstructions = {
   ],
 };
 
+/** True when tenants have a number to send GCash / transfers to. */
+export function isTenantPaymentInstructionsConfigured(
+  instructions: Pick<TenantPaymentInstructions, 'phone'> | null | undefined
+): boolean {
+  return Boolean(instructions?.phone?.trim());
+}
+
 export function parseTenantPaymentInstructions(raw: unknown): TenantPaymentInstructions {
   if (!raw || typeof raw !== 'object') {
     return { ...DEFAULT_TENANT_PAYMENT_INSTRUCTIONS };

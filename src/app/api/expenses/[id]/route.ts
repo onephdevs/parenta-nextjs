@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getExpenseById, updateExpense, deleteExpense } from '@/lib/api/expenses';
 import { logActivitySafe } from '@/lib/services/activity-logger';
+import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from '@/lib/constants/bills-expenses';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -68,14 +69,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     // Validate category if provided
-    if (body.expenseCategory) {
-      const validCategories = ['maintenance', 'utilities', 'supplies', 'services', 'insurance', 'taxes', 'other'];
-      if (!validCategories.includes(body.expenseCategory)) {
+    if (body.expenseCategory || body.category) {
+      const category = normalizeExpenseCategory(body.expenseCategory || body.category);
+      if (!(EXPENSE_CATEGORIES as readonly string[]).includes(category)) {
         return NextResponse.json(
           { error: 'Invalid expense category' },
           { status: 400 }
         );
       }
+      body.category = category;
+      delete body.expenseCategory;
     }
 
     // Validate date if provided

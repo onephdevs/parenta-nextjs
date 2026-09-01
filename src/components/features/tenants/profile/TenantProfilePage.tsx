@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/Tabs';
 import { PreviewTenantPortalButton } from '@/components/features/tenant/PreviewTenantPortalButton';
+import { ResetTenantPortalPasswordButton } from '@/components/features/tenants/profile/ResetTenantPortalPasswordButton';
 import TenantNotesAction from '@/components/features/tenants/TenantNotesAction';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TenantSummaryCard } from './TenantSummaryCard';
@@ -89,6 +90,15 @@ export default function TenantProfilePage({ tenant: initialTenant }: TenantProfi
             Back
           </Link>
           <div className="flex flex-wrap items-center gap-2">
+            <ResetTenantPortalPasswordButton
+              tenantId={tenant.id}
+              tenantName={name}
+              email={tenant.email || ''}
+              hasPortalLogin={tenant.hasPortalLogin}
+              onPortalLoginCreated={() =>
+                setTenant((prev) => ({ ...prev, hasPortalLogin: true }))
+              }
+            />
             <PreviewTenantPortalButton tenantId={tenant.id} tenantName={name} />
             <TenantNotesAction tenantId={tenant.id} tenantName={name} />
           </div>

@@ -3,17 +3,30 @@
  * Handles the connection between user accounts (authentication) and tenant profiles (property management)
  */
 
+import crypto from 'crypto';
 import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { sendTenantPortalCredentialsEmail } from '@/lib/services/email-service';
 
-/** Default portal password for tenants created from lease generation / admin setup. */
+/** @deprecated Seed/dev only. New tenants get a random password emailed to them. */
 export const DEFAULT_TENANT_PASSWORD = 'tenant123';
+
+const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+export function generateTemporaryPassword(length = 12): string {
+  const bytes = crypto.randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i += 1) {
+    out += TEMP_PASSWORD_CHARS[bytes[i] % TEMP_PASSWORD_CHARS.length];
+  }
+  return out;
+}
 
 export interface CreateTenantWithUserData {
   // User account fields
   email?: string | null;
   username?: string | null;
-  password?: string; // Optional: defaults to DEFAULT_TENANT_PASSWORD (tenant123)
+  password?: string; // Optional: a random password is generated and emailed when omitted
   sendInvitation?: boolean; // If true, sends invitation email to set password
   profileCompleted?: boolean;
   tenantStatus?: string;
@@ -43,21 +56,18 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
   userId: string;
   tenantId: string;
   temporaryPassword?: string;
+  emailSent?: boolean;
 }> {
   const client = await pool.connect();
   
   try {
     await client.query('BEGIN');
     
-    // Default portal password (same as lease/pipeline flow) unless admin sets one
-    const password = data.password || DEFAULT_TENANT_PASSWORD;
-    const isDefaultPassword =
-      !data.password || data.password === DEFAULT_TENANT_PASSWORD;
-    // Board/lease accounts with the default password must complete profile + change password
+    const password = data.password || generateTemporaryPassword();
     const profileCompleted =
       data.profileCompleted !== undefined
         ? data.profileCompleted
-        : !isDefaultPassword;
+        : false;
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
     const email = data.email ? data.email.toLowerCase().trim() : null;
@@ -147,16 +157,27 @@ export async function createTenantWithUser(data: CreateTenantWithUserData): Prom
     const tenantId = tenantResult.rows[0].id;
     
     await client.query('COMMIT');
-    
-    if (data.sendInvitation && email) {
-      console.log(`Invitation email would be sent to ${email} with password: ${password}`);
+
+    let emailSent = false;
+    if (email) {
+      const mailed = await sendTenantPortalCredentialsEmail({
+        to: email,
+        firstName: data.firstName,
+        temporaryPassword: password,
+      });
+      emailSent = mailed.success;
+      if (!mailed.success) {
+        console.error(
+          `[Tenant login] Could not email portal password to ${email}: ${mailed.error || 'unknown error'}`
+        );
+      }
     }
-    
+
     return {
       userId,
       tenantId,
-      // Show once in admin UI when we assigned the default password
-      temporaryPassword: isDefaultPassword ? password : undefined,
+      temporaryPassword: password,
+      emailSent,
     };
     
   } catch (error) {
@@ -172,6 +193,9 @@ export interface EnsureTenantForLeaseResult {
   userId: string | null;
   /** True when email belongs to admin/staff — portal login was not created */
   portalLoginSkipped: boolean;
+  createdNewLogin: boolean;
+  temporaryPassword?: string;
+  emailSent?: boolean;
 }
 
 /**
@@ -203,6 +227,7 @@ export async function ensureTenantForLease(
       tenantId: String(existingTenant.rows[0].id),
       userId: existingTenant.rows[0].user_id,
       portalLoginSkipped: false,
+      createdNewLogin: false,
     };
   }
 
@@ -221,6 +246,7 @@ export async function ensureTenantForLease(
           tenantId: String(linked.id),
           userId: user.id,
           portalLoginSkipped: false,
+          createdNewLogin: false,
         };
       }
 
@@ -231,7 +257,7 @@ export async function ensureTenantForLease(
         lastName,
         userId: user.id,
       });
-      return { tenantId: created.tenantId, userId: user.id, portalLoginSkipped: false };
+      return { tenantId: created.tenantId, userId: user.id, portalLoginSkipped: false, createdNewLogin: false };
     }
 
     // Admin/staff (or other non-tenant roles): email is taken — create tenant without portal user
@@ -252,6 +278,7 @@ export async function ensureTenantForLease(
       tenantId: created.tenantId,
       userId: null,
       portalLoginSkipped: true,
+      createdNewLogin: false,
     };
   }
 
@@ -260,13 +287,16 @@ export async function ensureTenantForLease(
     email,
     firstName,
     lastName,
-    // New portal logins from lease generation must change password + confirm profile
+    password: data.password || generateTemporaryPassword(),
     profileCompleted: data.profileCompleted ?? false,
   });
   return {
     tenantId: created.tenantId,
     userId: created.userId,
     portalLoginSkipped: false,
+    createdNewLogin: true,
+    temporaryPassword: created.temporaryPassword,
+    emailSent: created.emailSent,
   };
 }
 
@@ -485,6 +515,215 @@ export async function getTenantCompleteDataByTenantId(tenantId: string) {
       `Failed to fetch tenant data: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
+}
+
+export class TenantPortalPasswordError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'TenantPortalPasswordError';
+    this.status = status;
+    Object.setPrototypeOf(this, TenantPortalPasswordError.prototype);
+  }
+}
+
+export interface SetTenantPortalPasswordInput {
+  tenantId: string;
+  /** If omitted or blank, a temporary password is generated. */
+  password?: string;
+  sendEmail?: boolean;
+}
+
+export interface SetTenantPortalPasswordResult {
+  userId: string;
+  createdNewLogin: boolean;
+  temporaryPassword: string;
+  emailSent: boolean;
+  emailedTo: string | null;
+  tenantLabel: string;
+}
+
+/**
+ * Admin: set or generate a tenant portal password.
+ * Creates a tenant-role login and links it when the person has no user yet.
+ * Does not change profile_completed on an existing portal user.
+ */
+export async function setTenantPortalPassword(
+  input: SetTenantPortalPasswordInput
+): Promise<SetTenantPortalPasswordResult> {
+  const provided =
+    typeof input.password === 'string' && input.password.length > 0 ? input.password : '';
+  if (provided && provided.length < 8) {
+    throw new TenantPortalPasswordError('Password must be at least 8 characters');
+  }
+
+  const password = provided || generateTemporaryPassword();
+  const sendEmail = Boolean(input.sendEmail);
+
+  const tenantResult = await pool.query<{
+    id: string;
+    user_id: string | null;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+  }>(
+    `SELECT id, user_id, first_name, last_name, email
+     FROM tenants
+     WHERE id = $1`,
+    [input.tenantId]
+  );
+
+  if (tenantResult.rows.length === 0) {
+    throw new TenantPortalPasswordError('Tenant not found', 404);
+  }
+
+  const tenant = tenantResult.rows[0];
+  const email = tenant.email ? tenant.email.toLowerCase().trim() : null;
+
+  if (sendEmail && !email) {
+    throw new TenantPortalPasswordError(
+      'This tenant has no email. Add an email on the profile before sending the password.'
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const client = await pool.connect();
+  let userId = '';
+  let createdNewLogin = false;
+  let kind: 'created' | 'reset' = 'reset';
+
+  try {
+    await client.query('BEGIN');
+
+    let linkedUserId = tenant.user_id ? String(tenant.user_id) : null;
+    if (linkedUserId) {
+      const linkedUser = await client.query<{ id: string; role: string }>(
+        `SELECT id, role FROM users WHERE id = $1`,
+        [linkedUserId]
+      );
+      if (linkedUser.rows.length === 0) {
+        linkedUserId = null;
+      } else if (linkedUser.rows[0].role !== 'tenant') {
+        throw new TenantPortalPasswordError(
+          'This tenant is linked to an office account. Portal passwords can only be set for tenant logins.'
+        );
+      }
+    }
+
+    if (linkedUserId) {
+      await client.query(
+        `UPDATE users
+         SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND role = 'tenant'`,
+        [passwordHash, linkedUserId]
+      );
+      userId = linkedUserId;
+    } else {
+      if (!email) {
+        throw new TenantPortalPasswordError(
+          'This tenant has no portal login and no email. Add an email on the profile first, then set a password.'
+        );
+      }
+
+      const existingUser = await client.query<{ id: string; role: string }>(
+        `SELECT id, role FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+        [email]
+      );
+
+      if (existingUser.rows[0]) {
+        const user = existingUser.rows[0];
+        if (user.role !== 'tenant') {
+          throw new TenantPortalPasswordError(
+            `Cannot create a portal login: ${email} is already an office account. Use a different tenant email.`
+          );
+        }
+
+        const otherTenant = await client.query<{ id: string }>(
+          `SELECT id FROM tenants WHERE user_id = $1 AND id <> $2 LIMIT 1`,
+          [user.id, tenant.id]
+        );
+        if (otherTenant.rows[0]) {
+          throw new TenantPortalPasswordError(
+            'This email already has a portal login linked to another tenant.'
+          );
+        }
+
+        await client.query(
+          `UPDATE users
+           SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND role = 'tenant'`,
+          [passwordHash, user.id]
+        );
+        await client.query(
+          `UPDATE tenants
+           SET user_id = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [user.id, tenant.id]
+        );
+        userId = String(user.id);
+      } else {
+        const inserted = await client.query<{ id: string }>(
+          `INSERT INTO users (
+             email, password_hash, role, first_name, last_name, profile_completed
+           )
+           VALUES ($1, $2, 'tenant', $3, $4, false)
+           RETURNING id`,
+          [email, passwordHash, tenant.first_name, tenant.last_name]
+        );
+        userId = String(inserted.rows[0].id);
+        await client.query(
+          `UPDATE tenants
+           SET user_id = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [userId, tenant.id]
+        );
+        createdNewLogin = true;
+        kind = 'created';
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof TenantPortalPasswordError) {
+      throw error;
+    }
+    if (error instanceof Error && error.message.includes('duplicate key')) {
+      throw new TenantPortalPasswordError(
+        'A login with this email already exists',
+        409
+      );
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  let emailSent = false;
+  if (sendEmail && email) {
+    const mailed = await sendTenantPortalCredentialsEmail({
+      to: email,
+      firstName: tenant.first_name,
+      temporaryPassword: password,
+      kind,
+    });
+    emailSent = mailed.success;
+    if (!mailed.success) {
+      console.error(
+        `[Tenant login] Could not email portal password to ${email}: ${mailed.error || 'unknown error'}`
+      );
+    }
+  }
+
+  return {
+    userId,
+    createdNewLogin,
+    temporaryPassword: password,
+    emailSent,
+    emailedTo: sendEmail ? email : null,
+    tenantLabel: `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || email || input.tenantId,
+  };
 }
 
 /**

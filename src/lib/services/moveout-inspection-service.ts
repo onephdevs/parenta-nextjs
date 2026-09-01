@@ -145,6 +145,19 @@ export async function startMoveOutWithChecklist(
   },
   createdBy?: string
 ): Promise<{ moveoutId: string }> {
+  const existing = await pool.query(
+    `SELECT id FROM moveout_processing
+     WHERE room_assignment_id = $1
+       AND status NOT IN ('completed', 'cancelled')
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [data.roomAssignmentId]
+  );
+  if (existing.rows[0]) {
+    await ensureMoveoutChecklist(String(existing.rows[0].id));
+    return { moveoutId: String(existing.rows[0].id) };
+  }
+
   const moveout = await initiateMoveOut(
     {
       tenant_id: data.tenantId,

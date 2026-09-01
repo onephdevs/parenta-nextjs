@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       const result = await createTenantWithUser({
         email: tenantData.email || null,
         username: tenantData.username || null,
-        password: tenantData.password, // Optional: defaults to tenant123
+        password: tenantData.password ? String(tenantData.password) : undefined,
         sendInvitation: tenantData.sendInvitation || false,
         profileCompleted: tenantData.profileCompleted,
         tenantStatus: tenantData.tenantStatus,
@@ -133,6 +133,7 @@ export async function POST(request: Request) {
           userId: result.userId,
           // One-time handoff — not stored after this response
           temporaryPassword: result.temporaryPassword,
+          emailSent: result.emailSent,
         },
         message: 'Tenant and user account created successfully'
       });

@@ -21,7 +21,7 @@ export async function GET() {
         bankAccountNumber: instructions.bankAccountNumber,
         notes: instructions.notes,
         acceptedMethods: instructions.acceptedMethods,
-        configured: Boolean(instructions.phone),
+        configured: Boolean(instructions.phone?.trim()),
       },
     });
   } catch (error) {

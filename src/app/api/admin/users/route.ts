@@ -21,7 +21,7 @@ function mapAdminUser(row: AdminUserRow) {
     id: row.id,
     email: row.email,
     username: row.username,
-    role: row.role,
+    role: row.role === 'caretaker' ? 'admin' : row.role,
     firstName: row.first_name,
     lastName: row.last_name,
     isActive: row.is_active,
@@ -110,14 +110,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const roleRaw = String(body.role || 'admin').toLowerCase();
-    const role = roleRaw === 'caretaker' ? 'caretaker' : 'admin';
-
     const userData: CreateUserData = {
       email,
       username,
       password,
-      role,
+      role: 'admin',
       firstName,
       lastName,
       isActive: true,

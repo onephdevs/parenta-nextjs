@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
 import { Tenant } from '@/types/database';
 import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 import { CheckCircle2, Clock, PhilippinePeso, Users } from 'lucide-react';
 
 export const revalidate = 60;
@@ -48,7 +50,14 @@ export default async function TenantsPage() {
       <PageHeader
         title="Tenants"
         description="Manage your tenant relationships"
-        actions={<AddTenantButton />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/tenants/reservations">
+              <Button variant="outline">Reservations</Button>
+            </Link>
+            <AddTenantButton />
+          </div>
+        }
       />
 
       {stats && (

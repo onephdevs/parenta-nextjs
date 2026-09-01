@@ -60,7 +60,6 @@ const emptyCreateForm = {
   username: '',
   password: '',
   confirmPassword: '',
-  role: 'admin' as 'admin' | 'caretaker',
 };
 
 const emptyEditForm = {
@@ -202,7 +201,7 @@ export default function AdminUsersPage() {
           email: createForm.email,
           username: createForm.username || undefined,
           password: createForm.password,
-          role: createForm.role,
+          role: 'admin',
         }),
       });
       const data = await response.json();
@@ -211,10 +210,7 @@ export default function AdminUsersPage() {
         showNotification({
           type: 'success',
           title: 'Success',
-          message:
-            createForm.role === 'caretaker'
-              ? 'Caretaker account created — they can enter payments via admin sign-in'
-              : 'Admin account created successfully',
+          message: 'Admin account created successfully',
         });
         setShowCreateModal(false);
         setCreateForm(emptyCreateForm);
@@ -440,8 +436,8 @@ export default function AdminUsersPage() {
                   badges={[
                     {
                       key: 'role',
-                      label: user.role === 'caretaker' ? 'Caretaker' : 'Admin',
-                      tone: user.role === 'caretaker' ? 'warning' : 'info',
+                      label: 'Admin',
+                      tone: 'info',
                     },
                     {
                       key: 'status',
@@ -496,7 +492,7 @@ export default function AdminUsersPage() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Create portal account"
-        description="Admin has full access. Caretaker can enter payments but cannot see cash-flow or expense reports."
+        description="Office accounts have full admin access, including payments, reports, and user management."
         size="md"
         footer={
           <div className="flex justify-end gap-2">
@@ -510,21 +506,6 @@ export default function AdminUsersPage() {
         }
       >
         <div className="space-y-4">
-          <FormField label="Role" htmlFor="create-role" required>
-            <Select
-              id="create-role"
-              value={createForm.role}
-              onChange={(e) =>
-                setCreateForm((f) => ({
-                  ...f,
-                  role: e.target.value === 'caretaker' ? 'caretaker' : 'admin',
-                }))
-              }
-            >
-              <option value="admin">Admin (full access)</option>
-              <option value="caretaker">Caretaker (payments only)</option>
-            </Select>
-          </FormField>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="First name" htmlFor="create-first-name" required>
               <Input

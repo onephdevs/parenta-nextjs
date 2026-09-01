@@ -143,6 +143,7 @@ function LeaseStatusBadge({ status }: { status: string }) {
   const map: Record<string, BadgeTone> = {
     active: 'success',
     expiring_soon: 'warning',
+    notice_given: 'warning',
     draft: 'neutral',
     pending: 'neutral',
     terminated: 'danger',
@@ -150,6 +151,7 @@ function LeaseStatusBadge({ status }: { status: string }) {
   const labels: Record<string, string> = {
     active: 'Active',
     expiring_soon: 'Expiring soon',
+    notice_given: 'Notice given',
     draft: 'Draft',
     pending: 'Draft',
     terminated: 'Terminated',

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getExpenses, createExpense } from '@/lib/api/expenses';
 import { logActivitySafe } from '@/lib/services/activity-logger';
+import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from '@/lib/constants/bills-expenses';
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,9 +59,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Validate required fields
-    const { amount, category, description, expenseDate } = body;
+    const { amount, description, expenseDate } = body;
     
-    if (!amount || !category || !description || !expenseDate) {
+    if (!amount || !(body.category || body.expenseCategory) || !description || !expenseDate) {
       return NextResponse.json(
         { error: 'Missing required fields: amount, category, description, expenseDate' },
         { status: 400 }
@@ -76,22 +77,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate category - must match all options in ExpenseForm dropdown
-    const validCategories = [
-      'cleaning',
-      'maintenance',
-      'repair',
-      'upgrade',
-      'garbage_collection',
-      'worker_wages',
-      'utilities',
-      'supplies',
-      'services',
-      'insurance',
-      'taxes',
-      'other'
-    ];
-    if (!validCategories.includes(category)) {
+    // Validate category against the office form (aliases like worker_wages map in)
+    const category = normalizeExpenseCategory(body.category || body.expenseCategory);
+    if (!(EXPENSE_CATEGORIES as readonly string[]).includes(category)) {
       return NextResponse.json(
         { error: 'Invalid category' },
         { status: 400 }
