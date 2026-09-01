@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Legacy URL — People directory replaced Community. */
+/** Legacy URL — Community/People directory is hidden. Use Tenants. */
 export default function CommunityRedirectPage() {
-  redirect('/admin/people');
+  redirect('/admin/tenants');
 }
