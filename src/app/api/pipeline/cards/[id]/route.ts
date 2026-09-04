@@ -167,6 +167,12 @@ export async function PATCH(request: Request, context: RouteContext) {
           nextActionAt:
             body.nextActionAt !== undefined ? body.nextActionAt || null : undefined,
           viewingAt: body.viewingAt !== undefined ? body.viewingAt || null : undefined,
+          viewingStatus:
+            body.viewingStatus !== undefined
+              ? body.viewingStatus === null || body.viewingStatus === ''
+                ? null
+                : body.viewingStatus
+              : undefined,
           notes: body.notes !== undefined ? body.notes : undefined,
           lostReason: body.lostReason !== undefined ? body.lostReason : undefined,
           markAsLost: body.markAsLost === true,

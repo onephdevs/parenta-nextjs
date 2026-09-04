@@ -34,8 +34,8 @@ const BOARD_LINKS: QuickLinkCard[] = [
   {
     id: 'board-inquiries',
     title: 'Inquiries',
-    subtitle: 'Onboarding board',
-    href: '/admin/tasks?board=onboarding',
+    subtitle: 'Landing page leads',
+    href: '/admin/tenants/inquiries',
     count: 0,
     icon: UserPlus,
     wrap: 'bg-blue-50 text-blue-600',

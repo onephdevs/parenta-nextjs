@@ -82,7 +82,7 @@ function RowBody({
       <Circle className={cn('h-3.5 w-3.5 shrink-0', dotClass[dotTone])} aria-hidden />
 
       {idLabel ? (
-        <span className="w-14 shrink-0 font-mono text-[11px] text-gray-400 tabular-nums">
+        <span className="w-24 shrink-0 font-mono text-[11px] text-gray-400 tabular-nums">
           {idLabel}
         </span>
       ) : null}
@@ -165,10 +165,12 @@ const rowClassName =
   'group flex items-center gap-3 border-b border-gray-100 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-slate-50/80';
 
 export interface WorkItemHeaderProps {
-  title?: string;
-  status?: string;
-  date?: string;
-  meta?: string;
+  /** Ticket / row id column — width matches `idLabel` on `WorkItemRow`. */
+  id?: ReactNode;
+  title?: ReactNode;
+  status?: ReactNode;
+  date?: ReactNode;
+  meta?: ReactNode;
   showStatus?: boolean;
   showDate?: boolean;
   showMeta?: boolean;
@@ -178,6 +180,7 @@ export interface WorkItemHeaderProps {
 }
 
 export function WorkItemHeader({
+  id,
   title = 'Item',
   status = 'Status',
   date = 'Date',
@@ -197,6 +200,11 @@ export function WorkItemHeader({
       role="row"
     >
       <span className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      {id ? (
+        <div className="w-24 shrink-0" role="columnheader">
+          {id}
+        </div>
+      ) : null}
       <div className="min-w-0 flex-1" role="columnheader">
         {title}
       </div>

@@ -8,6 +8,8 @@ import pool from '@/lib/db';
  * - prospect: never leased (0 stays)
  */
 export type PersonBadge = 'active' | 'past' | 'prospect';
+/** List filter: occupancy badges plus `unassigned` (no current room). */
+export type PersonListBadge = PersonBadge | 'all' | 'unassigned';
 
 export interface DirectoryPerson {
   id: string;
@@ -127,7 +129,7 @@ export async function getPeopleStats() {
 
 export async function listPeople(options?: {
   search?: string;
-  badge?: PersonBadge | 'all';
+  badge?: PersonListBadge;
   buildingId?: string;
   limit?: number;
   offset?: number;
@@ -167,6 +169,8 @@ export async function listPeople(options?: {
     )`);
   } else if (badge === 'prospect') {
     where.push(`NOT EXISTS (SELECT 1 FROM tenant_room_assignments x WHERE x.tenant_id = t.id)`);
+  } else if (badge === 'unassigned') {
+    where.push(`curr_r.id IS NULL`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -213,11 +217,18 @@ export async function listPeople(options?: {
     ${fromSql}
     ${whereSql}
     ORDER BY
-      CASE
-        WHEN curr_r.id IS NOT NULL THEN 0
-        WHEN EXISTS (SELECT 1 FROM tenant_room_assignments s WHERE s.tenant_id = t.id) THEN 1
-        ELSE 2
-      END,
+      ${
+        badge === 'unassigned'
+          ? `CASE
+               WHEN EXISTS (SELECT 1 FROM tenant_room_assignments s WHERE s.tenant_id = t.id) THEN 1
+               ELSE 0
+             END`
+          : `CASE
+               WHEN curr_r.id IS NOT NULL THEN 0
+               WHEN EXISTS (SELECT 1 FROM tenant_room_assignments s WHERE s.tenant_id = t.id) THEN 1
+               ELSE 2
+             END`
+      },
       COALESCE(t.last_name, ''),
       COALESCE(t.first_name, ''),
       t.created_at DESC

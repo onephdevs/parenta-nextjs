@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Check, Copy, User, Briefcase, Home, MapPin, Phone, Heart, FileText } from 'lucide-react';
@@ -88,6 +88,11 @@ export interface TenantFormProps {
   initialRoomId?: string;
   /** When true, building/room fields stay fixed to the initial values */
   lockHousing?: boolean;
+  /**
+   * Hide housing/lease and never assign a room. Used when creating a person
+   * to hold a reservation.
+   */
+  omitHousing?: boolean;
   returnTo?: string;
   onCreated?: (tenantId: string) => void;
   /**
@@ -301,6 +306,7 @@ export default function TenantForm({
   initialBuildingId,
   initialRoomId,
   lockHousing = false,
+  omitHousing = false,
   returnTo,
   onCreated,
   redirectAfterCreate = true,
@@ -324,6 +330,20 @@ export default function TenantForm({
   const resolvedRoomId = initialRoomId || searchParams.get('roomId') || '';
   const resolvedReturnTo = returnTo || searchParams.get('returnTo') || '';
   const housingLocked = lockHousing || Boolean(resolvedBuildingId && resolvedRoomId);
+  const visibleSections = useMemo(() => {
+    const base = omitHousing
+      ? SECTIONS.filter((section) => section.id !== 'housing' && section.id !== 'lease')
+      : SECTIONS;
+    if (!omitHousing) return base;
+    return base.map((section) =>
+      section.id === 'personal'
+        ? {
+            ...section,
+            subtitle: 'Name and contact. They will hold the room, not move in yet.',
+          }
+        : section
+    );
+  }, [omitHousing]);
 
   const [activeSection, setActiveSection] = useState<SectionId>('personal');
   const [checkingEmail, setCheckingEmail] = useState(false);
@@ -359,9 +379,13 @@ export default function TenantForm({
       };
       if (!parsed.formData) return;
       skipNextDraftSave.current = true;
-      setFormData({ ...INITIAL_FORM_DATA, ...parsed.formData });
+      setFormData({
+        ...INITIAL_FORM_DATA,
+        ...parsed.formData,
+        ...(omitHousing ? { buildingId: '', roomId: '' } : {}),
+      });
       setOverrideMonthlyRent(Boolean(parsed.overrideMonthlyRent));
-      if (parsed.activeSection && SECTIONS.some((s) => s.id === parsed.activeSection)) {
+      if (parsed.activeSection && visibleSections.some((s) => s.id === parsed.activeSection)) {
         setActiveSection(parsed.activeSection);
       } else if (typeof parsed.step === 'number') {
         const legacy: SectionId[] = ['personal', 'emergency', 'employment', 'housing', 'lease', 'notes'];
@@ -373,7 +397,14 @@ export default function TenantForm({
     } catch (error) {
       console.warn('Could not restore tenant form draft:', error);
     }
-  }, [housingLocked]);
+  }, [housingLocked, omitHousing, visibleSections]);
+
+  useEffect(() => {
+    if (!omitHousing) return;
+    if (activeSection === 'housing' || activeSection === 'lease') {
+      setActiveSection('personal');
+    }
+  }, [omitHousing, activeSection]);
 
   // Autosave draft
   useEffect(() => {
@@ -475,8 +506,9 @@ export default function TenantForm({
       }
     };
 
+    if (omitHousing) return;
     loadData();
-  }, []);
+  }, [omitHousing]);
 
   // Filter rooms when building is selected (property first, then room)
   useEffect(() => {
@@ -606,14 +638,18 @@ export default function TenantForm({
   const collectErrors = useCallback((fields?: string[]): FormErrors => {
     const names =
       fields ??
-      Object.keys(SECTION_FIELDS).flatMap((k) => SECTION_FIELDS[k as SectionId]);
+      (omitHousing
+        ? (['personal', 'emergency', 'employment', 'notes'] as SectionId[]).flatMap(
+            (k) => SECTION_FIELDS[k]
+          )
+        : Object.keys(SECTION_FIELDS).flatMap((k) => SECTION_FIELDS[k as SectionId]));
     const next: FormErrors = {};
     for (const name of names) {
       const message = getFieldError(name, formData);
       if (message) next[name] = message;
     }
     return next;
-  }, [formData]);
+  }, [formData, omitHousing]);
 
   const validateForm = (): boolean => {
     const newErrors = collectErrors();
@@ -767,8 +803,8 @@ export default function TenantForm({
           monthlyRent: formData.monthlyRent || null,
           depositMonths: formData.depositMonths,
           advanceMonths: formData.advanceMonths,
-          buildingId: formData.buildingId || null,
-          roomId: formData.roomId || null,
+          buildingId: omitHousing ? null : formData.buildingId || null,
+          roomId: omitHousing ? null : formData.roomId || null,
         }),
       });
 
@@ -782,7 +818,7 @@ export default function TenantForm({
       const temporaryPassword = result.data.temporaryPassword as string | undefined;
       const emailSent = Boolean(result.data.emailSent);
 
-      if (formData.roomId) {
+      if (formData.roomId && !omitHousing) {
         updateNotification(loadingNotificationId, {
           type: 'loading',
           title: 'Assigning room...',
@@ -1094,12 +1130,12 @@ export default function TenantForm({
         {...(mode === 'modal'
           ? { mode: 'modal' as const, isOpen: isOpen && !credentialsModal }
           : { mode: 'page' as const })}
-        eyebrow="Create tenant"
-        sections={SECTIONS}
+        eyebrow={omitHousing ? 'Add person' : 'Create tenant'}
+        sections={visibleSections}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         onCancel={handleCancel}
-        primaryLabel="Create Tenant"
+        primaryLabel={omitHousing ? 'Add person' : 'Create Tenant'}
         primaryLoading={loading || checkingEmail}
         primaryType="submit"
         formId="tenant-form"

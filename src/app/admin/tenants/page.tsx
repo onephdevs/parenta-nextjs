@@ -52,8 +52,8 @@ export default async function TenantsPage() {
         description="Manage your tenant relationships"
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/tenants/reservations">
-              <Button variant="outline">Reservations</Button>
+            <Link href="/admin/tenants/inquiries">
+              <Button variant="outline">Inquiries</Button>
             </Link>
             <AddTenantButton />
           </div>

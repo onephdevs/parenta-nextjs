@@ -85,8 +85,8 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
       ),
       children: [
         {
-          name: 'Reservations',
-          href: '/admin/tenants/reservations',
+          name: 'Inquiries',
+          href: '/admin/tenants/inquiries',
         },
       ],
     },

@@ -269,7 +269,7 @@ async function getNewInquiries(): Promise<NeedsAttentionCard> {
       title: name,
       subtitle,
       urgency: row.stage_slug === 'new_inquiry' ? 'soon' : 'normal',
-      href: '/admin/tasks?board=onboarding',
+      href: '/admin/tenants/inquiries',
     };
   });
 
@@ -278,8 +278,8 @@ async function getNewInquiries(): Promise<NeedsAttentionCard> {
     title: 'New inquiries',
     count: items.length,
     items: items.slice(0, PREVIEW_LIMIT),
-    viewAllHref: '/admin/tasks?board=onboarding',
-    viewAllLabel: 'View pipeline',
+    viewAllHref: '/admin/tenants/inquiries',
+    viewAllLabel: 'View inquiries',
   };
 }
 
@@ -491,7 +491,7 @@ export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {
   ]);
 
   const fallbacks: NeedsAttentionCard[] = [
-    empty('inquiries', 'New inquiries', '/admin/tasks?board=onboarding', 'View onboarding pipeline'),
+    empty('inquiries', 'New inquiries', '/admin/tenants/inquiries', 'View inquiries'),
     empty('payments', 'Rent due', '/admin/tasks?board=payments', 'View rent payment board'),
     empty('utilities', 'Utilities due', '/admin/tasks?board=expenses', 'View electricity, water and expense board'),
     empty('maintenance', 'Maintenance', '/admin/tasks?board=maintenance', 'View maintenance pipeline'),

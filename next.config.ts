@@ -49,6 +49,16 @@ const nextConfig: NextConfig = {
         destination: '/admin/lease-templates/:id/edit',
         permanent: false,
       },
+      {
+        source: '/admin/tenants/reservations',
+        destination: '/admin/tenants/inquiries',
+        permanent: false,
+      },
+      {
+        source: '/admin/tenants/reservations/:path*',
+        destination: '/admin/tenants/inquiries',
+        permanent: false,
+      },
     ];
   },
 };

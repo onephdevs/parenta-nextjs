@@ -262,7 +262,7 @@ export async function POST(request: Request) {
         source: isHero ? 'website_hero' : 'website_contact',
         ip,
       },
-      link: '/admin/tasks',
+      link: '/admin/tenants/inquiries',
       skipNotifications: false,
     });
 

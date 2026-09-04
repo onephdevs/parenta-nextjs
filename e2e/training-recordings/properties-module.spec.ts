@@ -24,46 +24,21 @@ test.describe('Properties module recordings', () => {
   test('hold-unit training recording', async ({ page }, testInfo) => {
     await runRecording(page, testInfo, 'hold-unit', async () => {
       await loginAsAdmin(page);
-      await openNav(page, 'Tenants', 'Reservations');
+      await openNav(page, 'Tenants', 'Inquiries');
       await waitForAppIdle(page);
-      await clickNamed(page, /Create Reservation/i);
       await pause(page, 800);
-      const dialog = page.getByRole('dialog').or(page.locator('form').first());
-      if (await labeled(page, 'Room').first().isVisible().catch(() => false)) {
-        await selectFirstRealOption(labeled(page, 'Room').first(), { skip: /Select/i });
-        await pause(page);
-      }
-      const tenantField = labeled(page, 'Tenant').first();
-      if (await tenantField.isVisible().catch(() => false)) {
-        await selectFirstRealOption(tenantField).catch(() => undefined);
-        await pause(page);
-      }
-      const resDate = page.getByLabel(/Reservation Date/i).first();
-      if (await resDate.isVisible().catch(() => false)) {
-        await resDate.fill(todayIso());
-      }
-      const expDate = page.getByLabel(/Expiry Date/i).first();
-      if (await expDate.isVisible().catch(() => false)) {
-        await expDate.fill(plusDaysIso(14));
-      }
-      const rate = page.getByLabel(/Monthly Rate/i).first();
-      if (await rate.isVisible().catch(() => false)) {
-        await rate.fill('4800');
-      }
-      const deposit = page.getByLabel(/Reservation Deposit/i).first();
-      if (await deposit.isVisible().catch(() => false)) {
-        await deposit.fill('2000');
-      }
-      await pause(page, 800);
-      await clickIfVisible(page.getByRole('button', { name: /Create Reservation/i }));
-      await pause(page, 1200);
-      const search = page.getByPlaceholder(/Search by tenant, room, or building/i);
+      const search = page.getByPlaceholder(/Ticket, name, email, property/i);
       if (await search.isVisible().catch(() => false)) {
-        await search.fill('Balibago');
+        await search.fill('Inquiry');
         await pause(page, 900);
         await search.fill('');
       }
-      await clickIfVisible(page.getByRole('combobox').filter({ hasText: /All Status/i }));
+      await clickIfVisible(page.getByRole('button', { name: /^Filters$/i }));
+      await pause(page, 400);
+      await clickIfVisible(page.getByRole('button', { name: /Add opportunity/i }));
+      await pause(page, 1000);
+      await clickIfVisible(page.getByRole('button', { name: /Cancel/i }));
+      await hoverIfCards(page);
     });
   });
 
@@ -140,10 +115,14 @@ test.describe('Properties module recordings', () => {
 });
 
 async function hoverIfCards(page: import('@playwright/test').Page) {
-  for (const label of ['Active Reservations', 'Expired', 'Expiring Soon', 'Converted']) {
+  for (const label of ['Total tickets', 'New inquiry', 'In progress', 'Lease signed']) {
     const card = page.getByText(label, { exact: true }).first();
     if (await card.isVisible().catch(() => false)) {
       await card.hover();
     }
+  }
+  const ticket = page.getByText(/^#INQ-/).first();
+  if (await ticket.isVisible().catch(() => false)) {
+    await ticket.hover();
   }
 }

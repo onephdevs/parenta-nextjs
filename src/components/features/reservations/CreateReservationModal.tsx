@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Room, Tenant, CreateReservationData } from '@/types/database';
+import { Room, CreateReservationData } from '@/types/database';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import SectionedFormShell, { SectionedFormSection } from '@/components/ui/SectionedFormShell';
@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { FormField } from '@/components/forms/FormField';
 import { Home, User, Calendar, DollarSign, FileText } from 'lucide-react';
-import AddTenantButton from '@/components/features/tenants/AddTenantButton';
+import ReservationPersonPicker from '@/components/features/reservations/ReservationPersonPicker';
 
 interface CreateReservationModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ interface CreateReservationModalProps {
   initialTenantId?: string;
 }
 
-type FormSection = 'room' | 'tenant' | 'dates' | 'payments' | 'notes';
+type FormSection = 'room' | 'person' | 'dates' | 'payments' | 'notes';
 
 const formSections: SectionedFormSection<FormSection>[] = [
   {
@@ -28,14 +28,14 @@ const formSections: SectionedFormSection<FormSection>[] = [
     label: 'Room',
     icon: <Home className="h-4 w-4" />,
     title: 'Room Selection',
-    subtitle: 'Select the room to reserve',
+    subtitle: 'Select the vacant room to hold',
   },
   {
-    id: 'tenant',
-    label: 'Tenant',
+    id: 'person',
+    label: 'Person',
     icon: <User className="h-4 w-4" />,
-    title: 'Tenant Information',
-    subtitle: 'Select the tenant for the reservation',
+    title: 'Who is holding this room?',
+    subtitle: 'A walk-in or returning person — not a current occupant',
   },
   {
     id: 'dates',
@@ -72,9 +72,7 @@ export default function CreateReservationModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSection, setActiveSection] = useState<FormSection>('room');
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
-  const [loadingTenants, setLoadingTenants] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [activeReservationRoomIds, setActiveReservationRoomIds] = useState<Set<string>>(new Set());
   const [buildingConfig, setBuildingConfig] = useState<any>(null);
@@ -100,7 +98,6 @@ export default function CreateReservationModal({
   useEffect(() => {
     if (isOpen) {
       fetchActiveReservations();
-      fetchTenants();
     }
   }, [isOpen]);
 
@@ -283,31 +280,6 @@ export default function CreateReservationModal({
     }
   };
 
-  const fetchTenants = async () => {
-    setLoadingTenants(true);
-    try {
-      const response = await fetch('/api/tenants?limit=1000');
-      const result = await response.json();
-      
-      if (result.success) {
-        const tenantsData = result.data?.tenants || (Array.isArray(result.data) ? result.data : []);
-        setTenants(Array.isArray(tenantsData) ? tenantsData : []);
-      } else {
-        setTenants([]);
-      }
-    } catch (error) {
-      console.error('Error fetching tenants:', error);
-      setTenants([]);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load tenants',
-      });
-    } finally {
-      setLoadingTenants(false);
-    }
-  };
-
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -345,7 +317,28 @@ export default function CreateReservationModal({
       return;
     }
 
-    // Validate expiry date
+    if (!formData.tenantId) {
+      showNotification({
+        type: 'error',
+        title: 'Select a person',
+        message: 'Choose who is holding this room, or add them first.',
+      });
+      setActiveSection('person');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!formData.roomId) {
+      showNotification({
+        type: 'error',
+        title: 'Select a room',
+        message: 'Choose the vacant room to hold.',
+      });
+      setActiveSection('room');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (formData.expiryDate <= formData.reservationDate!) {
       showNotification({
         type: 'error',
@@ -526,53 +519,15 @@ export default function CreateReservationModal({
           </FormField>
         );
 
-      case 'tenant':
+      case 'person':
         return (
-          <FormField label="Tenant" htmlFor="tenantId" required>
-            <div className="flex gap-2">
-              <Select
-                id="tenantId"
-                name="tenantId"
-                required
-                value={formData.tenantId}
-                onChange={handleInputChange}
-                isDisabled={loadingTenants}
-                className="flex-1"
-              >
-                <option value="">Select a tenant</option>
-                {Array.isArray(tenants) && tenants.length > 0 ? (
-                  tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.firstName} {tenant.lastName} ({tenant.email})
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>
-                    {loadingTenants ? 'Loading tenants...' : 'No tenants available'}
-                  </option>
-                )}
-              </Select>
-              <AddTenantButton
-                label="New Tenant"
-                variant="outline"
-                redirectAfterCreate={false}
-                refreshOnCreated={false}
-                onCreated={(tenantId) => {
-                  void fetchTenants();
-                  setFormData((prev) => ({ ...prev, tenantId }));
-                }}
-                renderTrigger={(open) => (
-                  <button
-                    type="button"
-                    onClick={open}
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 hover:bg-gray-50"
-                  >
-                    New Tenant
-                  </button>
-                )}
-              />
-            </div>
-          </FormField>
+          <ReservationPersonPicker
+            value={formData.tenantId}
+            onChange={(personId) =>
+              setFormData((prev) => ({ ...prev, tenantId: personId }))
+            }
+            active={isOpen}
+          />
         );
 
       case 'dates':

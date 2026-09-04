@@ -159,8 +159,8 @@ test('add-tenant training recording', async ({ page }, testInfo) => {
 
     // Doc: No bulk actions. No export.
 
-    await page.getByRole('link', { name: 'Reservations' }).first().click().catch(async () => {
-      await page.getByRole('button', { name: 'Reservations' }).click();
+    await page.getByRole('link', { name: 'Inquiries' }).first().click().catch(async () => {
+      await page.getByRole('button', { name: 'Inquiries' }).click();
     });
     await pause(page, 600);
     await page.goto('/admin/tenants');

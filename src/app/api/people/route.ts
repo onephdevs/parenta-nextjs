@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
-import { getPeopleStats, listPeople, type PersonBadge } from '@/lib/api/people';
+import { getPeopleStats, listPeople, type PersonListBadge } from '@/lib/api/people';
 
-function parseBadge(value: string | null): PersonBadge | 'all' {
-  if (value === 'active' || value === 'past' || value === 'prospect' || value === 'all') {
+function parseBadge(value: string | null): PersonListBadge {
+  if (
+    value === 'active' ||
+    value === 'past' ||
+    value === 'prospect' ||
+    value === 'all' ||
+    value === 'unassigned'
+  ) {
     return value;
   }
   // Legacy community filters

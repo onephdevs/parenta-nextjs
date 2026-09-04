@@ -21,7 +21,7 @@ export interface AddTenantButtonProps {
   onCreated?: (tenantId: string) => void;
   /**
    * When true (default), go to the new tenant page after create.
-   * Set false to stay in place (e.g. reservation “New Tenant”).
+   * Set false to stay in place (e.g. reservation “Add person”).
    */
   redirectAfterCreate?: boolean;
   /**
@@ -29,6 +29,11 @@ export interface AddTenantButtonProps {
    * Default false when redirecting; true only if redirectAfterCreate is false.
    */
   refreshOnCreated?: boolean;
+  /**
+   * Create a person record only — hide housing/lease so they are not assigned
+   * a room (reservation holds the unit until convert).
+   */
+  omitHousing?: boolean;
   /**
    * Custom open trigger. Use for non-Button affordances (unit cards, text links).
    * When provided, the default Button is not rendered.
@@ -53,6 +58,7 @@ export default function AddTenantButton({
   onCreated,
   redirectAfterCreate = true,
   refreshOnCreated,
+  omitHousing = false,
   renderTrigger,
 }: AddTenantButtonProps) {
   const router = useRouter();
@@ -95,6 +101,7 @@ export default function AddTenantButton({
         initialBuildingId={buildingId}
         initialRoomId={roomId}
         lockHousing={housingLocked}
+        omitHousing={omitHousing}
         redirectAfterCreate={redirectAfterCreate}
         onCreated={handleCreated}
       />
