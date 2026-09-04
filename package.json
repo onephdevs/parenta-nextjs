@@ -19,7 +19,9 @@
     "sync:apartment1-occupancy-history": "node scripts/sync-apartment1-occupancy-history.mjs",
     "import:apartment-lease-history": "node scripts/import-apartment-lease-history.mjs",
     "purge:tenants": "node scripts/purge-tenants.mjs",
-    "test:occupancy": "node scripts/test-occupancy-reconcile.mjs"
+    "test:occupancy": "node scripts/test-occupancy-reconcile.mjs",
+    "test:training-recordings": "playwright test e2e/training-recordings --project=chromium",
+    "test:qa": "playwright test e2e/qa --project=chromium"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
@@ -54,6 +56,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^20",

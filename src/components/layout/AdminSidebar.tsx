@@ -231,13 +231,7 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M3 18v-6a9 9 0 0118 0v6"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"
+            d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"
           />
         </svg>
       ),
@@ -457,6 +451,33 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
           )}
         </div>
       </nav>
+
+      <div className={`border-t border-white/10 ${collapsed ? 'p-2' : 'px-3 py-2'}`}>
+        <Link
+          href="/admin/knowledge-base"
+          className={parentRowClass(isActive('/admin/knowledge-base'))}
+          title={collapsed ? 'Knowledge base' : undefined}
+          aria-label={collapsed ? 'Knowledge base' : undefined}
+          onClick={() => setExpandedSections([])}
+        >
+          <span
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+            style={{
+              color: isActive('/admin/knowledge-base') ? NAV_ACCENT : 'currentColor',
+            }}
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+          </span>
+          {!collapsed && <span>Knowledge base</span>}
+        </Link>
+      </div>
 
       {/* User Profile */}
       <div className={`border-t border-white/10 ${collapsed ? 'p-2' : 'p-4'}`}>

@@ -15,6 +15,12 @@
 verification-raw.json
 test-results*.log
 cookies.txt
+/test-results/
+/playwright-report/
+/recordings/*.webm
+/recordings/playwright-raw/
+/recordings/qa/
+/public/knowledge-base/videos/*.webm
 
 # next.js
 /.next/

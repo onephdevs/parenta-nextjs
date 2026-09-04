@@ -1,6 +1,9 @@
+---
 # Office training — try each job
 
 Tick a job after you have done it once in the app (including a refresh to confirm it saved).
+
+Start with buildings and rooms, then tenants, then **Create Invoice**, then payments. Set **Tenant pay details** before asking anyone to use portal **Pay now**. Use the pipeline for new inquiries; use **Add Tenant** when the person is already moving in.
 
 ## Core loop
 
@@ -18,11 +21,51 @@ Tick a job after you have done it once in the app (including a refresh to confir
 - [ ] [Move-out (unit becomes vacant, history retained)](./move-out.md)
 - [ ] [Tenant self-serve (unit, balance, docs, maintenance)](./tenant-portal.md)
 
-## Month close and people
+## Day to day
+
+- [ ] [Open the office home and clear the day’s work](./open-dashboard.md)
+- [ ] [Hold a unit (reservation)](./hold-unit.md)
+- [ ] [Start a lease from Leasing](./start-lease.md)
+- [ ] [Give notice (terminate on paper)](./give-notice.md)
+- [ ] [Renew a tenant’s lease](./renew-lease.md)
+- [ ] [Warn which leases expire soon](./leasing-alerts.md)
+- [ ] [Work a repair ticket](./work-repair.md)
+- [ ] [Chase unpaid rent on Tasks](./chase-payments.md)
+- [ ] [File a contract or ID in Documents](./file-documents.md)
+
+## Month close and reports
 
 - [ ] [Check who paid this month (unit × month)](./check-collections.md)
 - [ ] [Close the month (disbursement / grand total)](./close-month.md)
-- [ ] [Work a repair ticket](./work-repair.md)
-- [ ] [Add an office login](./add-office-login.md)
+- [ ] [Export this month’s bills and expenses](./bills-expenses-reports.md)
+- [ ] [Pull a collections or occupancy report](./pull-report.md)
+- [ ] [Read this month’s money at a glance](./financial-dashboard.md)
+- [ ] [Export a spreadsheet for the accountant](./export-data.md)
 
-Start with buildings and rooms, then tenants, then **Create Invoice**, then payments. Set **Tenant pay details** before asking anyone to use portal **Pay now**. Use the pipeline job for new inquiries; use **Add Tenant** when the person is already moving in.
+## Utilities and property extras
+
+- [ ] [Name a unit group for shared bills](./unit-groups.md)
+- [ ] [Enter this month’s meter readings](./enter-meter-readings.md)
+- [ ] [Split a metered bill by readings](./split-metered-bill.md)
+- [ ] [Log furniture and appliances in a unit](./log-assets.md)
+
+## Setup (once, then as needed)
+
+- [ ] [Set lease template terms (deposit, term, penalty)](./lease-templates.md)
+- [ ] [Design the lease PDF the office generates](./design-lease.md)
+- [ ] [Set document categories](./document-categories.md)
+- [ ] [Set office preferences](./office-settings.md)
+- [ ] [Add an office login](./add-office-login.md)
+- [ ] [Change my office password](./change-office-password.md)
+- [ ] [Look up who changed a record](./look-up-activity.md)
+- [ ] [Send payment reminder emails](./send-reminders.md)
+
+## Occasional / advanced
+
+- [ ] [Generate all rent invoices for the month](./generate-all-invoices.md)
+- [ ] [Import old Excel history](./import-history.md)
+- [ ] [Turn on and apply late fees](./late-fees.md)
+- [ ] [Set up online pay (gateways)](./payment-gateways.md) — skip unless you will use card checkout
+- [ ] [Sign in as staff and work the repair queue](./staff-portal.md)
+
+Caretaker is not a separate office role — see [caretaker.md](./caretaker.md).
