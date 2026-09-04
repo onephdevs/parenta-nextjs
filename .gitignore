@@ -47,6 +47,7 @@ yarn-error.log*
 # local deploy secrets (never commit)
 scripts/.deploy-secrets
 **/.deploy-secrets
+scripts/.youtube-oauth.json
 
 # vercel
 .vercel

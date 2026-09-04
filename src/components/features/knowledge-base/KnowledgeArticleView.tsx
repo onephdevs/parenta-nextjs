@@ -88,6 +88,7 @@ export default function KnowledgeArticleView({ article }: { article: KnowledgeAr
   const { map, patch, markComplete } = useKnowledgeProgress();
   const [guideTab, setGuideTab] = useState<GuideTab>('guide');
   const [durationLabel, setDurationLabel] = useState('');
+  const [videoFailed, setVideoFailed] = useState(false);
   const { previous, next } = getAdjacentArticles(article.slug);
   const module = moduleForArticle(article.slug);
   const moduleLessons = module ? articlesInModule(module.id) : [];
@@ -96,6 +97,7 @@ export default function KnowledgeArticleView({ article }: { article: KnowledgeAr
     patch(article.slug, { started: true });
     setGuideTab('guide');
     setDurationLabel('');
+    setVideoFailed(false);
     lastProgressWrite.current = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article.slug]);
@@ -171,7 +173,16 @@ export default function KnowledgeArticleView({ article }: { article: KnowledgeAr
 
       <section className="flex min-w-0 flex-1 flex-col overflow-y-auto">
         <div className="bg-black">
-          {article.videoSrc ? (
+          {article.youtubeId ? (
+            <iframe
+              key={article.slug}
+              className="aspect-video w-full bg-black"
+              src={`https://www.youtube-nocookie.com/embed/${article.youtubeId}?rel=0`}
+              title={article.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : article.videoSrc && !videoFailed ? (
             <video
               key={article.slug}
               ref={videoRef}
@@ -179,6 +190,7 @@ export default function KnowledgeArticleView({ article }: { article: KnowledgeAr
               controls
               playsInline
               preload="metadata"
+              onError={() => setVideoFailed(true)}
               onLoadedMetadata={(event) => {
                 const duration = event.currentTarget.duration;
                 if (Number.isFinite(duration)) {
@@ -205,7 +217,9 @@ export default function KnowledgeArticleView({ article }: { article: KnowledgeAr
             <div className="flex aspect-video items-center justify-center bg-zinc-900 px-8 text-center">
               <div>
                 <BookOpen className="mx-auto h-10 w-10 text-white/70" />
-                <p className="mt-3 text-sm text-white/80">No recording yet — follow the guide on the right.</p>
+                <p className="mt-3 text-sm text-white/80">
+                  Walkthrough will play here after the YouTube link is added. Follow the guide on the right.
+                </p>
               </div>
             </div>
           )}

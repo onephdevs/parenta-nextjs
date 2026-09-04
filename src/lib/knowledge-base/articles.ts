@@ -8,6 +8,8 @@ export interface KnowledgeArticle {
   href: string | null;
   hasVideo: boolean;
   videoSrc: string | null;
+  /** Filled from KNOWLEDGE_YOUTUBE_IDS after the article list is defined. */
+  youtubeId?: string | null;
   steps: string[];
   doneWhen: string;
   watchOut: string;
@@ -18,6 +20,77 @@ export interface KnowledgeCategory {
   id: string;
   title: string;
   description: string;
+}
+
+/**
+ * Unlisted YouTube URLs or 11-character ids, keyed by lesson slug.
+ * Example: 'add-unit': 'https://youtu.be/xxxxxxxxxxx'
+ */
+export const KNOWLEDGE_YOUTUBE_IDS: Record<string, string> = {
+  'add-occupant': 'IN-qYShi924',
+  'add-office-login': 'qkrJzz6_RcY',
+  'add-tenant': 'Ew_3RyOXWM0',
+  'add-unit': 'McvsuAgrukw',
+  'bills-expenses-reports': 'lX0GBdtqz2c',
+  'change-office-password': '6NvK8EMpE7U',
+  'chase-payments': 'bvdTolTx12I',
+  'check-collections': 'WaOAxNA89EM',
+  'close-month': 'r9j6PfozfBI',
+  'collect-rent': 'WShYBQGqOO8',
+  'confirm-receipt': '1UHtivYOQBM',
+  'create-invoice': 'PSTW16mfwNU',
+  'design-lease': 'uPVzo2AIwv0',
+  'document-categories': 'FLtZBnTX_-s',
+  'enter-meter-readings': 'TJSEjkOrp2I',
+  'export-data': 'CLT97tvSucs',
+  'file-documents': 'HXmdhlGlFMo',
+  'financial-dashboard': 'cP-92JxmuiI',
+  'generate-all-invoices': 'MhzKTl7DYKY',
+  'give-notice': 'J99eLwopLaA',
+  'hold-unit': 'THtlumydov4',
+  'import-history': 'Dl3-Rm80Cig',
+  'issue-lease': '3btZ5xwxuw4',
+  'late-fees': '1x54nWpwLHE',
+  'lead-to-tenant': 'tU56XdGyNXE',
+  'lease-templates': 'AopiniWn_vc',
+  'leasing-alerts': 'TbVzwYzsIFY',
+  'log-assets': 'VuZ535UYzRM',
+  'look-up-activity': '_yyYwBji0AA',
+  'move-out': 'ENE2_bKwoKE',
+  'office-settings': 'eYt1C-lM8Gk',
+  'open-dashboard': 'uGeFv4ed4qQ',
+  'payment-gateways': 'ZmFg59NzAoU',
+  'pull-report': 'H-Xa-eh0ruk',
+  'record-expense': 'xPmk_kBrx2Q',
+  'renew-lease': 'fgL3Z-ZYOSQ',
+  'send-reminders': 'V6k8t_3ZUyk',
+  'split-metered-bill': '7as9dAQkK1o',
+  'staff-portal': 'SD_Jrx-UEwA',
+  'start-lease': '9PFJ7Izrums',
+  'tenant-pay-details': '2223WNwOU7o',
+  'tenant-portal': 'F3ox7PMv6rk',
+  'unit-groups': 'WG_4fARg8GQ',
+  'utility-bill': 'NdTamureuNM',
+  'work-repair': 'krgdC5Im1Lk',
+};
+
+export function parseYouTubeId(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^[\w-]{11}$/.test(trimmed)) return trimmed;
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === 'youtu.be' || url.hostname === 'www.youtu.be') {
+      const id = url.pathname.split('/').filter(Boolean)[0];
+      return id && /^[\w-]{11}$/.test(id) ? id : null;
+    }
+    const fromQuery = url.searchParams.get('v');
+    if (fromQuery && /^[\w-]{11}$/.test(fromQuery)) return fromQuery;
+    const embed = url.pathname.match(/\/(?:embed|shorts)\/([\w-]{11})/);
+    return embed?.[1] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export const KNOWLEDGE_CATEGORIES: KnowledgeCategory[] = [
@@ -1323,9 +1396,18 @@ export const KNOWLEDGE_ARTICLES: KnowledgeArticle[] = [
 ];
 
 for (const article of KNOWLEDGE_ARTICLES) {
-  if (article.slug === 'caretaker') continue;
-  article.hasVideo = true;
-  article.videoSrc = `/knowledge-base/videos/${article.slug}.webm`;
+  if (article.slug === 'caretaker') {
+    article.hasVideo = false;
+    article.videoSrc = null;
+    article.youtubeId = null;
+    continue;
+  }
+  article.youtubeId = parseYouTubeId(KNOWLEDGE_YOUTUBE_IDS[article.slug] || '');
+  article.videoSrc =
+    article.youtubeId || process.env.NODE_ENV === 'production'
+      ? null
+      : `/knowledge-base/videos/${article.slug}.webm`;
+  article.hasVideo = Boolean(article.youtubeId || article.videoSrc);
 }
 
 export function getKnowledgeArticle(slug: string): KnowledgeArticle | undefined {

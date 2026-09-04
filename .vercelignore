@@ -5,3 +5,8 @@
 .windsurf/
 .cursor/
 public/uploads/documents/
+public/knowledge-base/videos/*.webm
+recordings/*.webm
+recordings/playwright-raw/
+recordings/qa/
+.next/
