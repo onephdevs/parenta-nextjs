@@ -12,7 +12,8 @@ import {
   Package,
   Zap,
   Calculator,
-  Layers
+  Layers,
+  FileSpreadsheet
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ListSummaryCard } from '@/components/ui/ListSummaryCard';
@@ -41,6 +42,13 @@ export default async function ReportsPage({
       icon: DollarSign,
       color: 'blue',
       reports: [
+        {
+          name: 'Apartment records',
+          description:
+            'Excel-style building ledger: tenants paid or not, electric/water, expenses, and summary. See all or pick Balibago / Villasol.',
+          href: '/admin/reports/apartment-records',
+          icon: FileSpreadsheet
+        },
         {
           name: 'Unit × Month Collections',
           description:

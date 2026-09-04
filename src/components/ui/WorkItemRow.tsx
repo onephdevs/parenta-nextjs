@@ -27,9 +27,14 @@ export interface WorkItemRowProps {
   metaLabel?: string | null;
   metaDetail?: string | null;
   metaTone?: 'danger' | 'warning' | 'muted' | 'default';
+  extra?: ReactNode;
   trailingIcon?: ReactNode;
   actions?: ReactNode;
   dotTone?: WorkItemTone;
+  showBadges?: boolean;
+  showDate?: boolean;
+  showMeta?: boolean;
+  showTrailing?: boolean;
   className?: string;
 }
 
@@ -49,6 +54,18 @@ const metaClass: Record<NonNullable<WorkItemRowProps['metaTone']>, string> = {
   default: 'text-gray-600',
 };
 
+function InteractiveSlot({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="relative flex shrink-0 items-center gap-1"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {children}
+    </div>
+  );
+}
+
 function RowBody({
   leading,
   idLabel,
@@ -60,24 +77,22 @@ function RowBody({
   metaLabel,
   metaDetail,
   metaTone = 'default',
+  extra,
   trailingIcon,
   actions,
   dotTone = 'neutral',
-}: Omit<WorkItemRowProps, 'href' | 'onClick' | 'className'>) {
+  showBadges = true,
+  showDate = true,
+  showMeta = true,
+  showTrailing = true,
+  includeSlots = true,
+}: Omit<WorkItemRowProps, 'href' | 'onClick' | 'className'> & { includeSlots?: boolean }) {
   const visibleBadges = (badges || []).slice(0, 5);
   const moreCount = Math.max(0, (badges?.length || 0) - visibleBadges.length);
 
   return (
     <>
-      {leading ? (
-        <div
-          className="shrink-0"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {leading}
-        </div>
-      ) : null}
+      {includeSlots && leading ? <InteractiveSlot>{leading}</InteractiveSlot> : null}
 
       <Circle className={cn('h-3.5 w-3.5 shrink-0', dotClass[dotTone])} aria-hidden />
 
@@ -96,67 +111,69 @@ function RowBody({
         ) : null}
       </div>
 
-      <div className="hidden min-w-0 flex-[1.4] flex-wrap items-center justify-end gap-1.5 md:flex">
-        {visibleBadges.map((badge) => (
-          <Badge key={badge.key} variant="dot" tone={badge.tone || 'neutral'}>
-            {badge.label}
-          </Badge>
-        ))}
-        {moreCount > 0 ? (
-          <span className="text-[11px] font-medium text-gray-500">{moreCount} more</span>
-        ) : null}
-        {visibleBadges.length === 0 ? (
-          <span className="text-[11px] text-gray-400">—</span>
-        ) : null}
-      </div>
-
-      <div className="hidden w-24 shrink-0 items-center justify-end gap-1 text-xs text-gray-600 lg:flex">
-        {date ? (
-          <>
-            {dateIcon ?? <Calendar className="h-3.5 w-3.5 text-gray-400" />}
-            <span className="tabular-nums">{date}</span>
-          </>
-        ) : (
-          <span className="text-gray-300">—</span>
-        )}
-      </div>
-
-      <div className="hidden w-40 shrink-0 flex-col items-end justify-center sm:flex">
-        {metaLabel || metaDetail ? (
-          <>
-            {metaLabel ? (
-              <span
-                className={cn('max-w-full truncate text-[11px] font-semibold', metaClass[metaTone])}
-                title={metaLabel}
-              >
-                {metaLabel}
-              </span>
-            ) : null}
-            {metaDetail ? (
-              <span
-                className="max-w-full truncate text-[10px] tabular-nums text-gray-500"
-                title={metaDetail}
-              >
-                {metaDetail}
-              </span>
-            ) : null}
-          </>
-        ) : (
-          <span className="text-[11px] text-gray-300">—</span>
-        )}
-      </div>
-
-      {actions ? (
-        <div
-          className="relative flex shrink-0 items-center gap-1"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {actions}
+      {showBadges ? (
+        <div className="hidden min-w-0 flex-[1.4] flex-wrap items-center justify-end gap-1.5 md:flex">
+          {visibleBadges.map((badge) => (
+            <Badge key={badge.key} variant="dot" tone={badge.tone || 'neutral'}>
+              {badge.label}
+            </Badge>
+          ))}
+          {moreCount > 0 ? (
+            <span className="text-[11px] font-medium text-gray-500">{moreCount} more</span>
+          ) : null}
+          {visibleBadges.length === 0 ? (
+            <span className="text-[11px] text-gray-400">—</span>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="flex w-6 shrink-0 items-center justify-end">{trailingIcon ?? null}</div>
+      {showDate ? (
+        <div className="hidden w-24 shrink-0 items-center justify-end gap-1 text-xs text-gray-600 lg:flex">
+          {date ? (
+            <>
+              {dateIcon ?? <Calendar className="h-3.5 w-3.5 text-gray-400" />}
+              <span className="tabular-nums">{date}</span>
+            </>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
+        </div>
+      ) : null}
+
+      {showMeta ? (
+        <div className="hidden w-40 shrink-0 flex-col items-end justify-center sm:flex">
+          {metaLabel || metaDetail ? (
+            <>
+              {metaLabel ? (
+                <span
+                  className={cn('max-w-full truncate text-[11px] font-semibold', metaClass[metaTone])}
+                  title={metaLabel}
+                >
+                  {metaLabel}
+                </span>
+              ) : null}
+              {metaDetail ? (
+                <span
+                  className="max-w-full truncate text-[10px] tabular-nums text-gray-500"
+                  title={metaDetail}
+                >
+                  {metaDetail}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="text-[11px] text-gray-300">—</span>
+          )}
+        </div>
+      ) : null}
+
+      {extra ? <div className="flex shrink-0 items-center gap-2">{extra}</div> : null}
+
+      {includeSlots && actions ? <InteractiveSlot>{actions}</InteractiveSlot> : null}
+
+      {showTrailing ? (
+        <div className="flex w-6 shrink-0 items-center justify-end">{trailingIcon ?? null}</div>
+      ) : null}
     </>
   );
 }
@@ -171,11 +188,14 @@ export interface WorkItemHeaderProps {
   status?: ReactNode;
   date?: ReactNode;
   meta?: ReactNode;
+  extra?: ReactNode;
+  leading?: ReactNode;
   showStatus?: boolean;
   showDate?: boolean;
   showMeta?: boolean;
   /** Reserve space for a single trailing action icon so columns line up. */
   showActions?: boolean;
+  showTrailing?: boolean;
   className?: string;
 }
 
@@ -185,10 +205,13 @@ export function WorkItemHeader({
   status = 'Status',
   date = 'Date',
   meta = 'Amount',
+  extra,
+  leading,
   showStatus = true,
   showDate = true,
   showMeta = true,
   showActions = false,
+  showTrailing = true,
   className,
 }: WorkItemHeaderProps) {
   return (
@@ -199,6 +222,7 @@ export function WorkItemHeader({
       )}
       role="row"
     >
+      {leading ? <div className="shrink-0">{leading}</div> : null}
       <span className="h-3.5 w-3.5 shrink-0" aria-hidden />
       {id ? (
         <div className="w-24 shrink-0" role="columnheader">
@@ -226,8 +250,13 @@ export function WorkItemHeader({
           {meta}
         </div>
       ) : null}
+      {extra ? (
+        <div className="flex shrink-0 items-center justify-end gap-2" role="columnheader">
+          {extra}
+        </div>
+      ) : null}
       {showActions ? <div className="w-5 shrink-0" aria-hidden /> : null}
-      <div className="w-6 shrink-0" aria-hidden />
+      {showTrailing ? <div className="w-6 shrink-0" aria-hidden /> : null}
     </div>
   );
 }
@@ -236,15 +265,22 @@ export function WorkItemRow({
   href,
   onClick,
   className,
+  leading,
+  actions,
   ...body
 }: WorkItemRowProps) {
   const classes = cn(rowClassName, className);
+  const main = <RowBody {...body} includeSlots={false} />;
 
   if (href) {
     return (
-      <Link href={href} className={classes}>
-        <RowBody {...body} />
-      </Link>
+      <div className={classes}>
+        {leading ? <InteractiveSlot>{leading}</InteractiveSlot> : null}
+        <Link href={href} className="flex min-w-0 flex-1 items-center gap-3">
+          {main}
+        </Link>
+        {actions ? <InteractiveSlot>{actions}</InteractiveSlot> : null}
+      </div>
     );
   }
 
@@ -263,14 +299,18 @@ export function WorkItemRow({
         }}
         className={cn(classes, 'w-full cursor-pointer text-left')}
       >
-        <RowBody {...body} />
+        {leading ? <InteractiveSlot>{leading}</InteractiveSlot> : null}
+        {main}
+        {actions ? <InteractiveSlot>{actions}</InteractiveSlot> : null}
       </div>
     );
   }
 
   return (
     <div className={classes}>
-      <RowBody {...body} />
+      {leading ? <InteractiveSlot>{leading}</InteractiveSlot> : null}
+      {main}
+      {actions ? <InteractiveSlot>{actions}</InteractiveSlot> : null}
     </div>
   );
 }

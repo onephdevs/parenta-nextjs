@@ -135,6 +135,10 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
       ),
       children: [
         {
+          name: 'Apartment records',
+          href: '/admin/reports/apartment-records',
+        },
+        {
           name: 'Invoices',
           href: '/admin/financial/invoices',
         },

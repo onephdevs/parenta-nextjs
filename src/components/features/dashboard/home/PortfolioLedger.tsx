@@ -192,6 +192,12 @@ export default function PortfolioLedger() {
             </select>
           </div>
           <Link
+            href="/admin/reports/apartment-records"
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50"
+          >
+            Apartment records
+          </Link>
+          <Link
             href="/admin/financial/payments/new"
             className="rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm"
             style={{ background: NAVY }}

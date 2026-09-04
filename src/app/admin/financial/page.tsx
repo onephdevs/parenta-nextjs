@@ -105,6 +105,12 @@ const INSIGHTS: HubLink[] = [
     icon: LayoutDashboard,
   },
   {
+    href: '/admin/reports/apartment-records',
+    title: 'Apartment records',
+    description: 'Who paid in each building, expenses, and the period summary.',
+    icon: FileText,
+  },
+  {
     href: '/admin/financial/reports',
     title: 'Reports',
     description: 'Period revenue, expenses, and profit & loss.',

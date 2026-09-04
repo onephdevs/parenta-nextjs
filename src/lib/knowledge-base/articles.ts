@@ -809,11 +809,37 @@ export const KNOWLEDGE_ARTICLES: KnowledgeArticle[] = [
       "Does not save a snapshot — generate again after a refresh.",
       "**Reports hub** (`/admin/reports`)",
       "Search **Report name...**. Category filter **All categories**.",
-      "Other financial reports: **Collected Amount Report**, **Disbursement / Cash-flow**, **Portfolio Rollup**, **Deposit Report**, **Expense Report**, **Comprehensive Financial Report**, **Revenue Report**, **Expense Analysis**, **Rent Roll Report**, **Profit & Loss Statement**.",
+      "Other financial reports: **Apartment records**, **Collected Amount Report**, **Disbursement / Cash-flow**, **Portfolio Rollup**, **Deposit Report**, **Expense Report**, **Comprehensive Financial Report**, **Revenue Report**, **Expense Analysis**, **Rent Roll Report**, **Profit & Loss Statement**.",
       "Property: **Vacant Rooms Report**, **Occupancy Report**, **Building Performance**, **Room Status Report**.",
       "Tenant: **Tenant List Report**, **Tenant Summary**, **Payment Patterns**, **Outstanding Balances**.",
       "Asset / Utility / Analytics rows as listed on the hub.",
       "See **Pull a collections or occupancy report**.",
+    ],
+  },
+  {
+    slug: "apartment-records",
+    title: "See who paid by apartment",
+    categoryId: "month-close",
+    who: "Office admin / Owner",
+    when: "During the month or at month close, to review one building or all buildings like the apartment Excel ledger.",
+    replaces: "The APARTMENT-1 / APARTMENT-2 rental sheets (unit, due date, amount paid, date paid, electric, water, expenses, collection total).",
+    href: "/admin/reports/apartment-records",
+    hasVideo: false,
+    videoSrc: null,
+    steps: [
+      "Sidebar **Payments** → **Apartment records**, or **Reports** → **Apartment records**.",
+      "Pick **See all** or a building (Balibago, Villasol). Set **Billing period** (16th–15th cycle).",
+      "To load electric and water from the APRT. RECORDS spreadsheet: **Import CSV**, drop the `.xlsx` or CSV, check the preview, then **Import**. Rent and expenses are not imported.",
+      "To change electric or water for several units: **Edit bulk**, tick units on the left, type amounts in the Electric and Water columns, choose Unpaid or Paid, **Save utilities**.",
+    ],
+    doneWhen: "Each unit shows rent, date, electric, water, and paid/unpaid status. Collection, electric, water, and expenses match the period you selected.",
+    watchOut: "This is a desk view, not recording rent. Use **Collect rent** to change a rent payment. Vacant meter amounts are not tenant collection. Import and bulk electric/water update the billing period on screen.",
+    alsoOnThisPage: [
+      "**See all** uses Balibago then Villasol tabs. One building shows that list only.",
+      "**Import CSV** accepts the APRT. RECORDS workbook (Balibago left, Villasol right) or a `building,unit,electric,water` CSV.",
+      "**Edit bulk** turns Electric and Water into amount fields for ticked rows.",
+      "**Monthly expenses** list and **Period summary** (collection − expenses, then allowance and cheque).",
+      "**Print** is on this page. Related: **Unit × Month Collections**, **Disbursement / Cash-flow**.",
     ],
   },
   {
@@ -1394,7 +1420,7 @@ export const KNOWLEDGE_ARTICLES: KnowledgeArticle[] = [
 ];
 
 for (const article of KNOWLEDGE_ARTICLES) {
-  if (article.slug === 'caretaker') {
+  if (article.slug === 'caretaker' || article.slug === 'apartment-records') {
     article.hasVideo = false;
     article.videoSrc = null;
     article.youtubeId = null;
@@ -1499,6 +1525,7 @@ export const KNOWLEDGE_MODULES: KnowledgeModule[] = [
     slugs: [
       'open-dashboard',
       'check-collections',
+      'apartment-records',
       'close-month',
       'pull-report',
       'financial-dashboard',
