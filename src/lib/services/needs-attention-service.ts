@@ -5,7 +5,6 @@
 
 import pool from '@/lib/db';
 import { getPastDueStatus } from '@/lib/past-due-status';
-import { listMaintenanceRequests } from '@/lib/api/maintenance';
 
 export interface NeedsAttentionItem {
   id: string;
@@ -64,83 +63,92 @@ function relativeTime(value: Date | string | null): string {
 }
 
 async function getPaymentsDue(): Promise<NeedsAttentionCard> {
+  // Dashboard tile: COUNT(*) OVER() + LIMIT so we never fetch the full roster
+  // just to rank in JS. Uses idx_tenants_status, idx_invoices_tenant, idx_invoices_status.
   const result = await pool.query(`
-    SELECT
-      t.id,
-      t.first_name,
-      t.last_name,
-      COALESCE(SUM(i.balance_due), 0) AS balance,
-      COALESCE(
-        SUM(
+    WITH due AS (
+      SELECT
+        t.id,
+        t.first_name,
+        t.last_name,
+        COALESCE(SUM(i.balance_due), 0) AS balance,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE
+                AND i.invoice_status != 'paid'
+                AND i.bill_status != 'PAID'
+              THEN i.balance_due
+              ELSE 0
+            END
+          ),
+          0
+        ) AS past_due_amount,
+        COALESCE(
+          MAX(
+            CASE
+              WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE
+                AND i.invoice_status != 'paid'
+                AND i.bill_status != 'PAID'
+              THEN (CURRENT_DATE - COALESCE(i.negotiated_due_date, i.due_date))
+              ELSE 0
+            END
+          ),
+          0
+        ) AS days_past_due,
+        MIN(
           CASE
-            WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE
+            WHEN COALESCE(i.negotiated_due_date, i.due_date) >= CURRENT_DATE
               AND i.invoice_status != 'paid'
               AND i.bill_status != 'PAID'
-            THEN i.balance_due
-            ELSE 0
+            THEN (COALESCE(i.negotiated_due_date, i.due_date) - CURRENT_DATE)
+            ELSE NULL
           END
-        ),
-        0
-      ) AS past_due_amount,
-      COALESCE(
-        MAX(
-          CASE
-            WHEN COALESCE(i.negotiated_due_date, i.due_date) < CURRENT_DATE
-              AND i.invoice_status != 'paid'
-              AND i.bill_status != 'PAID'
-            THEN (CURRENT_DATE - COALESCE(i.negotiated_due_date, i.due_date))
-            ELSE 0
-          END
-        ),
-        0
-      ) AS days_past_due,
-      MIN(
-        CASE
-          WHEN COALESCE(i.negotiated_due_date, i.due_date) >= CURRENT_DATE
-            AND i.invoice_status != 'paid'
-            AND i.bill_status != 'PAID'
-          THEN (COALESCE(i.negotiated_due_date, i.due_date) - CURRENT_DATE)
-          ELSE NULL
-        END
-      ) AS days_until_due
-    FROM tenants t
-    INNER JOIN invoices i
-      ON i.tenant_id = t.id
-      AND i.invoice_status IN ('sent', 'partial', 'overdue')
-      AND i.balance_due > 0
-    WHERE t.tenant_status = 'active' AND t.is_active = true
-    GROUP BY t.id, t.first_name, t.last_name
-    HAVING COALESCE(SUM(i.balance_due), 0) > 0
-  `);
+        ) AS days_until_due
+      FROM tenants t
+      INNER JOIN invoices i
+        ON i.tenant_id = t.id
+        AND i.invoice_status IN ('sent', 'partial', 'overdue')
+        AND i.balance_due > 0
+      WHERE t.tenant_status = 'active' AND t.is_active = true
+      GROUP BY t.id, t.first_name, t.last_name
+      HAVING COALESCE(SUM(i.balance_due), 0) > 0
+    )
+    SELECT *, COUNT(*) OVER()::int AS match_count
+    FROM due
+    ORDER BY
+      days_past_due DESC,
+      COALESCE(days_until_due, 9999) ASC,
+      past_due_amount DESC
+    LIMIT $1
+  `, [PREVIEW_LIMIT]);
 
-  const ranked = result.rows
-    .map((row) => {
-      const balance = parseFloat(row.balance || 0);
-      const daysPastDue = parseInt(row.days_past_due || 0, 10);
-      const daysUntilDue =
-        row.days_until_due == null ? null : parseInt(row.days_until_due, 10);
-      const status = getPastDueStatus({ balance, daysPastDue, daysUntilDue });
-      return {
-        id: String(row.id),
-        title: `${row.first_name} ${row.last_name}`.trim(),
-        subtitle: `${formatPhp(balance)} • ${status.urgencyLabel}`,
-        urgency:
-          status.tier === 'late' || status.tier === 'escalated'
-            ? ('late' as const)
-            : status.tier === 'due_soon'
-              ? ('soon' as const)
-              : ('normal' as const),
-        href: `/admin/tasks?board=payments`,
-        urgencyRank: status.urgencyRank,
-      };
-    })
-    .sort((a, b) => b.urgencyRank - a.urgencyRank);
+  const count = parseInt(String(result.rows[0]?.match_count || 0), 10);
+  const items: NeedsAttentionItem[] = result.rows.map((row) => {
+    const balance = parseFloat(row.balance || 0);
+    const daysPastDue = parseInt(row.days_past_due || 0, 10);
+    const daysUntilDue =
+      row.days_until_due == null ? null : parseInt(row.days_until_due, 10);
+    const status = getPastDueStatus({ balance, daysPastDue, daysUntilDue });
+    return {
+      id: String(row.id),
+      title: `${row.first_name} ${row.last_name}`.trim(),
+      subtitle: `${formatPhp(balance)} • ${status.urgencyLabel}`,
+      urgency:
+        status.tier === 'late' || status.tier === 'escalated'
+          ? ('late' as const)
+          : status.tier === 'due_soon'
+            ? ('soon' as const)
+            : ('normal' as const),
+      href: `/admin/tasks?board=payments`,
+    };
+  });
 
   return {
     key: 'payments',
     title: 'Rent due',
-    count: ranked.length,
-    items: ranked.slice(0, PREVIEW_LIMIT).map(({ urgencyRank: _, ...item }) => item),
+    count,
+    items,
     viewAllHref: '/admin/tasks?board=payments',
     viewAllLabel: 'View rent payment board',
   };
@@ -148,38 +156,43 @@ async function getPaymentsDue(): Promise<NeedsAttentionCard> {
 
 async function getUtilitiesDue(): Promise<NeedsAttentionCard> {
   const result = await pool.query(`
-    SELECT
-      ub.id,
-      ub.utility_type,
-      ub.amount,
-      ub.due_date,
-      ub.bill_status,
-      b.name AS building_name,
-      CASE
-        WHEN ub.due_date < CURRENT_DATE THEN (CURRENT_DATE - ub.due_date::date)
-        ELSE 0
-      END AS days_past_due,
-      CASE
-        WHEN ub.due_date >= CURRENT_DATE THEN (ub.due_date::date - CURRENT_DATE)
-        ELSE NULL
-      END AS days_until_due
-    FROM utility_bills ub
-    LEFT JOIN buildings b ON b.id = ub.building_id
-    WHERE ub.bill_status IN ('pending', 'overdue')
-      AND ub.due_date IS NOT NULL
-      AND (
-        ub.bill_status = 'overdue'
-        OR ub.due_date <= CURRENT_DATE + INTERVAL '14 days'
-      )
+    WITH due AS (
+      SELECT
+        ub.id,
+        ub.utility_type,
+        ub.amount,
+        ub.due_date,
+        ub.bill_status,
+        b.name AS building_name,
+        CASE
+          WHEN ub.due_date < CURRENT_DATE THEN (CURRENT_DATE - ub.due_date::date)
+          ELSE 0
+        END AS days_past_due,
+        CASE
+          WHEN ub.due_date >= CURRENT_DATE THEN (ub.due_date::date - CURRENT_DATE)
+          ELSE NULL
+        END AS days_until_due
+      FROM utility_bills ub
+      LEFT JOIN buildings b ON b.id = ub.building_id
+      WHERE ub.bill_status IN ('pending', 'overdue')
+        AND ub.due_date IS NOT NULL
+        AND (
+          ub.bill_status = 'overdue'
+          OR ub.due_date <= CURRENT_DATE + INTERVAL '14 days'
+        )
+    )
+    SELECT *, COUNT(*) OVER()::int AS match_count
+    FROM due
     ORDER BY
       CASE
-        WHEN ub.due_date < CURRENT_DATE OR ub.bill_status = 'overdue' THEN 0
+        WHEN due_date < CURRENT_DATE OR bill_status = 'overdue' THEN 0
         ELSE 1
       END,
-      ub.due_date ASC NULLS LAST
-    LIMIT 50
-  `);
+      due_date ASC NULLS LAST
+    LIMIT $1
+  `, [PREVIEW_LIMIT]);
 
+  const count = parseInt(String(result.rows[0]?.match_count || 0), 10);
   const items: NeedsAttentionItem[] = result.rows.map((row) => {
     const daysPastDue = parseInt(row.days_past_due || 0, 10);
     const daysUntilDue =
@@ -215,8 +228,8 @@ async function getUtilitiesDue(): Promise<NeedsAttentionCard> {
   return {
     key: 'utilities',
     title: 'Utilities due',
-    count: items.length,
-    items: items.slice(0, PREVIEW_LIMIT),
+    count,
+    items,
     viewAllHref: '/admin/tasks?board=expenses',
     viewAllLabel: 'View electricity, water and expense board',
   };
@@ -224,30 +237,34 @@ async function getUtilitiesDue(): Promise<NeedsAttentionCard> {
 
 async function getNewInquiries(): Promise<NeedsAttentionCard> {
   const result = await pool.query(`
-    SELECT
-      c.id,
-      c.title,
-      c.contact_first_name,
-      c.contact_last_name,
-      c.viewing_at,
-      c.created_at,
-      s.slug AS stage_slug,
-      s.name AS stage_name,
-      b.name AS building_name,
-      r.room_number
-    FROM pipeline_cards c
-    JOIN pipeline_boards pb ON pb.id = c.board_id
-    JOIN pipeline_stages s ON s.id = c.stage_id
-    LEFT JOIN buildings b ON b.id = c.building_id
-    LEFT JOIN rooms r ON r.id = c.room_id
-    WHERE pb.slug = 'onboarding'
-      AND c.card_status = 'open'
-      AND s.slug IN ('new_inquiry', 'viewing_scheduled')
+    WITH due AS (
+      SELECT
+        c.id,
+        c.title,
+        c.contact_first_name,
+        c.contact_last_name,
+        c.viewing_at,
+        c.created_at,
+        s.slug AS stage_slug,
+        s.name AS stage_name,
+        b.name AS building_name,
+        r.room_number
+      FROM pipeline_cards c
+      JOIN pipeline_boards pb ON pb.id = c.board_id
+      JOIN pipeline_stages s ON s.id = c.stage_id
+      LEFT JOIN buildings b ON b.id = c.building_id
+      LEFT JOIN rooms r ON r.id = c.room_id
+      WHERE pb.slug = 'onboarding'
+        AND c.card_status = 'open'
+        AND s.slug IN ('new_inquiry', 'viewing_scheduled')
+    )
+    SELECT *, COUNT(*) OVER()::int AS match_count
+    FROM due
     ORDER BY
-      CASE s.slug WHEN 'new_inquiry' THEN 0 ELSE 1 END,
-      c.created_at DESC
-    LIMIT 50
-  `);
+      CASE stage_slug WHEN 'new_inquiry' THEN 0 ELSE 1 END,
+      created_at DESC
+    LIMIT $1
+  `, [PREVIEW_LIMIT]);
 
   const items: NeedsAttentionItem[] = result.rows.map((row) => {
     const name =
@@ -276,37 +293,47 @@ async function getNewInquiries(): Promise<NeedsAttentionCard> {
   return {
     key: 'inquiries',
     title: 'New inquiries',
-    count: items.length,
-    items: items.slice(0, PREVIEW_LIMIT),
+    count: parseInt(String(result.rows[0]?.match_count || 0), 10),
+    items,
     viewAllHref: '/admin/tenants/inquiries',
     viewAllLabel: 'View inquiries',
   };
 }
 
 async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
-  const { requests } = await listMaintenanceRequests({ status: 'open' });
-  const inProgress = await listMaintenanceRequests({ status: 'in_progress' });
-  const combined = [...requests, ...inProgress.requests].sort((a, b) => {
-    const priorityRank = (p: unknown) => {
-      switch (String(p)) {
-        case 'urgent':
-          return 4;
-        case 'high':
-          return 3;
-        case 'medium':
-          return 2;
-        default:
-          return 1;
-      }
-    };
-    const pr = priorityRank(b.priority) - priorityRank(a.priority);
-    if (pr !== 0) return pr;
-    const aTime = new Date(String(a.created_at || 0)).getTime();
-    const bTime = new Date(String(b.created_at || 0)).getTime();
-    return bTime - aTime;
-  });
+  // Dedicated tile query (idx_maintenance_requests_status). Do not pull the
+  // unbounded admin list + attachments just to show 5 rows on the home page.
+  const result = await pool.query(
+    `
+    WITH open_reqs AS (
+      SELECT
+        mr.id,
+        mr.title,
+        mr.priority,
+        COALESCE(mr.created_at, mr.request_date) AS created_at,
+        r.room_number,
+        NULLIF(TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, ''))), '') AS tenant_name
+      FROM maintenance_requests mr
+      LEFT JOIN rooms r ON r.id = mr.room_id
+      LEFT JOIN tenants t ON t.id = mr.tenant_id
+      WHERE LOWER(COALESCE(mr.status, '')) IN ('open', 'in_progress')
+    )
+    SELECT *, COUNT(*) OVER()::int AS match_count
+    FROM open_reqs
+    ORDER BY
+      CASE LOWER(COALESCE(priority, ''))
+        WHEN 'urgent' THEN 4
+        WHEN 'high' THEN 3
+        WHEN 'medium' THEN 2
+        ELSE 1
+      END DESC,
+      created_at DESC NULLS LAST
+    LIMIT $1
+    `,
+    [PREVIEW_LIMIT]
+  );
 
-  const items: NeedsAttentionItem[] = combined.map((row) => {
+  const items: NeedsAttentionItem[] = result.rows.map((row) => {
     const room = row.room_number ? `Room ${row.room_number}` : null;
     const tenant = row.tenant_name ? String(row.tenant_name) : null;
     const location = [room, tenant].filter(Boolean).join(' • ') || 'Unassigned';
@@ -326,17 +353,17 @@ async function getMaintenanceOpen(): Promise<NeedsAttentionCard> {
   return {
     key: 'maintenance',
     title: 'Maintenance',
-    count: items.length,
-    items: items.slice(0, PREVIEW_LIMIT),
+    count: parseInt(String(result.rows[0]?.match_count || 0), 10),
+    items,
     viewAllHref: '/admin/tasks?board=maintenance',
     viewAllLabel: 'View maintenance pipeline',
   };
 }
 
 async function getDepositFundedAlerts(): Promise<NeedsAttentionCard> {
-  try {
-    // Bills recently covered via legacy deposit_ledger apply — not cash
-    const result = await pool.query(`
+  const result = await pool.query(
+    `
+    WITH funded AS (
       SELECT DISTINCT ON (i.id)
         i.id,
         i.invoice_number,
@@ -359,51 +386,43 @@ async function getDepositFundedAlerts(): Promise<NeedsAttentionCard> {
         AND dl.applied_to_invoice_id IS NOT NULL
         AND dl.transaction_date >= CURRENT_DATE - INTERVAL '60 days'
       ORDER BY i.id, dl.transaction_date DESC
-      LIMIT 50
-    `);
+    )
+    SELECT *, COUNT(*) OVER()::int AS match_count
+    FROM funded
+    ORDER BY transaction_date DESC
+    LIMIT $1
+    `,
+    [PREVIEW_LIMIT]
+  );
 
-    const items: NeedsAttentionItem[] = result.rows.map((row) => {
-      const name = `${row.first_name} ${row.last_name}`.trim();
-      const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
-      const applied = Math.abs(Number(row.deposit_amount || 0));
-      return {
-        id: String(row.id),
-        title: name,
-        subtitle: `${room} • ${row.invoice_number} paid ₱${applied.toLocaleString('en-PH')} from deposit`,
-        meta: row.reason ? String(row.reason) : undefined,
-        urgency: 'soon' as const,
-        href: `/admin/tenants/${row.tenant_id}`,
-      };
-    });
+  const items: NeedsAttentionItem[] = result.rows.map((row) => {
+    const name = `${row.first_name} ${row.last_name}`.trim();
+    const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
+    const applied = Math.abs(Number(row.deposit_amount || 0));
+    return {
+      id: String(row.id),
+      title: name,
+      subtitle: `${room} • ${row.invoice_number} paid ₱${applied.toLocaleString('en-PH')} from deposit`,
+      meta: row.reason ? String(row.reason) : undefined,
+      urgency: 'soon' as const,
+      href: `/admin/tenants/${row.tenant_id}`,
+    };
+  });
 
-    return {
-      key: 'deposit_funded',
-      title: 'Deposit-funded rent',
-      count: items.length,
-      items: items.slice(0, PREVIEW_LIMIT),
-      viewAllHref: '/admin/reports/deposits',
-      viewAllLabel: 'View deposits',
-    };
-  } catch (error) {
-    console.warn(
-      'deposit-funded alerts skipped:',
-      error instanceof Error ? error.message : error
-    );
-    return {
-      key: 'deposit_funded',
-      title: 'Deposit-funded rent',
-      count: 0,
-      items: [],
-      viewAllHref: '/admin/reports/deposits',
-      viewAllLabel: 'View deposits',
-    };
-  }
+  return {
+    key: 'deposit_funded',
+    title: 'Deposit-funded rent',
+    count: parseInt(String(result.rows[0]?.match_count || 0), 10),
+    items,
+    viewAllHref: '/admin/reports/deposits',
+    viewAllLabel: 'View deposits',
+  };
 }
 
 async function getDepositAlerts(): Promise<NeedsAttentionCard> {
-  try {
-    // Active tenants whose net deposit_ledger balance is zero (or fully applied)
-    const result = await pool.query(`
+  const result = await pool.query(
+    `
+    WITH zero AS (
       SELECT
         t.id AS tenant_id,
         t.first_name,
@@ -426,44 +445,35 @@ async function getDepositAlerts(): Promise<NeedsAttentionCard> {
         AND EXISTS (
           SELECT 1 FROM deposit_ledger dl2 WHERE dl2.tenant_id = t.id
         )
-      ORDER BY t.last_name, t.first_name
-      LIMIT 50
-    `);
+    )
+    SELECT *, COUNT(*) OVER()::int AS match_count
+    FROM zero
+    ORDER BY last_name, first_name
+    LIMIT $1
+    `,
+    [PREVIEW_LIMIT]
+  );
 
-    const items: NeedsAttentionItem[] = result.rows.map((row) => {
-      const name = `${row.first_name} ${row.last_name}`.trim();
-      const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
-      return {
-        id: String(row.tenant_id),
-        title: name,
-        subtitle: `${room} • deposit balance ₱0`,
-        urgency: 'soon' as const,
-        href: `/admin/tenants/${row.tenant_id}`,
-      };
-    });
+  const items: NeedsAttentionItem[] = result.rows.map((row) => {
+    const name = `${row.first_name} ${row.last_name}`.trim();
+    const room = row.room_number ? `Unit ${row.room_number}` : 'Unit';
+    return {
+      id: String(row.tenant_id),
+      title: name,
+      subtitle: `${room} • deposit balance ₱0`,
+      urgency: 'soon' as const,
+      href: `/admin/tenants/${row.tenant_id}`,
+    };
+  });
 
-    return {
-      key: 'deposits',
-      title: 'Deposit balance zero',
-      count: items.length,
-      items: items.slice(0, PREVIEW_LIMIT),
-      viewAllHref: '/admin/reports/deposits',
-      viewAllLabel: 'View deposits report',
-    };
-  } catch (error) {
-    console.warn(
-      'deposit alerts skipped:',
-      error instanceof Error ? error.message : error
-    );
-    return {
-      key: 'deposits',
-      title: 'Deposit balance zero',
-      count: 0,
-      items: [],
-      viewAllHref: '/admin/reports/deposits',
-      viewAllLabel: 'View deposits report',
-    };
-  }
+  return {
+    key: 'deposits',
+    title: 'Deposit balance zero',
+    count: parseInt(String(result.rows[0]?.match_count || 0), 10),
+    items,
+    viewAllHref: '/admin/reports/deposits',
+    viewAllLabel: 'View deposits report',
+  };
 }
 
 export async function getNeedsAttention(): Promise<NeedsAttentionPayload> {

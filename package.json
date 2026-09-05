@@ -20,6 +20,7 @@
     "import:apartment-lease-history": "node scripts/import-apartment-lease-history.mjs",
     "purge:tenants": "node scripts/purge-tenants.mjs",
     "test:occupancy": "node scripts/test-occupancy-reconcile.mjs",
+    "test:unit": "vitest run",
     "test:training-recordings": "playwright test e2e/training-recordings --project=chromium",
     "test:qa": "playwright test e2e/qa --project=chromium"
   },
@@ -68,6 +69,7 @@
     "playwright": "^1.62.0",
     "prisma": "^7.9.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

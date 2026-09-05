@@ -62,7 +62,7 @@ export default function DashboardActionRail() {
     void (async () => {
       try {
         const [buildingsRes, statsRes] = await Promise.all([
-          fetch('/api/buildings', { credentials: 'include' }),
+          fetch('/api/buildings?limit=50', { credentials: 'include' }),
           fetch('/api/dashboard/stats', { credentials: 'include' }),
         ]);
         if (buildingsRes.ok) {

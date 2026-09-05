@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { ensureTenantForLease } from '@/lib/api/tenant-user-link';
 import { buildMaintenancePipelineTags, formatMaintenanceCategory } from '@/lib/constants/maintenance';
 import { extractInvoiceIdFromNotes } from '@/lib/format-payment-notes';
+import { clampPageLimit } from '@/lib/db/query-limits';
 import type {
   CreatePipelineCardData,
   PipelineBackgroundCheckStatus,
@@ -291,9 +292,10 @@ export async function getBoardBySlug(slug: PipelineBoardSlug): Promise<PipelineB
 
 export async function getCardsForBoard(
   boardSlug: PipelineBoardSlug,
-  options?: { includeClosed?: boolean }
+  options?: { includeClosed?: boolean; limit?: number }
 ): Promise<PipelineCard[]> {
   const includeClosed = options?.includeClosed ?? true;
+  const limit = clampPageLimit(options?.limit, 200, 500);
   const result = await pool.query<DbCard>(
     `SELECT
        c.*,
@@ -319,8 +321,11 @@ export async function getCardsForBoard(
      LEFT JOIN users au ON au.id = c.assigned_to
      WHERE pb.slug = $1
        AND ($2::boolean OR c.card_status = 'open')
-     ORDER BY s.sort_order ASC, c.position ASC, c.created_at ASC`,
-    [boardSlug, includeClosed]
+     ORDER BY
+       CASE WHEN c.card_status = 'open' THEN 0 ELSE 1 END,
+       s.sort_order ASC, c.position ASC, c.created_at ASC
+     LIMIT $3`,
+    [boardSlug, includeClosed, limit]
   );
 
   return result.rows.map(mapCard);

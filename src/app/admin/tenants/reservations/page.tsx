@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 export const revalidate = 0;
 
 export default async function ReservationsPage() {
-  const result = await getAllReservations({ limit: 1000 });
+  const result = await getAllReservations({ limit: 200 });
   const reservations = result.reservations;
 
   return (

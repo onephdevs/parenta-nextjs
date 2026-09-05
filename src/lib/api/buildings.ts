@@ -9,6 +9,7 @@ import {
   LANDING_FEATURED_LIMIT,
   LandingFeaturedFullError,
 } from '@/lib/landing-featured';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 // Helper function to map database building to app building
 function mapDatabaseBuildingToBuilding(dbBuilding: DatabaseBuilding): Building {
@@ -59,7 +60,7 @@ export async function getAllBuildings(options?: {
 }): Promise<PaginatedBuildingsResponse> {
   try {
     const page = options?.page || 1;
-    const limit = options?.limit || 50;
+    const limit = clampPageLimit(options?.limit, 50, 200);
     const offset = (page - 1) * limit;
 
     // Build WHERE clause

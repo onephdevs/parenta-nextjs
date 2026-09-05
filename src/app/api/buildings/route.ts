@@ -3,12 +3,14 @@ import { getAllBuildings, createBuilding } from '@/lib/api/buildings';
 import { requireAdmin } from '@/lib/api-auth';
 import { logActivitySafe } from '@/lib/services/activity-logger';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { error } = await requireAdmin();
     if (error) return error;
 
-    const buildingsData = await getAllBuildings({ limit: 1000 }); // Get all buildings for API
+    const limitRaw = Number(new URL(request.url).searchParams.get('limit') || 100);
+    const limit = Math.min(200, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 100));
+    const buildingsData = await getAllBuildings({ limit });
 
     return NextResponse.json({
       success: true,

@@ -5,6 +5,10 @@
 
 import pool from '@/lib/db';
 import { DepositTransaction, DepositLedgerSummary, CreateDepositTransactionData } from '@/types/financial';
+import {
+  lockTenantMoney,
+  selectTenantDepositBalance,
+} from '@/lib/db/tenant-money-lock';
 
 /**
  * Get all deposit transactions for a tenant
@@ -52,16 +56,11 @@ export async function getTenantDepositTransactions(tenantId: string): Promise<De
  * Get tenant deposit balance
  */
 export async function getTenantDepositBalance(tenantId: string): Promise<number> {
-  try {
-    const result = await pool.query(
-      'SELECT get_tenant_deposit_balance($1) as balance',
-      [tenantId]
-    );
-    return parseFloat(result.rows[0].balance) || 0;
-  } catch (error) {
-    console.error('Error getting deposit balance:', error);
-    return 0;
-  }
+  const result = await pool.query(
+    'SELECT get_tenant_deposit_balance($1) as balance',
+    [tenantId]
+  );
+  return parseFloat(result.rows[0].balance) || 0;
 }
 
 /**
@@ -163,9 +162,8 @@ export async function refundDeposit(
   
   try {
     await client.query('BEGIN');
-
-    // Check available deposit balance
-    const balance = await getTenantDepositBalance(tenantId);
+    await lockTenantMoney(client, tenantId);
+    const balance = await selectTenantDepositBalance(client, tenantId);
 
     if (balance < amount) {
       throw new Error(`Insufficient deposit balance. Available: ₱${balance.toFixed(2)}, Requested: ₱${amount.toFixed(2)}`);
@@ -234,9 +232,8 @@ export async function applyDepositToInvoice(
   
   try {
     await client.query('BEGIN');
-
-    // Check available deposit balance
-    const balance = await getTenantDepositBalance(tenantId);
+    await lockTenantMoney(client, tenantId);
+    const balance = await selectTenantDepositBalance(client, tenantId);
 
     if (balance < amount) {
       throw new Error(`Insufficient deposit balance. Available: ₱${balance.toFixed(2)}, Requested: ₱${amount.toFixed(2)}`);
@@ -244,7 +241,7 @@ export async function applyDepositToInvoice(
 
     // Get invoice details
     const invoiceResult = await client.query(
-      'SELECT id, invoice_number, total_amount, amount_paid, balance_due FROM invoices WHERE id = $1 AND tenant_id = $2',
+      'SELECT id, invoice_number, total_amount, amount_paid, balance_due FROM invoices WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
       [invoiceId, tenantId]
     );
 
@@ -419,10 +416,21 @@ export async function adjustDepositBalance(
   adminUserId: string,
   isIncrease: boolean
 ): Promise<DepositTransaction> {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+    await lockTenantMoney(client, tenantId);
     const actualAmount = isIncrease ? Math.abs(amount) : -Math.abs(amount);
+    if (!isIncrease) {
+      const balance = await selectTenantDepositBalance(client, tenantId);
+      if (balance < Math.abs(amount)) {
+        throw new Error(
+          `Insufficient deposit balance. Available: ₱${balance.toFixed(2)}, Requested: ₱${Math.abs(amount).toFixed(2)}`
+        );
+      }
+    }
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO deposit_ledger (
         tenant_id,
         amount,
@@ -442,6 +450,8 @@ export async function adjustDepositBalance(
       ]
     );
 
+    await client.query('COMMIT');
+
     const row = result.rows[0];
     return {
       id: row.id,
@@ -457,8 +467,11 @@ export async function adjustDepositBalance(
       updatedAt: row.updated_at
     };
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error adjusting deposit balance:', error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 

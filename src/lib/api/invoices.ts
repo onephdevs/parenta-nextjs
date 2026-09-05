@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { Invoice, InvoiceFilters, InvoiceSummary, InvoicesResponse, InvoiceItem } from '@/types/financial';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 // Get all invoices with filtering and pagination
 export async function getInvoices(
@@ -7,7 +8,8 @@ export async function getInvoices(
   page: number = 1,
   limit: number = 20
 ): Promise<InvoicesResponse> {
-  const offset = (page - 1) * limit;
+  const safeLimit = clampPageLimit(limit, 20, 100);
+  const offset = (page - 1) * safeLimit;
   
   let query = `
     SELECT 
@@ -80,7 +82,7 @@ export async function getInvoices(
 
   // Add ordering and pagination
   query += ` ORDER BY i.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-  params.push(limit, offset);
+  params.push(safeLimit, offset);
 
   const result = await pool.query(query, params);
 
@@ -109,7 +111,7 @@ export async function getInvoices(
     invoices,
     total,
     page,
-    limit,
+    limit: safeLimit,
   };
 }
 

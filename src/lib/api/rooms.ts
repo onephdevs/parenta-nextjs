@@ -6,6 +6,7 @@ import {
   roomNumberNaturalOrderSql,
 } from '@/lib/rooms/parse-room-numbers';
 import { withOccupancyHistoryBadges } from '@/lib/occupancy/history-badge';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 // Helper function to map database room to Room interface
 function mapDatabaseRoomToRoom(dbRoom: DatabaseRoom): Room {
@@ -61,7 +62,7 @@ export async function getAllRooms(filters?: {
 }): Promise<PaginatedRoomsResponse> {
   try {
     const page = filters?.page || 1;
-    const limit = filters?.limit || 50;
+    const limit = clampPageLimit(filters?.limit, 50, 200);
     const offset = (page - 1) * limit;
 
     // Build WHERE clause

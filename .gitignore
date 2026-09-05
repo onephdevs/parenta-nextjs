@@ -61,3 +61,8 @@ next-env.d.ts
 # lease-history workbooks (PII) and generated dry-run reports
 /data/imports/*.xlsx
 /data/imports/*.dry-run.json
+
+# Skills copied from other repos — local-only, never commit
+.agents/skills/verify-change/
+.agents/skills/engineer-review/
+.cursor/imported-skills/

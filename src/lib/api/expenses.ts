@@ -1,5 +1,6 @@
 import pool from '../db';
 import { Expense } from '@/types/database';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 interface ExpenseFilters {
   search?: string;
@@ -62,7 +63,8 @@ export async function getExpenses(
   limit = 20
 ): Promise<ExpenseResult> {
   try {
-    const offset = (page - 1) * limit;
+    const safeLimit = clampPageLimit(limit, 20, 100);
+    const offset = (page - 1) * safeLimit;
     const conditions: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
@@ -146,14 +148,14 @@ export async function getExpenses(
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
 
-    const result = await pool.query(query, [...values, limit, offset]);
+    const result = await pool.query(query, [...values, safeLimit, offset]);
     const expenses = result.rows.map(mapRowToExpense);
 
     return {
       expenses,
       total,
       page,
-      limit,
+      limit: safeLimit,
       totalPages: Math.ceil(total / limit),
     };
   } catch (error) {

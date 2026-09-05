@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import pool from '@/lib/db';
 import { put, del } from '@vercel/blob';
 import { originalUploadFileName } from '@/lib/format/upload-filename';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 // Get all documents with filtering and pagination
 export async function getDocuments(
@@ -11,7 +12,8 @@ export async function getDocuments(
   page: number = 1,
   limit: number = 20
 ): Promise<DocumentsResponse> {
-  const offset = (page - 1) * limit;
+  const safeLimit = clampPageLimit(limit, 20, 100);
+  const offset = (page - 1) * safeLimit;
   
   let query = `
     SELECT 
@@ -154,7 +156,7 @@ export async function getDocuments(
 
   // Add ordering and pagination
   query += ` ORDER BY d.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-  params.push(limit, offset);
+  params.push(safeLimit, offset);
 
   const result = await pool.query(query, params);
 
@@ -193,7 +195,7 @@ export async function getDocuments(
     documents,
     total,
     page,
-    limit,
+    limit: safeLimit,
   };
 }
 

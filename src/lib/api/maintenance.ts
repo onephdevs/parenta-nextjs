@@ -1,12 +1,15 @@
 import pool from '../db';
 import { getImageUrl } from '@/lib/format/image-url';
 import { fillTenantAvatarUrls } from '@/lib/api/user-profile-extras';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 export interface MaintenanceFilters {
   status?: string | null;
   priority?: string | null;
   category?: string | null;
   buildingId?: string | null;
+  /** Preview size for the admin list. Stats are always computed on the full match set. */
+  limit?: number;
 }
 
 export interface MaintenanceStats {
@@ -72,8 +75,61 @@ export async function listMaintenanceRequests(
   filters: MaintenanceFilters = {}
 ): Promise<ListMaintenanceRequestsResult> {
   const { status, priority, category, buildingId } = filters;
+  const limit = clampPageLimit(filters.limit, 100, 200);
 
-  let query = `
+  const params: unknown[] = [];
+  let paramIndex = 1;
+  let whereSql = 'WHERE 1=1';
+
+  if (status && status !== 'all') {
+    whereSql += ` AND mr.status = $${paramIndex}`;
+    params.push(status);
+    paramIndex++;
+  }
+
+  if (priority && priority !== 'all') {
+    whereSql += ` AND mr.priority = $${paramIndex}`;
+    params.push(priority);
+    paramIndex++;
+  }
+
+  if (category && category !== 'all') {
+    whereSql += ` AND mr.category = $${paramIndex}`;
+    params.push(category);
+    paramIndex++;
+  }
+
+  if (buildingId && buildingId !== 'all') {
+    whereSql += ` AND mr.building_id = $${paramIndex}`;
+    params.push(buildingId);
+    paramIndex++;
+  }
+
+  const statsResult = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE mr.status = 'open')::int AS open,
+       COUNT(*) FILTER (WHERE mr.status = 'in_progress')::int AS in_progress,
+       COUNT(*) FILTER (WHERE mr.status = 'completed')::int AS completed,
+       COUNT(*) FILTER (WHERE mr.status = 'cancelled')::int AS cancelled,
+       COUNT(*) FILTER (WHERE mr.priority = 'urgent')::int AS urgent,
+       COUNT(*) FILTER (WHERE mr.priority = 'high')::int AS high
+     FROM maintenance_requests mr
+     ${whereSql}`,
+    params
+  );
+  const statsRow = statsResult.rows[0] || {};
+  const stats: MaintenanceStats = {
+    total: Number(statsRow.total) || 0,
+    open: Number(statsRow.open) || 0,
+    inProgress: Number(statsRow.in_progress) || 0,
+    completed: Number(statsRow.completed) || 0,
+    cancelled: Number(statsRow.cancelled) || 0,
+    urgent: Number(statsRow.urgent) || 0,
+    high: Number(statsRow.high) || 0,
+  };
+
+  const query = `
     SELECT 
       mr.*,
       t.first_name || ' ' || t.last_name as tenant_name,
@@ -98,47 +154,19 @@ export async function listMaintenanceRequests(
     LEFT JOIN rooms r ON mr.room_id = r.id
     LEFT JOIN buildings b ON b.id = COALESCE(mr.building_id, r.building_id)
     LEFT JOIN users au ON au.id = mr.assigned_to
-    WHERE 1=1
+    ${whereSql}
+    ORDER BY 
+      CASE mr.priority
+        WHEN 'urgent' THEN 1
+        WHEN 'high' THEN 2
+        WHEN 'medium' THEN 3
+        WHEN 'low' THEN 4
+      END,
+      mr.request_date DESC
+    LIMIT $${paramIndex}
   `;
 
-  const params: unknown[] = [];
-  let paramIndex = 1;
-
-  if (status && status !== 'all') {
-    query += ` AND mr.status = $${paramIndex}`;
-    params.push(status);
-    paramIndex++;
-  }
-
-  if (priority && priority !== 'all') {
-    query += ` AND mr.priority = $${paramIndex}`;
-    params.push(priority);
-    paramIndex++;
-  }
-
-  if (category && category !== 'all') {
-    query += ` AND mr.category = $${paramIndex}`;
-    params.push(category);
-    paramIndex++;
-  }
-
-  if (buildingId && buildingId !== 'all') {
-    query += ` AND mr.building_id = $${paramIndex}`;
-    params.push(buildingId);
-    paramIndex++;
-  }
-
-  query += ` ORDER BY 
-    CASE mr.priority
-      WHEN 'urgent' THEN 1
-      WHEN 'high' THEN 2
-      WHEN 'medium' THEN 3
-      WHEN 'low' THEN 4
-    END,
-    mr.request_date DESC
-  `;
-
-  const result = await pool.query(query, params);
+  const result = await pool.query(query, [...params, limit]);
   const requests = result.rows;
 
   const { listAttachmentsForRequests } = await import(
@@ -165,7 +193,7 @@ export async function listMaintenanceRequests(
 
   return {
     requests: requestsOut,
-    stats: calculateMaintenanceStats(requests),
+    stats,
   };
 }
 

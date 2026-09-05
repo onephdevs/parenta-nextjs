@@ -1,4 +1,5 @@
 import pool from '../db';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 export interface UtilityBill {
   id: string;
@@ -71,7 +72,8 @@ export async function getUtilityBills(
   limit = 20
 ): Promise<UtilityBillResult> {
   try {
-    const offset = (page - 1) * limit;
+    const safeLimit = clampPageLimit(limit, 20, 100);
+    const offset = (page - 1) * safeLimit;
     const conditions: string[] = [];
     const values: unknown[] = [];
     let paramCount = 0;
@@ -142,15 +144,15 @@ export async function getUtilityBills(
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
 
-    const result = await pool.query(query, [...values, limit, offset]);
+    const result = await pool.query(query, [...values, safeLimit, offset]);
     const bills = result.rows.map(mapRowToUtilityBill);
 
     return {
       bills,
       total,
       page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
     };
   } catch (error) {
     console.error('Error fetching utility bills:', error);
@@ -604,6 +606,7 @@ export async function getProvidersStats() {
  * Get upcoming due bills
  */
 export async function getUpcomingDueBills(days = 7) {
+  const windowDays = clampPageLimit(days, 7, 90);
   const query = `
     SELECT
       ub.*,
@@ -612,11 +615,12 @@ export async function getUpcomingDueBills(days = 7) {
     FROM utility_bills ub
     LEFT JOIN buildings b ON ub.building_id = b.id
     LEFT JOIN rooms r ON ub.room_id = r.id
-    WHERE ub.due_date BETWEEN NOW() AND NOW() + INTERVAL '${days} days'
+    WHERE ub.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1::integer * INTERVAL '1 day')
       AND ub.bill_status = 'pending'
     ORDER BY ub.due_date ASC
+    LIMIT 20
   `;
-  
-  const result = await pool.query(query);
+
+  const result = await pool.query(query, [windowDays]);
   return result.rows.map(mapRowToUtilityBill);
 }

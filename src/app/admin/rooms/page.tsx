@@ -19,7 +19,7 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
   try {
     const [roomsData, buildingsData] = await Promise.all([
       getRoomsForRoomsPage(),
-      getAllBuildings({ limit: 1000 }),
+      getAllBuildings({ limit: 200 }),
     ]);
     rooms = roomsData;
     buildings = buildingsData.buildings;

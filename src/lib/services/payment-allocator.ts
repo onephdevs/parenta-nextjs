@@ -12,6 +12,11 @@ import {
   getTenantCreditBalance as getCreditBalanceFromApi,
 } from '@/lib/api/tenant-credits';
 import { getTenantDepositBalance as getDepositBalanceFromApi } from '@/lib/api/deposit-ledger';
+import {
+  lockTenantMoney,
+  selectTenantCreditBalance,
+  selectTenantDepositBalance,
+} from '@/lib/db/tenant-money-lock';
 
 /**
  * Allocate a payment across unpaid invoices
@@ -31,7 +36,7 @@ export async function allocatePaymentToInvoices(
     if (ownsClient) {
       await client.query('BEGIN');
     }
-    
+
     const {
       paymentId,
       tenantId,
@@ -41,7 +46,6 @@ export async function allocatePaymentToInvoices(
       preferredInvoiceId,
     } = request;
 
-    // Validate input
     if (!paymentId || !tenantId || !paymentAmount) {
       throw new Error('Missing required fields for payment allocation');
     }
@@ -49,6 +53,8 @@ export async function allocatePaymentToInvoices(
     if (paymentAmount <= 0) {
       throw new Error('Payment amount must be greater than zero');
     }
+
+    await lockTenantMoney(client, tenantId);
 
     // Check if tenant exists
     const tenantCheck = await client.query(
@@ -86,14 +92,10 @@ export async function allocatePaymentToInvoices(
     // Check if admin wants to use existing deposit toward unpaid invoices
     let availableFromDeposit = 0;
     if (useDeposit) {
-      const depositBalance = await getTenantDepositBalance(tenantId);
-      availableFromDeposit = Math.max(0, depositBalance);
+      availableFromDeposit = Math.max(0, await selectTenantDepositBalance(client, tenantId));
     }
 
-    // Get unpaid invoices (sorted by due date, oldest first)
-    // Prioritize rent invoices, but include all invoice types for manual payments
-    // Note: Advance only applies to rent invoices, but manual payments can apply to any invoice
-    let unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId);
+    let unpaidInvoices = await getUnpaidInvoicesForTenant(tenantId, client);
 
     if (preferredInvoiceId) {
       const preferred = unpaidInvoices.find((inv) => inv.id === preferredInvoiceId);
@@ -336,9 +338,9 @@ export async function applyCreditToRentInvoice(
   
   try {
     await client.query('BEGIN');
+    await lockTenantMoney(client, tenantId);
 
-    // Get tenant's available credit (advance)
-    const creditBalance = await getTenantCreditBalance(tenantId);
+    const creditBalance = await selectTenantCreditBalance(client, tenantId);
 
     if (creditBalance <= 0) {
       await client.query('ROLLBACK');
@@ -352,6 +354,14 @@ export async function applyCreditToRentInvoice(
     }
 
     // Get invoice details and verify it's a rent invoice
+    const locked = await client.query(
+      `SELECT id FROM invoices WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+      [invoiceId, tenantId]
+    );
+    if (locked.rows.length === 0) {
+      throw new Error('Invoice not found');
+    }
+
     const invoiceResult = await client.query(
       `SELECT i.id, i.invoice_number, i.total_amount, i.amount_paid, i.balance_due, i.invoice_status,
               COUNT(CASE WHEN ili.item_type = 'rent' THEN 1 END) as rent_items_count,
@@ -401,7 +411,8 @@ export async function applyCreditToRentInvoice(
     const creditsResult = await client.query(
       `SELECT id, amount, description, source, payment_id FROM tenant_credits 
        WHERE tenant_id = $1 AND status = 'available'
-       ORDER BY created_at ASC`,
+       ORDER BY created_at ASC
+       FOR UPDATE`,
       [tenantId]
     );
 
@@ -531,9 +542,9 @@ export async function applyDepositToInvoice(
   
   try {
     await client.query('BEGIN');
+    await lockTenantMoney(client, tenantId);
 
-    // Get tenant's deposit balance
-    const depositBalance = await getTenantDepositBalance(tenantId);
+    const depositBalance = await selectTenantDepositBalance(client, tenantId);
 
     if (depositBalance <= 0) {
       throw new Error('No deposit balance available for this tenant');
@@ -545,7 +556,7 @@ export async function applyDepositToInvoice(
 
     // Get invoice details
     const invoiceResult = await client.query(
-      'SELECT id, invoice_number, total_amount, amount_paid, balance_due FROM invoices WHERE id = $1 AND tenant_id = $2',
+      'SELECT id, invoice_number, total_amount, amount_paid, balance_due FROM invoices WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
       [invoiceId, tenantId]
     );
 
@@ -666,13 +677,8 @@ export async function autoApplyCreditsToNewInvoice(
   tenantId: string,
   invoiceId: string
 ): Promise<boolean> {
-  try {
-    const result = await applyCreditToRentInvoice(tenantId, invoiceId);
-    return result.success;
-  } catch (error) {
-    console.error('Error auto-applying advance to invoice:', error);
-    return false;
-  }
+  const result = await applyCreditToRentInvoice(tenantId, invoiceId);
+  return result.success;
 }
 
 /**

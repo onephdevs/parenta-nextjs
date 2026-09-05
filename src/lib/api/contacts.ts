@@ -7,6 +7,7 @@ import {
   type Contact,
   type ContactRole,
 } from '@/lib/constants/contacts';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 export type { Contact, ContactRole, VendorUtilityType };
 export {
@@ -119,6 +120,7 @@ export async function listContacts(options?: {
   activeOnly?: boolean;
   search?: string;
   utilityType?: 'electricity' | 'water';
+  limit?: number;
 }): Promise<Contact[]> {
   const role = options?.role;
   const activeOnly = options?.activeOnly !== false;
@@ -174,8 +176,9 @@ export async function listContacts(options?: {
      LEFT JOIN contact_roles cr ON cr.contact_id = c.id
      ${where}
      GROUP BY c.id
-     ORDER BY c.first_name ASC, c.last_name ASC`,
-    params
+     ORDER BY c.first_name ASC, c.last_name ASC
+     LIMIT $${params.length + 1}`,
+    [...params, clampPageLimit(options?.limit, 200, 200)]
   );
 
   const contacts = result.rows.map((row) => mapRow(row as ContactRow));

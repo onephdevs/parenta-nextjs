@@ -64,16 +64,12 @@ async function loadSections(templateId: string): Promise<LeaseTemplateSection[]>
 }
 
 export async function leaseTemplatesTableExists(): Promise<boolean> {
-  try {
-    const r = await pool.query(
-      `SELECT 1 FROM information_schema.tables
-       WHERE table_schema = 'public' AND table_name = 'lease_templates'
-       LIMIT 1`
-    );
-    return r.rows.length > 0;
-  } catch {
-    return false;
-  }
+  const r = await pool.query(
+    `SELECT 1 FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_name = 'lease_templates'
+     LIMIT 1`
+  );
+  return r.rows.length > 0;
 }
 
 async function insertDefaultSections(templateId: string): Promise<void> {

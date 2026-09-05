@@ -730,6 +730,7 @@ export async function getRoomsForRoomsPage(): Promise<RoomsPageListItem[]> {
       regexp_replace(lower(r.room_number), '[0-9]+', '', 'g'),
       COALESCE(NULLIF(regexp_replace(r.room_number, '[^0-9]', '', 'g'), '')::bigint, 0),
       r.room_number
+    LIMIT 500
     `
   );
 

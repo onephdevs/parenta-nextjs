@@ -4,10 +4,12 @@
  */
 
 import pool from '@/lib/db';
+import type { PoolClient } from 'pg';
 import { InvoiceGenerationRequest, InvoiceGenerationResult } from '@/types/financial';
 import { initialInvoiceStatusForIssueDate } from '@/lib/services/invoice-issue-timing';
 import { dueDateForBillingMonth } from '@/lib/billing/invoice-due';
 import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
+import { lockTenantMoney } from '@/lib/db/tenant-money-lock';
 
 /** Open-ended leases get a rolling year of scheduled (mostly draft) invoices. */
 const OPEN_ENDED_INVOICE_MONTHS = 12;
@@ -74,7 +76,8 @@ export async function generateInvoicesForTenant(
   
   try {
     await client.query('BEGIN');
-    
+    await lockTenantMoney(client, request.tenantId);
+
     const {
       tenantId,
       roomId,
@@ -495,7 +498,10 @@ export async function updateOverdueInvoices(): Promise<number> {
  * Get unpaid RENT invoices for a tenant (sorted by due date, oldest first)
  * Used for automatic advance application - advance only applies to rent invoices
  */
-export async function getUnpaidRentInvoicesForTenant(tenantId: string): Promise<Array<{
+export async function getUnpaidRentInvoicesForTenant(
+  tenantId: string,
+  db?: PoolClient
+): Promise<Array<{
   id: string;
   invoiceNumber: string;
   totalAmount: number;
@@ -505,7 +511,8 @@ export async function getUnpaidRentInvoicesForTenant(tenantId: string): Promise<
   invoiceStatus: string;
 }>> {
   try {
-    const result = await pool.query(
+    const exec = db ?? pool;
+    const result = await exec.query(
       `SELECT 
         i.id,
         i.invoice_number,
@@ -541,7 +548,10 @@ export async function getUnpaidRentInvoicesForTenant(tenantId: string): Promise<
   }
 }
 
-export async function getUnpaidInvoicesForTenant(tenantId: string): Promise<Array<{
+export async function getUnpaidInvoicesForTenant(
+  tenantId: string,
+  db?: PoolClient
+): Promise<Array<{
   id: string;
   invoiceNumber: string;
   dueDate: Date;
@@ -552,7 +562,8 @@ export async function getUnpaidInvoicesForTenant(tenantId: string): Promise<Arra
   typeLabel: string;
 }>> {
   try {
-    const result = await pool.query(
+    const exec = db ?? pool;
+    const result = await exec.query(
       `SELECT 
         i.id,
         i.invoice_number,

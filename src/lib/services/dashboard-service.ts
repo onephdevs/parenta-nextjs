@@ -4,6 +4,7 @@
  */
 
 import pool from '@/lib/db';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 export interface RevenueMetrics {
   monthly: number;
@@ -267,6 +268,7 @@ export async function getOccupancyRate(): Promise<OccupancyMetrics> {
  * Get recent payments
  */
 export async function getRecentPayments(limit: number = 10): Promise<RecentPayment[]> {
+  const take = clampPageLimit(limit, 10, 50);
   const result = await pool.query(`
     SELECT 
       p.id,
@@ -281,7 +283,7 @@ export async function getRecentPayments(limit: number = 10): Promise<RecentPayme
     JOIN tenants t ON t.id = p.tenant_id
     ORDER BY p.payment_date DESC, p.created_at DESC
     LIMIT $1
-  `, [limit]);
+  `, [take]);
   
   return result.rows.map(row => ({
     id: row.id,
@@ -299,6 +301,7 @@ export async function getRecentPayments(limit: number = 10): Promise<RecentPayme
  * Get upcoming due dates
  */
 export async function getUpcomingDueDates(days: number = 30): Promise<UpcomingDueDate[]> {
+  // Dashboard widget only (idx_invoices_due_date). Cap rows instead of shipping every invoice in the window.
   const result = await pool.query(`
     SELECT 
       i.id,
@@ -316,6 +319,7 @@ export async function getUpcomingDueDates(days: number = 30): Promise<UpcomingDu
       AND i.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + $1::INTEGER
       AND i.total_amount > i.amount_paid
     ORDER BY i.due_date ASC, i.created_at ASC
+    LIMIT 20
   `, [days]);
   
   return result.rows.map(row => ({
@@ -335,6 +339,7 @@ export async function getUpcomingDueDates(days: number = 30): Promise<UpcomingDu
  * Get top tenants by payment history
  */
 export async function getTopTenantsByPayments(limit: number = 5): Promise<TopTenant[]> {
+  // Rank in SQL with LIMIT; 12-month window so the dashboard does not aggregate all-time payments.
   const result = await pool.query(`
     WITH tenant_payments AS (
       SELECT 
@@ -347,6 +352,7 @@ export async function getTopTenantsByPayments(limit: number = 5): Promise<TopTen
       FROM payments p
       JOIN tenants t ON t.id = p.tenant_id
       WHERE p.payment_status IN ('paid', 'partial', 'completed')
+        AND p.payment_date >= CURRENT_DATE - INTERVAL '12 months'
       GROUP BY p.tenant_id, tenant_name
     ),
     on_time_payments AS (
@@ -364,6 +370,7 @@ export async function getTopTenantsByPayments(limit: number = 5): Promise<TopTen
         ) as total_count
       FROM payments p
       WHERE p.payment_status IN ('paid', 'partial', 'completed')
+        AND p.payment_date >= CURRENT_DATE - INTERVAL '12 months'
       GROUP BY p.tenant_id
     )
     SELECT 

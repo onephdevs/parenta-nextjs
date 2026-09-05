@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { Reservation, ReservationWithDetails, CreateReservationData } from '@/types/database';
+import { clampPageLimit } from '@/lib/db/query-limits';
 import {
   getBuildingDepositConfig,
   calculateRequiredDeposit,
@@ -254,7 +255,7 @@ export async function getAllReservations(filters?: {
 }): Promise<{ reservations: ReservationWithDetails[]; total: number; page: number; limit: number }> {
   try {
     const page = filters?.page || 1;
-    const limit = filters?.limit || 50;
+    const limit = clampPageLimit(filters?.limit, 50, 200);
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE 1=1';

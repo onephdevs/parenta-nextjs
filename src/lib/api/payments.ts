@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import type { PoolClient } from 'pg';
 import { toCanonicalPaymentMethod } from '@/lib/constants/payment-methods';
 import { recalculateInvoiceStatusesForIds } from '@/lib/services/invoice-status-recalculator';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 export interface Payment {
   id: string;
@@ -230,6 +231,7 @@ export async function getPayments(
   page: number = 1,
   limit: number = 20
 ): Promise<{ payments: PaymentWithDetails[]; total: number }> {
+  const safeLimit = clampPageLimit(limit, 20, 100);
   const whereConditions: string[] = [];
   const queryParams: unknown[] = [];
   let paramIndex = 1;
@@ -319,7 +321,7 @@ export async function getPayments(
     LIMIT $${paramIndex++} OFFSET $${paramIndex++}
   `;
 
-  queryParams.push(limit, (page - 1) * limit);
+  queryParams.push(safeLimit, (page - 1) * safeLimit);
 
   try {
     const result = await pool.query(dataQuery, queryParams);

@@ -5,6 +5,10 @@
 
 import pool from '@/lib/db';
 import { TenantCredit, TenantCreditSummary, CreateTenantCreditData } from '@/types/financial';
+import {
+  lockTenantMoney,
+} from '@/lib/db/tenant-money-lock';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 /**
  * Get all credits for a tenant
@@ -51,16 +55,11 @@ export async function getTenantCredits(tenantId: string): Promise<TenantCredit[]
  * Get tenant credit balance
  */
 export async function getTenantCreditBalance(tenantId: string): Promise<number> {
-  try {
-    const result = await pool.query(
-      'SELECT get_tenant_credit_balance($1) as balance',
-      [tenantId]
-    );
-    return parseFloat(result.rows[0].balance) || 0;
-  } catch (error) {
-    console.error('Error getting credit balance:', error);
-    return 0;
-  }
+  const result = await pool.query(
+    'SELECT get_tenant_credit_balance($1) as balance',
+    [tenantId]
+  );
+  return parseFloat(result.rows[0].balance) || 0;
 }
 
 /**
@@ -225,7 +224,8 @@ export async function getAllTenantsWithCredits(): Promise<TenantCreditSummary[]>
        WHERE t.tenant_status = 'active'
        GROUP BY t.id, t.first_name, t.last_name
        HAVING COALESCE(SUM(CASE WHEN tc.status = 'available' THEN tc.amount ELSE 0 END), 0) > 0
-       ORDER BY available_credits DESC`
+       ORDER BY available_credits DESC
+       LIMIT 200`
     );
 
     return result.rows.map(row => ({
@@ -251,10 +251,14 @@ export async function adjustTenantCredit(
   description: string,
   isIncrease: boolean
 ): Promise<TenantCredit> {
+  const client = await pool.connect();
   try {
     const actualAmount = isIncrease ? Math.abs(amount) : -Math.abs(amount);
 
-    const result = await pool.query(
+    await client.query('BEGIN');
+    await lockTenantMoney(client, tenantId);
+
+    const result = await client.query(
       `INSERT INTO tenant_credits (
         tenant_id,
         amount,
@@ -272,6 +276,8 @@ export async function adjustTenantCredit(
       ]
     );
 
+    await client.query('COMMIT');
+
     const row = result.rows[0];
     return {
       id: row.id,
@@ -286,8 +292,11 @@ export async function adjustTenantCredit(
       updatedAt: row.updated_at
     };
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error adjusting tenant credit:', error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -299,6 +308,7 @@ export async function getTenantCreditHistory(
   limit: number = 50
 ): Promise<TenantCredit[]> {
   try {
+    const safeLimit = clampPageLimit(limit, 50, 100);
     const result = await pool.query(
       `SELECT 
         tc.*,
@@ -312,7 +322,7 @@ export async function getTenantCreditHistory(
        WHERE tc.tenant_id = $1
        ORDER BY tc.created_at DESC
        LIMIT $2`,
-      [tenantId, limit]
+      [tenantId, safeLimit]
     );
 
     return result.rows.map(row => ({

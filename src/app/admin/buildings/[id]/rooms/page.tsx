@@ -16,7 +16,7 @@ async function getBuildingRoomsData(buildingId: string) {
     const [building, rooms, buildingsData] = await Promise.all([
       getBuildingById(buildingId),
       getRoomsByBuildingId(buildingId),
-      getAllBuildings({ limit: 1000 }) // Get all buildings for navigation
+      getAllBuildings({ limit: 200 })
     ]);
     
     return { building, rooms, allBuildings: buildingsData.buildings };

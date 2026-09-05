@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 /**
  * People directory — forever person records.
@@ -134,7 +135,7 @@ export async function listPeople(options?: {
   limit?: number;
   offset?: number;
 }): Promise<{ people: DirectoryPerson[]; total: number }> {
-  const limit = Math.min(options?.limit || 200, 500);
+  const limit = clampPageLimit(options?.limit, 200, 200);
   const offset = options?.offset || 0;
   const values: unknown[] = [];
   let param = 0;

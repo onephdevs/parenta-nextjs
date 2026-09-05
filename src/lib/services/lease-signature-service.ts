@@ -3,10 +3,7 @@
  */
 
 import pool from '@/lib/db';
-import {
-  getPublishedLeaseTemplate,
-  leaseTemplatesTableExists,
-} from '@/lib/api/lease-templates';
+import { getPublishedLeaseTemplate } from '@/lib/api/lease-templates';
 import type { LeaseSignatureMethod } from '@/lib/lease-templates/types';
 
 export type LeaseSignerRole = 'tenant' | 'landlord' | 'witness' | 'guarantor';
@@ -105,19 +102,17 @@ export async function recordLeaseSignature(input: {
 
   // Prefer template-configured method when available
   let method = input.signatureMethod;
-  if (await leaseTemplatesTableExists()) {
-    const template = await getPublishedLeaseTemplate(input.buildingId);
-    if (template) {
-      method = template.signatureMethod;
-      if (method === 'typed_name' && !input.typedName?.trim()) {
-        throw new Error('Typed full legal name is required');
-      }
-      if (!template.auditIp) {
-        input.ipAddress = null;
-      }
-      if (!template.auditUserAgent) {
-        input.userAgent = null;
-      }
+  const template = await getPublishedLeaseTemplate(input.buildingId);
+  if (template) {
+    method = template.signatureMethod;
+    if (method === 'typed_name' && !input.typedName?.trim()) {
+      throw new Error('Typed full legal name is required');
+    }
+    if (!template.auditIp) {
+      input.ipAddress = null;
+    }
+    if (!template.auditUserAgent) {
+      input.userAgent = null;
     }
   }
 
@@ -312,15 +307,13 @@ export async function getAgreementSigningState(documentId: string, buildingId?: 
   let auditTimestamp = true;
   let auditUserAgent = true;
 
-  if (await leaseTemplatesTableExists()) {
-    const template = await getPublishedLeaseTemplate(buildingId);
-    if (template) {
-      signatureMethod = template.signatureMethod;
-      requireWitness = template.requireWitness;
-      auditIp = template.auditIp;
-      auditTimestamp = template.auditTimestamp;
-      auditUserAgent = template.auditUserAgent;
-    }
+  const template = await getPublishedLeaseTemplate(buildingId);
+  if (template) {
+    signatureMethod = template.signatureMethod;
+    requireWitness = template.requireWitness;
+    auditIp = template.auditIp;
+    auditTimestamp = template.auditTimestamp;
+    auditUserAgent = template.auditUserAgent;
   }
 
   return {

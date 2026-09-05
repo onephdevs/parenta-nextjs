@@ -5,10 +5,10 @@
  */
 
 import pool from '@/lib/db';
-import { generateInvoicesForTenant } from './invoice-generator';
 import { autoApplyAdvanceToUnpaidRentInvoices } from './payment-allocator';
 import { dueDateForBillingMonth } from '@/lib/billing/invoice-due';
 import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
+import { lockTenantMoney } from '@/lib/db/tenant-money-lock';
 
 /**
  * Generate next month's rent invoice for a tenant with an active lease
@@ -29,6 +29,7 @@ export async function generateNextMonthRentInvoice(
   
   try {
     await client.query('BEGIN');
+    await lockTenantMoney(client, tenantId);
 
     // Get tenant's active lease assignment
     const assignmentResult = await client.query(
@@ -54,6 +55,7 @@ export async function generateNextMonthRentInvoice(
     );
 
     if (assignmentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return {
         success: false,
         invoiceCreated: false,
@@ -95,6 +97,7 @@ export async function generateNextMonthRentInvoice(
     );
 
     if (existingInvoiceResult.rows.length > 0) {
+      await client.query('ROLLBACK');
       return {
         success: true,
         invoiceCreated: false,
@@ -105,6 +108,7 @@ export async function generateNextMonthRentInvoice(
 
     // Check if next month is within lease period
     if (nextMonth > assignmentEnd || nextMonth < assignmentStart) {
+      await client.query('ROLLBACK');
       return {
         success: false,
         invoiceCreated: false,
@@ -196,7 +200,7 @@ export async function generateNextMonthRentInvoice(
           advanceAmount = advanceResult.totalApplied;
         }
       } catch (advanceError) {
-        console.warn('Could not auto-apply advance to newly created invoice:', advanceError);
+        console.error('Could not auto-apply advance to newly created invoice:', advanceError);
       }
     }
 

@@ -46,7 +46,7 @@ export default async function InvoicesPage({ searchParams }: InvoicesPageProps) 
   try {
     const [invoicesResult, tenantsData, summaryResult] = await Promise.all([
       getInvoices(filters, page, 20),
-      getAllTenants({ limit: 1000 }), // Get all tenants for dropdown
+      getAllTenants({ limit: 200 }),
       getInvoiceSummary()
     ]);
     

@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       priority: searchParams.get('priority'),
       category: searchParams.get('category'),
       buildingId: searchParams.get('buildingId'),
+      limit: Number(searchParams.get('limit') || 100),
     });
 
     return NextResponse.json({

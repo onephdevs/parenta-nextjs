@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { clampPageLimit } from '@/lib/db/query-limits';
 
 async function applyPortalAvatarFallback<
   T extends { userId?: string; email?: string; profilePictureUrl?: string | null },
@@ -151,7 +152,7 @@ export async function getAllTenants(options?: {
 }): Promise<PaginatedTenantsResponse> {
   try {
     const page = options?.page || 1;
-    const limit = options?.limit || 50;
+    const limit = clampPageLimit(options?.limit, 50, 200);
     const offset = (page - 1) * limit;
 
     // Build WHERE clause
@@ -268,24 +269,7 @@ export async function getAllTenants(options?: {
 
 // Get tenant by ID with assignments
 export async function getTenantById(id: string): Promise<TenantWithAssignments & { agreementDocumentId?: string | null; agreementDocumentName?: string | null; agreementDocumentUrl?: string | null } | null> {
-  // First, check if tenant_agreement_document_id column exists
-  let hasAgreementColumn = false;
-  try {
-    const columnCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'tenants' AND column_name = 'tenant_agreement_document_id'
-    `);
-    hasAgreementColumn = columnCheck.rows.length > 0;
-  } catch (error) {
-    // If check fails, assume column doesn't exist
-    hasAgreementColumn = false;
-  }
-
-  // Build query based on whether column exists
-  let tenantQuery: string;
-  if (hasAgreementColumn) {
-    tenantQuery = `
+  const tenantQuery = `
       SELECT t.*, 
              d.id as agreement_document_id,
              d.document_name as agreement_document_name,
@@ -294,9 +278,6 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
       LEFT JOIN documents d ON t.tenant_agreement_document_id = d.id
       WHERE t.id = $1
     `;
-  } else {
-    tenantQuery = `SELECT * FROM tenants WHERE id = $1`;
-  }
   
   try {
     const tenantResult = await pool.query(tenantQuery, [id]);
@@ -365,9 +346,9 @@ export async function getTenantById(id: string): Promise<TenantWithAssignments &
       ...tenant,
       currentAssignment,
       assignmentHistory,
-      agreementDocumentId: hasAgreementColumn ? (row.agreement_document_id as string | null | undefined) : undefined,
-      agreementDocumentName: hasAgreementColumn ? (row.agreement_document_name as string | null | undefined) : undefined,
-      agreementDocumentUrl: hasAgreementColumn ? (row.agreement_document_url as string | null | undefined) : undefined,
+      agreementDocumentId: (row.agreement_document_id as string | null | undefined) ?? null,
+      agreementDocumentName: (row.agreement_document_name as string | null | undefined) ?? null,
+      agreementDocumentUrl: (row.agreement_document_url as string | null | undefined) ?? null,
     };
   } catch (error) {
     console.error('Error fetching tenant:', error);

@@ -810,34 +810,27 @@ async function composeLeaseHtml(input: LeaseAgreementInput): Promise<{
 }> {
   const context = toTemplateContext(input);
 
-  try {
-    const { leaseTemplatesTableExists, getPublishedLeaseTemplate } = await import(
-      '@/lib/api/lease-templates'
+  const { getPublishedLeaseTemplate } = await import(
+    '@/lib/api/lease-templates'
+  );
+  const template = await getPublishedLeaseTemplate(input.buildingId);
+  if (template && template.sections.length > 0) {
+    const { renderTemplateSections } = await import('@/lib/lease-templates/render');
+    const rendered = renderTemplateSections(template.sections, context);
+    const contentSections = rendered.filter(
+      (s) => s.sectionKey !== 'key_terms' && s.sectionKey !== 'signatures'
     );
-    if (await leaseTemplatesTableExists()) {
-      const template = await getPublishedLeaseTemplate(input.buildingId);
-      if (template && template.sections.length > 0) {
-        const { renderTemplateSections } = await import('@/lib/lease-templates/render');
-        const rendered = renderTemplateSections(template.sections, context);
-        // Shell still owns letterhead / key terms box / signature lines
-        const contentSections = rendered.filter(
-          (s) => s.sectionKey !== 'key_terms' && s.sectionKey !== 'signatures'
-        );
-        const html = buildLeaseHtmlFromCms(input, contentSections, {
-          requireWitness: template.requireWitness,
-        });
-        return {
-          html,
-          templateId: template.id,
-          templateVersion: template.version,
-          templateName: template.name,
-          sectionsJson: rendered,
-          contextJson: context,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('CMS lease template unavailable, using built-in template:', err);
+    const html = buildLeaseHtmlFromCms(input, contentSections, {
+      requireWitness: template.requireWitness,
+    });
+    return {
+      html,
+      templateId: template.id,
+      templateVersion: template.version,
+      templateName: template.name,
+      sectionsJson: rendered,
+      contextJson: context,
+    };
   }
 
   return {
@@ -927,10 +920,9 @@ async function persistGeneratedLease(
 
   const saveSnapshot = async (documentId: string, composed: Awaited<ReturnType<typeof composeLeaseHtml>>) => {
     try {
-      const { leaseTemplatesTableExists, saveLeaseAgreementSnapshot } = await import(
+      const { saveLeaseAgreementSnapshot } = await import(
         '@/lib/api/lease-templates'
       );
-      if (!(await leaseTemplatesTableExists())) return;
       await saveLeaseAgreementSnapshot({
         documentId,
         templateId: composed.templateId,
@@ -941,7 +933,8 @@ async function persistGeneratedLease(
         sectionsJson: composed.sectionsJson,
       });
     } catch (err) {
-      console.warn('Lease snapshot save skipped:', err);
+      console.error('Lease snapshot save failed:', err);
+      throw err;
     }
   };
 

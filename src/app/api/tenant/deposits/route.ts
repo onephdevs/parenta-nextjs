@@ -13,20 +13,8 @@ export async function GET() {
     if (access.error) return access.error;
 
     const { tenant } = access;
-    
-    // Check if deposit_ledger table exists, if not return empty data
-    let balance = 0;
-    let advanceBalance = 0;
-    let advanceCollected = 0;
-    let advanceApplied = 0;
-    let advanceRemaining = 0;
-    let advanceAppliedPeriod: string | null = null;
-    let transactionCount = 0;
-    let history: any[] = [];
-    
-    try {
-      // Get deposit balance and history
-      const query = `
+
+    const query = `
         SELECT 
           COALESCE(SUM(
             CASE 
@@ -41,62 +29,61 @@ export async function GET() {
         FROM deposit_ledger
         WHERE tenant_id = $1
       `;
-      
-      const balanceResult = await pool.query(query, [tenant.id]);
-      balance = parseFloat(balanceResult.rows[0]?.balance || 0);
-      transactionCount = parseInt(balanceResult.rows[0]?.transaction_count || 0);
 
-      const advanceResult = await pool.query(
-        `SELECT
-           COALESCE(SUM(amount) FILTER (WHERE status IN ('available', 'applied')), 0) AS collected,
-           COALESCE(SUM(amount) FILTER (WHERE status = 'available'), 0) AS remaining,
-           COALESCE(SUM(amount) FILTER (WHERE status = 'applied'), 0) AS applied
-         FROM tenant_credits
-         WHERE tenant_id = $1`,
+    const balanceResult = await pool.query(query, [tenant.id]);
+    const balance = parseFloat(balanceResult.rows[0]?.balance || 0);
+    const transactionCount = parseInt(balanceResult.rows[0]?.transaction_count || 0);
+
+    const advanceResult = await pool.query(
+      `SELECT
+         COALESCE(SUM(amount) FILTER (WHERE status IN ('available', 'applied')), 0) AS collected,
+         COALESCE(SUM(amount) FILTER (WHERE status = 'available'), 0) AS remaining,
+         COALESCE(SUM(amount) FILTER (WHERE status = 'applied'), 0) AS applied
+       FROM tenant_credits
+       WHERE tenant_id = $1`,
+      [tenant.id]
+    );
+    let advanceCollected = parseFloat(advanceResult.rows[0]?.collected || 0);
+    const advanceRemaining = parseFloat(advanceResult.rows[0]?.remaining || 0);
+    const advanceApplied = parseFloat(advanceResult.rows[0]?.applied || 0);
+    const advanceBalance = advanceRemaining;
+
+    if (advanceCollected <= 0) {
+      const paidAdvance = await pool.query(
+        `SELECT COALESCE(SUM(amount), 0) AS collected
+         FROM payments
+         WHERE tenant_id = $1
+           AND payment_status = 'paid'
+           AND payment_type ILIKE '%advance%'`,
         [tenant.id]
       );
-      advanceCollected = parseFloat(advanceResult.rows[0]?.collected || 0);
-      advanceRemaining = parseFloat(advanceResult.rows[0]?.remaining || 0);
-      advanceApplied = parseFloat(advanceResult.rows[0]?.applied || 0);
-      advanceBalance = advanceRemaining;
+      advanceCollected = parseFloat(paidAdvance.rows[0]?.collected || 0);
+    }
 
-      if (advanceCollected <= 0) {
-        const paidAdvance = await pool.query(
-          `SELECT COALESCE(SUM(amount), 0) AS collected
-           FROM payments
-           WHERE tenant_id = $1
-             AND payment_status = 'paid'
-             AND payment_type ILIKE '%advance%'`,
-          [tenant.id]
-        );
-        advanceCollected = parseFloat(paidAdvance.rows[0]?.collected || 0);
+    let advanceAppliedPeriod: string | null = null;
+    if (advanceApplied > 0) {
+      const appliedInvoice = await pool.query(
+        `SELECT i.billing_period_start, i.due_date
+         FROM tenant_credits tc
+         JOIN invoices i ON i.id = tc.applied_to_invoice_id
+         WHERE tc.tenant_id = $1
+           AND tc.status = 'applied'
+           AND tc.applied_to_invoice_id IS NOT NULL
+         ORDER BY COALESCE(i.billing_period_start, i.due_date) DESC
+         LIMIT 1`,
+        [tenant.id]
+      );
+      const periodDate =
+        appliedInvoice.rows[0]?.billing_period_start || appliedInvoice.rows[0]?.due_date;
+      if (periodDate) {
+        advanceAppliedPeriod = new Date(periodDate).toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric',
+        });
       }
+    }
 
-      if (advanceApplied > 0) {
-        const appliedInvoice = await pool.query(
-          `SELECT i.billing_period_start, i.due_date
-           FROM tenant_credits tc
-           JOIN invoices i ON i.id = tc.applied_to_invoice_id
-           WHERE tc.tenant_id = $1
-             AND tc.status = 'applied'
-             AND tc.applied_to_invoice_id IS NOT NULL
-           ORDER BY COALESCE(i.billing_period_start, i.due_date) DESC
-           LIMIT 1`,
-          [tenant.id]
-        );
-        const periodDate =
-          appliedInvoice.rows[0]?.billing_period_start || appliedInvoice.rows[0]?.due_date;
-        if (periodDate) {
-          advanceAppliedPeriod = new Date(periodDate).toLocaleDateString('en-US', {
-            month: 'long',
-            year: 'numeric',
-          });
-        }
-      }
-      
-      // Get transaction history (note: deposit_ledger doesn't have reference_number column)
-      // Join with payments to get reference_number if payment_id exists
-      const historyQuery = `
+    const historyQuery = `
         SELECT 
           dl.id,
           dl.transaction_type,
@@ -112,33 +99,20 @@ export async function GET() {
         ORDER BY dl.transaction_date DESC, dl.created_at DESC
         LIMIT 50
       `;
-      
-      const historyResult = await pool.query(historyQuery, [tenant.id]);
-      
-      history = historyResult.rows.map(row => ({
-        id: row.id,
-        transactionType: row.transaction_type,
-        amount: parseFloat(row.amount || 0),
-        description: row.description,
-        transactionDate: row.transaction_date,
-        createdAt: row.created_at,
-        paymentId: row.payment_id,
-        referenceNumber: row.reference_number || null,
-      }));
-    } catch (dbError) {
-      // If table doesn't exist or query fails, return empty data instead of error
-      console.warn('Deposit ledger table may not exist or query failed:', dbError);
-      // Return empty data - this is not critical for the page to function
-      balance = 0;
-      advanceBalance = 0;
-      advanceCollected = 0;
-      advanceApplied = 0;
-      advanceRemaining = 0;
-      advanceAppliedPeriod = null;
-      transactionCount = 0;
-      history = [];
-    }
-    
+
+    const historyResult = await pool.query(historyQuery, [tenant.id]);
+
+    const history = historyResult.rows.map((row) => ({
+      id: row.id,
+      transactionType: row.transaction_type,
+      amount: parseFloat(row.amount || 0),
+      description: row.description,
+      transactionDate: row.transaction_date,
+      createdAt: row.created_at,
+      paymentId: row.payment_id,
+      referenceNumber: row.reference_number || null,
+    }));
+
     return NextResponse.json({
       success: true,
       data: {
