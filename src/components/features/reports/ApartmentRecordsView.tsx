@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Calendar,
   Pencil,
+  Plus,
   Printer,
   Upload,
   Zap,
@@ -14,10 +15,10 @@ import {
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import {
-  Badge,
   Checkbox,
   Dialog,
   FileDropzone,
+  FormField,
   Input,
   Select,
   Tab,
@@ -25,9 +26,9 @@ import {
   TabPanel,
   Tabs,
   TableCard,
+  Textarea,
   WorkItemHeader,
   WorkItemRow,
-  type WorkItemBadge,
   type WorkItemTone,
 } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
@@ -39,6 +40,11 @@ import type {
   ApartmentRecordsData,
   ApartmentUnitBlock,
 } from '@/lib/apartment-records-types';
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+  type ExpenseCategory,
+} from '@/lib/constants/bills-expenses';
 
 function buildingTabOrder(name: string): number {
   const upper = name.toUpperCase();
@@ -95,43 +101,18 @@ function unitRentAmount(unit: ApartmentUnitBlock): number | null {
   return null;
 }
 
-function paymentStatusBadges(unit: ApartmentUnitBlock): WorkItemBadge[] {
-  const badges: WorkItemBadge[] = [];
-  if (unit.payStatus === 'vacant') {
-    badges.push({ key: 'rent', label: 'Rent vacant', tone: 'neutral' });
-  } else if (unit.payStatus === 'partial') {
-    badges.push({ key: 'rent', label: 'Rent partial', tone: 'warning' });
-  } else if (unit.payStatus === 'unpaid') {
-    badges.push({ key: 'rent', label: 'Rent unpaid', tone: 'danger' });
-  } else {
-    badges.push({ key: 'rent', label: 'Rent paid', tone: 'success' });
-  }
-
-  const electric = unitUtilityAmount(unit, 'electric');
-  if (electric != null) {
-    const unpaid = utilityUnpaid(unit, 'electric');
-    badges.push({
-      key: 'electric',
-      label: unpaid ? 'Electric unpaid' : 'Electric paid',
-      tone: unpaid ? 'danger' : 'success',
-    });
-  }
-
-  const water = unitUtilityAmount(unit, 'water');
-  if (water != null) {
-    const unpaid = utilityUnpaid(unit, 'water');
-    badges.push({
-      key: 'water',
-      label: unpaid ? 'Water unpaid' : 'Water paid',
-      tone: unpaid ? 'danger' : 'success',
-    });
-  }
-
-  return badges;
+function rentStatusWord(status: ApartmentPayStatus): string {
+  if (status === 'vacant') return 'Vacant';
+  if (status === 'partial') return 'Partial';
+  if (status === 'unpaid') return 'Unpaid';
+  return 'Paid';
 }
 
-function unitDatePaid(unit: ApartmentUnitBlock): string | null {
-  return unit.lines.find((line) => line.datePaid)?.datePaid || null;
+function unitDate(unit: ApartmentUnitBlock): { text: string; paid: boolean } | null {
+  const paid = unit.lines.find((line) => line.datePaid)?.datePaid;
+  if (paid) return { text: paid, paid: true };
+  if (unit.dueDate) return { text: unit.dueDate, paid: false };
+  return null;
 }
 
 function unitUtilityAmount(unit: ApartmentUnitBlock, kind: 'electric' | 'water'): number | null {
@@ -165,6 +146,11 @@ function parseDraftAmount(value: string): number | null {
   return Math.round(amount * 100) / 100;
 }
 
+interface UtilityDraft {
+  electric: string;
+  water: string;
+}
+
 export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsData }) {
   const router = useRouter();
   const { showNotification } = useNotifications();
@@ -178,6 +164,15 @@ export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsD
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const [openingPeriod, setOpeningPeriod] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseDescription, setExpenseDescription] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>('other');
+  const [expenseDate, setExpenseDate] = useState(data.defaultExpenseDate);
+  const [expenseBuildingId, setExpenseBuildingId] = useState(data.buildingId || '');
   const selectedBuilding = data.buildingId || 'ALL';
 
   const setQuery = (next: { month?: string; buildingId?: string }) => {
@@ -208,6 +203,11 @@ export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsD
       setActiveTab(orderedSheets[0].buildingId);
     }
   }, [orderedSheets, activeTab]);
+
+  useEffect(() => {
+    setExpenseDate(data.defaultExpenseDate);
+    setExpenseBuildingId(data.buildingId || '');
+  }, [data.defaultExpenseDate, data.buildingId]);
 
   const visibleUnits = useMemo(() => (activeSheet ? activeSheet.units : []), [activeSheet]);
   const visibleIds = useMemo(() => visibleUnits.map((unit) => unit.roomId), [visibleUnits]);
@@ -419,16 +419,136 @@ export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsD
     }
   };
 
+  const openNextPeriod = async () => {
+    if (!data.nextPeriod) return;
+    setOpeningPeriod(true);
+    try {
+      const response = await fetch('/api/reports/apartment-records/period', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monthKey: data.nextPeriod.monthKey,
+          buildingId: data.buildingId || undefined,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.error || 'Failed to open billing period');
+      }
+      showNotification({
+        type: 'success',
+        title: 'Next period opened',
+        message: json.message || `Opened ${data.nextPeriod.periodShortLabel}`,
+      });
+      setPeriodOpen(false);
+      setQuery({ month: data.nextPeriod.monthKey });
+      router.refresh();
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'Could not open period',
+        message: err instanceof Error ? err.message : 'Failed to open billing period',
+      });
+    } finally {
+      setOpeningPeriod(false);
+    }
+  };
+
+  const closeExpense = () => {
+    if (savingExpense) return;
+    setExpenseOpen(false);
+  };
+
+  const saveExpense = async () => {
+    const amount = parseDraftAmount(expenseAmount);
+    const description = expenseDescription.trim();
+    const buildingId = data.buildingId || expenseBuildingId;
+    if (amount == null || amount <= 0) {
+      showNotification({
+        type: 'warning',
+        title: 'Amount required',
+        message: 'Enter an expense amount greater than zero.',
+      });
+      return;
+    }
+    if (!description) {
+      showNotification({
+        type: 'warning',
+        title: 'Description required',
+        message: 'Enter a short description for this expense.',
+      });
+      return;
+    }
+    if (!buildingId) {
+      showNotification({
+        type: 'warning',
+        title: 'Building required',
+        message: 'Choose which apartment this expense belongs to.',
+      });
+      return;
+    }
+    if (expenseDate < data.startDate || expenseDate > data.endDate) {
+      showNotification({
+        type: 'warning',
+        title: 'Date outside this period',
+        message: `Use a date between ${data.startDate} and ${data.endDate}.`,
+      });
+      return;
+    }
+
+    setSavingExpense(true);
+    try {
+      const response = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          description,
+          category: expenseCategory,
+          expenseDate,
+          buildingId,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error || 'Failed to add expense');
+      }
+      showNotification({
+        type: 'success',
+        title: 'Expense added',
+        message: `${description} saved to ${data.periodShortLabel}`,
+      });
+      setExpenseOpen(false);
+      setExpenseAmount('');
+      setExpenseDescription('');
+      setExpenseCategory('other');
+      router.refresh();
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'Could not add expense',
+        message: err instanceof Error ? err.message : 'Failed to add expense',
+      });
+    } finally {
+      setSavingExpense(false);
+    }
+  };
+
   const s = showBuildingTabs && activeSheet ? sheetPeriodSummary(activeSheet) : data.summary;
   const summaryLabel = showBuildingTabs && activeSheet
     ? `${activeSheet.shortName} · ${data.periodLabel}`
     : data.periodLabel;
+  const periodNeedsRecords =
+    data.summary.collection === 0 &&
+    data.summary.electricTotal === 0 &&
+    data.summary.waterTotal === 0 &&
+    data.summary.expenses === 0;
 
   return (
     <div className="space-y-6 print:space-y-4">
       <PageHeader
         title="Apartment records"
-        description="Who paid in each building this cycle, with expenses and a period summary."
+        description="Who paid in each building this cycle. Open the next period, then add electric, water, and expenses."
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
             <Link href="/admin/reports">
@@ -471,25 +591,48 @@ export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsD
                 ))}
             </div>
           </div>
-          <label className="text-sm text-gray-600">
-            Billing period
-            <select
-              value={data.monthKey}
-              onChange={(event) => setQuery({ month: event.target.value })}
-              className="ml-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800"
-            >
-              {(data.availableMonths.length > 0
-                ? data.availableMonths
-                : [{ value: data.monthKey, label: data.periodLabel }]
-              ).map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-sm text-gray-600">
+              Billing period
+              <select
+                value={data.monthKey}
+                onChange={(event) => setQuery({ month: event.target.value })}
+                className="ml-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800"
+              >
+                {(data.availableMonths.length > 0
+                  ? data.availableMonths
+                  : [{ value: data.monthKey, label: data.periodLabel }]
+                ).map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {data.nextPeriod ? (
+              <Button
+                type="button"
+                size="sm"
+                leftIcon={<Plus className="h-4 w-4" />}
+                onClick={() => setPeriodOpen(true)}
+              >
+                Add next period
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {periodNeedsRecords ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">
+          <p className="font-medium">No collection, utilities, or expenses in {data.periodShortLabel} yet.</p>
+          <p className="mt-1 text-amber-800">
+            Add electric and water with <span className="font-medium">Import CSV</span> or{' '}
+            <span className="font-medium">Edit bulk</span>. Add expenses on the right. Rent invoices
+            for occupied units are created when you open the next billing period.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.9fr)]">
         <div className="space-y-5">
@@ -563,6 +706,7 @@ export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsD
             items={data.expenses}
             showBuilding={!data.buildingId && data.buildings.length > 1}
             total={data.summary.expenses}
+            onAdd={() => setExpenseOpen(true)}
           />
           <TableCard title="Period summary" description={summaryLabel}>
             <SummaryRow label="Total collection" value={s.collection} />
@@ -683,6 +827,135 @@ export default function ApartmentRecordsView({ data }: { data: ApartmentRecordsD
           </div>
         ) : null}
       </Dialog>
+
+      <Dialog
+        isOpen={periodOpen}
+        onClose={() => {
+          if (!openingPeriod) setPeriodOpen(false);
+        }}
+        title="Add next billing period"
+        description={
+          data.nextPeriod
+            ? `Open ${data.nextPeriod.periodLabel} and create rent invoices for occupied units that do not have this month yet${
+                data.buildingId ? '' : ' (all apartments on this page)'
+              }.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setPeriodOpen(false)}
+              disabled={openingPeriod}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void openNextPeriod()}
+              isLoading={openingPeriod}
+              disabled={!data.nextPeriod}
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              Open {data.nextPeriod?.periodShortLabel || 'next period'}
+            </Button>
+          </>
+        }
+      >
+        {data.nextPeriod ? (
+          <div className="space-y-3 text-sm text-gray-700">
+            <p>
+              Occupied units stay on the ledger. Future-month rent invoices stay draft until the
+              issue date. Then add electric, water, and expenses on that period.
+            </p>
+            <ul className="list-disc space-y-1 pl-5 text-gray-600">
+              <li>Rent: one invoice per occupied unit for this month, skipped if it already exists</li>
+              <li>Electric and water: Import CSV or Edit bulk after the period opens</li>
+              <li>Expenses: Add expense on the right-hand list</li>
+              <li>Rent cash: still recorded with Collect rent</li>
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">The next billing period is already open.</p>
+        )}
+      </Dialog>
+
+      <Dialog
+        isOpen={expenseOpen}
+        onClose={closeExpense}
+        title="Add expense"
+        description={`Saved to ${data.periodShortLabel}. Use a date inside this 16th–15th cycle.`}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeExpense} disabled={savingExpense}>
+              Cancel
+            </Button>
+            <Button onClick={() => void saveExpense()} isLoading={savingExpense}>
+              Save expense
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Amount" htmlFor="apartment-expense-amount" required>
+            <Input
+              id="apartment-expense-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={expenseAmount}
+              onChange={(event) => setExpenseAmount(event.target.value)}
+            />
+          </FormField>
+          <FormField label="Description" htmlFor="apartment-expense-description" required>
+            <Textarea
+              id="apartment-expense-description"
+              rows={2}
+              value={expenseDescription}
+              onChange={(event) => setExpenseDescription(event.target.value)}
+            />
+          </FormField>
+          <FormField label="Category" htmlFor="apartment-expense-category">
+            <Select
+              id="apartment-expense-category"
+              value={expenseCategory}
+              onChange={(event) => setExpenseCategory(event.target.value as ExpenseCategory)}
+            >
+              {EXPENSE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {EXPENSE_CATEGORY_LABELS[category]}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Date" htmlFor="apartment-expense-date" required>
+            <Input
+              id="apartment-expense-date"
+              type="date"
+              min={data.startDate}
+              max={data.endDate}
+              value={expenseDate}
+              onChange={(event) => setExpenseDate(event.target.value)}
+            />
+          </FormField>
+          {!data.buildingId ? (
+            <FormField label="Apartment" htmlFor="apartment-expense-building" required>
+              <Select
+                id="apartment-expense-building"
+                value={expenseBuildingId}
+                onChange={(event) => setExpenseBuildingId(event.target.value)}
+              >
+                <option value="">Choose apartment</option>
+                {data.buildings.map((building) => (
+                  <option key={building.id} value={building.id}>
+                    {building.shortName}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          ) : null}
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -789,10 +1062,9 @@ function BuildingChip({
   );
 }
 
-const RENT_COL = 'w-24 shrink-0';
-const DATE_COL = 'w-[6.25rem] shrink-0';
-const UTILITY_COL = 'w-[5.75rem] shrink-0';
-const STATUS_COL = 'w-[15.5rem] shrink-0';
+const RENT_COL = 'w-[7rem] shrink-0';
+const DATE_COL = 'w-[6.75rem] shrink-0';
+const UTILITY_COL = 'w-[7rem] shrink-0';
 
 function BuildingTenantList({
   sheet,
@@ -832,6 +1104,7 @@ function BuildingTenantList({
                 />
               ) : null
             }
+            id="Unit"
             title="Tenant"
             showStatus={false}
             showDate={false}
@@ -839,11 +1112,10 @@ function BuildingTenantList({
             showTrailing={false}
             extra={
               <>
-                <span className={`${RENT_COL} text-right`}>Rent</span>
-                <span className={`${DATE_COL} text-right`}>Date</span>
+                <span className={`${DATE_COL} text-right`}>Due date</span>
                 <span className={`${UTILITY_COL} text-right`}>Electric</span>
                 <span className={`${UTILITY_COL} text-right`}>Water</span>
-                <span className={`${STATUS_COL} text-right`}>Status</span>
+                <span className={`${RENT_COL} text-right`}>Rent</span>
               </>
             }
           />
@@ -860,12 +1132,18 @@ function BuildingTenantList({
           ))}
         </div>
       )}
-      <div className="flex flex-wrap items-end justify-between gap-3 border-t-2 border-gray-900 bg-gray-50 px-6 py-3.5">
+      <div className="flex items-end justify-between gap-3 border-t-2 border-gray-900 bg-gray-50 px-3 py-3.5">
         <span className="text-sm font-semibold text-gray-900">{sheet.shortName} collection</span>
-        <div className="flex flex-wrap items-end gap-6">
-          <LedgerFootNote label="Electric" value={sheet.electricTotal} />
-          <LedgerFootNote label="Water" value={sheet.waterTotal} />
-          <LedgerFootNote label="Total" value={sheet.collection} emphasize />
+        <div className="flex items-end gap-2">
+          <div className={UTILITY_COL}>
+            <LedgerFootNote label="Electric" value={sheet.electricTotal} />
+          </div>
+          <div className={UTILITY_COL}>
+            <LedgerFootNote label="Water" value={sheet.waterTotal} />
+          </div>
+          <div className={RENT_COL}>
+            <LedgerFootNote label="Total" value={sheet.collection} emphasize />
+          </div>
         </div>
       </div>
     </TableCard>
@@ -888,8 +1166,7 @@ function UnitRecordRow({
   onDraftChange: (roomId: string, field: keyof UtilityDraft, value: string) => void;
 }) {
   const rent = unitRentAmount(unit);
-  const datePaid = unitDatePaid(unit);
-  const statusBadges = paymentStatusBadges(unit);
+  const dateInfo = unitDate(unit);
 
   return (
     <WorkItemRow
@@ -904,28 +1181,25 @@ function UnitRecordRow({
           />
         ) : null
       }
-      title={unit.tenantName || (unit.payStatus === 'vacant' ? 'Vacant' : unit.unit)}
-      subtitle={unit.unit}
+      idLabel={unit.unit}
+      idLabelClassName="font-sans text-sm font-medium text-gray-900"
+      title={unit.tenantName || (unit.payStatus === 'vacant' ? 'Vacant' : '—')}
       showBadges={false}
       showDate={false}
       showMeta={false}
       showTrailing={false}
       extra={
         <>
-          <div className={`${RENT_COL} text-right`}>
-            <span
-              className={`text-xs tabular-nums ${
-                rent == null ? 'text-gray-300' : 'text-gray-900'
-              }`}
-            >
-              {rent == null ? '—' : formatCurrency(rent)}
-            </span>
-          </div>
           <div className={`${DATE_COL} flex items-center justify-end gap-1 text-xs text-gray-600`}>
-            {datePaid ? (
+            {dateInfo ? (
               <>
                 <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                <span className="tabular-nums">{datePaid}</span>
+                <span
+                  className="tabular-nums"
+                  title={dateInfo.paid ? 'Date paid' : 'Due date from lease'}
+                >
+                  {dateInfo.text}
+                </span>
               </>
             ) : (
               <span className="text-gray-300">—</span>
@@ -947,18 +1221,59 @@ function UnitRecordRow({
             value={draft?.water ?? ''}
             onChange={(value) => onDraftChange(unit.roomId, 'water', value)}
           />
-          <div className={`${STATUS_COL} flex flex-wrap items-center justify-end gap-1`}>
-            {statusBadges.map((badge) => (
-              <Badge key={badge.key} variant="dot" tone={badge.tone || 'neutral'}>
-                {badge.label}
-              </Badge>
-            ))}
-          </div>
+          <AmountStatusCell
+            className={RENT_COL}
+            amount={rent}
+            status={rentStatusWord(unit.payStatus)}
+            statusTone={
+              unit.payStatus === 'unpaid'
+                ? 'unpaid'
+                : unit.payStatus === 'partial'
+                  ? 'partial'
+                  : unit.payStatus === 'vacant'
+                    ? 'muted'
+                    : 'paid'
+            }
+          />
         </>
       }
       dotTone={statusTone(unit.payStatus)}
       className={selected ? 'bg-sky-50/70 hover:bg-sky-50/80' : undefined}
     />
+  );
+}
+
+function amountStatusClass(tone: 'paid' | 'unpaid' | 'partial' | 'muted'): string {
+  if (tone === 'unpaid') return 'text-rose-600';
+  if (tone === 'paid') return 'text-emerald-700';
+  if (tone === 'partial') return 'text-amber-600';
+  return 'text-gray-400';
+}
+
+function AmountStatusCell({
+  className,
+  amount,
+  status,
+  statusTone,
+}: {
+  className: string;
+  amount: number | null;
+  status: string | null;
+  statusTone: 'paid' | 'unpaid' | 'partial' | 'muted';
+}) {
+  return (
+    <div className={`${className} flex flex-col items-end justify-center leading-tight`}>
+      <span
+        className={`text-xs tabular-nums ${
+          amount == null ? 'text-gray-300' : statusTone === 'unpaid' ? 'text-rose-600' : 'text-gray-900'
+        }`}
+      >
+        {amount == null ? '—' : formatCurrency(amount)}
+      </span>
+      {status ? (
+        <span className={`text-[11px] ${amountStatusClass(statusTone)}`}>{status}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -998,29 +1313,48 @@ function UtilityAmountCell({
   }
 
   return (
-    <div className={`${UTILITY_COL} text-right`}>
-      <span
-        className={`text-xs tabular-nums ${
-          amount == null ? 'text-gray-300' : unpaid ? 'text-rose-600' : 'text-gray-900'
-        }`}
-        title={!unpaid && amount != null ? 'Paid — cannot edit' : undefined}
-      >
-        {amount == null ? '—' : formatCurrency(amount)}
-      </span>
-    </div>
+    <AmountStatusCell
+      className={UTILITY_COL}
+      amount={amount}
+      status={amount == null ? null : unpaid ? 'Unpaid' : 'Paid'}
+      statusTone={amount == null ? 'muted' : unpaid ? 'unpaid' : 'paid'}
+    />
   );
 }
+
+function expenseCategoryTone(category: string): WorkItemTone {
+  switch (category) {
+    case 'repair':
+    case 'maintenance':
+      return 'warning';
+    case 'cleaning':
+      return 'info';
+    case 'cash_allowance':
+    case 'staff_salary':
+      return 'purple';
+    case 'refund':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+const EXPENSE_DATE_COL = DATE_COL;
+const EXPENSE_CATEGORY_COL = 'w-[8.5rem] shrink-0';
+const EXPENSE_AMOUNT_COL = 'w-[7rem] shrink-0';
 
 function ExpensePanel({
   periodLabel,
   items,
   showBuilding,
   total,
+  onAdd,
 }: {
   periodLabel: string;
   items: ApartmentExpenseItem[];
   showBuilding: boolean;
   total: number;
+  onAdd: () => void;
 }) {
   const unique = useMemo(() => {
     const seen = new Set<string>();
@@ -1036,44 +1370,81 @@ function ExpensePanel({
       title="Expenses"
       description={periodLabel}
       actions={
-        <Link
-          href="/admin/financial/expenses"
-          className="text-sm font-medium text-gray-700 hover:text-gray-900"
-        >
-          View all
-        </Link>
+        <div className="flex items-center gap-3 print:hidden">
+          <Button type="button" variant="outline" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={onAdd}>
+            Add expense
+          </Button>
+          <Link
+            href="/admin/financial/expenses"
+            className="text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            View all
+          </Link>
+        </div>
       }
     >
       {unique.length === 0 ? (
         <p className="px-6 py-8 text-sm text-gray-500">No expenses this period</p>
       ) : (
         <div className="max-h-[28rem] overflow-auto">
+          <WorkItemHeader
+            className="sticky top-0 z-10 bg-slate-50"
+            title="Expense"
+            showStatus={false}
+            showDate={false}
+            showMeta={false}
+            showTrailing={false}
+            extra={
+              <>
+                <span className={`${EXPENSE_CATEGORY_COL} text-right`}>Category</span>
+                <span className={`${EXPENSE_DATE_COL} text-right`}>Date</span>
+                <span className={`${EXPENSE_AMOUNT_COL} text-right`}>Amount</span>
+              </>
+            }
+          />
           {unique.map((item) => (
-            <Link
+            <WorkItemRow
               key={item.id}
               href={`/admin/financial/expenses/${item.id}`}
-              className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-2.5 last:border-b-0 hover:bg-slate-50/80"
-            >
-              <div className="min-w-0">
-                <p className="text-sm leading-snug text-gray-900">{item.description}</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {[item.categoryLabel, showBuilding ? item.buildingName : null, item.date]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-              </div>
-              <span className="shrink-0 text-right text-sm tabular-nums text-gray-900">
-                {formatCurrency(item.amount)}
-              </span>
-            </Link>
+              title={item.description}
+              subtitle={showBuilding ? item.buildingName : null}
+              showBadges={false}
+              showDate={false}
+              showMeta={false}
+              showTrailing={false}
+              extra={
+                <>
+                  <span className={`${EXPENSE_CATEGORY_COL} truncate text-right text-xs text-gray-600`}>
+                    {item.categoryLabel}
+                  </span>
+                  <div className={`${EXPENSE_DATE_COL} flex items-center justify-end gap-1 text-xs text-gray-600`}>
+                    {item.date ? (
+                      <>
+                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="tabular-nums">{item.date}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </div>
+                  <span className={`${EXPENSE_AMOUNT_COL} text-right text-xs tabular-nums text-gray-900`}>
+                    {formatCurrency(item.amount)}
+                  </span>
+                </>
+              }
+              dotTone={expenseCategoryTone(item.category)}
+            />
           ))}
         </div>
       )}
-      <div className="flex items-baseline justify-between gap-4 border-t-2 border-gray-900 bg-gray-50 px-6 py-3.5">
+      <div className="flex items-end justify-between gap-3 border-t-2 border-gray-900 bg-gray-50 px-3 py-3.5">
         <span className="text-sm font-semibold text-gray-900">Total expenses</span>
-        <span className="text-xl font-semibold tabular-nums text-gray-900">
-          {formatCurrency(total)}
-        </span>
+        <div className={`${EXPENSE_AMOUNT_COL} text-right`}>
+          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Total</div>
+          <div className="text-xl font-semibold tabular-nums text-gray-900">
+            {formatCurrency(total)}
+          </div>
+        </div>
       </div>
     </TableCard>
   );

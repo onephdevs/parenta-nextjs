@@ -4,17 +4,21 @@
  */
 
 import pool from '@/lib/db';
+import { resolveRentDueDay } from '@/lib/billing/billing-cycle';
+import { dueDateForBillingMonth } from '@/lib/billing/invoice-due';
 import { formatReportCategoryLabel } from '@/lib/constants/bills-expenses';
 import { PAYMENT_IS_REVENUE_UNIT } from '@/lib/sql/revenue-unit-filter';
 import {
   manilaMonthRange,
   rangeFromMonthKey,
 } from '@/lib/services/portfolio-ledger-service';
+import { initialInvoiceStatusForIssueDate } from '@/lib/services/invoice-issue-timing';
 import type {
   ApartmentBuilding,
   ApartmentBuildingSheet,
   ApartmentExpenseItem,
   ApartmentLedgerLine,
+  ApartmentNextPeriod,
   ApartmentPayStatus,
   ApartmentRecordsData,
   ApartmentUnitBlock,
@@ -67,6 +71,24 @@ function excelDay(value: unknown): string | null {
   return `${day}-${month}-${year}`;
 }
 
+/**
+ * Map a lease due day (1–31) into the 16th–15th apartment-records cycle.
+ * Day 16–31 falls in the start month; day 1–15 falls in the end month.
+ */
+function dueDateInBillingCycle(dueDay: number, startDate: string, endDate: string): string | null {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const day = Math.min(31, Math.max(1, Math.round(dueDay)));
+  const target = day >= 16 ? start : end;
+  const year = target.getUTCFullYear();
+  const month = target.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+  if (iso < startDate || iso > endDate) return null;
+  return iso;
+}
+
 function periodShortLabel(startDate: string, endDate: string): string {
   const start = new Date(`${startDate}T00:00:00Z`);
   const end = new Date(`${endDate}T00:00:00Z`);
@@ -104,6 +126,52 @@ function isPaidStatus(status: unknown): boolean {
 
 function notesOf(value: unknown): string {
   return String(value || '').toLowerCase();
+}
+
+export function shiftMonthKey(key: string, delta: number): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(key.trim());
+  if (!match) return key;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function laterMonthKey(...keys: string[]): string {
+  return keys.reduce((latest, key) => (key > latest ? key : latest));
+}
+
+function manilaTodayIso(anchor = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(anchor);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function defaultExpenseDateForPeriod(startDate: string, endDate: string): string {
+  const today = manilaTodayIso();
+  if (today >= startDate && today <= endDate) return today;
+  if (today < startDate) return startDate;
+  return endDate;
+}
+
+function toNextPeriod(monthKey: string): ApartmentNextPeriod {
+  const range = rangeFromMonthKey(monthKey);
+  return {
+    monthKey: range.monthKey,
+    periodLabel: range.periodLabel,
+    periodShortLabel: periodShortLabel(range.startDate, range.endDate),
+    startDate: range.startDate,
+    endDate: range.endDate,
+  };
+}
+
+export function maxOpenApartmentMonthKey(currentMonthKey = manilaMonthRange().monthKey): string {
+  return shiftMonthKey(currentMonthKey, 1);
 }
 
 function monthOptions(fromIso: string | null, toKey: string) {
@@ -145,6 +213,7 @@ interface RoomRow {
   start_date: unknown;
   end_date: unknown;
   assignment_status: string | null;
+  billing_cycle_start_day: unknown;
   tenant_id: string | null;
   tenant_name: string | null;
   due_date: unknown;
@@ -226,6 +295,25 @@ function buildUnit(params: {
 
   const isNewTenant = !vacant && (newByMoveIn || advancePaid > 0);
   const monthlyRate = num(room.monthly_rate);
+  const dueDay = vacant
+    ? null
+    : resolveRentDueDay({
+        billingCycleStartDay:
+          room.billing_cycle_start_day != null && Number.isFinite(Number(room.billing_cycle_start_day))
+            ? Number(room.billing_cycle_start_day)
+            : null,
+        startDate: isoDate(room.start_date) || String(room.start_date || ''),
+        fallbackDay: 5,
+      });
+  const cycleDueIso =
+    dueDay != null ? dueDateInBillingCycle(dueDay, startDate, endDate) : null;
+  const invoiceDueIso = isoDate(room.due_date);
+  const dueDate =
+    excelDay(cycleDueIso) ||
+    (invoiceDueIso && invoiceDueIso >= startDate && invoiceDueIso <= endDate
+      ? excelDay(invoiceDueIso)
+      : null);
+
   const electricAmount = electric ? num(electric.amount) : null;
   const waterAmount = water ? num(water.amount) : null;
   const utilityPays = payments.filter((p) => String(p.payment_type).toLowerCase() === 'utility');
@@ -298,7 +386,7 @@ function buildUnit(params: {
       });
     }
   } else {
-    const dueLabel = excelDay(rentRow?.due_date || room.due_date);
+    const dueLabel = excelDay(rentRow?.due_date || cycleDueIso || room.due_date) || dueDate;
     pushLine(lines, {
       kind: 'rent',
       label: dueLabel || (payStatus === 'unpaid' ? 'Unpaid' : 'Rent'),
@@ -342,6 +430,7 @@ function buildUnit(params: {
     href: room.tenant_id ? `/admin/tenants/${room.tenant_id}` : `/admin/rooms/${room.room_id}`,
     payStatus,
     monthlyRate,
+    dueDate: vacant ? null : dueDate,
     lines: lines.length > 0 ? lines : [
       {
         kind: 'rent',
@@ -390,13 +479,14 @@ export async function getApartmentRecords(params: {
           tra.start_date,
           tra.end_date,
           tra.assignment_status,
+          tra.billing_cycle_start_day,
           t.id AS tenant_id,
           NULLIF(TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, ''))), '') AS tenant_name,
           inv.due_date
         FROM rooms r
         JOIN buildings b ON b.id = r.building_id
         LEFT JOIN LATERAL (
-          SELECT tra.start_date, tra.end_date, tra.assignment_status, tra.tenant_id
+          SELECT tra.start_date, tra.end_date, tra.assignment_status, tra.tenant_id, tra.billing_cycle_start_day
           FROM tenant_room_assignments tra
           WHERE tra.room_id = r.id
             AND (
@@ -413,11 +503,15 @@ export async function getApartmentRecords(params: {
         LEFT JOIN LATERAL (
           SELECT
             COALESCE(
-              MIN(i.due_date) FILTER (
+              MIN(COALESCE(i.negotiated_due_date, i.due_date)) FILTER (
+                WHERE i.invoice_status IS DISTINCT FROM 'cancelled'
+                  AND COALESCE(i.negotiated_due_date, i.due_date) BETWEEN $1::date AND $2::date
+              ),
+              MIN(COALESCE(i.negotiated_due_date, i.due_date)) FILTER (
                 WHERE i.invoice_status IN ('sent', 'partial', 'overdue') AND i.balance_due > 0
               ),
-              MIN(i.due_date) FILTER (
-                WHERE i.invoice_status NOT IN ('draft', 'cancelled')
+              MIN(COALESCE(i.negotiated_due_date, i.due_date)) FILTER (
+                WHERE i.invoice_status IS DISTINCT FROM 'cancelled'
                   AND COALESCE(i.billing_period_start, i.due_date) <= $2::date
                   AND COALESCE(i.billing_period_end, i.due_date) >= $1::date
               )
@@ -700,6 +794,10 @@ export async function getApartmentRecords(params: {
   const totalUnits = sheets.reduce((s, sh) => s + sh.totalUnits, 0);
 
   const earliest = isoDate(earliestRes.rows[0]?.min_date);
+  const maxOpenKey = maxOpenApartmentMonthKey(current.monthKey);
+  const candidateNextKey = shiftMonthKey(range.monthKey, 1);
+  const nextPeriod =
+    candidateNextKey <= maxOpenKey ? toNextPeriod(candidateNextKey) : null;
 
   return {
     startDate,
@@ -707,7 +805,12 @@ export async function getApartmentRecords(params: {
     monthKey: range.monthKey,
     periodLabel: range.periodLabel,
     periodShortLabel: periodShort,
-    availableMonths: monthOptions(earliest, current.monthKey),
+    availableMonths: monthOptions(
+      earliest,
+      laterMonthKey(current.monthKey, maxOpenKey, range.monthKey)
+    ),
+    nextPeriod,
+    defaultExpenseDate: defaultExpenseDateForPeriod(startDate, endDate),
     buildingId,
     buildings,
     expenses: expenseItems,
@@ -879,3 +982,197 @@ export async function bulkUpsertApartmentUtilities(params: {
 
   return { created, updated };
 }
+
+export interface OpenApartmentPeriodResult {
+  monthKey: string;
+  periodLabel: string;
+  periodShortLabel: string;
+  startDate: string;
+  endDate: string;
+  invoicesCreated: number;
+  invoicesSkipped: number;
+  occupiedUnits: number;
+}
+
+export async function openApartmentBillingPeriod(params: {
+  monthKey: string;
+  buildingId?: string | null;
+}): Promise<OpenApartmentPeriodResult> {
+  const current = manilaMonthRange();
+  const maxOpenKey = maxOpenApartmentMonthKey(current.monthKey);
+  if (!/^\d{4}-\d{2}$/.test(params.monthKey) || params.monthKey > maxOpenKey) {
+    throw new Error(
+      `You can only open through ${rangeFromMonthKey(maxOpenKey).periodLabel}`
+    );
+  }
+
+  const range = rangeFromMonthKey(params.monthKey);
+  const [year, month] = [Number(params.monthKey.slice(0, 4)), Number(params.monthKey.slice(5, 7))];
+  const monthIndex = month - 1;
+  const periodStart = `${params.monthKey}-01`;
+  const periodEndDate = new Date(Date.UTC(year, month, 0));
+  const periodEnd = periodEndDate.toISOString().slice(0, 10);
+  const issueDate = periodStart;
+  const invoiceStatus = initialInvoiceStatusForIssueDate(new Date(year, monthIndex, 1));
+  const monthLabel = new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const noteTag = `[apartment-records-period:${params.monthKey}]`;
+  const buildingId = params.buildingId || null;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const tenantsRes = await client.query(
+      `
+      SELECT DISTINCT ON (t.id)
+        t.id AS tenant_id,
+        NULLIF(TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, ''))), '') AS tenant_name,
+        tra.room_id,
+        tra.start_date,
+        tra.monthly_rate,
+        tra.billing_cycle_start_day,
+        r.room_number,
+        b.name AS building_name
+      FROM tenant_room_assignments tra
+      JOIN tenants t ON t.id = tra.tenant_id
+      JOIN rooms r ON r.id = tra.room_id
+      JOIN buildings b ON b.id = r.building_id
+      WHERE tra.assignment_status = 'active'
+        AND COALESCE(t.is_active, true)
+        AND COALESCE(r.is_active, true)
+        AND COALESCE(b.is_active, true)
+        AND COALESCE(r.is_revenue_unit, true) = true
+        AND r.room_number !~* '^MO-'
+        AND LOWER(TRIM(r.room_number)) <> 'admin'
+        AND (tra.end_date IS NULL OR tra.end_date >= $1::date)
+        AND tra.start_date <= $2::date
+        AND ($3::uuid IS NULL OR b.id = $3)
+      ORDER BY t.id, tra.start_date DESC
+      `,
+      [range.startDate, range.endDate, buildingId]
+    );
+
+    const tenants = tenantsRes.rows as Array<{
+      tenant_id: string;
+      tenant_name: string | null;
+      room_id: string;
+      start_date: unknown;
+      monthly_rate: unknown;
+      billing_cycle_start_day: unknown;
+      room_number: string;
+      building_name: string;
+    }>;
+
+    let invoicesCreated = 0;
+    let invoicesSkipped = 0;
+
+    for (const tenant of tenants) {
+      const existing = await client.query(
+        `
+        SELECT i.id
+        FROM invoices i
+        INNER JOIN invoice_line_items ili
+          ON ili.invoice_id = i.id AND ili.item_type = 'rent'
+        WHERE i.tenant_id = $1
+          AND i.invoice_status <> 'cancelled'
+          AND TO_CHAR(COALESCE(i.billing_period_start, i.due_date, i.issue_date), 'YYYY-MM') = $2
+        LIMIT 1
+        `,
+        [tenant.tenant_id, params.monthKey]
+      );
+      if (existing.rows.length > 0) {
+        invoicesSkipped += 1;
+        continue;
+      }
+
+      const rent = num(tenant.monthly_rate);
+      if (rent <= 0) {
+        invoicesSkipped += 1;
+        continue;
+      }
+
+      const rentDueDay = resolveRentDueDay({
+        billingCycleStartDay:
+          tenant.billing_cycle_start_day != null
+            ? Number(tenant.billing_cycle_start_day)
+            : null,
+        startDate: tenant.start_date instanceof Date ? tenant.start_date : String(tenant.start_date || ''),
+        fallbackDay: 5,
+      });
+      const dueDate = dueDateForBillingMonth(year, monthIndex, rentDueDay);
+      const dueDateIso = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
+      const invoiceNumber = `INV-AR-${params.monthKey.replace('-', '')}-${String(tenant.room_number)
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .slice(0, 12)
+        .toUpperCase()}-${tenant.tenant_id.replace(/-/g, '').slice(0, 8)}`;
+
+      const invoiceResult = await client.query(
+        `
+        INSERT INTO invoices (
+          tenant_id,
+          invoice_number,
+          issue_date,
+          due_date,
+          billing_period_start,
+          billing_period_end,
+          subtotal,
+          tax_amount,
+          total_amount,
+          amount_paid,
+          invoice_status,
+          bill_status,
+          notes
+        ) VALUES (
+          $1, $2, $3::date, $4::date, $5::date, $6::date,
+          $7, 0, $7, 0, $8, 'UNPAID', $9
+        )
+        RETURNING id
+        `,
+        [
+          tenant.tenant_id,
+          invoiceNumber,
+          issueDate,
+          dueDateIso,
+          periodStart,
+          periodEnd,
+          rent,
+          invoiceStatus,
+          `Monthly rent ${monthLabel} · ${String(tenant.building_name || '').trim()} ${tenant.room_number} ${noteTag}`,
+        ]
+      );
+
+      await client.query(
+        `
+        INSERT INTO invoice_line_items (
+          invoice_id, description, quantity, unit_price, item_type
+        ) VALUES ($1, $2, 1, $3, 'rent')
+        `,
+        [invoiceResult.rows[0].id, `Monthly Rent - ${monthLabel}`, rent]
+      );
+      invoicesCreated += 1;
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      monthKey: range.monthKey,
+      periodLabel: range.periodLabel,
+      periodShortLabel: periodShortLabel(range.startDate, range.endDate),
+      startDate: range.startDate,
+      endDate: range.endDate,
+      invoicesCreated,
+      invoicesSkipped,
+      occupiedUnits: tenants.length,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+

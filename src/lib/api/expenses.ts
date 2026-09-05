@@ -41,6 +41,18 @@ async function syncExpenseToExpensesBoard(expense: Expense): Promise<void> {
   }
 }
 
+async function afterExpenseWrite(expense: Expense): Promise<Expense> {
+  const full = (await getExpenseById(expense.id)) || expense;
+  await syncExpenseToExpensesBoard(full);
+  try {
+    const { invalidateDashboardCache } = await import('@/lib/cache/memory-cache');
+    invalidateDashboardCache();
+  } catch (err) {
+    console.error('Dashboard cache invalidation after expense failed:', err);
+  }
+  return full;
+}
+
 /**
  * Get all expenses with optional filtering and pagination
  */
@@ -253,9 +265,7 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
     }
     
     const result = await pool.query(query, values);
-    const expense = mapRowToExpense(result.rows[0]);
-    await syncExpenseToExpensesBoard(expense);
-    return expense;
+    return afterExpenseWrite(mapRowToExpense(result.rows[0]));
   } catch (error) {
     console.error('Error creating expense:', error);
     // Provide more detailed error message
@@ -287,9 +297,7 @@ export async function createExpense(expenseData: Partial<Expense>): Promise<Expe
           ];
           
           const result = await pool.query(query, values);
-          const expense = mapRowToExpense(result.rows[0]);
-          await syncExpenseToExpensesBoard(expense);
-          return expense;
+          return afterExpenseWrite(mapRowToExpense(result.rows[0]));
         } catch (retryError) {
           throw new Error(`Failed to create expense: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
         }
@@ -363,9 +371,7 @@ export async function updateExpense(
       throw new Error('Expense not found');
     }
 
-    const expense = mapRowToExpense(result.rows[0]);
-    await syncExpenseToExpensesBoard(expense);
-    return expense;
+    return afterExpenseWrite(mapRowToExpense(result.rows[0]));
   } catch (error) {
     console.error('Error updating expense:', error);
     throw error;
@@ -387,6 +393,12 @@ export async function deleteExpense(id: string): Promise<void> {
     
     if (result.rowCount === 0) {
       throw new Error('Expense not found');
+    }
+    try {
+      const { invalidateDashboardCache } = await import('@/lib/cache/memory-cache');
+      invalidateDashboardCache();
+    } catch (err) {
+      console.error('Dashboard cache invalidation after expense delete failed:', err);
     }
   } catch (error) {
     console.error('Error deleting expense:', error);

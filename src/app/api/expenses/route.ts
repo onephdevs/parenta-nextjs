@@ -119,8 +119,8 @@ export async function POST(request: NextRequest) {
       entityId: expenseId || null,
       entityLabel: description,
       afterData: expense as unknown as Record<string, unknown>,
-      link: '/admin/financial/expenses',
-      metadata: { link: '/admin/financial/expenses' },
+      link: expenseId ? `/admin/financial/expenses/${expenseId}` : '/admin/financial/expenses',
+      metadata: { link: expenseId ? `/admin/financial/expenses/${expenseId}` : '/admin/financial/expenses' },
     });
     
     return NextResponse.json({ expense }, { status: 201 });

@@ -19,6 +19,7 @@ export interface WorkItemRowProps {
   onClick?: () => void;
   leading?: ReactNode;
   idLabel?: string;
+  idLabelClassName?: string;
   title: string;
   subtitle?: string | null;
   badges?: WorkItemBadge[];
@@ -69,6 +70,7 @@ function InteractiveSlot({ children }: { children: ReactNode }) {
 function RowBody({
   leading,
   idLabel,
+  idLabelClassName,
   title,
   subtitle,
   badges,
@@ -97,7 +99,12 @@ function RowBody({
       <Circle className={cn('h-3.5 w-3.5 shrink-0', dotClass[dotTone])} aria-hidden />
 
       {idLabel ? (
-        <span className="w-24 shrink-0 font-mono text-[11px] text-gray-400 tabular-nums">
+        <span
+          className={cn(
+            'w-24 shrink-0 font-mono text-[11px] text-gray-400 tabular-nums',
+            idLabelClassName
+          )}
+        >
           {idLabel}
         </span>
       ) : null}

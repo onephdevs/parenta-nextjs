@@ -26,6 +26,14 @@ export interface ApartmentMonthOption {
   label: string;
 }
 
+export interface ApartmentNextPeriod {
+  monthKey: string;
+  periodLabel: string;
+  periodShortLabel: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface ApartmentLedgerLine {
   kind: ApartmentLineKind;
   label: string;
@@ -44,6 +52,7 @@ export interface ApartmentUnitBlock {
   href: string;
   payStatus: ApartmentPayStatus;
   monthlyRate: number;
+  dueDate: string | null;
   lines: ApartmentLedgerLine[];
 }
 
@@ -102,6 +111,8 @@ export interface ApartmentRecordsData {
   periodLabel: string;
   periodShortLabel: string;
   availableMonths: ApartmentMonthOption[];
+  nextPeriod: ApartmentNextPeriod | null;
+  defaultExpenseDate: string;
   buildingId: string | null;
   buildings: ApartmentBuilding[];
   summary: ApartmentRecordsSummary;
